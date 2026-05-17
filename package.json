@@ -1,0 +1,23 @@
+{
+  "name": "jdd-ops",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Juneau Digital Designs ops repo — provisioning orchestrator for per-client Next.js + Retell + Twilio + Airtable stacks. Never deployed.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "onboard": "node onboard.js",
+    "update-prompt": "node scripts/update-agent-prompt.js",
+    "sync-env": "node scripts/sync-vercel-env.js",
+    "teardown": "node scripts/teardown.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@octokit/rest": "^21.0.2",
+    "airtable": "^0.12.2",
+    "dotenv": "^16.4.5",
+    "twilio": "^5.3.5"
+  }
+}

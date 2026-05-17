@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.local
+clients/*/.env.local
+clients/*/repo/node_modules/
+clients/*/repo/.next/
+*.log
+.DS_Store
