@@ -9,6 +9,8 @@
   },
   "scripts": {
     "onboard": "node onboard.js",
+    "new-client": "node scripts/new-client.js",
+    "hydrate": "node scripts/hydrate.js",
     "update-prompt": "node scripts/update-agent-prompt.js",
     "sync-env": "node scripts/sync-vercel-env.js",
     "teardown": "node scripts/teardown.js"
