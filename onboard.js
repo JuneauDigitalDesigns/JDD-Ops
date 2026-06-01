@@ -20,7 +20,7 @@
  */
 
 import 'dotenv/config';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, basename, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -201,58 +201,63 @@ function siteDirFor(baseSlug, intake, i) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Step 2: Create GitHub repo + clone
+// Step 2: Create empty GitHub repo + use the local repo (local-first)
+//
+// JDD builds each client site locally (copy of template/, components dropped in,
+// previewed on a dev server) at clients/{slug}/repo. We no longer clone from a
+// GitHub template. Step 2 just creates an EMPTY GitHub repo and points the local
+// repo's origin at it; step 8c (commitAndPush) does the actual push.
 // ───────────────────────────────────────────────────────────────────────────
 
-async function createGitHubRepoAndClone(siteSlug, content, clientDir) {
-  log(2, `Create per-site GitHub repo from TEMPLATE_REPO + clone → ${clientDir}/repo`);
+async function createRepoFromLocal(siteSlug, content, clientDir) {
+  log(2, `Create empty GitHub repo + use local repo at ${clientDir}/repo`);
+  const repoDir = resolve(clientDir, 'repo');
   if (DRY_RUN) {
-    dryLog(`would create repo ${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug} from ${process.env.TEMPLATE_REPO || '<TEMPLATE_REPO>'}`);
-    dryLog(`would clone into ${clientDir}/repo`);
-    return { repoDir: resolve(clientDir, 'repo'), repoUrl: `https://github.com/${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug}.git` };
+    dryLog(`would require local repo at ${repoDir}`);
+    dryLog(`would create empty repo ${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug} (auto_init: false)`);
+    dryLog(`would git init (if needed) + set origin + push (step 8c)`);
+    return { repoDir, repoUrl: `https://github.com/${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug}.git` };
   }
+
+  if (!existsSync(repoDir)) {
+    fail(2, `No local repo at ${repoDir}. Run \`npm run new-client -- --slug ${siteSlug}\`, build it locally, then re-run onboard.`);
+  }
+
   const token = requireEnv('GITHUB_TOKEN');
   const githubOrg = requireEnv('GITHUB_ORG');
-  const templateRepoEnv = requireEnv('TEMPLATE_REPO');
-  const [templateOwner, templateRepo] = templateRepoEnv.split('/');
-  if (!templateOwner || !templateRepo) {
-    fail(2, `TEMPLATE_REPO must be in "owner/repo" format (got "${templateRepoEnv}")`);
-  }
-
-  const repoDir = resolve(clientDir, 'repo');
-  if (existsSync(repoDir)) {
-    fail(2, `${repoDir} already exists — refusing to overwrite. Delete it and re-run if you intend to re-provision.`);
-  }
-
   const octokit = new Octokit({ auth: token });
 
-  let cloneUrl;
+  let repoUrl;
   try {
     const existing = await octokit.repos.get({ owner: githubOrg, repo: siteSlug });
-    console.log(`  GitHub repo ${githubOrg}/${siteSlug} already exists — cloning existing`);
-    cloneUrl = existing.data.clone_url;
+    console.log(`  GitHub repo ${githubOrg}/${siteSlug} already exists — reusing`);
+    repoUrl = existing.data.clone_url;
   } catch (err) {
     if (err.status !== 404) fail(2, `GitHub API error checking ${githubOrg}/${siteSlug}`, err);
-    console.log(`  Creating ${githubOrg}/${siteSlug} from template ${templateOwner}/${templateRepo}…`);
-    const created = await octokit.repos.createUsingTemplate({
-      template_owner: templateOwner,
-      template_repo: templateRepo,
-      owner: githubOrg,
+    console.log(`  Creating empty repo ${githubOrg}/${siteSlug}…`);
+    const created = await octokit.repos.createInOrg({
+      org: githubOrg,
       name: siteSlug,
       private: true,
-      include_all_branches: false,
+      auto_init: false,
       description: `${content.brand.name} — managed site`,
     });
-    cloneUrl = created.data.clone_url;
-    await new Promise((r) => setTimeout(r, 3000));
+    repoUrl = created.data.clone_url;
   }
 
-  const authedUrl = cloneUrl.replace('https://', `https://${token}@`);
-  mkdirSync(clientDir, { recursive: true });
-  run(`git clone ${authedUrl} "${repoDir}"`);
-  run(`git -C "${repoDir}" remote set-url origin ${cloneUrl}`);
+  // Make the local repo a git repo (if needed) and point origin at the new GitHub
+  // repo. commitAndPush (step 8c) handles the commit + `git push HEAD:main`.
+  if (!existsSync(resolve(repoDir, '.git'))) {
+    run('git init', { cwd: repoDir });
+  }
+  try {
+    execSync('git remote get-url origin', { cwd: repoDir, stdio: 'ignore' });
+    run(`git remote set-url origin ${repoUrl}`, { cwd: repoDir });
+  } catch {
+    run(`git remote add origin ${repoUrl}`, { cwd: repoDir });
+  }
 
-  return { repoDir, repoUrl: cloneUrl };
+  return { repoDir, repoUrl };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -260,7 +265,7 @@ async function createGitHubRepoAndClone(siteSlug, content, clientDir) {
 // ───────────────────────────────────────────────────────────────────────────
 
 function writeClientSchema(repoDir, content) {
-  log(3, `Write src/data/site.ts in cloned repo`);
+  log(3, `Write src/data/site.ts in local repo`);
   if (DRY_RUN) {
     dryLog(`would splice CONTENT into ${repoDir}/src/data/site.ts (${JSON.stringify(content).length.toLocaleString()} chars)`);
     return;
@@ -695,7 +700,7 @@ async function main() {
     const clientDir = siteDirFor(baseSlug, intake, i);
     CURRENT_SITE_LABEL = intake.sites.length > 1 ? `site ${i + 1}/${intake.sites.length}` : '';
 
-    const { repoDir, repoUrl } = await createGitHubRepoAndClone(siteSlug, site, clientDir);
+    const { repoDir, repoUrl } = await createRepoFromLocal(siteSlug, site, clientDir);
     writeClientSchema(repoDir, site);
     writeClientEnvLocal(clientDir, siteSlug, intake.plan, site);
     buildClientRepo(repoDir);

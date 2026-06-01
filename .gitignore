@@ -1,8 +1,9 @@
 node_modules/
+.next/
 .env
 .env.local
 clients/*/.env.local
-clients/*/repo/node_modules/
-clients/*/repo/.next/
+clients/*/repo/
+studio/preview/export/
 *.log
 .DS_Store
