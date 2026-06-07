@@ -688,11 +688,57 @@ async function createAirtableBase(intake, primaryContent, clientDir) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Step 8c: Commit + push client repo
+// Step 8c: Register agent in Make data store (retell-agent-lookup)
+//
+// The master post-call Make scenario looks up agent_id → { base_id,
+// client_name, table_name } to route call logs to the correct Airtable base.
+// Without this entry the lookup fails and no Airtable rows are written.
+// ───────────────────────────────────────────────────────────────────────────
+
+async function registerInMakeLookup(agentId, content, baseId) {
+  log(8, `Register agent in Make data store (retell-agent-lookup)`);
+  const apiKey  = process.env.MAKE_API_KEY;
+  const dsId    = process.env.MAKE_DATA_STORE_ID;
+  if (!apiKey || !dsId) {
+    console.warn(`  ⚠ MAKE_API_KEY or MAKE_DATA_STORE_ID not set — skipping data store registration.`);
+    console.warn(`    Add the agent manually: key=${agentId}, base_id=${baseId}, client_name=${content.brand.name}, table_name=Call Log`);
+    return;
+  }
+  if (DRY_RUN) {
+    dryLog(`would upsert key=${agentId} → base_id=${baseId}, client_name=${content.brand.name}, table_name=Call Log`);
+    return;
+  }
+
+  const base    = 'https://us2.make.com/api/v2';
+  const headers = { Authorization: `Token ${apiKey}`, 'Content-Type': 'application/json' };
+  const record  = { base_id: baseId, client_name: content.brand.name, table_name: 'Call Log' };
+
+  // PATCH updates an existing key (flat body, no wrapper).
+  // Falls back to POST (create) if the key doesn't exist yet (404).
+  // Make returns 400 "duplicate key" on POST if the key already exists, so PATCH-first is safest.
+  let res = await fetch(`${base}/data-stores/${dsId}/data/${encodeURIComponent(agentId)}`, {
+    method: 'PATCH', headers, body: JSON.stringify(record),
+  });
+  if (res.status === 404) {
+    res = await fetch(`${base}/data-stores/${dsId}/data`, {
+      method: 'POST', headers, body: JSON.stringify({ key: agentId, data: record }),
+    });
+  }
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    console.warn(`  ⚠ Make data store upsert failed (${res.status}): ${txt.slice(0, 200)}`);
+    console.warn(`    Add manually: key=${agentId}, base_id=${baseId}, client_name=${content.brand.name}, table_name=Call Log`);
+    return;
+  }
+  console.log(`  Registered: ${agentId} → ${content.brand.name} (${baseId})`);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Step 8d: Commit + push client repo
 // ───────────────────────────────────────────────────────────────────────────
 
 function commitAndPush(repoDir, brandName) {
-  console.log(`  Commit + push client repo…`);
+  log(8, `Commit + push client repo`);
   if (DRY_RUN) {
     dryLog(`would: git add -A && git commit -m "feat: initial provisioning for ${brandName}" && git push origin main`);
     return;
@@ -894,6 +940,7 @@ async function main() {
         patchEnvLocal(clientDir, 'AIRTABLE_SITE_TAG', site.brand.short);
         console.log(`  Reusing shared Airtable base ${sharedBaseId} (site tag: ${site.brand.short})`);
       }
+      await registerInMakeLookup(agentId, site, sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID);
     }
 
     commitAndPush(repoDir, site.brand.name);
