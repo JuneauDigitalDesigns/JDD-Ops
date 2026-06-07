@@ -27,7 +27,7 @@ import { execSync } from 'node:child_process';
 import Anthropic from '@anthropic-ai/sdk';
 import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
-import { syncEnvToVercel } from './lib/vercel-sync.js';
+import { syncEnvToVercel, sanitizeProjectName } from './lib/vercel-sync.js';
 
 const TOTAL_STEPS = 9;
 
@@ -99,6 +99,37 @@ function requireEnv(name) {
 // Step 1: Load + validate Intake
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * Remove every `interface … { … }` / `export interface … { … }` block from TS
+ * source, honoring nested braces. The naive `^export type …;` regex below only
+ * handles single-line type aliases; interface blocks span multiple lines and
+ * nest braces, so they need a brace-counting pass or the data:URL import throws
+ * `Unexpected token 'export'`.
+ */
+function stripInterfaceBlocks(src) {
+  const headerRe = /(?:export\s+)?interface\s+\w+[^{]*\{/g;
+  let result = '';
+  let lastIndex = 0;
+  let m;
+  while ((m = headerRe.exec(src)) !== null) {
+    const start = m.index;
+    let depth = 0;
+    let i = start + m[0].length - 1; // index of the opening '{'
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') {
+        depth--;
+        if (depth === 0) { i++; break; }
+      }
+    }
+    result += src.slice(lastIndex, start);
+    lastIndex = i;
+    headerRe.lastIndex = i;
+  }
+  result += src.slice(lastIndex);
+  return result;
+}
+
 async function loadIntake(schemaPath) {
   if (!schemaPath) fail(1, 'Missing --schema argument');
   if (!existsSync(schemaPath)) fail(1, `Schema file not found: ${schemaPath}`);
@@ -108,7 +139,7 @@ async function loadIntake(schemaPath) {
   try {
     if (ext === '.ts') {
       const src = readFileSync(schemaPath, 'utf8');
-      const stripped = src
+      const stripped = stripInterfaceBlocks(src)
         .replace(/:\s*SiteContent/g, '')
         .replace(/:\s*Intake/g, '')
         .replace(/^import .*$/gm, '')
@@ -602,9 +633,13 @@ function commitAndPush(repoDir, brandName) {
 // ───────────────────────────────────────────────────────────────────────────
 
 async function syncVercelEnv(siteSlug, content, clientDir, plan) {
-  log(9, `Sync env to Vercel project "${siteSlug}"`);
+  const projectName = sanitizeProjectName(siteSlug);
+  log(9, `Sync env to Vercel project "${projectName}"`);
   if (DRY_RUN) {
-    dryLog(`would lookup/create Vercel project "${siteSlug}" linked to GitHub repo`);
+    if (projectName !== siteSlug) {
+      dryLog(`project name sanitized: "${siteSlug}" → "${projectName}" (GitHub repo keeps "${siteSlug}")`);
+    }
+    dryLog(`would lookup/create Vercel project "${projectName}" linked to GitHub repo ${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug}`);
     dryLog(`would push env vars from ${clientDir}/.env.local + NEXT_PUBLIC_BRAND_NAME="${content.brand.name}"`);
     return { dryRun: true };
   }
