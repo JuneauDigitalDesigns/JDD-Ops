@@ -4,20 +4,28 @@ The master list of catalog components to build (in later sessions). Read
 `AUTHORING_CONTRACT.md` in this folder **before** building any of them — it defines
 the rules every component must follow to drop in cleanly and survive `onboard.js`.
 
-Each component is one self-contained `.tsx` under `studio/catalog/<category>/`,
-named `{Category}{Variant}.tsx`, with a default export named identically and a
-`meta` named export. Target: **2 variants per category** for v1.
+Each component is one self-contained `.tsx` at
+`studio/preview/src/components/catalog/<category>/{Category}{Variant}.tsx`,
+with a default export named identically to the file and a `meta` named export.
+The studio/preview app renders all of them; selected variants export via the
+File System Access API into any folder you choose. Target: **2 variants per
+category** for v1.
 
 | Category | Schema consumed | Variants to build | Status |
 |---|---|---|---|
-| Nav | `brand.name`, `brand.short`, `brand.phone`, `brand.phoneHref` | `NavMinimal`, `NavCentered` | ☐ ☐ |
-| Hero | `brand.name`, `brand.long`, `brand.tagline`, `brand.phone`, `seo.description` | `HeroSplit`, `HeroCentered` | ☐ ☐ |
-| Services | `services.items[] {n,t,d,tag}` | `ServicesGrid`, `ServicesAccordion` | ☐ ☐ |
-| FAQ | `faq.items[] {q,a}` | `FaqAccordion`, `FaqTwoColumn` | ☐ ☐ |
-| Testimonials | `testimonials?.items[] {q,a,r,company,stars}` (optional) | `TestimonialsCarousel`, `TestimonialsGrid` | ☐ ☐ |
-| Contact / CTA | `brand.phone`, `brand.phoneHref`, `brand.email`, `brand.address` → POSTs `/api/contact` | `ContactSplit`, `CtaBanner` | ☐ ☐ |
-| Footer | `brand.name`, `brand.long`, `brand.license`, `brand.established`, `brand.address`, `brand.phone`, `brand.email` | `FooterColumns`, `FooterMinimal` | ☐ ☐ |
-| SEO head | `seo {title,description,canonical}` + `brand` (JSON-LD) | `SeoDefault`, `SeoLocalBusiness` | ☐ ☐ |
+| Nav | `brand.name`, `brand.short`, `brand.phone`, `brand.phoneHref` | `NavMinimal`, `NavCentered` | ☑ ☑ |
+| Hero | `brand.name`, `brand.long`, `brand.tagline`, `brand.phone`, `seo.description` | `HeroSplit`, `HeroCentered` | ☑ ☑ |
+| Services | `services.items[] {n,t,d,tag}` | `ServicesGrid`, `ServicesAccordion` | ☑ ☑ |
+| FAQ | `faq.items[] {q,a}` | `FaqAccordion`, `FaqTwoColumn` | ☑ ☑ |
+| Testimonials | `testimonials?.items[] {q,a,r,company,stars}` (optional) | `TestimonialsCarousel`, `TestimonialsGrid` | ☑ ☑ |
+| Contact / CTA | `brand.phone`, `brand.phoneHref`, `brand.email`, `brand.address` → POSTs `/api/contact` | `ContactSplit`, `CtaBanner` | ☑ ☑ |
+| Footer | `brand.name`, `brand.long`, `brand.license`, `brand.established`, `brand.address`, `brand.phone`, `brand.email` | `FooterColumns`, `FooterMinimal` | ☑ ☑ |
+| SEO head | `seo {title,description,canonical}` + `brand` (JSON-LD) | `SeoDefault`, `SeoLocalBusiness` | ☑ ☑ |
+
+**v1 status:** all 16 components shipped at `studio/preview/src/components/catalog/<category>/`.
+The studio/preview Next.js app renders every variant and lets you select one per
+category for export. `cd studio/preview && npm run build` is the build-correctness
+gate; the template itself is back to its blank-base form.
 
 ## Notes per category
 

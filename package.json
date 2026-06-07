@@ -13,7 +13,8 @@
     "hydrate": "node scripts/hydrate.js",
     "update-prompt": "node scripts/update-agent-prompt.js",
     "sync-env": "node scripts/sync-vercel-env.js",
-    "teardown": "node scripts/teardown.js"
+    "teardown": "node scripts/teardown.js",
+    "preview": "cd studio/preview && npm install && npm run dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

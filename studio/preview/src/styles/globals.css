@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Defaults so the template renders before layout.tsx applies brand vars (and as a
+   fallback). layout.tsx overrides these per client from CONTENT.brand. */
+:root {
+  --accent: #1e6fbf;
+  --bg: #ffffff;
+  --bg-soft: #f0f5fb;
+  --ink: #0f1b2d;
+  --ink-soft: #4a5568;
+  --rule: #cbd5e1;
+  --font-sans: -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, sans-serif;
+  --heading-weight: 700;
+  --body-weight: 400;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: var(--body-weight);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+}

@@ -1,0 +1,120 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { X } from '@phosphor-icons/react';
+import { CONTENT } from '@/data/site';
+
+export const meta = {
+  id: 'nav-announcement',
+  category: 'nav',
+  label: 'Nav / Announcement bar',
+  consumes: ['nav', 'hero.cta', 'announcement', 'brand.name', 'brand.long', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+} as const;
+
+export default function NavAnnouncementBar() {
+  const reduce = useReducedMotion() ?? false;
+  const { brand, nav, hero, announcement } = CONTENT;
+  const [barVisible, setBarVisible] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 12);
+    fn();
+    window.addEventListener('scroll', fn, { passive: true });
+    return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [open]);
+
+  return (
+    <>
+      {/* Announcement strip */}
+      <AnimatePresence>
+        {announcement && barVisible && (
+          <motion.div
+            className="flex items-center justify-between gap-2 bg-accent px-4 py-2 text-sm text-bg"
+            initial={reduce ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduce ? undefined : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <span className="mx-auto">{announcement}</span>
+            <button type="button" onClick={() => setBarVisible(false)} aria-label="Dismiss"
+              className="shrink-0 rounded p-0.5 text-bg/70 hover:text-bg">
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sticky nav */}
+      <header className={`sticky top-0 z-40 border-b border-rule bg-bg/95 backdrop-blur transition-shadow duration-200 ${scrolled ? 'shadow-sm' : ''}`}>
+        <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-4">
+          <a href="#top" className="mr-auto font-heading text-lg font-semibold text-ink">
+            {brand.long}
+          </a>
+
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-6 lg:flex" aria-label="Primary navigation">
+            {nav.map((item) => (
+              <a key={item.label} href={item.href}
+                className="text-sm font-medium text-inkSoft transition-colors hover:text-ink">
+                {item.label}
+              </a>
+            ))}
+          </nav>
+
+          <a href={brand.phoneHref}
+            className="hidden text-sm font-medium text-ink transition-colors hover:text-accent lg:block">
+            {brand.phone}
+          </a>
+          <a href="#cta"
+            className="hidden rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg transition-opacity hover:opacity-90 lg:inline-block">
+            {hero.cta}
+          </a>
+
+          {/* Mobile burger */}
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-label={open ? 'Close menu' : 'Open menu'}
+            className="flex h-8 w-8 flex-col items-center justify-center gap-1.5 lg:hidden">
+            <span className={`block h-0.5 w-5 bg-ink transition-transform ${open ? 'translate-y-2 rotate-45' : ''}`} />
+            <span className={`block h-0.5 w-5 bg-ink transition-opacity ${open ? 'opacity-0' : ''}`} />
+            <span className={`block h-0.5 w-5 bg-ink transition-transform ${open ? '-translate-y-2 -rotate-45' : ''}`} />
+          </button>
+        </div>
+
+        {/* Mobile sheet */}
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              className="overflow-hidden lg:hidden"
+              initial={reduce ? false : { height: 0 }}
+              animate={{ height: 'auto' }}
+              exit={reduce ? undefined : { height: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <nav className="border-t border-rule px-6 pb-6 pt-4 space-y-1">
+                {nav.map((item) => (
+                  <a key={item.label} href={item.href} onClick={() => setOpen(false)}
+                    className="block py-2.5 text-sm font-medium text-ink">
+                    {item.label}
+                  </a>
+                ))}
+                <a href="#cta" onClick={() => setOpen(false)}
+                  className="mt-4 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-bg">
+                  {hero.cta}
+                </a>
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+    </>
+  );
+}
