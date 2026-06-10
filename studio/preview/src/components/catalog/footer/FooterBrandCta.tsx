@@ -76,7 +76,7 @@ export default function FooterBrandCta() {
           <div className="flex flex-col gap-3 lg:min-w-[200px]">
             <p className="text-sm font-semibold text-bg">Ready to get started?</p>
             <a href="#cta"
-              className="inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90 text-center">
+              className="inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accentFg transition-opacity hover:opacity-90 text-center">
               {finalCta.cta}
             </a>
             {brand.license && <p className="text-xs text-bg/40">Lic. {brand.license}</p>}

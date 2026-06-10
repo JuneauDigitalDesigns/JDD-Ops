@@ -5,58 +5,40 @@ import { CONTENT } from '@/data/site';
 // -----------------------------------------------------------------------------
 // Home page - the composition surface.
 //
-// Each SLOT below is where you drop a catalog component. To use one:
-//   1. Paste its file into src/components/catalog/<category>/.
-//   2. Import it here and replace the placeholder block inside the matching SLOT.
+// The body between @studio:body:start and @studio:body:end is the composition area.
+// The studio export REPLACES this whole region with the selected catalog components,
+// in the order chosen on the Finalize tab. The plain placeholders below are only here
+// so the bare template builds and renders out of the box; they read straight from
+// CONTENT and guard optional fields.
 //
-// The placeholders below are intentionally plain so the template builds and renders
-// out of the box. They read straight from CONTENT and guard optional fields.
-//
-// The `@studio:*` comment anchors and `@studio:slot:<cat>:start/end` markers let the
-// studio export wire components in automatically — keep them intact.
+// Keep the `@studio:imports`, `@studio:metadata`, and `@studio:body:*` anchors intact —
+// the studio export relies on them to wire components in automatically.
 // -----------------------------------------------------------------------------
 
 export default function HomePage() {
-  const { brand, services, faq, testimonials } = CONTENT;
-
   return (
     <main className="font-sans text-ink">
-      {/* SLOT: nav -- replace with a Nav* component */}
-      {/* @studio:slot:nav:start */}
+      {/* @studio:body:start */}
       <header className="flex items-center justify-between border-b border-rule px-6 py-4">
-        <span className="text-lg font-semibold">{brand.name}</span>
-        <a href={brand.phoneHref} className="text-accent">{brand.phone}</a>
+        <span className="text-lg font-semibold">{CONTENT.brand.name}</span>
+        <a href={CONTENT.brand.phoneHref} className="text-accent">{CONTENT.brand.phone}</a>
       </header>
-      {/* @studio:slot:nav:end */}
 
-      {/* SLOT: hero -- replace with a Hero* component */}
-      {/* @studio:slot:hero:start */}
       <section className="bg-bgSoft px-6 py-20 text-center">
-        <h1 className="text-4xl">{brand.name}</h1>
-        <p className="mx-auto mt-4 max-w-xl text-inkSoft">{brand.tagline}</p>
+        <h1 className="text-4xl">{CONTENT.brand.name}</h1>
+        <p className="mx-auto mt-4 max-w-xl text-inkSoft">{CONTENT.brand.tagline}</p>
         <a
-          href={brand.phoneHref}
+          href={CONTENT.brand.phoneHref}
           className="mt-8 inline-block rounded bg-accent px-6 py-3 text-bg"
         >
-          Call {brand.phone}
+          Call {CONTENT.brand.phone}
         </a>
       </section>
-      {/* @studio:slot:hero:end */}
 
-      {/* SLOT: trust -- replace with a Trust* component */}
-      {/* @studio:slot:trust:start */}
-      {/* @studio:slot:trust:end */}
-
-      {/* SLOT: about -- replace with an About* component */}
-      {/* @studio:slot:about:start */}
-      {/* @studio:slot:about:end */}
-
-      {/* SLOT: services -- replace with a Services* component */}
-      {/* @studio:slot:services:start */}
       <section className="px-6 py-16">
         <h2 className="text-2xl">Services</h2>
         <ul className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {services.items.map((s) => (
+          {CONTENT.services.items.map((s) => (
             <li key={s.n} className="rounded border border-rule p-5">
               <span className="text-sm text-accent">{s.n} - {s.tag}</span>
               <h3 className="mt-2 text-lg">{s.t}</h3>
@@ -65,20 +47,12 @@ export default function HomePage() {
           ))}
         </ul>
       </section>
-      {/* @studio:slot:services:end */}
 
-      {/* SLOT: work -- replace with a Work* component */}
-      {/* @studio:slot:work:start */}
-      {/* @studio:slot:work:end */}
-
-      {/* SLOT: testimonials -- replace with a Testimonials* component.
-          Optional in the schema - guard before rendering. */}
-      {/* @studio:slot:testimonials:start */}
-      {testimonials && testimonials.items.length > 0 && (
+      {CONTENT.testimonials && CONTENT.testimonials.items.length > 0 && (
         <section className="px-6 py-16">
           <h2 className="text-2xl">What clients say</h2>
           <ul className="mt-6 grid gap-6 sm:grid-cols-2">
-            {testimonials.items.map((t, i) => (
+            {CONTENT.testimonials.items.map((t, i) => (
               <li key={i} className="rounded border border-rule p-5">
                 <p>&quot;{t.q}&quot;</p>
                 <p className="mt-2 text-sm text-inkSoft">
@@ -89,14 +63,11 @@ export default function HomePage() {
           </ul>
         </section>
       )}
-      {/* @studio:slot:testimonials:end */}
 
-      {/* SLOT: faq -- replace with a Faq* component */}
-      {/* @studio:slot:faq:start */}
       <section className="bg-bgSoft px-6 py-16">
         <h2 className="text-2xl">FAQ</h2>
         <dl className="mt-6 space-y-4">
-          {faq.items.map((f) => (
+          {CONTENT.faq.items.map((f) => (
             <div key={f.q}>
               <dt className="font-medium">{f.q}</dt>
               <dd className="text-inkSoft">{f.a}</dd>
@@ -104,33 +75,22 @@ export default function HomePage() {
           ))}
         </dl>
       </section>
-      {/* @studio:slot:faq:end */}
 
-      {/* SLOT: finalCta -- replace with a FinalCta* component */}
-      {/* @studio:slot:finalCta:start */}
-      {/* @studio:slot:finalCta:end */}
-
-      {/* SLOT: contact -- replace with a Contact or Cta component.
-          A catalog Contact component POSTs to /api/contact. */}
-      {/* @studio:slot:contact:start */}
       <section className="bg-bgSoft px-6 py-16 text-center">
         <h2 className="text-2xl">Get in touch</h2>
-        <p className="mt-2 text-inkSoft">{brand.address}</p>
+        <p className="mt-2 text-inkSoft">{CONTENT.brand.address}</p>
         <p className="mt-1">
-          <a href={`mailto:${brand.email}`} className="text-accent">{brand.email}</a>
+          <a href={`mailto:${CONTENT.brand.email}`} className="text-accent">{CONTENT.brand.email}</a>
         </p>
       </section>
-      {/* @studio:slot:contact:end */}
 
-      {/* SLOT: footer -- replace with a Footer* component */}
-      {/* @studio:slot:footer:start */}
       <footer className="border-t border-rule px-6 py-8 text-sm text-inkSoft">
         <p>
-          &copy; {new Date().getFullYear()} {brand.long}
-          {brand.license ? ` - License ${brand.license}` : ''}
+          &copy; {new Date().getFullYear()} {CONTENT.brand.long}
+          {CONTENT.brand.license ? ` - License ${CONTENT.brand.license}` : ''}
         </p>
       </footer>
-      {/* @studio:slot:footer:end */}
+      {/* @studio:body:end */}
     </main>
   );
 }

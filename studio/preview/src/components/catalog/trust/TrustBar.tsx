@@ -23,7 +23,7 @@ export default function TrustBar() {
     <AnimatePresence>
       {visible && (
         <motion.div
-          className="bg-accent text-bg"
+          className="bg-accent text-accentFg"
           initial={reduce ? false : { height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={reduce ? undefined : { height: 0, opacity: 0 }}
@@ -37,7 +37,7 @@ export default function TrustBar() {
               {trust.logos.length > 0 && (
                 <span className="hidden items-center gap-3 sm:flex">
                   {trust.logos.slice(0, 4).map((logo, i) => (
-                    <span key={i} className="text-xs text-bg/80">{logo}</span>
+                    <span key={i} className="text-xs uppercase tracking-wide text-accentFg/80">{logo}</span>
                   ))}
                 </span>
               )}
@@ -46,7 +46,7 @@ export default function TrustBar() {
               type="button"
               onClick={() => setVisible(false)}
               aria-label="Dismiss announcement"
-              className="shrink-0 rounded p-1 text-bg/70 transition-colors hover:bg-white/20 hover:text-bg"
+              className="shrink-0 rounded p-1 text-accentFg/70 transition-colors hover:bg-white/20 hover:text-accentFg"
             >
               <X size={14} />
             </button>

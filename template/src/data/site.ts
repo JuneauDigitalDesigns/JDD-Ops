@@ -14,6 +14,7 @@
 
 export type Palette = {
   accent: string;
+  accentFg?: string; // text drawn on accent bg; when absent, derived for contrast
   bg: string;
   bgSoft: string;
   ink: string;

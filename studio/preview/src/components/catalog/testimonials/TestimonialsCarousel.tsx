@@ -42,7 +42,7 @@ export default function TestimonialsCarousel() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{testimonials.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink">{testimonials.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink">{testimonials.title}</h2>
         </motion.div>
 
         <div className="mt-10">

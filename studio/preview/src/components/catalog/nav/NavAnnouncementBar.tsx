@@ -3,28 +3,22 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
+import { useScrolled } from '@/lib/useScrolled';
 
 export const meta = {
   id: 'nav-announcement',
   category: 'nav',
   label: 'Nav / Announcement bar',
   consumes: ['nav', 'hero.cta', 'announcement', 'brand.name', 'brand.long', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useScrolled'],
 } as const;
 
 export default function NavAnnouncementBar() {
   const reduce = useReducedMotion() ?? false;
   const { brand, nav, hero, announcement } = CONTENT;
   const [barVisible, setBarVisible] = useState(true);
-  const [scrolled, setScrolled] = useState(false);
+  const scrolled = useScrolled();
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 12);
-    fn();
-    window.addEventListener('scroll', fn, { passive: true });
-    return () => window.removeEventListener('scroll', fn);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +33,7 @@ export default function NavAnnouncementBar() {
       <AnimatePresence>
         {announcement && barVisible && (
           <motion.div
-            className="flex items-center justify-between gap-2 bg-accent px-4 py-2 text-sm text-bg"
+            className="flex items-center justify-between gap-2 bg-accent px-4 py-2 text-sm text-accentFg"
             initial={reduce ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={reduce ? undefined : { height: 0, opacity: 0 }}
@@ -47,7 +41,7 @@ export default function NavAnnouncementBar() {
           >
             <span className="mx-auto">{announcement}</span>
             <button type="button" onClick={() => setBarVisible(false)} aria-label="Dismiss"
-              className="shrink-0 rounded p-0.5 text-bg/70 hover:text-bg">
+              className="shrink-0 rounded p-0.5 text-accentFg/70 hover:text-accentFg">
               <X size={14} />
             </button>
           </motion.div>
@@ -76,7 +70,7 @@ export default function NavAnnouncementBar() {
             {brand.phone}
           </a>
           <a href="#cta"
-            className="hidden rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg transition-opacity hover:opacity-90 lg:inline-block">
+            className="hidden rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accentFg transition-opacity hover:opacity-90 lg:inline-block">
             {hero.cta}
           </a>
 
@@ -107,7 +101,7 @@ export default function NavAnnouncementBar() {
                   </a>
                 ))}
                 <a href="#cta" onClick={() => setOpen(false)}
-                  className="mt-4 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-bg">
+                  className="mt-4 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-accentFg">
                   {hero.cta}
                 </a>
               </nav>

@@ -30,18 +30,16 @@ export default function TestimonialsRotator() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{testimonials.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink">{testimonials.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink">{testimonials.title}</h2>
         </motion.div>
 
-        {/* Number pill nav */}
+        {/* Dot nav */}
         <div className="mb-8 flex justify-center gap-2">
           {testimonials.items.map((_, i) => (
             <button key={i} onClick={() => setIdx(i)} aria-label={`Testimonial ${i + 1}`}
-              className={`h-8 w-8 rounded-full text-xs font-semibold transition-all ${
-                i === idx ? 'bg-accent text-bg' : 'bg-bgSoft text-inkSoft hover:bg-rule'
-              }`}>
-              {String(i + 1).padStart(2, '0')}
-            </button>
+              className={`h-2 rounded-full transition-all duration-200 ${
+                i === idx ? 'w-6 bg-accent' : 'w-2 bg-rule hover:bg-inkSoft'
+              }`} />
           ))}
         </div>
 

@@ -1,15 +1,16 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { motion, animate, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, Clock, Tag, Star } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
+import { useCountUp } from '@/lib/useCountUp';
 
 export const meta = {
   id: 'about-pillars',
   category: 'about',
   label: 'About / Pillars + stats',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars', 'about.stats'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useCountUp'],
 } as const;
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
@@ -18,27 +19,6 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; cla
   tag:    Tag,
   star:   Star,
 };
-
-function useCountUp(target: string, run: boolean, reduce: boolean): string {
-  const [val, setVal] = useState(target);
-  useEffect(() => {
-    if (!run || reduce) { setVal(target); return; }
-    const m = target.match(/([^\d.]*)(\d+(?:\.\d+)?)([^\d.].*|$)/);
-    if (!m) { setVal(target); return; }
-    const [, pre, numStr, post] = m;
-    const end = parseFloat(numStr);
-    const controls = animate(0, end, {
-      duration: 1.2,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate(v: number) {
-        const fmt = end >= 100 ? Math.round(v).toString() : v.toFixed(numStr.includes('.') ? 1 : 0);
-        setVal(`${pre}${fmt}${post}`);
-      },
-    });
-    return () => controls.stop();
-  }, [run, target, reduce]);
-  return val;
-}
 
 function StatCell({ n, l, run, reduce }: { n: string; l: string; run: boolean; reduce: boolean }) {
   const v = useCountUp(n, run, reduce);
@@ -80,7 +60,7 @@ export default function AboutPillars() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{about.eyebrow}</p>
-          <h2 className="mt-3 font-heading text-3xl font-bold text-ink md:text-4xl">{about.title}</h2>
+          <h2 className="mt-3 font-heading text-3xl text-ink md:text-4xl">{about.title}</h2>
           <p className="mt-4 leading-relaxed text-inkSoft">{about.body}</p>
         </motion.div>
 

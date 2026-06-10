@@ -29,7 +29,7 @@ export default function WorkSpotlight() {
           className="mb-10"
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{work.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{work.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{work.title}</h2>
         </motion.div>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -44,16 +44,16 @@ export default function WorkSpotlight() {
             <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
               {featured.image?.url ? (
                 <img src={featured.image.url} alt={featured.image.alt} loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-103" />
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
                   <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">{featured.caption}</span>
                 </div>
               )}
-              <span className="absolute left-4 top-4 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-bg">{featured.scope}</span>
             </div>
             <div className="p-7">
-              <h3 className="font-heading text-xl font-bold text-ink">{featured.t}</h3>
+              <span className="text-xs font-semibold uppercase tracking-wider text-accent">{featured.scope}</span>
+              <h3 className="mt-1 font-heading text-xl font-bold text-ink">{featured.t}</h3>
               <p className="mt-2 leading-relaxed text-inkSoft">{featured.caption}</p>
               <div className="mt-4 flex gap-6 text-sm">
                 <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Location</span><p className="mt-0.5 text-ink">{featured.loc}</p></div>

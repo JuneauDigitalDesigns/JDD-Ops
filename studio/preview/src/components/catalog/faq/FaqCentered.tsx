@@ -28,7 +28,7 @@ export default function FaqCentered() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{faq.eyebrow}</p>
-          <h2 className="mt-3 font-heading text-4xl font-bold text-ink">{faq.title}</h2>
+          <h2 className="mt-3 font-heading text-4xl text-ink">{faq.title}</h2>
           <p className="mt-4 text-inkSoft">{faq.sub}</p>
         </motion.div>
 
@@ -48,9 +48,6 @@ export default function FaqCentered() {
                 className="flex w-full items-start gap-4 px-7 py-6 text-left"
                 aria-expanded={open === i}
               >
-                <span className="mt-0.5 font-heading text-sm font-bold text-accent">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
                 <span className="flex-1 font-heading text-lg font-semibold text-ink">{item.q}</span>
                 <span className={`mt-1 text-xl text-inkSoft transition-transform duration-200 ${open === i ? 'rotate-45' : ''}`}>+</span>
               </button>
@@ -62,7 +59,7 @@ export default function FaqCentered() {
                     exit={reduce ? undefined : { height: 0, opacity: 0 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <p className="px-7 pb-6 pl-[calc(1.75rem+2rem)] leading-relaxed text-inkSoft">{item.a}</p>
+                    <p className="px-7 pb-6 leading-relaxed text-inkSoft">{item.a}</p>
                   </motion.div>
                 )}
               </AnimatePresence>

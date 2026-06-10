@@ -20,7 +20,7 @@ const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 // catalog registry in app/page.tsx; guards against path traversal via untrusted input.
 export const CATALOG: Record<string, readonly string[]> = {
   nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta'],
-  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus'],
+  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap'],
   trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar'],
   about:        ['AboutPillars', 'AboutFeature', 'AboutStatBand', 'AboutStory'],
   services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase'],
@@ -133,19 +133,29 @@ export function placeComponents(repoRoot: string, slug: string, entries: Entry[]
   return written;
 }
 
+/** Stable order with nav pinned first and footer pinned last, others left as-is. */
+function orderBodyEntries(entries: Entry[]): Entry[] {
+  const nav = entries.filter((e) => e.categoryId === 'nav');
+  const footer = entries.filter((e) => e.categoryId === 'footer');
+  const middle = entries.filter((e) => e.categoryId !== 'nav' && e.categoryId !== 'footer');
+  return [...nav, ...middle, ...footer];
+}
+
 /**
  * Derive the client repo's page.tsx from the PRISTINE template page.tsx (so re-running is
- * idempotent), injecting component imports + slot elements + the SEO generateMetadata
- * re-export based on the selected entries.
+ * idempotent), injecting component imports + the SEO generateMetadata re-export, and
+ * replacing the @studio:body region with the selected components IN THE GIVEN ORDER.
+ * Unselected categories are omitted entirely (WYSIWYG). The order of `entries` is the
+ * page order; nav/footer are pinned as a server-side guard.
  */
 export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void {
   const templatePage = resolve(repoRoot, 'template', 'src', 'app', 'page.tsx');
   let src = readFileSync(templatePage, 'utf8');
 
-  const bodyEntries = entries.filter((e) => BODY_SLOTS.includes(e.categoryId));
+  const bodyEntries = orderBodyEntries(entries.filter((e) => BODY_SLOTS.includes(e.categoryId)));
   const seoEntry = entries.find((e) => e.categoryId === 'seo');
 
-  // 1. Inject component imports under the `// @studio:imports` anchor.
+  // 1. Inject component imports under the `// @studio:imports` anchor (in page order).
   const importLines = bodyEntries
     .map((e) => `import ${e.name} from '@/components/catalog/${e.categoryId}/${e.name}';`)
     .join('\n');
@@ -159,16 +169,18 @@ export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void
     src = src.replace('// @studio:metadata', `// @studio:metadata\n${line}`);
   }
 
-  // 3. Replace each selected body slot's placeholder with the component element. Markers
-  //    are kept so the result stays re-wireable.
-  for (const e of bodyEntries) {
-    const startTag = `{/* @studio:slot:${e.categoryId}:start */}`;
-    const endTag = `{/* @studio:slot:${e.categoryId}:end */}`;
-    const re = new RegExp(
-      `${escapeRe(startTag)}[\\s\\S]*?${escapeRe(endTag)}`,
-    );
-    src = src.replace(re, `${startTag}\n      <${e.name} />\n      ${endTag}`);
-  }
+  // 3. Replace the whole body region with the selected components in order. The markers
+  //    are kept so the result stays re-wireable on a later export.
+  const body = bodyEntries.map((e) => `      <${e.name} />`).join('\n');
+  const bodyRegion = /\{\/\* @studio:body:start \*\/\}[\s\S]*?\{\/\* @studio:body:end \*\/\}/;
+  src = src.replace(
+    bodyRegion,
+    `{/* @studio:body:start */}\n${body}\n      {/* @studio:body:end */}`,
+  );
+
+  // 4. The wired page renders components (each imports its own CONTENT), so the page's
+  //    own top-level CONTENT import is now unused — drop it to avoid a build error.
+  src = src.replace(/^import \{ CONTENT \} from '@\/data\/site';\n/m, '');
 
   writeFileSync(resolve(repoDirFor(repoRoot, slug), 'src', 'app', 'page.tsx'), src, 'utf8');
 }
@@ -181,8 +193,4 @@ export function copySiteData(repoRoot: string, slug: string): void {
   const src = resolve(process.cwd(), 'src', 'data', 'site.ts');
   const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
   copyFileSync(src, dest);
-}
-
-function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -1,16 +1,16 @@
 'use client';
 import { motion, useReducedMotion } from 'framer-motion';
-import { PhoneCall, CheckCircle } from '@phosphor-icons/react';
+import { PhoneCall, CheckCircle, Star } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 
 export const meta = {
   id: 'hero-split',
   category: 'hero',
-  label: 'Hero / Split',
+  label: 'Hero / Split (offset)',
   consumes: [
     'hero.eyebrow', 'hero.headline', 'hero.headlineEmphasis', 'hero.sub',
     'hero.badge', 'hero.cta', 'hero.frictionReducers', 'hero.heroBullets',
-    'brand.phoneHref', 'brand.phone', 'images.hero.slides',
+    'brand.phoneHref', 'brand.phone', 'images.hero.slides', 'extensions.reviewBadge',
   ],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
 } as const;
@@ -30,12 +30,13 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 
 export default function HeroSplit() {
   const reduce = useReducedMotion() ?? false;
-  const { hero, brand, images } = CONTENT;
+  const { hero, brand, images, extensions } = CONTENT;
   const slide = images.hero.slides?.[0];
+  const review = extensions.reviewBadge;
 
   return (
     <section className="overflow-hidden bg-bg">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 lg:grid-cols-2">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center lg:grid-cols-[1.05fr_0.95fr]">
 
         {/* Left: text content */}
         <motion.div
@@ -53,7 +54,7 @@ export default function HeroSplit() {
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">
             {hero.eyebrow}
           </p>
-          <h1 className="mt-3 font-heading text-4xl font-bold leading-tight text-ink lg:text-5xl">
+          <h1 className="mt-3 font-heading text-4xl leading-tight text-ink lg:text-5xl xl:text-6xl">
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
           <p className="mt-4 max-w-prose leading-relaxed text-inkSoft">{hero.sub}</p>
@@ -62,7 +63,7 @@ export default function HeroSplit() {
           <div className="mt-8 flex flex-wrap gap-4">
             <a
               href="#cta"
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-medium text-bg transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-medium text-accentFg shadow-sm shadow-accent/20 transition-all hover:-translate-y-px hover:opacity-95 active:translate-y-0"
             >
               {hero.cta}
             </a>
@@ -88,40 +89,59 @@ export default function HeroSplit() {
           )}
         </motion.div>
 
-        {/* Right: image panel */}
+        {/* Right: offset image with floating review card */}
         <motion.div
-          className="relative flex flex-col overflow-hidden bg-bgSoft lg:rounded-l-3xl"
+          className="relative px-6 pb-16 lg:p-10"
           initial={reduce ? false : { opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
         >
-          {slide?.url ? (
-            <img
-              src={slide.url}
-              alt={slide.alt}
-              loading="eager"
-              className="h-full w-full object-cover"
-              style={{ minHeight: '400px' }}
-            />
-          ) : (
-            <div className="flex flex-1 items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)] p-10">
-              <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">
-                {hero.rotatingImages[0]?.caption ?? 'Hero image'}
-              </span>
-            </div>
-          )}
+          <div className="relative overflow-hidden rounded-3xl bg-bgSoft" style={{ aspectRatio: '4/5' }}>
+            {slide?.url ? (
+              <img
+                src={slide.url}
+                alt={slide.alt}
+                loading="eager"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)] p-10">
+                <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">
+                  {images.hero.slides?.[0]?.alt ?? 'Hero image'}
+                </span>
+              </div>
+            )}
 
-          {/* heroBullets overlay bar */}
-          {hero.heroBullets.length > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 grid grid-cols-4 gap-px bg-ink/20">
-              {hero.heroBullets.map((b) => (
-                <div key={b.label} className="bg-ink/80 px-3 py-3 text-center backdrop-blur-sm">
-                  <p className="font-heading text-lg font-bold text-bg">{b.value}</p>
-                  <p className="mt-0.5 text-xs text-bg/70">{b.label}</p>
-                </div>
-              ))}
+            {/* heroBullets glass strip */}
+            {hero.heroBullets.length > 0 && (
+              <div className="absolute inset-x-0 bottom-0 grid grid-cols-2 gap-px bg-ink/10 sm:grid-cols-4">
+                {hero.heroBullets.map((b) => (
+                  <div key={b.label} className="bg-ink/75 px-3 py-3 text-center backdrop-blur-sm">
+                    <p className="font-heading text-lg font-bold text-bg">{b.value}</p>
+                    <p className="mt-0.5 text-xs text-bg/70">{b.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Floating review/badge card overlapping the seam */}
+          {review ? (
+            <div className="absolute bottom-10 left-2 z-10 rounded-2xl border border-rule bg-bg p-4 shadow-xl lg:-left-6">
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Star key={i} size={14} weight="fill" className={i < Math.round(review.rating) ? 'text-accent' : 'text-rule'} />
+                ))}
+              </div>
+              <p className="mt-1.5 font-heading text-lg font-bold text-ink">{review.rating} / 5</p>
+              <p className="text-xs text-inkSoft">{review.count}+ verified reviews</p>
             </div>
-          )}
+          ) : hero.badge ? (
+            <div className="absolute bottom-10 left-2 z-10 inline-flex items-center gap-2 rounded-full border border-rule bg-bg px-4 py-2 text-sm font-semibold text-ink shadow-xl lg:-left-6">
+              <Star size={15} weight="fill" className="text-accent" />
+              {hero.badge}
+            </div>
+          ) : null}
         </motion.div>
 
       </div>

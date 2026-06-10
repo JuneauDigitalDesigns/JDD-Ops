@@ -62,14 +62,14 @@ export default function ContactInlineStrip() {
             <p className="font-semibold text-accent">We'll call you shortly.</p>
           ) : (
             <form onSubmit={submit} className="flex flex-1 flex-wrap gap-3">
-              <input type="text" placeholder="Your name" required value={name}
+              <input type="text" aria-label="Your name" placeholder="Your name" required value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="min-w-[140px] flex-1 rounded-lg border border-rule bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-accent" />
-              <input type="tel" placeholder="Phone number" required value={phone}
+              <input type="tel" aria-label="Phone number" placeholder="Phone number" required value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="min-w-[140px] flex-1 rounded-lg border border-rule bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-accent" />
               <button type="submit" disabled={status === 'loading'}
-                className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-60">
+                className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accentFg transition-opacity hover:opacity-90 disabled:opacity-60">
                 {status === 'loading' ? '...' : finalCta.cta}
               </button>
             </form>

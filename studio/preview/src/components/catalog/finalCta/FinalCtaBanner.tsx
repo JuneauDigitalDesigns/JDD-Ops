@@ -38,13 +38,19 @@ export default function FinalCtaBanner() {
   }
 
   return (
-    <section id="cta" className="relative overflow-hidden bg-ink py-20">
-      {/* Accent radial wash */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,rgba(30,111,191,0.25)_0%,transparent_60%)]" />
-      {/* Subtle grid */}
-      <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_40px),repeating-linear-gradient(90deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_1px,transparent_1px,transparent_40px)]" />
+    <section id="cta" className="relative overflow-hidden bg-ink py-24">
+      {/* Accent washes (driven by the client's accent, no hardcoded color) */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(60% 80% at 28% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)' }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(50% 70% at 100% 100%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%)' }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-accent/50" />
 
-      <div className="relative mx-auto max-w-4xl px-6">
+      <div className="relative mx-auto max-w-3xl px-6">
         <motion.div
           className="text-center"
           initial={reduce ? false : { opacity: 0, y: 20 }}
@@ -53,8 +59,8 @@ export default function FinalCtaBanner() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{finalCta.eyebrow}</p>
-          <h2 className="mt-3 font-heading text-3xl font-bold text-bg md:text-4xl">{finalCta.headline}</h2>
-          <p className="mx-auto mt-4 max-w-xl text-bg/70">{finalCta.sub}</p>
+          <h2 className="mt-3 font-heading text-4xl text-bg md:text-5xl">{finalCta.headline}</h2>
+          <p className="mx-auto mt-4 max-w-xl text-balance text-bg/70">{finalCta.sub}</p>
         </motion.div>
 
         <motion.div
@@ -85,7 +91,7 @@ export default function FinalCtaBanner() {
               </div>
               <button
                 type="submit" disabled={status === 'loading'}
-                className="w-full rounded-lg bg-accent px-6 py-3.5 font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="w-full rounded-lg bg-accent px-6 py-3.5 font-semibold text-accentFg transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {status === 'loading' ? 'Sending...' : finalCta.cta}
               </button>

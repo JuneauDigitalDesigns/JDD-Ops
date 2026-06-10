@@ -1,15 +1,16 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { motion, animate, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, Clock, Tag, Star } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
+import { useCountUp } from '@/lib/useCountUp';
 
 export const meta = {
   id: 'about-stat-band',
   category: 'about',
   label: 'About / Stat band',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.stats', 'about.pillars'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useCountUp'],
 } as const;
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
@@ -18,27 +19,6 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; cla
   tag:    Tag,
   star:   Star,
 };
-
-function useCountUp(target: string, run: boolean, reduce: boolean): string {
-  const [val, setVal] = useState(target);
-  useEffect(() => {
-    if (!run || reduce) { setVal(target); return; }
-    const m = target.match(/([^\d.]*)(\d+(?:\.\d+)?)([^\d.].*|$)/);
-    if (!m) { setVal(target); return; }
-    const [, pre, numStr, post] = m;
-    const end = parseFloat(numStr);
-    const controls = animate(0, end, {
-      duration: 1.2,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate(v: number) {
-        const fmt = end >= 100 ? Math.round(v).toString() : v.toFixed(numStr.includes('.') ? 1 : 0);
-        setVal(`${pre}${fmt}${post}`);
-      },
-    });
-    return () => controls.stop();
-  }, [run, target, reduce]);
-  return val;
-}
 
 export default function AboutStatBand() {
   const reduce = useReducedMotion() ?? false;
@@ -69,7 +49,7 @@ export default function AboutStatBand() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{about.eyebrow}</p>
-          <h2 className="mt-3 font-heading text-3xl font-bold text-ink md:text-4xl">{about.title}</h2>
+          <h2 className="mt-3 font-heading text-3xl text-ink md:text-4xl">{about.title}</h2>
           <p className="mt-4 leading-relaxed text-inkSoft">{about.body}</p>
         </motion.div>
 
@@ -79,14 +59,9 @@ export default function AboutStatBand() {
             ref={bandRef}
             className="mt-12 grid grid-cols-2 overflow-hidden rounded-2xl md:grid-cols-4"
           >
-            {about.stats.map((s, i) => {
-              const v = bandIn && !reduce
-                ? undefined // rendered by child
-                : s.n;
-              return (
-                <StatCell key={s.l} n={s.n} l={s.l} run={bandIn} reduce={reduce} idx={i} />
-              );
-            })}
+            {about.stats.map((s, i) => (
+              <StatCell key={s.l} n={s.n} l={s.l} run={bandIn} reduce={reduce} idx={i} />
+            ))}
           </div>
         )}
 
@@ -117,27 +92,7 @@ export default function AboutStatBand() {
 }
 
 function StatCell({ n, l, run, reduce, idx }: { n: string; l: string; run: boolean; reduce: boolean; idx: number }) {
-  const [val, setVal] = useState(n);
-  useEffect(() => {
-    if (!run || reduce) { setVal(n); return; }
-    const m = n.match(/([^\d.]*)(\d+(?:\.\d+)?)([^\d.].*|$)/);
-    if (!m) { setVal(n); return; }
-    const [, pre, numStr, post] = m;
-    const end = parseFloat(numStr);
-    const t = setTimeout(() => {
-      const controls = animate(0, end, {
-        duration: 1.2,
-        ease: [0.16, 1, 0.3, 1],
-        onUpdate(v: number) {
-          const fmt = end >= 100 ? Math.round(v).toString() : v.toFixed(numStr.includes('.') ? 1 : 0);
-          setVal(`${pre}${fmt}${post}`);
-        },
-      });
-      return () => controls.stop();
-    }, idx * 80);
-    return () => clearTimeout(t);
-  }, [run, n, reduce, idx]);
-
+  const val = useCountUp(n, run, reduce, idx * 80);
   return (
     <div className={`px-8 py-10 text-center ${idx % 2 === 0 ? 'bg-ink' : 'bg-ink/90'}`}>
       <p className="font-heading text-4xl font-bold text-bg">{val}</p>

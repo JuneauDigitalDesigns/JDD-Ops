@@ -44,14 +44,15 @@ export default function ContactCardOverlap() {
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           {/* Details card */}
           <motion.div
-            className="rounded-2xl bg-ink p-8 text-bg lg:sticky lg:top-24"
+            className="relative overflow-hidden rounded-2xl p-8 text-bg shadow-xl lg:sticky lg:top-24"
+            style={{ background: 'radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 60%), var(--ink)' }}
             initial={reduce ? false : { opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
             <p className="text-xs font-semibold uppercase tracking-widest text-accent">{finalCta.eyebrow}</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-bg">{finalCta.headline}</h2>
+            <h2 className="mt-3 font-heading text-3xl text-bg">{finalCta.headline}</h2>
             <p className="mt-3 text-bg/70">{finalCta.sub}</p>
             <div className="mt-8 space-y-4">
               <a href={brand.phoneHref} className="flex items-center gap-3 text-bg/90 hover:text-bg">
@@ -79,7 +80,7 @@ export default function ContactCardOverlap() {
 
           {/* Form card */}
           <motion.div
-            className="rounded-2xl bg-bg p-8 shadow-sm lg:mt-8"
+            className="relative z-10 rounded-2xl bg-bg p-8 shadow-xl ring-1 ring-rule lg:-ml-10 lg:mt-12"
             initial={reduce ? false : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
@@ -101,7 +102,7 @@ export default function ContactCardOverlap() {
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full rounded-lg border border-rule px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
                   <button type="submit" disabled={status === 'loading'}
-                    className="w-full rounded-lg bg-accent py-3.5 font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-60">
+                    className="w-full rounded-lg bg-accent py-3.5 font-semibold text-accentFg transition-opacity hover:opacity-90 disabled:opacity-60">
                     {status === 'loading' ? 'Sending...' : finalCta.cta}
                   </button>
                   {status === 'error' && <p className="text-center text-sm text-red-500">Something went wrong.</p>}

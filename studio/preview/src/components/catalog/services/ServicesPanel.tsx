@@ -1,23 +1,21 @@
 'use client';
-import { useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 
 export const meta = {
-  id: 'services-panel',
+  id: 'services-bento',
   category: 'services',
-  label: 'Services / Preview panel',
+  label: 'Services / Bento',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
 } as const;
 
 export default function ServicesPanel() {
   const reduce = useReducedMotion() ?? false;
   const { services } = CONTENT;
-  const [active, setActive] = useState(0);
-  if (!services.items.length) return null;
-
-  const current = services.items[active];
+  const items = services.items;
+  if (!items.length) return null;
 
   return (
     <section id="services" className="bg-bg py-20">
@@ -30,65 +28,54 @@ export default function ServicesPanel() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{services.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{services.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{services.title}</h2>
           <p className="mt-3 text-inkSoft">{services.sub}</p>
         </motion.div>
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:items-start">
-          {/* Left list */}
-          <ul className="space-y-2">
-            {services.items.map((item, i) => (
-              <li key={item.n}>
-                <button
-                  type="button"
-                  onClick={() => setActive(i)}
-                  className={`w-full rounded-xl px-5 py-4 text-left transition-all ${
-                    i === active
-                      ? 'bg-accent text-bg shadow-md'
-                      : 'bg-bgSoft text-ink hover:bg-bgSoft/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <span className={`text-xs font-medium ${i === active ? 'text-bg/70' : 'text-accent'}`}>{item.tag}</span>
-                      <p className={`mt-0.5 font-heading font-semibold ${i === active ? 'text-bg' : 'text-ink'}`}>{item.t}</p>
-                    </div>
-                    <span className={`text-lg ${i === active ? 'text-bg' : 'text-rule'}`}>→</span>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          {/* Right preview */}
-          <div className="sticky top-24">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={active}
-                className="overflow-hidden rounded-2xl bg-bgSoft"
-                initial={reduce ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? undefined : { opacity: 0, y: -8 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        {/* Bento: item 0 is the feature; a trailing odd item also goes full-width so the
+            grid never has an empty cell. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {items.map((item, i) => {
+            const feature = i === 0;
+            const lastOdd = i === items.length - 1 && (items.length - 1) % 2 === 1;
+            const wide = feature || lastOdd;
+            return (
+              <motion.article
+                key={item.n}
+                className={`group relative isolate flex flex-col justify-end overflow-hidden rounded-2xl ${
+                  wide ? 'sm:col-span-2' : ''
+                } ${feature ? 'min-h-[300px]' : 'min-h-[210px]'}`}
+                initial={reduce ? false : { opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: i * 0.06 }}
               >
-                <div className="relative" style={{ aspectRatio: '4/3' }}>
-                  {current.image?.url ? (
-                    <img src={current.image.url} alt={current.image.alt} loading="lazy"
-                      className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
-                      <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">{current.tag}</span>
-                    </div>
-                  )}
-                </div>
+                {/* Base + image + legibility gradient */}
+                <div className="absolute inset-0 -z-10 bg-ink" />
+                {item.image?.url && (
+                  <img
+                    src={item.image.url}
+                    alt={item.image.alt}
+                    loading="lazy"
+                    className="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                )}
+                <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink/90 via-ink/45 to-ink/10" />
+
                 <div className="p-6">
-                  <span className="text-xs font-medium text-accent">{current.tag}</span>
-                  <h3 className="mt-1 font-heading text-xl font-bold text-ink">{current.t}</h3>
-                  <p className="mt-3 leading-relaxed text-inkSoft">{current.d}</p>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-bg/70">{item.tag}</span>
+                  <h3 className={`mt-1 font-heading font-semibold text-bg ${feature ? 'text-2xl' : 'text-lg'}`}>
+                    {item.t}
+                  </h3>
+                  {feature && <p className="mt-2 max-w-md text-sm leading-relaxed text-bg/80">{item.d}</p>}
+                  <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-bg/90">
+                    Learn more
+                    <ArrowRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />
+                  </span>
                 </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
+              </motion.article>
+            );
+          })}
         </div>
       </div>
     </section>

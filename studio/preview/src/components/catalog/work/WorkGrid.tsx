@@ -27,7 +27,7 @@ export default function WorkGrid() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{work.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{work.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{work.title}</h2>
           <p className="mt-3 text-inkSoft">{work.sub}</p>
         </motion.div>
 
@@ -51,10 +51,10 @@ export default function WorkGrid() {
                     <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">{p.caption}</span>
                   </div>
                 )}
-                <span className="absolute left-3 top-3 rounded-full bg-ink/70 px-2.5 py-1 text-xs font-medium text-bg backdrop-blur-sm">{p.scope}</span>
               </div>
               <div className="p-5">
-                <div className="flex items-start justify-between gap-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-accent">{p.scope}</span>
+                <div className="mt-1 flex items-start justify-between gap-2">
                   <h3 className="font-heading text-sm font-semibold text-ink">{p.t}</h3>
                   {p.yr && <span className="shrink-0 text-xs text-inkSoft">{p.yr}</span>}
                 </div>

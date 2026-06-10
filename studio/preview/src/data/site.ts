@@ -52,7 +52,7 @@ export interface Testimonial {
   q: string;        // quote text
   a: string;        // author name
   r: string;        // role
-  company?: string; // company or location (optional, shown as secondary line)
+  company?: string | null; // company or location (optional, shown as secondary line)
   stars: number;    // 1–5
 }
 
@@ -79,10 +79,6 @@ export interface HeroContent {
   badge: string | null;            // null → omit hero badge
   frictionReducers: string[];      // bullets under form; empty → omit
   heroBullets: Array<{ value: string; label: string }>;
-  rotatingImages: Array<{          // hero image slideshow frames
-    caption: string;
-    tone: "light" | "mid" | "dark" | "ink";
-  }>;
 }
 
 export interface AboutContent {
@@ -151,7 +147,6 @@ export interface BrandPalette {
 export interface BrandTypography {
   fontSans:           string;
   fontHeading:        string;
-  fontMono?:          string;
   headingWeight:      number;
   bodyWeight:         number;
   headingTracking?:   string;
@@ -200,7 +195,6 @@ export interface ExtensionsContent {
 export interface SiteImages {
   hero:         { portrait?: string; slides?: Array<{ url: string; alt: string }> };
   about:        { feature?: string };
-  work:         { cards: string[] };    // legacy parallel array — prefer Project.image when set
   testimonials: { avatars?: string[] };
   footer:       { logoImage?: string };
 }
@@ -330,10 +324,6 @@ export const CONTENT: SiteContent = {
       { value: "24/7",   label: "Emergency line" },
     ],
 
-    rotatingImages: [
-      { caption: "Peak Home Services team on the job",  tone: "mid"  },
-      { caption: "HVAC installation in progress",       tone: "dark" },
-    ],
   },
 
   // ── About ─────────────────────────────────────────────────────────────────
@@ -598,10 +588,6 @@ export const CONTENT: SiteContent = {
 
     about: {
       feature: "https://picsum.photos/seed/peak-about/900/600",
-    },
-
-    work: {
-      cards: [], // images are now embedded per-project via Project.image
     },
 
     testimonials: {},

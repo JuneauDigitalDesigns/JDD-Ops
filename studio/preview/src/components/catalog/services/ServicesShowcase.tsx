@@ -26,7 +26,7 @@ export default function ServicesShowcase() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{services.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{services.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{services.title}</h2>
           <p className="mt-3 text-inkSoft">{services.sub}</p>
         </motion.div>
 
@@ -49,12 +49,10 @@ export default function ServicesShowcase() {
                     <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">{item.tag}</span>
                   </div>
                 )}
-                <div className="absolute left-3 top-3">
-                  <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-bg">{item.tag}</span>
-                </div>
               </div>
               <div className="p-5">
-                <h3 className="font-heading text-base font-semibold text-ink">{item.t}</h3>
+                <span className="text-xs font-semibold uppercase tracking-wider text-accent">{item.tag}</span>
+                <h3 className="mt-1 font-heading text-base font-semibold text-ink">{item.t}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-inkSoft">{item.d}</p>
               </div>
             </motion.article>

@@ -9,6 +9,7 @@ const config: Config = {
     extend: {
       colors: {
         accent: 'var(--accent)',
+        accentFg: 'var(--accent-fg)',
         bg: 'var(--bg)',
         bgSoft: 'var(--bg-soft)',
         ink: 'var(--ink)',

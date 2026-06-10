@@ -8,6 +8,7 @@ import HeroSplit, { meta as heroSplitMeta } from '@/components/catalog/hero/Hero
 import HeroCentered, { meta as heroCenteredMeta } from '@/components/catalog/hero/HeroCentered';
 import HeroSlideshow, { meta as heroSlideshowMeta } from '@/components/catalog/hero/HeroSlideshow';
 import HeroFormFocus, { meta as heroFormMeta } from '@/components/catalog/hero/HeroFormFocus';
+import HeroOverlap, { meta as heroOverlapMeta } from '@/components/catalog/hero/HeroOverlap';
 import AboutPillars, { meta as aboutPillarsMeta } from '@/components/catalog/about/AboutPillars';
 import AboutFeature, { meta as aboutFeatureMeta } from '@/components/catalog/about/AboutFeature';
 import AboutStatBand, { meta as aboutStatBandMeta } from '@/components/catalog/about/AboutStatBand';
@@ -87,6 +88,7 @@ export default function Page() {
         { name: 'HeroCentered',  id: heroCenteredMeta.id,  label: heroCenteredMeta.label,  node: <HeroCentered /> },
         { name: 'HeroSlideshow', id: heroSlideshowMeta.id, label: heroSlideshowMeta.label, node: <HeroSlideshow /> },
         { name: 'HeroFormFocus', id: heroFormMeta.id,      label: heroFormMeta.label,      node: <HeroFormFocus /> },
+        { name: 'HeroOverlap',   id: heroOverlapMeta.id,   label: heroOverlapMeta.label,   node: <HeroOverlap /> },
       ],
     },
     {
