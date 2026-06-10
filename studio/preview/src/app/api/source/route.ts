@@ -6,7 +6,7 @@ import path from 'node:path';
 // Prevents path traversal and constrains the route to known catalog entries.
 const ALLOWED: Record<string, readonly string[]> = {
   nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta'],
-  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus'],
+  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap'],
   trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar'],
   about:        ['AboutPillars', 'AboutFeature', 'AboutStatBand', 'AboutStory'],
   services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase'],

@@ -1,35 +1,29 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { PhoneCall } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
+import { useScrolled } from '@/lib/useScrolled';
 
 export const meta = {
   id: 'nav-split-cta',
   category: 'nav',
   label: 'Nav / Split CTA',
   consumes: ['nav', 'hero.cta', 'brand.name', 'brand.long', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useScrolled'],
 } as const;
 
 export default function NavSplitCta() {
   const reduce = useReducedMotion() ?? false;
   const { brand, nav, hero } = CONTENT;
-  const [scrolled, setScrolled] = useState(false);
+  const scrolled = useScrolled();
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 12);
-    fn();
-    window.addEventListener('scroll', fn, { passive: true });
-    return () => window.removeEventListener('scroll', fn);
-  }, []);
 
   return (
     <header className={`sticky top-0 z-40 bg-bg/95 backdrop-blur transition-all duration-200 ${scrolled ? 'border-b border-rule shadow-sm' : ''}`}>
-      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-4">
+      <div className={`mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 transition-all duration-300 ${scrolled ? 'py-2.5' : 'py-4'}`}>
         {/* Brand (left) */}
-        <a href="#top" className="font-heading text-lg font-bold text-ink">{brand.name}</a>
+        <a href="#top" className={`font-heading font-bold text-ink transition-all duration-300 ${scrolled ? 'text-base' : 'text-lg'}`}>{brand.name}</a>
 
         {/* Nav (center) */}
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
@@ -50,7 +44,7 @@ export default function NavSplitCta() {
             {brand.phone}
           </a>
           <a href="#cta"
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg transition-opacity hover:opacity-90">
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accentFg shadow-sm shadow-accent/20 transition-all hover:-translate-y-px hover:opacity-95 active:translate-y-0">
             {hero.cta}
           </a>
 
@@ -77,7 +71,7 @@ export default function NavSplitCta() {
                   className="block py-2 text-sm font-medium text-ink">{item.label}</a>
               ))}
               <a href="#cta" onClick={() => setOpen(false)}
-                className="mt-3 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-bg">
+                className="mt-3 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-accentFg">
                 {hero.cta}
               </a>
             </nav>

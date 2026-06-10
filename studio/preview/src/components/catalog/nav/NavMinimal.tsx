@@ -3,27 +3,21 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { List, X, PhoneCall } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
+import { useScrolled } from '@/lib/useScrolled';
 
 export const meta = {
   id: 'nav-minimal',
   category: 'nav',
   label: 'Nav / Minimal',
   consumes: ['nav', 'hero.cta', 'brand.name', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useScrolled'],
 } as const;
 
 export default function NavMinimal() {
   const reduce = useReducedMotion() ?? false;
   const { brand, nav, hero } = CONTENT;
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 12);
-    fn();
-    window.addEventListener('scroll', fn, { passive: true });
-    return () => window.removeEventListener('scroll', fn);
-  }, []);
+  const scrolled = useScrolled();
 
   useEffect(() => {
     if (!open) return;
@@ -48,7 +42,7 @@ export default function NavMinimal() {
 
         <div className="flex items-center gap-3">
           <a href="#cta"
-            className="hidden items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-bg transition-opacity hover:opacity-90 md:inline-flex">
+            className="hidden items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accentFg transition-opacity hover:opacity-90 md:inline-flex">
             {hero.cta}
           </a>
           <a href={brand.phoneHref}
@@ -81,7 +75,7 @@ export default function NavMinimal() {
                 </a>
               ))}
               <a href="#cta" onClick={() => setOpen(false)}
-                className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-sm font-medium text-bg">
+                className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-sm font-medium text-accentFg">
                 {hero.cta}
               </a>
             </nav>

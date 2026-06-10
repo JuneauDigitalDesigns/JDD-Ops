@@ -25,13 +25,13 @@ export default function FinalCtaSimple() {
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{finalCta.eyebrow}</p>
-          <h2 className="mt-4 font-heading text-4xl font-bold text-ink md:text-5xl">{finalCta.headline}</h2>
+          <h2 className="mt-4 font-heading text-4xl text-ink md:text-5xl">{finalCta.headline}</h2>
           <p className="mx-auto mt-5 max-w-lg leading-relaxed text-inkSoft">{finalCta.sub}</p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
               href="#contact"
-              className="inline-block rounded-lg bg-accent px-8 py-4 font-semibold text-bg transition-opacity hover:opacity-90"
+              className="inline-block rounded-lg bg-accent px-8 py-4 font-semibold text-accentFg transition-opacity hover:opacity-90"
             >
               {finalCta.cta}
             </a>

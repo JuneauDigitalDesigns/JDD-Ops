@@ -1,41 +1,69 @@
 'use client';
 import { motion, useReducedMotion } from 'framer-motion';
+import { Star } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 
 export const meta = {
-  id: 'trust-logo-grid',
+  id: 'trust-credibility-band',
   category: 'trust',
-  label: 'Trust / Logo grid',
-  consumes: ['trust.label', 'trust.logos'],
-  sharedDeps: ['framer-motion'],
+  label: 'Trust / Credibility band',
+  consumes: ['trust.label', 'trust.logos', 'extensions.reviewBadge'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
 } as const;
 
 export default function TrustLogoGrid() {
   const reduce = useReducedMotion() ?? false;
-  const { trust } = CONTENT;
-  if (!trust.logos.length) return null;
+  const { trust, extensions } = CONTENT;
+  const review = extensions.reviewBadge;
+  if (!trust.logos.length && !review) return null;
 
   return (
-    <section className="bg-bg py-14">
-      <div className="mx-auto max-w-5xl px-6">
-        <p className="mb-8 text-center text-xs font-semibold uppercase tracking-widest text-inkSoft">
-          {trust.label}
-        </p>
-        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-7">
+    <section className="border-y border-rule bg-bg py-10">
+      <motion.div
+        className="mx-auto grid max-w-6xl gap-8 px-6 lg:grid-cols-[auto_1fr] lg:items-center lg:gap-12"
+        initial={reduce ? false : { opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.5 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {/* Anchor: rating, or a partner-count statement */}
+        <div className="lg:border-r lg:border-rule lg:pr-12">
+          {review ? (
+            <div className="flex items-center gap-3">
+              <p className="font-heading text-4xl font-bold leading-none text-ink">{review.rating}</p>
+              <div>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Star key={i} size={14} weight="fill" className={i < Math.round(review.rating) ? 'text-accent' : 'text-rule'} />
+                  ))}
+                </div>
+                <p className="mt-0.5 text-xs text-inkSoft">{review.count}+ verified reviews</p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-accent">{trust.label}</p>
+              <p className="mt-1 font-heading text-2xl font-bold text-ink">
+                {trust.logos.length}+ local partners
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Credential wordmarks separated by hairlines */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           {trust.logos.map((logo, i) => (
-            <motion.div
-              key={logo}
-              className="flex items-center justify-center rounded-lg border border-rule bg-bgSoft px-3 py-3 text-center"
-              initial={reduce ? false : { opacity: 0, scale: 0.92 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: i * 0.04 }}
+            <span
+              key={i}
+              className={`text-sm font-medium uppercase tracking-wide text-inkSoft ${
+                i > 0 ? 'border-l border-rule pl-6' : ''
+              }`}
             >
-              <span className="text-xs font-medium leading-tight text-inkSoft">{logo}</span>
-            </motion.div>
+              {logo}
+            </span>
           ))}
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 }

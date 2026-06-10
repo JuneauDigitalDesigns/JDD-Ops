@@ -33,7 +33,7 @@ export default function HeroCentered() {
   const { hero, brand } = CONTENT;
 
   return (
-    <section className="bg-bgSoft px-6 py-24 text-center">
+    <section className="bg-bgSoft px-6 py-20 text-center">
       <div className="mx-auto max-w-3xl">
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 24 }}
@@ -48,7 +48,7 @@ export default function HeroCentered() {
 
           <p className="text-sm font-semibold uppercase tracking-widest text-accent">{hero.eyebrow}</p>
 
-          <h1 className="mt-4 font-heading text-4xl font-bold leading-tight text-ink md:text-5xl lg:text-6xl">
+          <h1 className="mt-4 font-heading text-4xl leading-tight text-ink md:text-5xl lg:text-6xl">
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
@@ -58,7 +58,7 @@ export default function HeroCentered() {
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
               href="#cta"
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-7 py-3.5 font-medium text-bg transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-7 py-3.5 font-medium text-accentFg transition-opacity hover:opacity-90"
             >
               {hero.cta}
             </a>
@@ -89,7 +89,7 @@ export default function HeroCentered() {
         {/* heroBullets row */}
         {hero.heroBullets.length > 0 && (
           <motion.div
-            className="mt-14 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-rule sm:grid-cols-4"
+            className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-rule sm:grid-cols-4"
             initial={reduce ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}

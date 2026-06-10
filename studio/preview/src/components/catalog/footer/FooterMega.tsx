@@ -30,14 +30,13 @@ export default function FooterMega() {
           <div>
             <p className="font-heading text-xl font-bold">{brand.name}</p>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-bg/60">{footer.blurb}</p>
-            <div className="mt-5 flex items-center gap-3">
-              <a href={brand.phoneHref} className="flex items-center gap-1.5 text-sm text-bg/70 hover:text-bg">
-                <PhoneCall size={15} className="text-accent" />
+            <div className="mt-5 space-y-2">
+              <a href={brand.phoneHref} className="flex items-center gap-2 text-sm text-bg/70 hover:text-bg">
+                <PhoneCall size={15} className="shrink-0 text-accent" />
                 {brand.phone}
               </a>
-              <span className="text-bg/20">|</span>
-              <a href={`mailto:${brand.email}`} className="flex items-center gap-1.5 text-sm text-bg/70 hover:text-bg">
-                <Envelope size={15} className="text-accent" />
+              <a href={`mailto:${brand.email}`} className="flex items-center gap-2 text-sm text-bg/70 hover:text-bg">
+                <Envelope size={15} className="shrink-0 text-accent" />
                 {brand.email}
               </a>
             </div>

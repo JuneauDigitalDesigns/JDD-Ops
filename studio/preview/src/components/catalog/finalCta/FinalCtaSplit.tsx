@@ -49,7 +49,7 @@ export default function FinalCtaSplit() {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
             <p className="text-xs font-semibold uppercase tracking-widest text-accent">{finalCta.eyebrow}</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-ink">{finalCta.headline}</h2>
+            <h2 className="mt-3 font-heading text-3xl text-ink">{finalCta.headline}</h2>
             <p className="mt-4 leading-relaxed text-inkSoft">{finalCta.sub}</p>
 
             {finalCta.frictionReducers.length > 0 && (
@@ -98,7 +98,7 @@ export default function FinalCtaSplit() {
                     className="w-full rounded-lg border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
                 </div>
                 <button type="submit" disabled={status === 'loading'}
-                  className="w-full rounded-lg bg-accent px-6 py-3.5 font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-60">
+                  className="w-full rounded-lg bg-accent px-6 py-3.5 font-semibold text-accentFg transition-opacity hover:opacity-90 disabled:opacity-60">
                   {status === 'loading' ? 'Sending...' : finalCta.cta}
                 </button>
                 {status === 'error' && (

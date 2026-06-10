@@ -55,7 +55,7 @@ export default function ContactSplit() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{finalCta.eyebrow}</p>
-          <h2 className="mt-3 font-heading text-3xl font-bold text-ink md:text-4xl">{finalCta.headline}</h2>
+          <h2 className="mt-3 font-heading text-3xl text-ink md:text-4xl">{finalCta.headline}</h2>
           <p className="mt-3 leading-relaxed text-inkSoft">{finalCta.sub}</p>
 
           <div className="mt-8 space-y-4">
@@ -128,7 +128,7 @@ export default function ContactSplit() {
                   className="w-full rounded-xl border border-rule bg-bg px-4 py-2.5 text-ink outline-none transition-colors focus:border-accent" />
               </div>
               <button type="submit" disabled={status === 'sending'}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-50">
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-medium text-accentFg transition-opacity hover:opacity-90 disabled:opacity-50">
                 {status === 'sending' ? 'Sending...' : finalCta.cta}
                 {status !== 'sending' && <ArrowRight size={16} />}
               </button>

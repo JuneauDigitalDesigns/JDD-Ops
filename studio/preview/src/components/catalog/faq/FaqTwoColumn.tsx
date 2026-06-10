@@ -28,7 +28,7 @@ export default function FaqTwoColumn() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{faq.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{faq.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{faq.title}</h2>
           <p className="mt-3 text-inkSoft">{faq.sub}</p>
         </motion.div>
 

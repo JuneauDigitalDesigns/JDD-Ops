@@ -1,13 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Plus, Minus } from '@phosphor-icons/react';
+import { PhoneCall, CaretRight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 
 export const meta = {
-  id: 'faq-sticky-aside',
+  id: 'faq-two-pane',
   category: 'faq',
-  label: 'FAQ / Sticky aside',
+  label: 'FAQ / Two-pane',
   consumes: ['faq.eyebrow', 'faq.title', 'faq.sub', 'faq.items', 'brand.phone', 'brand.phoneHref'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
 } as const;
@@ -15,53 +15,70 @@ export const meta = {
 export default function FaqStickyAside() {
   const reduce = useReducedMotion() ?? false;
   const { faq, brand } = CONTENT;
+  const [active, setActive] = useState(0);
   if (!faq.items.length) return null;
-  const [open, setOpen] = useState<number | null>(0);
+  const current = faq.items[active];
 
   return (
     <section id="faq" className="bg-bg py-20">
       <div className="mx-auto max-w-5xl px-6">
-        <div className="grid gap-12 lg:grid-cols-[300px_1fr] lg:items-start">
-          {/* Sticky aside */}
-          <div className="lg:sticky lg:top-24">
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent">{faq.eyebrow}</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-ink">{faq.title}</h2>
-            <p className="mt-4 leading-relaxed text-inkSoft">{faq.sub}</p>
-            <a href={brand.phoneHref}
-              className="mt-6 inline-block rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90">
-              Call {brand.phone}
-            </a>
-          </div>
+        <motion.div
+          className="max-w-xl"
+          initial={reduce ? false : { opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.4 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent">{faq.eyebrow}</p>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{faq.title}</h2>
+          <p className="mt-3 text-inkSoft">{faq.sub}</p>
+        </motion.div>
 
-          {/* Accordion */}
-          <div className="space-y-2">
-            {faq.items.map((item, i) => (
-              <div key={i} className="overflow-hidden rounded-xl border border-rule">
+        <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+          {/* Left: question list */}
+          <ul className="space-y-1">
+            {faq.items.map((f, i) => (
+              <li key={i}>
                 <button
                   type="button"
-                  onClick={() => setOpen(open === i ? null : i)}
-                  className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
-                  aria-expanded={open === i}
+                  onClick={() => setActive(i)}
+                  aria-expanded={active === i}
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-5 py-4 text-left transition-colors ${
+                    i === active ? 'bg-bgSoft text-ink' : 'text-inkSoft hover:bg-bgSoft/60'
+                  }`}
                 >
-                  <span className="font-heading font-semibold text-ink">{item.q}</span>
-                  {open === i
-                    ? <Minus size={18} className="shrink-0 text-accent" />
-                    : <Plus size={18} className="shrink-0 text-inkSoft" />}
+                  <span className="font-heading text-sm font-semibold">{f.q}</span>
+                  <CaretRight
+                    size={16}
+                    className={`shrink-0 transition-transform ${i === active ? 'translate-x-0 text-accent' : '-translate-x-1 text-rule'}`}
+                  />
                 </button>
-                <AnimatePresence initial={false}>
-                  {open === i && (
-                    <motion.div
-                      initial={reduce ? false : { height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={reduce ? undefined : { height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    >
-                      <p className="px-6 pb-5 leading-relaxed text-inkSoft">{item.a}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              </li>
             ))}
+          </ul>
+
+          {/* Right: answer pane */}
+          <div className="lg:sticky lg:top-24">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={active}
+                className="rounded-2xl border border-rule bg-bgSoft p-8"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? undefined : { opacity: 0, y: -8 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <h3 className="font-heading text-xl font-semibold text-ink">{current.q}</h3>
+                <p className="mt-3 leading-relaxed text-inkSoft">{current.a}</p>
+                <a
+                  href={brand.phoneHref}
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline"
+                >
+                  <PhoneCall size={15} weight="bold" />
+                  Still unsure? Call {brand.phone}
+                </a>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </div>

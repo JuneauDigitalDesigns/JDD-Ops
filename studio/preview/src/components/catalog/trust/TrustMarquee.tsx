@@ -32,7 +32,7 @@ export default function TrustMarquee() {
         {reduce ? (
           <div className="flex flex-wrap justify-center gap-6 px-6">
             {trust.logos.map((logo, i) => (
-              <span key={i} className="rounded-full border border-rule px-4 py-1.5 text-sm font-medium text-inkSoft">{logo}</span>
+              <span key={i} className="rounded-full border border-rule px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-inkSoft">{logo}</span>
             ))}
           </div>
         ) : (
@@ -43,7 +43,7 @@ export default function TrustMarquee() {
             transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
           >
             {doubled.map((logo, i) => (
-              <span key={i} className="inline-flex items-center rounded-full border border-rule bg-bgSoft px-5 py-2 text-sm font-medium text-inkSoft">
+              <span key={i} className="inline-flex items-center rounded-full border border-rule px-5 py-2 text-xs font-semibold uppercase tracking-wider text-inkSoft">
                 {logo}
               </span>
             ))}

@@ -1,8 +1,16 @@
 # JDD Operations Runbook
 
-Step-by-step setup for the JDD provisioning pipeline. Read this top-to-bottom
-the first time. After that, jump to the "Per-client setup at Checkpoint 3"
-section for each new Growth/Enterprise client.
+Step-by-step setup for the JDD provisioning pipeline. Read this top-to-bottom the
+first time. After that, the per-client path is: **Part B (build the site) → Part C
+(provision) → Part D (wire the lead-callback) → Part E (set up the client portal)**.
+
+> **Repo location:** this repo lives at `C:\Users\Xander\Desktop\ops\jdd-ops`.
+> The Desktop is organized into `clients/`, `ops/`, and `templates/`.
+
+> **The site builder ("studio")** is the drag-and-drop app at `studio/preview`. It is how
+> you compose a client site from the prebuilt component catalog and export it into
+> `clients/{slug}/repo`. There is **no GitHub template repo** anymore — the blank template
+> lives in this repo at `template/` and is copied locally per client.
 
 ---
 
@@ -11,7 +19,7 @@ section for each new Growth/Enterprise client.
 ### A1. Fill in master credentials
 
 ```
-cd C:\Users\Xander\Desktop\jdd-ops
+cd C:\Users\Xander\Desktop\ops\jdd-ops
 cp .env.example .env
 ```
 
@@ -19,79 +27,67 @@ Open `.env` and fill in:
 
 | Variable | Where to get it |
 |---|---|
-| `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys |
-| `RESEND_API_KEY` | resend.com → API Keys. Used by Starter sites for lead email delivery. |
+| `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys. Used in step 6 to generate the Retell agent prompt. |
+| `RESEND_API_KEY` | resend.com → API Keys. Used by **Starter** sites for lead email delivery. |
 | `RESEND_FROM_EMAIL` | A verified sender on a domain you control (e.g. `leads@juneaudigitaldesigns.com`). Reused across every Starter site. |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | console.twilio.com → top-right Account SID / Auth Token |
-| `RETELL_API_KEY` | dashboard.retellai.com → API Keys |
+| `RETELL_API_KEY` | dashboard.retellai.com → API Keys. Used to create agents **and provision phone numbers**. |
 | `RETELL_LLM_ID` | One Retell LLM created once; reused for every agent. dashboard.retellai.com → LLM → Create → copy ID. |
 | `RETELL_DEFAULT_VOICE_ID` | dashboard.retellai.com → Voices → pick one → copy ID. |
 | `AIRTABLE_API_KEY` | airtable.com/create/tokens with `data.records:write` + `schema.bases:write` scopes on your workspace. |
-| `AIRTABLE_WORKSPACE_ID` | airtable.com/{workspaceId}/api — copy the workspace ID from the URL. |
-| `GITHUB_TOKEN` | github.com/settings/tokens → fine-grained PAT with `repo` + `delete_repo` scopes on `xjuneau1`. |
-| `GITHUB_ORG` | `xjuneau1` (or whichever org owns the per-client repos). |
+| `AIRTABLE_WORKSPACE_ID` | airtable.com/{workspaceId}/api — copy the workspace ID from the URL (starts with `wsp`). |
+| `GITHUB_TOKEN` | github.com/settings/tokens → fine-grained PAT with `repo` + `delete_repo` scopes on `GITHUB_ORG`. |
+| `GITHUB_ORG` | The account/org that owns per-client repos (e.g. `xjuneau1`). Personal accounts work too. |
 | `VERCEL_TOKEN` | vercel.com/account/tokens → create. Scope = the team that holds client projects. |
 | `VERCEL_TEAM_ID` | vercel.com/{team}/~/settings → "Team ID" (only if using a team, not a personal account). |
-| `TEMPLATE_REPO` | `xjuneau1/business-site-template` (must already exist on GitHub — see A2). |
+| `MAKE_API_KEY` | make.com → Profile → API → create a token. Lets step 8c register the agent in the post-call Data Store. |
+| `MAKE_DATA_STORE_ID` | make.com → Data stores → `retell-agent-lookup` → the numeric ID in the URL (see A4). |
+| `RETELL_POST_CALL_WEBHOOK_URL` | The webhook URL of the `jdd-post-call-log` Make scenario (see A4). Used to wire agents to post-call logging. |
+
+> **No Twilio account credentials.** Phone numbers are now **provisioned and owned by
+> Retell** (Twilio is the carrier under the hood). You do **not** need `TWILIO_ACCOUNT_SID`
+> or `TWILIO_AUTH_TOKEN`. The provisioned number is stored in `.env.local` as `TWILIO_NUMBER`
+> only for backward-compat with the Make scenario's `from_number`.
+
+> **`TEMPLATE_REPO` is deprecated/unused.** `onboard.js` no longer clones a GitHub template.
+> Leave it blank.
 
 `npm install` once after the file is filled.
 
-### A2. Push `business-site-template` to GitHub
+### A2. Install Vercel's GitHub App on `GITHUB_ORG`
 
-The provisioning script clones from `TEMPLATE_REPO`. If the template is local-only,
-step 2 of `onboard.js` will fail.
-
-```
-cd C:\Users\Xander\Desktop\business-site-template\business-template
-gh repo create xjuneau1/business-site-template --private --source=. --push
-```
-
-If `gh` CLI isn't installed: create the repo on github.com manually, then:
-
-```
-git remote add origin https://github.com/xjuneau1/business-site-template.git
-git push -u origin master
-```
-
-### A3. Install Vercel's GitHub App on `xjuneau1`
-
-Lets `onboard.js` step 9 call `POST /v10/projects` with a `gitRepository`
-field; Vercel auto-detects the repo and auto-deploys on push. Without this,
-step 9 will 403 on project creation.
+Lets `onboard.js` step 9 create a Vercel project linked to the new client repo and
+auto-deploy on push. Without this, project creation/link will 403.
 
 1. Sign in to **vercel.com** with the account that owns the team holding client projects.
-2. In the top-left, click your **team name** → confirm the right team is selected. (Personal account is fine; `VERCEL_TEAM_ID` in `.env` reflects which scope.)
-3. Visit **https://vercel.com/integrations/github** (or: top nav → **Integrations** → search "GitHub" → click it).
-4. Click **Add Integration**. A modal asks which Vercel scope (team). Pick the team that owns your `.env` `VERCEL_TOKEN`.
-5. GitHub redirects you. Pick **Install to `xjuneau1`**.
-6. **Repository access**: choose **All repositories**. Important — new client repos must be auto-visible to Vercel. With "Only select repositories" you'd have to manually allowlist each one before provisioning.
-7. Click **Install**. GitHub redirects back to Vercel.
-8. **Verify**: in Vercel dashboard → **Add New… → Project** → repos under `xjuneau1` should appear in the picker.
+2. Top-left → confirm the right **team** is selected (matches `VERCEL_TEAM_ID` in `.env`).
+3. Visit **https://vercel.com/integrations/github** → **Add Integration**. Pick the team
+   that owns your `.env` `VERCEL_TOKEN`.
+4. GitHub redirects you → **Install to `{GITHUB_ORG}`**.
+5. **Repository access**: choose **All repositories** — new client repos must be auto-visible
+   to Vercel. With "Only select repositories" you'd have to allowlist each new repo by hand.
+6. **Install**. Verify: Vercel → **Add New… → Project** → repos under `{GITHUB_ORG}` appear.
 
-### A4. Build the Master Make.com scenario
+### A3. Build the outbound lead-callback master Make scenario
 
 Make.com is the orchestration glue: client lead form → Make webhook → Retell
-`create-phone-call` → Twilio dials the lead. The master scenario is a
-template you build **once**, then clone per client. Cloning is necessary
-because each client has a different Retell `agent_id` and Twilio
-`from_number` — the HTTP module hardcodes both.
+`create-phone-call` → the agent dials the lead back. The master scenario is a template you
+build **once**, then **clone per client** (each client has a different `from_number` and
+`agent_id` baked into the HTTP module — see Part F-why at the bottom).
 
-1. Sign up at **make.com** (free tier is enough to start).
-2. Click **Create a new scenario**.
-3. Add the first module: **Webhooks → Custom webhook**. Click **Add** to create the webhook (it'll get a unique URL — for the master, this URL is never used; clones get their own).
-4. **Run once** with a test payload so Make learns the body structure. Click "Run once" then in another browser tab POST this JSON to the webhook URL with curl or Postman:
+1. Sign up / sign in at **make.com**.
+2. **Create a new scenario.**
+3. Module 1: **Webhooks → Custom webhook** → **Add** (gets a unique URL — for the master,
+   this URL is never used; clones get their own).
+4. **Run once** with a test payload so Make learns the body shape. POST this to the webhook:
    ```json
-   { "name": "Test Lead", "phone": "9075550142", "email": "", "type": "form", "brand": "test", "receivedAt": "2026-05-13T00:00:00Z" }
+   { "name": "Test Lead", "phone": "9075550142", "email": "", "type": "form", "brand": "test", "receivedAt": "2026-01-01T00:00:00Z" }
    ```
-   Make will detect the schema and store it for later modules to reference.
-5. Add the second module: **HTTP → Make a request**.
+5. Module 2: **HTTP → Make a request**.
    - **URL**: `https://api.retellai.com/v2/create-phone-call`
    - **Method**: `POST`
-   - **Headers**:
-     - `Authorization: Bearer <YOUR_RETELL_API_KEY>` (paste your real key here in the master — clones inherit)
-     - `Content-Type: application/json`
-   - **Body type**: Raw → JSON
-   - **Body**:
+   - **Headers**: `Authorization: Bearer <YOUR_RETELL_API_KEY>` (paste the real key in the
+     master — clones inherit it) · `Content-Type: application/json`
+   - **Body type**: Raw → JSON:
      ```json
      {
        "from_number": "<<<TWILIO_NUMBER>>>",
@@ -99,131 +95,250 @@ because each client has a different Retell `agent_id` and Twilio
        "override_agent_id": "<<<RETELL_AGENT_ID>>>"
      }
      ```
-     Leave `<<<TWILIO_NUMBER>>>` and `<<<RETELL_AGENT_ID>>>` as literal placeholders in the master. The clone step replaces them with real values per client. `{{1.phone}}` references the phone field from module 1's payload — Make's UI lets you click-to-insert it.
-6. *(optional)* Add a third module: **Email → Send an Email** or **Slack → Create a Message** with a lead summary. Useful to get a heads-up when a lead lands. Wire body fields to `{{1.name}}`, `{{1.phone}}`, `{{1.brand}}`.
-7. **Save** the scenario.
-8. **Deactivate** the master (toggle in the bottom-left, scenario editor). The master should never run — only clones do.
+     Leave `<<<TWILIO_NUMBER>>>` and `<<<RETELL_AGENT_ID>>>` as literal placeholders in the
+     master. The clone step (Part D) replaces them per client.
+6. *(optional)* Module 3: **Email** or **Slack** lead summary wired to `{{1.name}}`,
+   `{{1.phone}}`, `{{1.brand}}`.
+7. **Save**, then **Deactivate** the master (it should never run — only clones do).
+
+### A4. Build the shared post-call logging scenario + Data Store
+
+This is the pipeline that fills each client's Airtable **Call Log** (which the client portal
+reads). One **shared** scenario routes every agent's completed call to the right Airtable base
+via a Data Store lookup — **no per-client cloning**.
+
+```
+Any Retell agent → call_ended webhook → Make: jdd-post-call-log
+   → Data Store lookup: agent_id → base_id → Airtable: Create Record in {base_id}/Call Log
+```
+
+1. **Create a Data Store** — make.com → **Data stores** → **Create a data store**:
+   - Name: `retell-agent-lookup`
+   - Fields: `base_id` (text), `client_name` (text), `table_name` (text).
+   - Copy its numeric ID from the URL into `.env` as `MAKE_DATA_STORE_ID`.
+   - Onboarding adds one row per Growth/Enterprise client automatically (step 8c), keyed by
+     the client's `RETELL_AGENT_ID`.
+2. **Create the scenario** `jdd-post-call-log`:
+   - Module 1: **Webhooks → Custom webhook** named `retell-post-call`. Copy its URL into
+     `.env` as `RETELL_POST_CALL_WEBHOOK_URL`. **Run once** and POST a sample Retell
+     `call_ended` payload so Make learns the schema (see `retell-post-call-airtable-plan.md`
+     for a ready-to-paste payload).
+   - Module 2: **Data store → Get a record** — store `retell-agent-lookup`, key `{{1.agent_id}}`.
+   - Module 3: **Airtable → Create a Record** — Base ID `{{2.base_id}}`, Table `Call Log`,
+     map Date / Caller name / Caller number / Summary / Duration / Call type / Outcome from
+     the payload (see the plan doc for exact field expressions).
+   - Add an **error handler → Resume** on Module 2 so an unknown `agent_id` doesn't halt it.
+   - **Activate** the scenario.
+3. **Wire each Retell agent to the webhook.** `onboard.js` does **not** yet set the agent's
+   post-call webhook automatically, so for each agent: Retell dashboard → **Agents** →
+   {agent} → **Settings** → **Post-call webhook URL** → paste `RETELL_POST_CALL_WEBHOOK_URL`
+   → Save. (Do this at Part F / Checkpoint 3 for each new client.)
+
+### A5. Client portal master setup (in the agency repo)
+
+The client portal lives in `ops/juneau-digital-designs` (route `/portal`) and is configured
+by **that** repo's `.env`, not this one. Do this once:
+
+1. **Clerk** — create a Clerk application; set `CLERK_SECRET_KEY` +
+   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (and the sign-in URL vars) in the agency `.env` and on
+   Vercel. The portal protects `/portal` and `/api/portal/*` via Clerk middleware.
+2. **Google service account + GA4 Data API** — in Google Cloud, create a service account,
+   enable the **Google Analytics Data API**, download its JSON key, and put the whole JSON in
+   `GOOGLE_SERVICE_ACCOUNT_KEY`. Note the service account **email** — you grant it Viewer on
+   each client's GA4 property (Part F).
+3. **PageSpeed Insights API key** → `PAGESPEED_API_KEY`.
+4. **Upstash Redis** (cache + rate-limit) — provision via Vercel → Storage; confirm the env
+   var names match what `portal-kv.ts` reads (`Redis.fromEnv()`).
+5. **Airtable** — `AIRTABLE_API_KEY` (the same JDD key) so the portal can read each client's
+   Call Log base.
 
 ---
 
-## Part B — Per-client setup at Checkpoint 3
+## Part B — Build the client site (studio)
 
-After `npm run onboard -- --schema clients/{slug}/site.ts` completes
-successfully and prints the handoff summary, do this for **every Growth or
-Enterprise site**. (Skip for Starter — Starter uses Resend email, no Make
-scenario needed.)
+Compose the site from the prebuilt component catalog and export it into `clients/{slug}/repo`.
 
-For Enterprise clients, repeat steps 1-7 **once per site** — each site (`site-1`,
-`site-2`, optionally `site-3`) gets its own clone with its own webhook URL.
+### Option 1 — Studio (drag-and-drop, recommended)
 
-### B1. Clone the master Make scenario
+1. Start the studio: `npm run preview` (runs `studio/preview` on a dev server).
+2. In the studio, **name the client** (this is the `slug`), pick and order components (nav,
+   hero, services, FAQ, contact, footer, SEO, …), and preview live.
+3. Click **Export**. The studio copies `template/` → `clients/{slug}/repo`, installs the
+   content schema, wires `page.tsx`, then runs `npm install && npm run build` to verify it
+   compiles. On success you have `clients/{slug}/repo` ready to provision.
 
-1. In Make dashboard, open the master scenario.
-2. Click **"…"** (top-right) → **Clone**.
-3. Rename the clone: `Lead → Retell: <brand short>` (e.g. `Lead → Retell: Peak` for Growth, or `Lead → Retell: Peak — Anchorage` for an Enterprise site).
+### Option 2 — Manual scaffold
 
-### B2. Grab the new webhook URL
+```
+npm run new-client -- --slug {slug}     # copies template/ → clients/{slug}/repo, scaffolds clients/{slug}/site.ts
+# fill in clients/{slug}/site.ts (the INTAKE); drop catalog components; wire SLOTs in src/app/page.tsx
+npm run hydrate -- --slug {slug}        # splice real content into the repo for an accurate preview
+(cd clients/{slug}/repo && npm run dev) # preview
+```
 
-1. Open the cloned scenario.
-2. Click the **Webhook trigger** module (module 1).
-3. Click **Copy address to clipboard** — this is the new client/site's unique webhook URL.
+Either way you end with two files that drive provisioning:
+- `clients/{slug}/site.ts` — the intake (`export const INTAKE` or legacy `CONTENT`). Source of truth.
+- `clients/{slug}/repo/` — the local Next.js site (gitignored here; pushed to its own repo in step 8).
 
-### B3. Replace placeholders with the client's real values
+---
 
-1. Open `clients/{slug}/.env.local` in your editor. For Enterprise, this is
-   `clients/{baseSlug}/site-N/.env.local`. Note the values of:
-   - `TWILIO_NUMBER` (e.g. `+19075551234`)
-   - `RETELL_AGENT_ID` (e.g. `agent_abc123…`)
-2. Back in Make, open the **HTTP module** in the clone.
-3. In the body, replace `<<<TWILIO_NUMBER>>>` with the real Twilio number from `.env.local`.
-4. Replace `<<<RETELL_AGENT_ID>>>` with the real `RETELL_AGENT_ID`.
+## Part C — Provision (onboard.js)
 
-### B4. Activate the cloned scenario
+```
+cd C:\Users\Xander\Desktop\ops\jdd-ops
+npm run onboard -- --schema clients/{slug}/site.ts        # add --dry-run to preview with no side effects
+```
 
-Toggle **Active** in the bottom-left of the scenario editor. The clone is now live and listening on its webhook URL.
+`onboard.js` runs 9 steps, gated by the intake's `plan` (`starter` / `growth` / `enterprise`):
 
-### B5. Paste the webhook URL into the client's `.env.local`
+1. Load + validate the intake (and pre-flight credential check).
+2. Create an **empty** GitHub repo under `{GITHUB_ORG}/{slug}` and point the local
+   `clients/{slug}/repo` origin at it (no template clone).
+3. Write `src/data/site.ts` into the local repo.
+4. Write `clients/{slug}/.env.local` (idempotent — preserves already-provisioned IDs).
+5. `npm install && npm run build` in the local repo.
+6. **Starter stops here for voice.** Growth/Enterprise continue:
+   6. Claude generates the Retell agent prompt → `clients/{slug}/agent-prompt.txt`.
+   7. Create the Retell agent.
+   8. **Provision a Retell-managed phone number** (local area code, else toll-free), bound to
+      the agent for inbound + outbound → stored as `TWILIO_NUMBER`; create the Airtable base
+      (shared for Enterprise, with a per-site `Site` column); register the agent in the Make
+      `retell-agent-lookup` Data Store (step 8c).
+9. Commit + push the local repo (Vercel auto-deploys); sync env vars to the Vercel project.
 
-Open `clients/{slug}/.env.local` (or `clients/{baseSlug}/site-N/.env.local`) and set:
+For **Enterprise** (2–3 sites), steps repeat per site; sites share one Airtable base and the
+master Retell minute pool, each with its own agent + number.
 
+On completion `onboard.js` prints a handoff summary with repo URL, agent ID, number, and the
+checkpoint next-steps.
+
+- **Starter** → verify the lead email arrives after a test form submission; verify the
+  deployed Vercel URL. (No voice agent, no Make scenario.)
+- **Growth / Enterprise** → continue to Part D and Part E.
+
+---
+
+## Part D — Wire the lead-callback (per Growth/Enterprise site, Checkpoint 3)
+
+For Enterprise, repeat **once per site** (`site-1`, `site-2`, …) — each gets its own clone.
+
+### D1. Clone the outbound master scenario
+Make dashboard → open the master → **"…" → Clone** → rename `Lead → Retell: <brand short>`
+(Enterprise: `… — <site>`).
+
+### D2. Grab the clone's webhook URL
+Open the clone → **Webhook trigger** module → **Copy address to clipboard**.
+
+### D3. Replace placeholders with the client's real values
+From `clients/{slug}/.env.local` (Enterprise: `clients/{baseSlug}/site-N/.env.local`) read
+`TWILIO_NUMBER` and `RETELL_AGENT_ID`. In the clone's **HTTP module** body, replace
+`<<<TWILIO_NUMBER>>>` and `<<<RETELL_AGENT_ID>>>` with those real values.
+
+### D4. Activate the clone
+Toggle **Active** (bottom-left of the scenario editor).
+
+### D5. Paste the webhook URL into `.env.local`
 ```
 MAKE_WEBHOOK_URL=https://hook.us1.make.com/...your unique URL...
 ```
 
-### B6. Push the env var to Vercel
-
+### D6. Push the env var to Vercel
 ```
-cd C:\Users\Xander\Desktop\jdd-ops
-npm run sync-env -- --slug {slug}
+npm run sync-env -- --slug {slug}          # Enterprise: --slug {baseSlug}/site-N
 ```
 
-For Enterprise sites, the slug includes the site folder: `--slug {baseSlug}/site-N`.
+### D7. Redeploy
+Push any commit to the client repo (Vercel auto-deploys), or Vercel → project → **Deployments**
+→ "…" → **Redeploy**.
 
-### B7. Trigger a redeploy on Vercel
-
-Either:
-- Push any commit to the client's GitHub repo (Vercel auto-deploys), or
-- In the Vercel dashboard → the project → **Deployments** tab → "…" → **Redeploy**.
-
-### B8. Live test
-
-Submit the lead form on the deployed site with your own phone number. The
-Retell agent should call your phone within 60 seconds with the brand's
-greeting.
-
-If nothing happens within 90 seconds, check:
-1. Vercel function logs for `/api/contact` → did it 200 or 500?
-2. Make scenario "History" tab → did the webhook fire? Did the Retell HTTP request succeed?
-3. Retell dashboard → outbound call logs → was the call attempted? Any error?
+### D8. Post-call webhook + live test
+- Ensure the agent's **Post-call webhook URL** is set (A4 step 3) so calls log to Airtable.
+- Submit the lead form on the deployed site with your own phone number. The agent should call
+  back within ~60s. If nothing in 90s, check: Vercel `/api/contact` logs (200 vs 500); Make
+  clone **History** (webhook fired? Retell call succeeded?); Retell outbound call logs; then
+  the `jdd-post-call-log` scenario History + the Airtable Call Log row.
 
 ---
 
-## Part C — Why clone per client (not one shared scenario)
+## Part E — Set up the client portal (per client)
 
-Each client has different values that get baked into the Make scenario:
+Gives the client a `/portal` login showing Traffic (GA4), Calls (Airtable), and Performance
+(PageSpeed). The portal reads everything from the client's **Clerk user metadata**.
 
-- **Retell `agent_id`**: each client has their own Retell agent with their own
-  persona, prompt, and brand greeting. Calling the wrong agent_id would route
-  the lead to the wrong client's voicebot.
-- **Twilio `from_number`**: each client owns their own Twilio number. Calling
-  with the wrong from_number would show a different caller-ID to the lead.
+### E1. Create a GA4 property
+Google Analytics → **Admin → Create Property** (one per site for Enterprise) → add a **Web
+data stream** for the live site URL. Capture both the **Measurement ID** (`G-XXXXXXX`) and the
+numeric **Property ID** (`properties/123456789`).
 
-Since the HTTP module's body is static JSON, these two values are hardcoded.
-One scenario = one client/site.
+### E2. Tag the client site with GA4
+> **Required — the exported site is not GA4-tagged by default.** Without the tag the property
+> collects nothing and the portal's Traffic tab stays empty.
 
-**Could we use one shared scenario instead?** Yes — a router-based design
-with a Make Data Store (or Airtable lookup) keyed on `brand` from the payload
-could pull the right agent_id + from_number dynamically. Trade-offs:
-- ✓ One scenario to maintain
-- ✗ Adds a lookup step (latency + a failure point)
-- ✗ Harder to debug per-client; harder to disable just one client
-- ✗ Per-client changes require editing the data store, not the scenario
+Add the Measurement ID to the client site (`NEXT_PUBLIC_GA_MEASUREMENT_ID` + a GA component)
+and redeploy. *(See the open template task — once the template ships a GA component, this is a
+single env var per client.)*
 
-The PDF blueprint and current architecture deliberately chose per-client clones
-for isolation. Sticking with clones until scale forces a refactor (~30+ clients).
+### E3. Grant the JDD service account access
+GA4 → **Admin → Property Access Management** → add the service account **email** (from
+`GOOGLE_SERVICE_ACCOUNT_KEY`) as **Viewer**.
+
+### E4. Create the client's Clerk user + metadata
+Clerk dashboard → **Users → Create user** for the client. Set **publicMetadata** to:
+```json
+{
+  "slug": "{slug}",
+  "plan": "growth",
+  "canonical": "https://clientsite.com",
+  "airtableBaseId": "appXXXXXXXXXXXXXX",
+  "ga4PropertyId": "properties/123456789"
+}
+```
+- `slug`, `plan`, `canonical` come from `clients/{slug}/site.ts`.
+- `airtableBaseId` comes from `clients/{slug}/.env.local` (`AIRTABLE_BASE_ID`). **Starter:**
+  set `airtableBaseId` to `null` (no call data).
+- **Enterprise:** add a `sites` array, one entry per site:
+  ```json
+  "sites": [
+    { "slug": "{slug}-1", "canonical": "https://site1.com", "ga4PropertyId": "properties/111" },
+    { "slug": "{slug}-2", "canonical": "https://site2.com", "ga4PropertyId": "properties/222" }
+  ]
+  ```
+
+### E5. Invite the client
+Send them the `/portal/sign-in` link (or a Clerk invitation). Confirm the three tabs render
+with real data.
 
 ---
 
-## Part D — Cleanup of test resources
+## Part F — Why clone the outbound scenario per client (not one shared scenario)
 
-After running through any `_e2e-*` fixture:
+The outbound HTTP module bakes in two per-client values:
+- **Retell `agent_id`** — each client has their own agent/persona; the wrong ID routes the
+  lead to the wrong voicebot.
+- **`from_number`** — each client owns their own number; the wrong one shows the wrong
+  caller-ID.
 
+A shared router design (Data Store keyed on `brand`) is possible but adds a lookup
+(latency + failure point), is harder to debug/disable per client, and moves per-client edits
+into a data store. We deliberately use per-client clones for isolation until scale forces a
+refactor (~30+ clients).
+
+> Note the **post-call** scenario (Part A4) is the opposite choice — it *is* shared, because
+> its routing key (`agent_id`) is already in the payload, so a Data Store lookup is natural.
+
+---
+
+## Part G — Cleanup of test resources
+
+After running any `_e2e-*` fixture:
 ```
-cd C:\Users\Xander\Desktop\jdd-ops
+cd C:\Users\Xander\Desktop\ops\jdd-ops
 npm run teardown -- --slug _e2e-{name}
 ```
+Deletes: all GitHub repos for the cluster, all Vercel projects, all Retell agents (and their
+provisioned numbers), the shared Airtable base, and the local `clients/{slug}/` folder.
+Refuses unless the slug starts with `_e2e-`. **Real client teardown is intentionally not
+scripted** — do it by hand so you can't accidentally delete a paying customer's infra.
 
-This deletes:
-- All GitHub repos for the cluster
-- All Vercel projects
-- All Retell agents (via DELETE /delete-agent/{id})
-- All purchased Twilio numbers
-- The shared Airtable base
-- The local `clients/{slug}/` folder
-
-Refuses to run unless the slug starts with `_e2e-`. **Real client teardown is
-intentionally not scripted** — do it by hand so you can't accidentally
-delete a paying customer's infrastructure.
-
-Make scenarios are not deleted by teardown — do that manually in the Make
-dashboard if needed (otherwise leaving an inactive clone around is harmless).
+Make scenarios and Clerk users are **not** deleted by teardown — remove an inactive clone, the
+`retell-agent-lookup` row, and the Clerk user manually in their dashboards if needed.

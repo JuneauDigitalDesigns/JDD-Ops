@@ -1,29 +1,23 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { PhoneCall } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
+import { useScrolled } from '@/lib/useScrolled';
 
 export const meta = {
   id: 'nav-centered',
   category: 'nav',
   label: 'Nav / Centered',
   consumes: ['nav', 'hero.cta', 'brand.name', 'brand.long', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useScrolled'],
 } as const;
 
 export default function NavCentered() {
   const reduce = useReducedMotion() ?? false;
   const { brand, nav, hero } = CONTENT;
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 12);
-    fn();
-    window.addEventListener('scroll', fn, { passive: true });
-    return () => window.removeEventListener('scroll', fn);
-  }, []);
+  const scrolled = useScrolled();
 
   return (
     <header className={`sticky top-0 z-50 bg-bg/95 backdrop-blur transition-all duration-200 ${scrolled ? 'border-b border-rule shadow-sm' : 'border-b border-transparent'}`}>
@@ -39,7 +33,7 @@ export default function NavCentered() {
               {brand.phone}
             </a>
             <a href="#cta"
-              className="hidden rounded-lg bg-accent px-4 py-2 text-sm font-medium text-bg transition-opacity hover:opacity-90 sm:inline-block">
+              className="hidden rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accentFg transition-opacity hover:opacity-90 sm:inline-block">
               {hero.cta}
             </a>
             <button type="button" onClick={() => setOpen((v) => !v)}
@@ -77,7 +71,7 @@ export default function NavCentered() {
                   className="block py-2.5 text-sm font-medium text-ink">{item.label}</a>
               ))}
               <a href="#cta" onClick={() => setOpen(false)}
-                className="mt-3 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-bg">
+                className="mt-3 block rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-accentFg">
                 {hero.cta}
               </a>
             </nav>

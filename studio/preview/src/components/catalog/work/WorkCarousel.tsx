@@ -20,16 +20,12 @@ export default function WorkCarousel() {
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
-  const [active, setActive] = useState(0);
 
   const onScroll = () => {
     const el = trackRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
     setProgress(max ? el.scrollLeft / max : 0);
-    const card = el.firstElementChild as HTMLElement | null;
-    const w = card?.getBoundingClientRect().width ?? 1;
-    setActive(Math.round(el.scrollLeft / (w + 24)));
   };
 
   const nudge = (dir: number) => {
@@ -50,14 +46,11 @@ export default function WorkCarousel() {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
             <p className="text-xs font-semibold uppercase tracking-widest text-accent">{work.eyebrow}</p>
-            <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{work.title}</h2>
+            <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{work.title}</h2>
             <p className="mt-2 text-inkSoft">{work.sub}</p>
           </motion.div>
 
           <div className="flex items-center gap-3">
-            <span className="font-heading text-sm text-inkSoft">
-              {String(active + 1).padStart(2, '0')} / {String(work.projects.length).padStart(2, '0')}
-            </span>
             <button onClick={() => nudge(-1)} aria-label="Previous project"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-rule bg-bg text-ink transition-colors hover:border-accent hover:text-accent">
               <ArrowLeft size={16} />
@@ -95,12 +88,10 @@ export default function WorkCarousel() {
                       <span className="font-sans text-xs uppercase tracking-widest text-inkSoft">{p.caption}</span>
                     </div>
                   )}
-                  <div className="absolute left-3 top-3">
-                    <span className="rounded-full bg-ink/70 px-2.5 py-1 text-xs font-medium text-bg backdrop-blur-sm">{p.scope}</span>
-                  </div>
                 </div>
                 <div className="p-5">
-                  <div className="flex items-start justify-between gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wider text-accent">{p.scope}</span>
+                  <div className="mt-1 flex items-start justify-between gap-2">
                     <h3 className="font-heading text-base font-semibold leading-snug text-ink">{p.t}</h3>
                     {p.yr && <span className="shrink-0 text-xs text-inkSoft">{p.yr}</span>}
                   </div>

@@ -32,7 +32,7 @@ export default function AboutStory() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{about.eyebrow}</p>
-          <h2 className="mt-4 font-heading text-4xl font-bold text-ink md:text-5xl">{about.title}</h2>
+          <h2 className="mt-4 font-heading text-4xl text-ink md:text-5xl">{about.title}</h2>
           <p className="mt-6 text-lg leading-relaxed text-inkSoft">{about.body}</p>
         </motion.div>
 
@@ -40,24 +40,22 @@ export default function AboutStory() {
           <div className="mt-14 space-y-0 divide-y divide-rule">
             {about.pillars.map((p, i) => {
               const Icon = ICON_MAP[p.k];
-              const num = String(i + 1).padStart(2, '0');
               return (
                 <motion.div
                   key={p.k}
-                  className="flex gap-6 py-8"
+                  className="flex gap-5 py-8"
                   initial={reduce ? false : { opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.3 }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: i * 0.06 }}
                 >
-                  <div className="flex-shrink-0 pt-0.5">
-                    <span className="font-heading text-sm font-semibold text-accent">{num}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      {Icon && <Icon size={18} className="text-accent" />}
-                      <h3 className="font-heading text-lg font-semibold text-ink">{p.t}</h3>
+                  {Icon && (
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                      <Icon size={20} className="text-accent" />
                     </div>
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-heading text-lg font-semibold text-ink">{p.t}</h3>
                     <p className="mt-2 leading-relaxed text-inkSoft">{p.d}</p>
                   </div>
                 </motion.div>

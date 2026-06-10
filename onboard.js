@@ -33,8 +33,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
 import { syncEnvToVercel, sanitizeProjectName } from './lib/vercel-sync.js';
+import { createClerkClient } from '@clerk/backend';
 
-const TOTAL_STEPS = 9;
+const TOTAL_STEPS = 10;
 
 let DRY_RUN = false;
 let CURRENT_SITE_LABEL = ''; // e.g., "site 2/3" when looping
@@ -64,15 +65,23 @@ function run(cmd, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const args = { schema: null, dryRun: false };
+  const args = { schema: null, dryRun: false, setGa4: null, slug: null };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--schema' && argv[i + 1]) {
       args.schema = argv[i + 1];
       i++;
     } else if (argv[i] === '--dry-run') {
       args.dryRun = true;
+    } else if (argv[i] === '--set-ga4' && argv[i + 1]) {
+      args.setGa4 = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--slug' && argv[i + 1]) {
+      args.slug = argv[i + 1];
+      i++;
     } else if (argv[i] === '--help' || argv[i] === '-h') {
-      console.log('Usage: npm run onboard -- --schema clients/{slug}/site.ts [--dry-run]');
+      console.log('Usage:');
+      console.log('  npm run onboard -- --schema clients/{slug}/site.ts [--dry-run]');
+      console.log('  npm run onboard -- --slug {slug} --set-ga4 properties/{id}');
       process.exit(0);
     }
   }
@@ -796,6 +805,120 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Step 10: Provision Clerk portal user
+// ───────────────────────────────────────────────────────────────────────────
+
+async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug }) {
+  log(10, `Provision Clerk portal user`);
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) {
+    console.warn(`  ⚠ CLERK_SECRET_KEY not set — skipping Clerk user creation. Run CLERK setup first (see RUNBOOK.md).`);
+    return;
+  }
+
+  // For single-site: clients/{slug}/.env.local
+  // For enterprise: clients/{slug}/site-1/.env.local (the primary site dir)
+  const primaryClientDir = intake.sites.length === 1
+    ? resolve('clients', baseSlug)
+    : resolve('clients', baseSlug, 'site-1');
+
+  const existingUserId = readEnvLocal(primaryClientDir).CLERK_USER_ID;
+  if (existingUserId) {
+    console.log(`  Reusing existing Clerk user ${existingUserId} (skipping create)`);
+    return existingUserId;
+  }
+
+  if (DRY_RUN) {
+    dryLog(`would create Clerk user for ${intake.sites[0].brand.email}`);
+    dryLog(`would set publicMetadata: { slug: "${baseSlug}", plan: "${intake.plan}", canonical: "${intake.sites[0].seo?.canonical ?? ''}", airtableBaseId: ..., ga4PropertyId: null }`);
+    dryLog(`would patch CLERK_USER_ID into ${primaryClientDir}/.env.local`);
+    return;
+  }
+
+  const clerk = createClerkClient({ secretKey });
+
+  const airtableBaseId = intake.plan !== 'starter'
+    ? (sharedBaseId || readEnvLocal(primaryClientDir).AIRTABLE_BASE_ID || null)
+    : null;
+
+  const publicMetadata = {
+    slug: baseSlug,
+    plan: intake.plan,
+    canonical: intake.sites[0].seo?.canonical ?? '',
+    airtableBaseId,
+    ga4PropertyId: null,
+    ...(intake.plan === 'enterprise' ? {
+      sites: intake.sites.map((s, i) => ({
+        slug: provisioned[i]?.siteSlug ?? `${baseSlug}-${i + 1}`,
+        canonical: s.seo?.canonical ?? '',
+        ga4PropertyId: null,
+      })),
+    } : {}),
+  };
+
+  let user;
+  try {
+    user = await clerk.users.createUser({
+      emailAddress: [intake.sites[0].brand.email],
+      publicMetadata,
+    });
+  } catch (err) {
+    // If user already exists (e.g. re-run), look them up instead
+    if (err?.errors?.[0]?.code === 'form_identifier_exists') {
+      const list = await clerk.users.getUserList({ emailAddress: [intake.sites[0].brand.email] });
+      user = list.data?.[0];
+      if (user) {
+        console.log(`  Clerk user already exists (${user.id}) — updating metadata`);
+        await clerk.users.updateUserMetadata(user.id, { publicMetadata });
+      } else {
+        console.warn(`  ⚠ Could not create or find Clerk user for ${intake.sites[0].brand.email}`);
+        return;
+      }
+    } else {
+      console.warn(`  ⚠ Clerk user creation failed: ${err?.message ?? err}`);
+      return;
+    }
+  }
+
+  console.log(`  Clerk user: ${user.id} (${intake.sites[0].brand.email})`);
+  patchEnvLocal(primaryClientDir, 'CLERK_USER_ID', user.id);
+  return user.id;
+}
+
+// Updates a client's Clerk portal user with their GA4 property ID.
+// Usage: node onboard.js --slug {slug} --set-ga4 properties/{id}
+async function setGa4Property(slug, ga4PropertyId) {
+  console.log(`\n[set-ga4] Updating portal metadata for slug "${slug}"`);
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) fail(0, 'CLERK_SECRET_KEY not set. Cannot update Clerk metadata.');
+
+  // Look for CLERK_USER_ID in single-site or enterprise-primary location
+  const singleDir = resolve('clients', slug);
+  const enterpriseDir = resolve('clients', slug, 'site-1');
+  const clientDir = existsSync(resolve(singleDir, '.env.local')) ? singleDir : enterpriseDir;
+  const userId = readEnvLocal(clientDir).CLERK_USER_ID;
+
+  if (!userId) {
+    fail(0, `CLERK_USER_ID not found in ${clientDir}/.env.local. Run full onboarding first.`);
+  }
+
+  const clerk = createClerkClient({ secretKey });
+  const user = await clerk.users.getUser(userId);
+  const existing = user.publicMetadata ?? {};
+
+  // For enterprise, also offer per-site GA4 update if --site is provided (future: add --site flag)
+  await clerk.users.updateUserMetadata(userId, {
+    publicMetadata: { ...existing, ga4PropertyId },
+  });
+
+  console.log(`  Updated Clerk user ${userId} → ga4PropertyId: ${ga4PropertyId}`);
+  console.log(`\n  Next: add the JDD service account email as a Viewer on the GA4 property.`);
+  console.log(`        (Google Analytics → Admin → Property Access Management)`);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Final handoff summary
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -818,11 +941,13 @@ function printHandoff({ intake, provisioned, sharedBaseId, baseSlug }) {
   if (sharedBaseId) {
     console.log(`\n  Airtable base (shared): ${sharedBaseId}`);
   }
+  console.log(`\n  Portal: https://juneaudigitaldesigns.com/portal`);
   console.log(`\n${line}`);
   console.log(`  Next:`);
   if (intake.plan === 'starter') {
     console.log(`    1. Verify lead email at ${intake.sites[0].brand.email} after a test form submission.`);
     console.log(`    2. Verify the deployed Vercel URL renders correctly.`);
+    console.log(`    3. Once GA4 is set up: npm run onboard -- --slug ${baseSlug} --set-ga4 properties/{id}`);
   } else {
     console.log(`    1. Checkpoint 1 — review Vercel preview URL(s).`);
     console.log(`    2. Checkpoint 2 — test-call each Twilio number; tune each agent-prompt.txt.`);
@@ -834,6 +959,8 @@ function printHandoff({ intake, provisioned, sharedBaseId, baseSlug }) {
     });
     console.log(`    3. Checkpoint 3 — submit a test lead per site; confirm Retell call + Airtable row.`);
     console.log(`    4. Paste each Make webhook URL into the per-site .env.local, then \`npm run sync-env\`.`);
+    console.log(`    5. Portal GA4: add JDD service account as Viewer on client GA4 property, then:`);
+    console.log(`         npm run onboard -- --slug ${baseSlug} --set-ga4 properties/{id}`);
   }
   console.log('');
 }
@@ -863,6 +990,7 @@ function preflight(intake) {
   need('GITHUB_TOKEN');
   need('GITHUB_ORG');
   if (!process.env.VERCEL_TOKEN) warnings.push('VERCEL_TOKEN not set — step 9 (Vercel sync) will be skipped');
+  if (!process.env.CLERK_SECRET_KEY) warnings.push('CLERK_SECRET_KEY not set — step 10 (Clerk portal user) will be skipped. Run Clerk setup first (see RUNBOOK.md).');
 
   if (intake.plan === 'starter') {
     if (!process.env.RESEND_API_KEY) warnings.push('RESEND_API_KEY not set — starter lead emails will not send until configured');
@@ -896,6 +1024,14 @@ function preflight(intake) {
 async function main() {
   const args = parseArgs(process.argv);
   DRY_RUN = args.dryRun;
+
+  // Short-circuit: --set-ga4 flag updates Clerk metadata only, no provisioning
+  if (args.setGa4) {
+    if (!args.slug) fail(0, '--set-ga4 requires --slug {slug}');
+    await setGa4Property(args.slug, args.setGa4);
+    return;
+  }
+
   if (DRY_RUN) {
     console.log('\n=== DRY RUN MODE — no external API calls, no file writes outside this print ===\n');
   }
@@ -960,6 +1096,10 @@ async function main() {
   }
 
   CURRENT_SITE_LABEL = '';
+
+  // Step 10: Provision Clerk portal user (after Airtable so sharedBaseId is known)
+  await provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug });
+
   printHandoff({ intake, provisioned, sharedBaseId, baseSlug });
 
   if (DRY_RUN) {

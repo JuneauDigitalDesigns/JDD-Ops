@@ -60,7 +60,7 @@ export default function HeroFormFocus() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{hero.eyebrow}</p>
-          <h1 className="mt-3 font-heading text-4xl font-bold leading-tight text-ink md:text-5xl">
+          <h1 className="mt-3 font-heading text-4xl leading-tight text-ink md:text-5xl">
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-inkSoft">{hero.sub}</p>
@@ -100,7 +100,7 @@ export default function HeroFormFocus() {
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full rounded-lg border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
                 <button type="submit" disabled={status === 'loading'}
-                  className="w-full rounded-lg bg-accent py-3.5 font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-60">
+                  className="w-full rounded-lg bg-accent py-3.5 font-semibold text-accentFg transition-opacity hover:opacity-90 disabled:opacity-60">
                   {status === 'loading' ? 'Sending...' : hero.cta}
                 </button>
                 {status === 'error' && (

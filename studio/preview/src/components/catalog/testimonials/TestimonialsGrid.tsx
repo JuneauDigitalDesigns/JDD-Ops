@@ -37,10 +37,10 @@ export default function TestimonialsGrid() {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">{testimonials.eyebrow}</p>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-ink md:text-4xl">{testimonials.title}</h2>
+          <h2 className="mt-2 font-heading text-3xl text-ink md:text-4xl">{testimonials.title}</h2>
         </motion.div>
 
-        <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-10 grid gap-6 md:grid-cols-2">
           {testimonials.items.map((t, i) => {
             const initial = t.a.charAt(0).toUpperCase();
             const avatar = avatars?.[i];

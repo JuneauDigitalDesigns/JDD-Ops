@@ -1,4 +1,5 @@
 'use client';
+import type { CSSProperties } from 'react';
 import { PhoneCall, Envelope, MapPin, InstagramLogo, FacebookLogo } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 
@@ -20,7 +21,10 @@ export default function FooterColumns() {
   return (
     <footer className="border-t border-rule bg-bg px-6 pt-12 pb-6">
       <div className="mx-auto max-w-6xl">
-        <div className={`grid gap-8 sm:grid-cols-2 ${footer.cols.length > 0 ? 'lg:grid-cols-[1.5fr_1fr_repeat(' + footer.cols.length + ',1fr)]' : 'lg:grid-cols-[1.5fr_1fr]'}`}>
+        <div
+          className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[var(--footer-cols)]"
+          style={{ '--footer-cols': `1.5fr 1fr${footer.cols.length > 0 ? ` repeat(${footer.cols.length},1fr)` : ''}` } as CSSProperties}
+        >
           {/* Company */}
           <div>
             <p className="font-heading text-lg font-semibold text-ink">{brand.long}</p>
