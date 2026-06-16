@@ -14,6 +14,7 @@ export default function ClientPanel({
   onSetStatus,
   onToggleStep,
   onRefresh,
+  onOpenSetup,
 }: {
   ctx: ClientContext;
   config: OpsConfig;
@@ -21,6 +22,7 @@ export default function ClientPanel({
   onSetStatus: (status: ClientStatus) => void;
   onToggleStep: (id: string, done: boolean) => void;
   onRefresh: () => void;
+  onOpenSetup: () => void;
 }) {
   const phases = useMemo(() => buildRunbook(ctx, config), [ctx, config]);
 
@@ -85,7 +87,7 @@ export default function ClientPanel({
         )}
       </header>
 
-      <LaunchPanel ctx={ctx} onComplete={onRefresh} />
+      <LaunchPanel ctx={ctx} onComplete={onRefresh} onOpenSetup={onOpenSetup} />
 
       <StepGuide phases={phases} done={done} onToggle={(id) => onToggleStep(id, !done.has(id))} />
     </motion.div>

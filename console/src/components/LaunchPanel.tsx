@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Flask, Hammer, Lightning, ArrowSquareOut, X } from '@phosphor-icons/react';
+import { Play, Flask, Hammer, Lightning, FileDashed, Stack, ArrowRight, X } from '@phosphor-icons/react';
 import type { ClientContext } from '@/lib/types';
 import CopyButton from './CopyButton';
+import NextSteps from './NextSteps';
 
 type LogLine = { kind: 'meta' | 'step' | 'log' | 'ok' | 'error'; text: string };
 
@@ -22,7 +24,15 @@ const LINE_COLOR: Record<LogLine['kind'], string> = {
   error: 'var(--danger)',
 };
 
-export default function LaunchPanel({ ctx, onComplete }: { ctx: ClientContext; onComplete: () => void }) {
+export default function LaunchPanel({
+  ctx,
+  onComplete,
+  onOpenSetup,
+}: {
+  ctx: ClientContext;
+  onComplete: () => void;
+  onOpenSetup?: () => void;
+}) {
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -79,6 +89,35 @@ export default function LaunchPanel({ ctx, onComplete }: { ctx: ClientContext; o
     }
   }
 
+  // ── No-intake gate ─────────────────────────────────────────────────────────
+  // A folder with no clients/{slug}/site.ts can't be provisioned — onboard.js has nothing
+  // to read. Block the run here and point at the Build tab (export writes site.ts).
+  if (!ctx.hasIntake) {
+    return (
+      <div className="panel flex flex-col gap-3 p-5">
+        <div className="flex items-center gap-2">
+          <FileDashed size={17} style={{ color: 'var(--warn)' }} />
+          <h3 className="font-display text-[16px] font-medium">No intake schema yet</h3>
+        </div>
+        <p className="text-[13px] leading-[1.6] text-fg2">
+          There’s no <code className="codechip">clients/{ctx.slug}/site.ts</code> for this client, so there’s nothing to
+          provision. Build the site in the <strong className="text-fg">Build</strong> tab — exporting writes the intake
+          schema into this folder.
+        </p>
+        <div className="flex items-center gap-2 rounded-[10px] border border-rule bg-[var(--bg-deep)] px-3 py-2">
+          <code className="mono flex-1 text-fg2">npm run new-client -- --slug {ctx.slug}</code>
+          <CopyButton value={`npm run new-client -- --slug ${ctx.slug}`} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/build" className="btn btn-primary btn-sm">
+            <Stack size={13} /> Open Build <ArrowRight size={12} weight="bold" />
+          </Link>
+          <span className="text-[12px] text-fg3">or scaffold a blank intake above, then fill it in.</span>
+        </div>
+      </div>
+    );
+  }
+
   // ── Pre-build gate ─────────────────────────────────────────────────────────
   if (!ctx.repoBuilt) {
     return (
@@ -88,23 +127,29 @@ export default function LaunchPanel({ ctx, onComplete }: { ctx: ClientContext; o
           <h3 className="font-display text-[16px] font-medium">Build the site first</h3>
         </div>
         <p className="text-[13px] leading-[1.6] text-fg2">
-          No <code className="codechip">clients/{ctx.slug}/repo</code> yet. Compose the site in the studio (drag-and-drop),
-          export it to this client folder, then come back to provision.
+          No <code className="codechip">clients/{ctx.slug}/repo</code> yet. Compose the site in the <strong className="text-fg">Build</strong> tab
+          (drag-and-drop), export it to this client folder, then come back to provision.
         </p>
         <div className="flex items-center gap-2 rounded-[10px] border border-rule bg-[var(--bg-deep)] px-3 py-2">
-          <code className="mono flex-1 text-fg2">npm run preview</code>
-          <CopyButton value="npm run preview" />
+          <code className="mono flex-1 text-fg2">npm run console</code>
+          <CopyButton value="npm run console" />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <a href="http://localhost:3000" target="_blank" rel="noreferrer" className="btn btn-sm">
-            <ArrowSquareOut size={13} /> Open studio
-          </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/build" className="btn btn-sm">
+            <Stack size={13} /> Open Build <ArrowRight size={12} weight="bold" />
+          </Link>
           <span className="text-[12px] text-fg3">or scaffold manually:</span>
           <code className="codechip">npm run new-client -- --slug {ctx.slug}</code>
         </div>
       </div>
     );
   }
+
+  // A run "errored" if onboard.js exited non-zero, or an error was streamed without an exit
+  // event (e.g. the route's pre-flight guards close the stream after an error). Either way
+  // we surface remediation built from the collected error lines.
+  const errorLines = logs.filter((l) => l.kind === 'error').map((l) => l.text);
+  const errored = errorLines.length > 0 || (exitCode !== null && exitCode !== 0);
 
   return (
     <div className="panel flex flex-col gap-4 p-5">
@@ -185,9 +230,14 @@ export default function LaunchPanel({ ctx, onComplete }: { ctx: ClientContext; o
               ? dryRun
                 ? 'Dry run clean — flip the toggle off to provision for real.'
                 : 'Provisioned. Continue with the steps below.'
-              : 'See the log above; fix and re-run.'}
+              : 'See the log above and the next steps below.'}
           </span>
         </div>
+      )}
+
+      {/* Next steps — interpret the failure and show how to fix it (this + future errors) */}
+      {!running && errored && (
+        <NextSteps errorText={errorLines.join('\n')} slug={ctx.slug} onOpenSetup={onOpenSetup} />
       )}
 
       {/* Confirm modal for a real run */}

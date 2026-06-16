@@ -125,6 +125,7 @@ export default function RunbookApp() {
                 onSetStatus={(s) => setStatus(ctx.slug, s)}
                 onToggleStep={(id, done) => toggleStep(ctx.slug, id, done)}
                 onRefresh={() => load(true)}
+                onOpenSetup={() => setPartAOpen(true)}
               />
             ) : (
               <div className="panel p-8 text-center">
