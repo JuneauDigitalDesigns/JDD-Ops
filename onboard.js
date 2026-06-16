@@ -6,8 +6,8 @@
  *   npm run onboard -- --schema clients/{slug}/site.ts [--dry-run]
  *
  * Plan-tier behavior:
- *   - starter    → site only (no voice agent, no Twilio, no Airtable)
- *   - growth     → site + 1 Retell agent + 1 Twilio number + 1 Airtable base
+ *   - starter    → site only (no voice agent, no Airtable)
+ *   - growth     → site + 1 Retell agent + 1 JDD-owned Twilio number + 1 Airtable base
  *   - enterprise → N sites (N from intake.sites.length); each with its own
  *                  Retell agent + Twilio number; shared master Retell account
  *                  (= shared minute pool); shared Airtable base with a
@@ -397,13 +397,14 @@ VERCEL_PROJECT_NAME=${siteSlug}
 LEAD_DELIVERY_MODE=webhook
 RETELL_AGENT_ID=${keep('RETELL_AGENT_ID')}
 TWILIO_NUMBER=${keep('TWILIO_NUMBER')}
+CLIENT_FORWARD_PHONE=${content.brand.phone}
 AIRTABLE_BASE_ID=${keep('AIRTABLE_BASE_ID')}
 MAKE_WEBHOOK_URL=${keep('MAKE_WEBHOOK_URL')}
 VERCEL_PROJECT_NAME=${siteSlug}
 `;
   }
   writeFileSync(envPath, body, 'utf8');
-  const preserved = ['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'AIRTABLE_BASE_ID', 'MAKE_WEBHOOK_URL'].filter((k) => prev[k]);
+  const preserved = ['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'CLIENT_FORWARD_PHONE', 'AIRTABLE_BASE_ID', 'MAKE_WEBHOOK_URL'].filter((k) => prev[k]);
   console.log(`  Wrote ${envPath}${preserved.length ? ` (preserved: ${preserved.join(', ')})` : ''}`);
 }
 
@@ -551,68 +552,67 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Step 8a: Provision a Retell-managed phone number
+// Step 8a: Provision a JDD-owned Twilio number with custom call routing.
 //
-// Retell owns/manages the number (provider: Twilio under the hood) and binds it
-// to the agent for BOTH inbound and outbound. This is required for the outbound
-// lead-callback flow: Retell's create-phone-call only accepts a from_number that
-// Retell purchased or imported. We try the client's local area code first, then
-// fall back to toll-free. The resulting number is stored as TWILIO_NUMBER for
-// backward-compat (the Make scenario references <<<TWILIO_NUMBER>>> as
-// create-phone-call's from_number).
+// Inbound calls → /api/voice on the client site → tries CLIENT_FORWARD_PHONE
+// first (20s), then falls back to the Retell AI agent. The number is stored as
+// TWILIO_NUMBER for backward-compat with the Make outbound lead-callback
+// scenario (from_number field). voiceUrl uses the permanent .vercel.app URL.
 // ───────────────────────────────────────────────────────────────────────────
 
-async function provisionRetellNumber(content, agentId, clientDir) {
-  log(8, `Provision Retell-managed phone number (inbound + outbound → agent)`);
+async function provisionTwilioNumber(content, siteSlug, clientDir) {
+  log(8, `Provision JDD Twilio number (human-first routing → Retell fallback)`);
   const existingNumber = readEnvLocal(clientDir).TWILIO_NUMBER;
   if (existingNumber) {
     console.log(`  Reusing existing number ${existingNumber} (skipping purchase)`);
     return existingNumber;
   }
   if (DRY_RUN) {
-    dryLog(`would POST https://api.retellai.com/create-phone-number bound to agent ${agentId} (inbound+outbound)`);
-    dryLog(`would try local area code from ${content.brand.phone}, then toll-free`);
+    dryLog(`would search Twilio for local number (area code from brand.phone) then toll-free`);
+    dryLog(`would purchase number and set voiceUrl → https://${siteSlug}.vercel.app/api/voice`);
     dryLog(`would patch TWILIO_NUMBER into ${clientDir}/.env.local`);
     return '<dry-run-number>';
   }
-  const apiKey = requireEnv('RETELL_API_KEY');
 
-  const digits = (content.brand.phone || '').replace(/\D/g, '');
-  const areaCode = digits.length >= 10 ? parseInt(digits.slice(-10, -7), 10) : null;
+  const accountSid = requireEnv('TWILIO_ACCOUNT_SID');
+  const authToken  = requireEnv('TWILIO_AUTH_TOKEN');
+  const client     = twilio(accountSid, authToken);
+  const voiceUrl   = `https://${siteSlug}.vercel.app/api/voice`;
 
-  const bind = {
-    inbound_agents: [{ agent_id: agentId, weight: 1 }],
-    outbound_agents: [{ agent_id: agentId, weight: 1 }],
-    nickname: content.brand.name,
-  };
+  const digits   = (content.brand.phone || '').replace(/\D/g, '');
+  const areaCode = digits.length >= 10 ? digits.slice(-10, -7) : null;
 
-  async function tryCreate(body, label) {
-    const res = await fetch('https://api.retellai.com/create-phone-number', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) return await res.json();
-    console.log(`  ${label} request failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
-    return null;
-  }
+  let numberRecord = null;
 
-  let data = null;
   if (areaCode) {
-    console.log(`  Requesting local number in area code ${areaCode}…`);
-    data = await tryCreate({ ...bind, area_code: areaCode }, `local ${areaCode}`);
-    if (!data) console.log(`  No local number — falling back to toll-free`);
+    console.log(`  Searching for local number in area code ${areaCode}…`);
+    const results = await client.availablePhoneNumbers('US').local.list({ areaCode, limit: 1 });
+    if (results.length) {
+      numberRecord = await client.incomingPhoneNumbers.create({
+        phoneNumber: results[0].phoneNumber,
+        voiceUrl,
+        voiceMethod: 'POST',
+      });
+      console.log(`  Purchased local number ${numberRecord.phoneNumber}`);
+    } else {
+      console.log(`  No local number in ${areaCode} — falling back to toll-free`);
+    }
   } else {
     console.log(`  Could not derive an area code from brand.phone="${content.brand.phone}" — using toll-free`);
   }
-  if (!data) {
-    data = await tryCreate({ ...bind, toll_free: true }, 'toll-free');
-  }
-  if (!data) fail(8, `Could not provision a Retell number (local ${areaCode || 'n/a'} and toll-free both failed).`);
 
-  const number = data.phone_number;
-  if (!number) fail(8, `Retell create-phone-number response missing phone_number: ${JSON.stringify(data)}`);
-  console.log(`  Provisioned ${number} (${data.phone_number_type || 'retell'}) bound to ${agentId} for inbound + outbound`);
+  if (!numberRecord) {
+    const tfResults = await client.availablePhoneNumbers('US').tollFree.list({ limit: 1 });
+    if (!tfResults.length) fail(8, `No toll-free numbers available in Twilio account`);
+    numberRecord = await client.incomingPhoneNumbers.create({
+      phoneNumber: tfResults[0].phoneNumber,
+      voiceUrl,
+      voiceMethod: 'POST',
+    });
+    console.log(`  Purchased toll-free number ${numberRecord.phoneNumber}`);
+  }
+
+  const number = numberRecord.phoneNumber;
   patchEnvLocal(clientDir, 'TWILIO_NUMBER', number);
   return number;
 }
@@ -995,16 +995,17 @@ function preflight(intake) {
   if (intake.plan === 'starter') {
     if (!process.env.RESEND_API_KEY) warnings.push('RESEND_API_KEY not set — starter lead emails will not send until configured');
   } else {
-    // growth / enterprise voice + CRM stack. Phone numbers are now provisioned
-    // and owned by Retell (not bought directly on Twilio), so Twilio account
-    // credentials are no longer required here.
+    // growth / enterprise voice + CRM stack
     need('ANTHROPIC_API_KEY');
     need('RETELL_API_KEY');
     need('RETELL_LLM_ID');
     need('RETELL_DEFAULT_VOICE_ID');
+    need('TWILIO_ACCOUNT_SID');
+    need('TWILIO_AUTH_TOKEN');
     need('AIRTABLE_API_KEY');
     need('AIRTABLE_WORKSPACE_ID');
     fmt('ANTHROPIC_API_KEY', 'sk-ant-');
+    fmt('TWILIO_ACCOUNT_SID', 'AC');
     fmt('AIRTABLE_API_KEY', 'pat');
     fmt('AIRTABLE_WORKSPACE_ID', 'wsp');
   }
@@ -1067,7 +1068,7 @@ async function main() {
     } else {
       const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug);
       agentId = await createRetellAgent(site, agentPrompt, clientDir);
-      twilioNumber = await provisionRetellNumber(site, agentId, clientDir);
+      twilioNumber = await provisionTwilioNumber(site, siteSlug, clientDir);
 
       if (i === 0) {
         sharedBaseId = await createAirtableBase(intake, site, clientDir);
