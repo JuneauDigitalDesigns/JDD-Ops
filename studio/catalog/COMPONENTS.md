@@ -5,9 +5,9 @@ The master list of catalog components to build (in later sessions). Read
 the rules every component must follow to drop in cleanly and survive `onboard.js`.
 
 Each component is one self-contained `.tsx` at
-`studio/preview/src/components/catalog/<category>/{Category}{Variant}.tsx`,
+`console/src/components/catalog/<category>/{Category}{Variant}.tsx`,
 with a default export named identically to the file and a `meta` named export.
-The studio/preview app renders all of them; selected variants export via the
+The console app renders all of them; selected variants export via the
 File System Access API into any folder you choose. Target: **2 variants per
 category** for v1.
 
@@ -22,9 +22,9 @@ category** for v1.
 | Footer | `brand.name`, `brand.long`, `brand.license`, `brand.established`, `brand.address`, `brand.phone`, `brand.email` | `FooterColumns`, `FooterMinimal` | ☑ ☑ |
 | SEO head | `seo {title,description,canonical}` + `brand` (JSON-LD) | `SeoDefault`, `SeoLocalBusiness` | ☑ ☑ |
 
-**v1 status:** all 16 components shipped at `studio/preview/src/components/catalog/<category>/`.
-The studio/preview Next.js app renders every variant and lets you select one per
-category for export. `cd studio/preview && npm run build` is the build-correctness
+**v1 status:** all 16 components shipped at `console/src/components/catalog/<category>/`.
+The console Next.js app renders every variant and lets you select one per
+category for export. `cd console && npm run build` is the build-correctness
 gate; the template itself is back to its blank-base form.
 
 ## Notes per category

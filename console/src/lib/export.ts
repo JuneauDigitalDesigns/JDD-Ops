@@ -1,0 +1,222 @@
+// Server-only helpers for the studio export flow: copy the blank template repo into
+// clients/<slug>/repo, drop selected catalog components in, and wire them into page.tsx.
+//
+// These run inside the console app's /api/build/* routes. The jdd-ops root (which holds
+// template/ and clients/) is found by walking up from cwd via findOpsRoot().
+import {
+  cpSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import type { SiteContent } from '@/data/site';
+import { basename, resolve } from 'node:path';
+import { findOpsRoot } from '@/lib/opsRoot';
+
+const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
+
+// Allowlist of category -> component file names. Mirrors /api/source's ALLOWED and the
+// catalog registry in app/page.tsx; guards against path traversal via untrusted input.
+export const CATALOG: Record<string, readonly string[]> = {
+  nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta'],
+  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap'],
+  trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar'],
+  about:        ['AboutPillars', 'AboutFeature', 'AboutStatBand', 'AboutStory'],
+  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase'],
+  work:         ['WorkCarousel', 'WorkGrid', 'WorkSpotlight', 'WorkMasonry'],
+  faq:          ['FaqAccordion', 'FaqTwoColumn', 'FaqStickyAside', 'FaqCentered'],
+  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsRotator', 'TestimonialsMarquee'],
+  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'FinalCtaGradient'],
+  contact:      ['ContactSplit', 'CtaBanner', 'ContactCardOverlap', 'ContactInlineStrip'],
+  footer:       ['FooterColumns', 'FooterMinimal', 'FooterBrandCta', 'FooterMega'],
+  seo:          ['SeoDefault', 'SeoLocalBusiness'],
+};
+
+// Categories that map to a JSX body slot in page.tsx (everything except seo, which is
+// wired as a generateMetadata re-export instead of a rendered element).
+const BODY_SLOTS = ['nav', 'hero', 'trust', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'contact', 'footer'];
+
+export type Entry = { categoryId: string; name: string; label?: string };
+
+export function resolveRepoRoot(): string {
+  const root = findOpsRoot();
+  const tplPkg = resolve(root, 'template', 'package.json');
+  if (!existsSync(tplPkg)) {
+    throw new Error(`Template not found at ${resolve(root, 'template')} (cwd=${process.cwd()}).`);
+  }
+  const pkg = JSON.parse(readFileSync(tplPkg, 'utf8')) as { name?: string };
+  if (pkg.name !== 'business-site-template') {
+    throw new Error(`Unexpected template package "${pkg.name}" at ${tplPkg}.`);
+  }
+  return root;
+}
+
+export function isValidSlug(slug: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(slug);
+}
+
+export function repoDirFor(repoRoot: string, slug: string): string {
+  return resolve(repoRoot, 'clients', slug, 'repo');
+}
+
+/** Existing client slugs (directories under clients/, dotfiles skipped). */
+export function listClients(repoRoot: string): string[] {
+  const clientsDir = resolve(repoRoot, 'clients');
+  if (!existsSync(clientsDir)) return [];
+  return readdirSync(clientsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => d.name)
+    .sort();
+}
+
+/** True if clients/<slug>/repo already exists. */
+export function repoExists(repoRoot: string, slug: string): boolean {
+  return existsSync(repoDirFor(repoRoot, slug));
+}
+
+/** Validate selections; throws on anything not in the allowlist. Returns clean entries. */
+export function validateEntries(entries: Entry[]): Entry[] {
+  if (!entries.length) throw new Error('No components selected to export.');
+  for (const e of entries) {
+    const allowed = CATALOG[e.categoryId];
+    if (!allowed) throw new Error(`Unknown category "${e.categoryId}".`);
+    if (!allowed.includes(e.name)) {
+      throw new Error(`Unknown component "${e.name}" for category "${e.categoryId}".`);
+    }
+  }
+  return entries;
+}
+
+/**
+ * Copy template/ -> clients/<slug>/repo (skipping node_modules/.next/.git/out).
+ * Skips the copy if the repo already exists and overwrite is false.
+ * Returns true if a copy happened, false if an existing repo was reused.
+ */
+export function copyTemplate(
+  repoRoot: string,
+  slug: string,
+  { overwrite }: { overwrite: boolean },
+): boolean {
+  const templateDir = resolve(repoRoot, 'template');
+  const clientDir = resolve(repoRoot, 'clients', slug);
+  const repoDir = repoDirFor(repoRoot, slug);
+
+  if (existsSync(repoDir) && !overwrite) return false;
+
+  mkdirSync(clientDir, { recursive: true });
+  cpSync(templateDir, repoDir, {
+    recursive: true,
+    force: true,
+    filter: (src) => !EXCLUDE.has(basename(src)),
+  });
+  return true;
+}
+
+/**
+ * Copy each selected component's source from the preview catalog into the client repo.
+ * Returns the relative repo paths written.
+ */
+export function placeComponents(repoRoot: string, slug: string, entries: Entry[]): string[] {
+  const repoDir = repoDirFor(repoRoot, slug);
+  const written: string[] = [];
+  for (const e of entries) {
+    const srcFile = resolve(process.cwd(), 'src', 'components', 'catalog', e.categoryId, `${e.name}.tsx`);
+    if (!existsSync(srcFile)) {
+      throw new Error(`Catalog source missing: ${srcFile}`);
+    }
+    const destDir = resolve(repoDir, 'src', 'components', 'catalog', e.categoryId);
+    mkdirSync(destDir, { recursive: true });
+    copyFileSync(srcFile, resolve(destDir, `${e.name}.tsx`));
+    written.push(`src/components/catalog/${e.categoryId}/${e.name}.tsx`);
+  }
+  return written;
+}
+
+/** Stable order with nav pinned first and footer pinned last, others left as-is. */
+function orderBodyEntries(entries: Entry[]): Entry[] {
+  const nav = entries.filter((e) => e.categoryId === 'nav');
+  const footer = entries.filter((e) => e.categoryId === 'footer');
+  const middle = entries.filter((e) => e.categoryId !== 'nav' && e.categoryId !== 'footer');
+  return [...nav, ...middle, ...footer];
+}
+
+/**
+ * Derive the client repo's page.tsx from the PRISTINE template page.tsx (so re-running is
+ * idempotent), injecting component imports + the SEO generateMetadata re-export, and
+ * replacing the @studio:body region with the selected components IN THE GIVEN ORDER.
+ * Unselected categories are omitted entirely (WYSIWYG). The order of `entries` is the
+ * page order; nav/footer are pinned as a server-side guard.
+ */
+export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void {
+  const templatePage = resolve(repoRoot, 'template', 'src', 'app', 'page.tsx');
+  let src = readFileSync(templatePage, 'utf8');
+
+  const bodyEntries = orderBodyEntries(entries.filter((e) => BODY_SLOTS.includes(e.categoryId)));
+  const seoEntry = entries.find((e) => e.categoryId === 'seo');
+
+  // 1. Inject component imports under the `// @studio:imports` anchor (in page order).
+  const importLines = bodyEntries
+    .map((e) => `import ${e.name} from '@/components/catalog/${e.categoryId}/${e.name}';`)
+    .join('\n');
+  if (importLines) {
+    src = src.replace('// @studio:imports', `// @studio:imports\n${importLines}`);
+  }
+
+  // 2. Inject the SEO generateMetadata re-export under the `// @studio:metadata` anchor.
+  if (seoEntry) {
+    const line = `export { generateMetadata } from '@/components/catalog/seo/${seoEntry.name}';`;
+    src = src.replace('// @studio:metadata', `// @studio:metadata\n${line}`);
+  }
+
+  // 3. Replace the whole body region with the selected components in order. The markers
+  //    are kept so the result stays re-wireable on a later export.
+  const body = bodyEntries.map((e) => `      <${e.name} />`).join('\n');
+  const bodyRegion = /\{\/\* @studio:body:start \*\/\}[\s\S]*?\{\/\* @studio:body:end \*\/\}/;
+  src = src.replace(
+    bodyRegion,
+    `{/* @studio:body:start */}\n${body}\n      {/* @studio:body:end */}`,
+  );
+
+  // 4. The wired page renders components (each imports its own CONTENT), so the page's
+  //    own top-level CONTENT import is now unused — drop it to avoid a build error.
+  src = src.replace(/^import \{ CONTENT \} from '@\/data\/site';\n/m, '');
+
+  writeFileSync(resolve(repoDirFor(repoRoot, slug), 'src', 'app', 'page.tsx'), src, 'utf8');
+}
+
+/**
+ * Copy the preview's v2.1 site.ts into the client repo, overwriting the
+ * template's minimal placeholder schema so exported repos build with rich data.
+ */
+export function copySiteData(repoRoot: string, slug: string): void {
+  const src = resolve(process.cwd(), 'src', 'data', 'site.ts');
+  const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
+  copyFileSync(src, dest);
+}
+
+/**
+ * Write a SiteContent object as the client repo's site.ts. Preserves the full SiteContent
+ * interface block from the studio's site.ts and replaces only the CONTENT object with the
+ * serialized content. JSON.stringify makes this data-only (no code injection from edits).
+ */
+export function writeSiteContent(repoRoot: string, slug: string, content: SiteContent): void {
+  const studioSitePath = resolve(process.cwd(), 'src', 'data', 'site.ts');
+  const studioSite = readFileSync(studioSitePath, 'utf8');
+  const marker = '\nexport const CONTENT: SiteContent = {';
+  const splitIdx = studioSite.indexOf(marker);
+  if (splitIdx === -1) {
+    throw new Error('Could not locate CONTENT declaration in site.ts');
+  }
+  const interfaceBlock = studioSite.slice(0, splitIdx);
+  const output = `${interfaceBlock}\nexport const CONTENT: SiteContent = ${JSON.stringify(content, null, 2)};\n`;
+  const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
+  writeFileSync(dest, output, 'utf8');
+}
+
+/** @deprecated Use writeSiteContent. Kept as a thin alias for the vertical-preset path. */
+export function writeVerticalSiteTs(repoRoot: string, slug: string, verticalContent: SiteContent): void {
+  writeSiteContent(repoRoot, slug, verticalContent);
+}

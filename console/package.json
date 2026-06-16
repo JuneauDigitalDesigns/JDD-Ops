@@ -1,0 +1,35 @@
+{
+  "name": "jdd-console",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JDD Console — unified internal app merging the Studio site builder (/build) and the Onboarding Runbook (/onboard) behind one home page. Local-only, never deployed.",
+  "scripts": {
+    "dev": "next dev -p 3040",
+    "build": "next build",
+    "start": "next start -p 3040",
+    "sync-schema": "node scripts/sync-schema.mjs",
+    "check-schema": "node scripts/sync-schema.mjs --check",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@phosphor-icons/react": "^2.1.7",
+    "framer-motion": "^11.0.0",
+    "gsap": "^3.12.5",
+    "geist": "^1.3.1",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.0"
+  }
+}

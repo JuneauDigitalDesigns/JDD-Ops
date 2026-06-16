@@ -7,7 +7,8 @@ first time. After that, the per-client path is: **Part B (build the site) → Pa
 > **Repo location:** this repo lives at `C:\Users\Xander\Desktop\ops\jdd-ops`.
 > The Desktop is organized into `clients/`, `ops/`, and `templates/`.
 
-> **The site builder ("studio")** is the drag-and-drop app at `studio/preview`. It is how
+> **The site builder ("studio")** is the **Build** tab of the unified console at
+> `console` (route `/build`, dev server on port 3040 — run `npm run console`). It is how
 > you compose a client site from the prebuilt component catalog and export it into
 > `clients/{slug}/repo`. There is **no GitHub template repo** anymore — the blank template
 > lives in this repo at `template/` and is copied locally per client.
@@ -160,7 +161,8 @@ Compose the site from the prebuilt component catalog and export it into `clients
 
 ### Option 1 — Studio (drag-and-drop, recommended)
 
-1. Start the studio: `npm run preview` (runs `studio/preview` on a dev server).
+1. Start the console: `npm run console` (runs `console` on port 3040), then open the
+   **Build** tab at `http://localhost:3040/build`.
 2. In the studio, **name the client** (this is the `slug`), pick and order components (nav,
    hero, services, FAQ, contact, footer, SEO, …), and preview live.
 3. Click **Export**. The studio copies `template/` → `clients/{slug}/repo`, installs the

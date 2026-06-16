@@ -15,7 +15,7 @@ Two files per client:
 1. `clients/{slug}/site.ts` — the schema (brand, palette, hero, services, etc.).
    Exports `CONTENT` typed as `SiteContent`. This is the single source of truth.
 2. `clients/{slug}/.env.local` — secrets only (`RETELL_AGENT_ID`,
-   `TWILIO_NUMBER`, `AIRTABLE_BASE_ID`, `MAKE_WEBHOOK_URL`, `VERCEL_PROJECT_NAME`).
+   `TWILIO_NUMBER`, `CLIENT_FORWARD_PHONE`, `AIRTABLE_BASE_ID`, `MAKE_WEBHOOK_URL`, `VERCEL_PROJECT_NAME`).
 
 ## Plan tiers
 
@@ -28,7 +28,11 @@ The intake schema's top-level `plan` field gates which provisioning steps run.
 | enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Make webhook → Retell |
 
 Enterprise sites share the master Retell account's minute pool. Per-site
-Twilio numbers route to per-site Retell agents.
+Twilio numbers route inbound calls through `/api/voice` (human-first) then to
+per-site Retell agents on no-answer.
+
+Master env prerequisites for Growth/Enterprise provisioning: `TWILIO_ACCOUNT_SID`,
+`TWILIO_AUTH_TOKEN` (in addition to `RETELL_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
 
 ## Hard rules — never break these
 
@@ -57,9 +61,19 @@ Tailwind colors come from the palette via inline CSS variables wired in
 
 ## Twilio ownership
 
-JDD owns all numbers. Clients have no Twilio access. Number costs ~$2/mo on
-the master account, bundled into the client fee. Webhook routes inbound calls
-to: `https://api.retellai.com/twilio-voice-webhook/{RETELL_AGENT_ID}`.
+JDD owns all numbers via the master Twilio account (`TWILIO_ACCOUNT_SID` /
+`TWILIO_AUTH_TOKEN`). Clients have no Twilio access. Number costs ~$2/mo,
+bundled into the client fee.
+
+**Inbound call routing (two-hop):**
+1. Caller dials the Twilio number → Twilio POSTs to `/api/voice` on the client site
+2. `/api/voice` dials `CLIENT_FORWARD_PHONE` (brand's real phone) with a 20s timeout
+3. If answered: normal call, done
+4. If no-answer / busy / failed: `/api/voice/no-answer` redirects to the Retell AI:
+   `https://api.retellai.com/twilio-voice-webhook/{RETELL_AGENT_ID}`
+
+The `voiceUrl` is set at number-purchase time to `https://{siteSlug}.vercel.app/api/voice`.
+Vercel keeps `.vercel.app` URLs live permanently, so no update is needed after a custom domain is assigned.
 
 ## Retell agent
 
