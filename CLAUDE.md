@@ -14,8 +14,9 @@ The ops repo for Juneau Digital Designs. It holds master credentials, the
 Two files per client:
 1. `clients/{slug}/site.ts` — the schema (brand, palette, hero, services, etc.).
    Exports `CONTENT` typed as `SiteContent`. This is the single source of truth.
-2. `clients/{slug}/.env.local` — secrets only (`RETELL_AGENT_ID`,
-   `TWILIO_NUMBER`, `CLIENT_FORWARD_PHONE`, `AIRTABLE_BASE_ID`, `MAKE_WEBHOOK_URL`, `VERCEL_PROJECT_NAME`).
+2. `clients/{slug}/.env.local` — secrets only (`RETELL_AGENT_ID`, `RETELL_API_KEY`,
+   `RETELL_SIP_DOMAIN`, `TWILIO_NUMBER`, `CLIENT_FORWARD_PHONE`,
+   `CLIENT_FORWARD_RING_SECONDS`, `AIRTABLE_BASE_ID`, `MAKE_WEBHOOK_URL`, `VERCEL_PROJECT_NAME`).
 
 ## Plan tiers
 
@@ -67,12 +68,19 @@ bundled into the client fee.
 
 **Inbound call routing (two-hop):**
 1. Caller dials the Twilio number → Twilio POSTs to `/api/voice` on the client site
-2. `/api/voice` dials `CLIENT_FORWARD_PHONE` (brand's real phone) with a 20s timeout
+2. `/api/voice` normalizes `CLIENT_FORWARD_PHONE` (brand's real phone) to E.164 and
+   dials it with a timeout of `CLIENT_FORWARD_RING_SECONDS` (default 25s)
 3. If answered: normal call, done
-4. If no-answer / busy / failed: `/api/voice/no-answer` redirects to the Retell AI:
-   `https://api.retellai.com/twilio-voice-webhook/{RETELL_AGENT_ID}`
+4. If no-answer / busy / failed: `/api/voice/no-answer` calls Retell's
+   `POST https://api.retellai.com/v2/register-phone-call` API (Bearer
+   `RETELL_API_KEY`, body `{ agent_id, direction: "inbound", from_number,
+   to_number }`) → gets back `call_id` → returns
+   `<Dial><Sip>sip:{call_id}@{RETELL_SIP_DOMAIN}</Sip></Dial>` TwiML
+   (`RETELL_SIP_DOMAIN` default `sip.retellai.com`) → Twilio
+   connects the call to the Retell AI agent over SIP (no bridge server needed;
+   the SIP leg must be dialed within 5 min of register-phone-call).
 
-The `voiceUrl` is set at number-purchase time to `https://{siteSlug}.vercel.app/api/voice`.
+The `voiceUrl` is set at number-purchase time to `https://{vercelHost}.vercel.app/api/voice`, where `vercelHost` is `sanitizeProjectName(siteSlug).replace(/_/g, '-')` — underscores are not valid in DNS hostnames and Vercel renders them as hyphens anyway.
 Vercel keeps `.vercel.app` URLs live permanently, so no update is needed after a custom domain is assigned.
 
 ## Retell agent
