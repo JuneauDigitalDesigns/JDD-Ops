@@ -32,7 +32,7 @@ Open `.env` and fill in:
 | `RESEND_API_KEY` | resend.com → API Keys. Used by **Starter** sites for lead email delivery. |
 | `RESEND_FROM_EMAIL` | A verified sender on a domain you control (e.g. `leads@juneaudigitaldesigns.com`). Reused across every Starter site. |
 | `RETELL_API_KEY` | dashboard.retellai.com → API Keys. Used to create agents **and at runtime by `/api/voice/no-answer`** to register each inbound call (onboard.js copies it into every client `.env.local`). |
-| `RETELL_LLM_ID` | One Retell LLM created once; reused for every agent. dashboard.retellai.com → LLM → Create → copy ID. |
+| `RETELL_LLM_ID` | A Retell LLM used as the **config template** (model + tools). dashboard.retellai.com → LLM → Create → copy ID. onboard.js clones its model/tools into a **per-client LLM** carrying that client's prompt (the prompt lives on the LLM, not the agent), and stores the per-client LLM id in the client `.env.local`. |
 | `RETELL_DEFAULT_VOICE_ID` | dashboard.retellai.com → Voices → pick one → copy ID. |
 | `RETELL_SIP_DOMAIN` | *(optional)* SIP host the no-answer leg dials (`sip:{call_id}@<domain>`). Defaults to `sip.retellai.com`; only set if Retell assigns your account a different SIP ingress domain. |
 | `TWILIO_ACCOUNT_SID` | console.twilio.com (Growth/Enterprise). Step 8 buys the client's number and sets human-first call routing. |
@@ -213,7 +213,9 @@ npm run onboard -- --schema clients/{slug}/site.ts        # add --dry-run to pre
 5. `npm install && npm run build` in the local repo.
 6. **Starter stops here for voice.** Growth/Enterprise continue:
    6. Claude generates the Retell agent prompt → `clients/{slug}/agent-prompt.txt`.
-   7. Create the Retell agent.
+   7. Create a **per-client Retell LLM** (cloning `RETELL_LLM_ID`'s model + tools,
+      carrying this client's prompt) and an agent bound to it. The prompt lives on
+      the LLM — `update-prompt` later edits the LLM, not the agent.
    8. **Provision a JDD-owned Twilio number** (local area code, else toll-free) and set its
       voiceUrl to `https://{slug}.vercel.app/api/voice` → stored as `TWILIO_NUMBER`; create the
       Airtable base (shared for Enterprise, with a per-site `Site` column); register the agent

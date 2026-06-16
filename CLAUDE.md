@@ -88,10 +88,19 @@ Vercel keeps `.vercel.app` URLs live permanently, so no update is needed after a
 
 ## Retell agent
 
-One agent per client. JDD owns the Retell account. Prompt is Claude-generated
-from the intake schema, saved to `clients/{slug}/agent-prompt.txt` for review
-before upload. Agent qualifies leads, answers FAQs from intake, defers prices
-to owner, never invents facts.
+One agent per client, each backed by its **own per-client Retell LLM**. JDD owns
+the Retell account. Prompt is Claude-generated from the intake schema, saved to
+`clients/{slug}/agent-prompt.txt` for review before upload. Agent qualifies leads,
+answers FAQs from intake, defers prices to owner, never invents facts.
+
+**The prompt lives on the LLM, not the agent.** For a `retell-llm` response
+engine, `general_prompt` passed to `create-agent`/`update-agent` is ignored — so
+onboard.js creates a per-client LLM (cloning `RETELL_LLM_ID`'s model+tools) with
+the prompt and binds the agent to it; the per-client LLM id is saved as
+`RETELL_LLM_ID` in the client `.env.local`. `npm run update-prompt` edits that LLM
+(`update-retell-llm`), not the agent. Note: Retell blocks changing an agent's
+`response_engine` once it has multiple versions — re-point at provision time, not
+after.
 
 ## Airtable
 
