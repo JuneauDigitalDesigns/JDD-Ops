@@ -2,8 +2,10 @@ node_modules/
 .next/
 .env
 .env.local
-clients/*/.env.local
-clients/*/repo/
+# Client folders live only on local machines — each client gets its own GitHub repo.
+# Keep the directory present on fresh clones via .gitkeep, but track nothing else.
+/clients/*
+!/clients/.gitkeep
 console/export/
 *.log
 .DS_Store
