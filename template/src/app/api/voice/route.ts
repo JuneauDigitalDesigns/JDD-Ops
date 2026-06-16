@@ -29,10 +29,17 @@ export async function POST(req: NextRequest) {
   const ringSecondsRaw = parseInt(process.env.CLIENT_FORWARD_RING_SECONDS ?? '', 10);
   const ringSeconds = Number.isFinite(ringSecondsRaw) && ringSecondsRaw > 0 ? ringSecondsRaw : 25;
 
+  // Originate the forward leg from the JDD-owned Twilio number, not the inbound
+  // caller's number. Passing an arbitrary customer caller ID through gets rejected
+  // by some carriers / STIR-SHAKEN (Twilio 13224). Falls back to pass-through if
+  // TWILIO_NUMBER is unset.
+  const callerId = toE164(process.env.TWILIO_NUMBER ?? '');
+  const callerIdAttr = callerId ? ` callerId="${callerId}"` : '';
+
   const baseUrl = req.nextUrl.origin;
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="${ringSeconds}" action="${baseUrl}/api/voice/no-answer" method="POST">
+  <Dial timeout="${ringSeconds}"${callerIdAttr} action="${baseUrl}/api/voice/no-answer" method="POST">
     <Number>${forwardPhone}</Number>
   </Dial>
 </Response>`;

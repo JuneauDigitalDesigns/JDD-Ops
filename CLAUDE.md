@@ -69,7 +69,10 @@ bundled into the client fee.
 **Inbound call routing (two-hop):**
 1. Caller dials the Twilio number → Twilio POSTs to `/api/voice` on the client site
 2. `/api/voice` normalizes `CLIENT_FORWARD_PHONE` (brand's real phone) to E.164 and
-   dials it with a timeout of `CLIENT_FORWARD_RING_SECONDS` (default 25s)
+   dials it with a timeout of `CLIENT_FORWARD_RING_SECONDS` (default 25s). The
+   forward leg sets `callerId=TWILIO_NUMBER` so it originates from the JDD-owned
+   number (arbitrary customer caller IDs get rejected by carriers/STIR-SHAKEN —
+   Twilio 13224)
 3. If answered: normal call, done
 4. If no-answer / busy / failed: `/api/voice/no-answer` calls Retell's
    `POST https://api.retellai.com/v2/register-phone-call` API (Bearer
