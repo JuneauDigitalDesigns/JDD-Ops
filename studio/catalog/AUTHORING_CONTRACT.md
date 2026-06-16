@@ -9,7 +9,7 @@ into the template glue-free and survives `onboard.js` provisioning.
 JDD builds each client site from a fixed Next.js template (`template/`). Components
 are visual **variants** that render slices of a **fixed schema** — variety comes
 from design, never from new data fields. You author components here in
-`studio/catalog/<category>/`. They are previewed/selected in `studio/preview`,
+`studio/catalog/<category>/`. They are previewed/selected in `console`,
 exported to a folder, and pasted into a client's `template/src/components/catalog/`.
 At export time `copySiteData` copies the preview's `site.ts` (v2.1) into the new
 client repo. At provision time `onboard.js` splices the client's real content into
@@ -17,7 +17,7 @@ client repo. At provision time `onboard.js` splices the client's real content in
 
 ## 1. The fixed schema (`SiteContent`) — v2.1
 
-Source of truth: `studio/preview/src/data/site.ts` (the preview carries the canonical
+Source of truth: `console/src/data/site.ts` (the preview carries the canonical
 v2.1 schema; the template's `src/data/site.ts` is a minimal placeholder for standalone
 builds and gets overwritten at export time). Do **not** add fields. Shape:
 
@@ -154,7 +154,7 @@ the matching SLOT.
 everything from that declaration onward. Do not add code after it, and do not edit
 the template's `site.ts` from a component. Only the type definitions live above it.
 
-The canonical v2.1 schema lives in `studio/preview/src/data/site.ts`. The export
+The canonical v2.1 schema lives in `console/src/data/site.ts`. The export
 pipeline copies it into each new client repo via `copySiteData`.
 
 ## 9. Env-var contract

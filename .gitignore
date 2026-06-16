@@ -4,6 +4,6 @@ node_modules/
 .env.local
 clients/*/.env.local
 clients/*/repo/
-studio/preview/export/
+console/export/
 *.log
 .DS_Store

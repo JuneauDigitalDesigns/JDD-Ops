@@ -35,7 +35,7 @@ immediately. To use a catalog component:
 2. Import it in `page.tsx` and replace the placeholder block inside the matching
    `SLOT`.
 
-Browse and select components in the studio preview app (`studio/preview`), which
+Browse and select components in the studio preview app (`console`), which
 exports a folder you copy into `src/components/catalog/`.
 
 ## Local commands

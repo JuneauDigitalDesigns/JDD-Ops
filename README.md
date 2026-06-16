@@ -30,7 +30,7 @@ jdd-ops/
 
 ## Onboarding a client (summary — see RUNBOOK.md for the full flow)
 
-1. **Build** the site in the studio (`npm run preview` → drag-drop → Export to
+1. **Build** the site in the studio (`npm run console` → drag-drop → Export to
    `clients/{slug}/repo`), or scaffold manually with `npm run new-client -- --slug {slug}`.
 2. **Provision**: `npm run onboard -- --schema clients/{slug}/site.ts`.
 3. Walk the three human checkpoints:

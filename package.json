@@ -14,8 +14,9 @@
     "update-prompt": "node scripts/update-agent-prompt.js",
     "sync-env": "node scripts/sync-vercel-env.js",
     "teardown": "node scripts/teardown.js",
-    "preview": "cd studio/preview && npm install && npm run dev",
-    "runbook": "cd runbook && npm install && npm run dev"
+    "console": "cd console && npm install && npm run dev",
+    "preview": "cd console && npm install && npm run dev",
+    "runbook": "cd console && npm install && npm run dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
