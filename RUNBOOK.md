@@ -31,9 +31,12 @@ Open `.env` and fill in:
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys. Used in step 6 to generate the Retell agent prompt. |
 | `RESEND_API_KEY` | resend.com → API Keys. Used by **Starter** sites for lead email delivery. |
 | `RESEND_FROM_EMAIL` | A verified sender on a domain you control (e.g. `leads@juneaudigitaldesigns.com`). Reused across every Starter site. |
-| `RETELL_API_KEY` | dashboard.retellai.com → API Keys. Used to create agents **and provision phone numbers**. |
+| `RETELL_API_KEY` | dashboard.retellai.com → API Keys. Used to create agents **and at runtime by `/api/voice/no-answer`** to register each inbound call (onboard.js copies it into every client `.env.local`). |
 | `RETELL_LLM_ID` | One Retell LLM created once; reused for every agent. dashboard.retellai.com → LLM → Create → copy ID. |
 | `RETELL_DEFAULT_VOICE_ID` | dashboard.retellai.com → Voices → pick one → copy ID. |
+| `RETELL_SIP_DOMAIN` | *(optional)* SIP host the no-answer leg dials (`sip:{call_id}@<domain>`). Defaults to `sip.retellai.com`; only set if Retell assigns your account a different SIP ingress domain. |
+| `TWILIO_ACCOUNT_SID` | console.twilio.com (Growth/Enterprise). Step 8 buys the client's number and sets human-first call routing. |
+| `TWILIO_AUTH_TOKEN` | console.twilio.com (Growth/Enterprise). Paired with the SID to purchase + configure the number. |
 | `AIRTABLE_API_KEY` | airtable.com/create/tokens with `data.records:write` + `schema.bases:write` scopes on your workspace. |
 | `AIRTABLE_WORKSPACE_ID` | airtable.com/{workspaceId}/api — copy the workspace ID from the URL (starts with `wsp`). |
 | `GITHUB_TOKEN` | github.com/settings/tokens → fine-grained PAT with `repo` + `delete_repo` scopes on `GITHUB_ORG`. |
@@ -44,10 +47,19 @@ Open `.env` and fill in:
 | `MAKE_DATA_STORE_ID` | make.com → Data stores → `retell-agent-lookup` → the numeric ID in the URL (see A4). |
 | `RETELL_POST_CALL_WEBHOOK_URL` | The webhook URL of the `jdd-post-call-log` Make scenario (see A4). Used to wire agents to post-call logging. |
 
-> **No Twilio account credentials.** Phone numbers are now **provisioned and owned by
-> Retell** (Twilio is the carrier under the hood). You do **not** need `TWILIO_ACCOUNT_SID`
-> or `TWILIO_AUTH_TOKEN`. The provisioned number is stored in `.env.local` as `TWILIO_NUMBER`
-> only for backward-compat with the Make scenario's `from_number`.
+> **Twilio account credentials required (Growth/Enterprise).** `onboard.js` step 8 buys a
+> **JDD-owned Twilio** number via the Twilio API, so you **do** need `TWILIO_ACCOUNT_SID` +
+> `TWILIO_AUTH_TOKEN` in `.env`. The number's voiceUrl is pointed at `/api/voice` on the
+> client site for human-first routing; it is stored in `.env.local` as `TWILIO_NUMBER` (also
+> the Make scenario's `from_number`).
+>
+> **Inbound routing (do NOT use Retell SIP trunking / number import).** Calls hit `/api/voice`
+> first, ring `CLIENT_FORWARD_PHONE` for `CLIENT_FORWARD_RING_SECONDS` (default 25), and on
+> no-answer `/api/voice/no-answer` calls Retell `POST /v2/register-phone-call` and dials
+> `<Sip>sip:{call_id}@{RETELL_SIP_DOMAIN}</Sip>` (default `sip.retellai.com`). The client
+> `.env.local` therefore also carries `RETELL_API_KEY`, `CLIENT_FORWARD_RING_SECONDS`, and
+> `RETELL_SIP_DOMAIN`. Importing the number into Retell or configuring a Retell SIP trunk
+> bypasses `/api/voice` and breaks the human-first ring.
 
 > **`TEMPLATE_REPO` is deprecated/unused.** `onboard.js` no longer clones a GitHub template.
 > Leave it blank.
@@ -202,10 +214,10 @@ npm run onboard -- --schema clients/{slug}/site.ts        # add --dry-run to pre
 6. **Starter stops here for voice.** Growth/Enterprise continue:
    6. Claude generates the Retell agent prompt → `clients/{slug}/agent-prompt.txt`.
    7. Create the Retell agent.
-   8. **Provision a Retell-managed phone number** (local area code, else toll-free), bound to
-      the agent for inbound + outbound → stored as `TWILIO_NUMBER`; create the Airtable base
-      (shared for Enterprise, with a per-site `Site` column); register the agent in the Make
-      `retell-agent-lookup` Data Store (step 8c).
+   8. **Provision a JDD-owned Twilio number** (local area code, else toll-free) and set its
+      voiceUrl to `https://{slug}.vercel.app/api/voice` → stored as `TWILIO_NUMBER`; create the
+      Airtable base (shared for Enterprise, with a per-site `Site` column); register the agent
+      in the Make `retell-agent-lookup` Data Store (step 8c).
 9. Commit + push the local repo (Vercel auto-deploys); sync env vars to the Vercel project.
 
 For **Enterprise** (2–3 sites), steps repeat per site; sites share one Airtable base and the

@@ -8,4 +8,6 @@ node_modules/
 !/clients/.gitkeep
 console/export/
 *.log
+*.tsbuildinfo
+**/.state/
 .DS_Store

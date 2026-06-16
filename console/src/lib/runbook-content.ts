@@ -100,7 +100,7 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
           {
             t: 'callout',
             tone: 'info',
-            body: 'Step 8 buys a JDD-owned Twilio number and points its voiceUrl at /api/voice on the client site — inbound calls ring the client’s real phone first (20s), then fall back to the Retell agent. The number is saved as TWILIO_NUMBER (also the Make scenario’s from_number). Full chain in the Voice agent phase.',
+            body: 'Step 8 buys a JDD-owned Twilio number and points its voiceUrl at /api/voice on the client site — inbound calls ring the client’s real phone first (25s, set by CLIENT_FORWARD_RING_SECONDS), then fall back to the Retell agent over SIP. The number is saved as TWILIO_NUMBER (also the Make scenario’s from_number). Full chain in the Voice agent phase.',
           },
           {
             t: 'callout',
@@ -157,17 +157,18 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
 function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
   const routingStep: Step = {
     id: 'call-routing',
-    title: 'How inbound calls route (human-first → AI fallback)',
+    title: 'How inbound calls route (human-first → AI fallback over SIP)',
     auto: true,
-    why: 'onboard.js (step 8) and the site template wire this automatically — there is no manual Twilio console step. Understand it before you test-call: the Retell agent only answers when the client misses the call.',
+    why: 'onboard.js (step 8) and the site template wire this automatically — there is no manual Twilio or Retell console step for routing. Understand it before you test-call: the Retell agent only answers when the client misses the call.',
     blocks: [
       {
         t: 'substeps',
         items: [
           { text: 'A customer dials the Twilio number → Twilio POSTs to /api/voice on the deployed client site.', detail: 'voiceUrl is set to https://{slug}.vercel.app/api/voice at number-purchase time — the .vercel.app URL stays live permanently, so a custom domain later needs no change.' },
-          { text: '/api/voice returns <Dial timeout="20"> to the client’s real phone (CLIENT_FORWARD_PHONE).' },
-          { text: 'If the client answers within 20s → normal connected call, the AI never engages.' },
-          { text: 'If no-answer / busy / failed → /api/voice/no-answer redirects the call to the Retell agent at https://api.retellai.com/twilio-voice-webhook/{RETELL_AGENT_ID}.' },
+          { text: '/api/voice normalizes CLIENT_FORWARD_PHONE to E.164 and returns <Dial timeout="25"> to the client’s real phone.', detail: 'The 25s ring window is set by CLIENT_FORWARD_RING_SECONDS in .env.local — change that env var (no code edit) to tune it per client.' },
+          { text: 'If the client answers within 25s → normal connected call, the AI never engages.' },
+          { text: 'If no-answer / busy / failed → /api/voice/no-answer calls Retell POST /v2/register-phone-call (Bearer RETELL_API_KEY) and gets back a call_id.' },
+          { text: 'It then returns <Dial><Sip>sip:{call_id}@{RETELL_SIP_DOMAIN}</Sip></Dial> — Twilio connects the caller to the Retell agent over SIP.', detail: 'RETELL_SIP_DOMAIN defaults to sip.retellai.com. No bridge server, no Twilio SIP trunk, no number import needed — plain outbound <Dial><Sip> works out of the box.' },
         ],
       },
       ...ctx.sites.map((s): Block => {
@@ -179,15 +180,25 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
           caption: ctx.isEnterprise ? `Routing for ${s.brandName}:` : 'This client’s routing chain:',
           rows: [
             { label: 'Customers dial — TWILIO_NUMBER', value: num.value, pending: num.pending },
-            { label: 'Rings first, 20s — CLIENT_FORWARD_PHONE', value: forward.value, pending: forward.pending },
-            { label: 'AI fallback on no-answer — RETELL_AGENT_ID', value: agent.value, pending: agent.pending },
+            { label: 'Rings first, 25s — CLIENT_FORWARD_PHONE', value: forward.value, pending: forward.pending },
+            { label: 'AI fallback on no-answer (SIP) — RETELL_AGENT_ID', value: agent.value, pending: agent.pending },
           ],
         };
       }),
       {
         t: 'callout',
+        tone: 'danger',
+        body: 'Do NOT import this Twilio number into the Retell dashboard or set up SIP trunking there. A Retell-managed / SIP-trunked number bypasses /api/voice entirely, which kills the human-first ring (calls go straight to the AI). The number must stay JDD/Twilio-owned with its voiceUrl pointed at /api/voice — onboard.js sets this automatically.',
+      },
+      {
+        t: 'callout',
+        tone: 'info',
+        body: '/api/voice/no-answer needs RETELL_API_KEY and RETELL_SIP_DOMAIN at runtime to register the call and build the SIP URI. onboard.js writes both into .env.local and Vercel sync pushes them — no manual step. If the AI leg 500s after the ring, confirm RETELL_API_KEY exists on the Vercel project.',
+      },
+      {
+        t: 'callout',
         tone: 'warn',
-        body: 'Routing only works once the client repo is deployed to Vercel with env synced — Twilio must reach /api/voice at the .vercel.app URL (local dev gets no Twilio webhooks without a tunnel). To change the ring window, edit timeout="20" in template/src/app/api/voice/route.ts.',
+        body: 'Routing only works once the client repo is deployed to Vercel with env synced — Twilio must reach /api/voice at the .vercel.app URL (local dev gets no Twilio webhooks without a tunnel). To change the ring window, set CLIENT_FORWARD_RING_SECONDS in .env.local and re-sync (no code edit).',
       },
     ],
   };
@@ -211,7 +222,7 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
             {
               t: 'substeps',
               items: [
-                { text: 'To reach the AI, call the number from a phone that is NOT the client’s, and let the client’s real phone go unanswered for ~20s — only then does the agent pick up (human-first routing). Confirm the greeting names the business correctly.', detail: 'Answering the client’s phone within 20s connects a normal call and the AI never engages — see “How inbound calls route”.' },
+                { text: 'To reach the AI, call the number from a phone that is NOT the client’s, and let the client’s real phone go unanswered for ~25s — only then does the agent pick up (human-first routing). Confirm the greeting names the business correctly.', detail: 'Answering the client’s phone within the ring window (CLIENT_FORWARD_RING_SECONDS, default 25s) connects a normal call and the AI never engages — see “How inbound calls route”.' },
                 { text: 'Run a fake lead: ask about a service, give a name and a callback number, mention a timeline.' },
                 { text: 'Note anything off — wrong hours, missing services, awkward phrasing, quoting a price (it should never quote prices).' },
                 { text: `Edit the prompt at clients/${slugForCmd}/agent-prompt.txt to fix it.` },
@@ -589,7 +600,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             t: 'substeps',
             items: [
               { text: 'ANTHROPIC_API_KEY — console.anthropic.com (generates the Retell agent prompt).' },
-              { text: 'RETELL_API_KEY + RETELL_LLM_ID + RETELL_DEFAULT_VOICE_ID — dashboard.retellai.com (agent + voice).' },
+              { text: 'RETELL_API_KEY + RETELL_LLM_ID + RETELL_DEFAULT_VOICE_ID — dashboard.retellai.com (agent + voice). The account also needs custom-telephony / outbound SIP available — the no-answer leg dials sip:{call_id}@sip.retellai.com (on by default for standard accounts).' },
               { text: 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN — console.twilio.com (Growth/Enterprise: step 8 buys each client’s number and sets human-first call routing).' },
               { text: 'AIRTABLE_API_KEY (data.records:write + schema.bases:write) + AIRTABLE_WORKSPACE_ID (wsp…).' },
               { text: 'GITHUB_TOKEN (repo + delete_repo) + GITHUB_ORG; VERCEL_TOKEN + VERCEL_TEAM_ID.' },
