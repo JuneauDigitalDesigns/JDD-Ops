@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { Stack, ClipboardText, ArrowRight, Compass } from '@phosphor-icons/react';
 
 // Home landing — shown on every launch. Two large card "buttons" route to the two tools.
-// Aurora-Glass dark chrome comes from the global body + tokens (globals.css). No auto
+// JDD light/dark chrome comes from the global body + tokens (globals.css). No auto
 // redirect: the operator always chooses Build or Onboard from here.
 export default function Home() {
   return (
-    <main className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-16">
+    <main className="no-scrollbar relative z-10 flex h-full flex-col items-center justify-center overflow-y-auto px-6 py-16">
       {/* Brand mark */}
       <div className="mb-10 flex flex-col items-center text-center">
         <div className="mb-5 flex items-center gap-2.5">

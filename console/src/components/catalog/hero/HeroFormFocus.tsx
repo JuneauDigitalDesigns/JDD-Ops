@@ -2,16 +2,18 @@
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle } from '@phosphor-icons/react';
-import { CONTENT } from '@/data/site';
-import type { SiteContent } from '@/data/site';
+import { CONTENT, type SiteContent } from '@/data/site';
 import { E, useEditing } from '@/lib/editable';
+import { skinClasses, type SkinId } from '@/lib/skins';
+import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
 export const meta = {
   id: 'hero-form',
   category: 'hero',
   label: 'Hero / Lead form',
   consumes: ['hero.eyebrow', 'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta', 'hero.frictionReducers'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
+  skins: ['editorial', 'quiet'],
 } as const;
 
 type Status = 'idle' | 'loading' | 'done' | 'error';
@@ -29,9 +31,17 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
   );
 }
 
-export default function HeroFormFocus({ content = CONTENT }: { content?: SiteContent }) {
+export default function HeroFormFocus({
+  content = CONTENT,
+  skin = 'editorial',
+}: {
+  content?: SiteContent;
+  skin?: SkinId;
+}) {
   const reduce = useReducedMotion() ?? false;
   const editing = useEditing();
+  const still = stillFor(skin, reduce);
+  const s = skinClasses(skin);
   const { hero } = content;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -54,26 +64,29 @@ export default function HeroFormFocus({ content = CONTENT }: { content?: SiteCon
   }
 
   return (
-    <section className="bg-bg py-20">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 lg:grid-cols-2 lg:items-center">
+    <section className={`py-24 ${s.section}`}>
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-14 px-6 lg:grid-cols-2 lg:items-center">
         {/* Copy */}
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          initial={still ? false : { opacity: 0, y: 20 }}
+          whileInView={still ? undefined : { opacity: 1, y: 0 }}
+          viewport={viewportOnce}
+          transition={{ duration: 0.6, ease: EASE }}
         >
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent"><E p="hero.eyebrow">{hero.eyebrow}</E></p>
-          <h1 className="mt-3 font-heading text-4xl leading-tight text-ink md:text-5xl">
+          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}>
+            <E p="hero.eyebrow">{hero.eyebrow}</E>
+          </p>
+          <h1 className={`mt-4 font-heading text-5xl font-bold leading-[0.98] tracking-[-0.02em] ${s.heading} md:text-6xl`}>
             {editing
               ? <E p="hero.headline" fit>{hero.headline}</E>
               : <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />}
           </h1>
-          <p className="mt-5 text-lg leading-relaxed text-inkSoft"><E p="hero.sub">{hero.sub}</E></p>
+          <p className={`mt-6 text-lg leading-relaxed ${s.body}`}><E p="hero.sub">{hero.sub}</E></p>
 
           {hero.frictionReducers.length > 0 && (
-            <ul className="mt-8 space-y-2.5">
+            <ul className="mt-9 space-y-3">
               {hero.frictionReducers.map((r, i) => (
-                <li key={r} className="flex items-center gap-2.5 text-inkSoft">
+                <li key={r} className={`flex items-center gap-2.5 ${s.body}`}>
                   <CheckCircle size={17} weight="fill" className="shrink-0 text-accent" />
                   <E p={`hero.frictionReducers.${i}`}>{r}</E>
                 </li>
@@ -82,16 +95,18 @@ export default function HeroFormFocus({ content = CONTENT }: { content?: SiteCon
           )}
         </motion.div>
 
-        {/* Form */}
+        {/* Form card — always a bright, high-contrast surface for conversion clarity */}
         <motion.div
-          className="rounded-2xl border border-rule bg-bgSoft p-8"
-          initial={reduce ? false : { opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+          className="rounded-3xl border border-rule bg-bg p-8 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.25)]"
+          initial={still ? false : { opacity: 0, x: 20 }}
+          whileInView={still ? undefined : { opacity: 1, x: 0 }}
+          viewport={viewportOnce}
+          transition={{ duration: 0.6, ease: EASE, delay: 0.1 }}
         >
           {status === 'done' ? (
             <div className="py-6 text-center">
-              <p className="font-heading text-xl font-semibold text-ink">We'll call you shortly.</p>
+              <CheckCircle size={36} weight="fill" className="mx-auto text-accent" />
+              <p className="mt-3 font-heading text-xl font-semibold text-ink">We&apos;ll call you shortly.</p>
               <p className="mt-2 text-inkSoft">Expect to hear from us within the hour.</p>
             </div>
           ) : (
@@ -100,12 +115,12 @@ export default function HeroFormFocus({ content = CONTENT }: { content?: SiteCon
               <form onSubmit={submit} className="mt-5 space-y-4">
                 <input type="text" placeholder="Your name" required value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
+                  className="w-full rounded-xl border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
                 <input type="tel" placeholder="Phone number" required value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-lg border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
+                  className="w-full rounded-xl border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
                 <button type="submit" disabled={status === 'loading'}
-                  className="w-full rounded-lg bg-accent py-3.5 font-semibold text-accentFg transition-opacity hover:opacity-90 disabled:opacity-60">
+                  className="w-full rounded-xl bg-accent py-3.5 font-semibold text-accentFg shadow-[0_10px_30px_-10px_var(--accent-glow)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60">
                   {status === 'loading' ? 'Sending...' : <E p="hero.cta">{hero.cta}</E>}
                 </button>
                 {status === 'error' && (

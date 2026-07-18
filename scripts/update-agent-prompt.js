@@ -43,14 +43,23 @@ async function main() {
   const prompt = readFileSync(promptPath, 'utf8').trim();
   if (!prompt) fail(`Prompt file is empty: ${promptPath}`);
 
-  console.log(`Uploading prompt (${prompt.length} chars) → Retell agent ${agentId}`);
+  const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
-  const res = await fetch(`https://api.retellai.com/update-agent/${agentId}`, {
+  // The prompt lives on the agent's LLM, not the agent itself (retell-llm engine).
+  // Look up the agent's bound llm_id, then update that LLM's general_prompt.
+  const agentRes = await fetch(`https://api.retellai.com/get-agent/${agentId}`, { headers });
+  if (!agentRes.ok) fail(`Retell get-agent ${agentId} returned ${agentRes.status}: ${await agentRes.text().catch(() => '')}`);
+  const agent = await agentRes.json();
+  const llmId = agent.response_engine?.llm_id;
+  if (!llmId) {
+    fail(`Agent ${agentId} is not backed by a retell-llm engine (response_engine=${JSON.stringify(agent.response_engine)}). Cannot update prompt.`);
+  }
+
+  console.log(`Uploading prompt (${prompt.length} chars) → Retell LLM ${llmId} (agent ${agentId})`);
+
+  const res = await fetch(`https://api.retellai.com/update-retell-llm/${llmId}`, {
     method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ general_prompt: prompt }),
   });
 
@@ -59,7 +68,7 @@ async function main() {
     fail(`Retell API returned ${res.status}: ${text}`);
   }
 
-  console.log(`✓ Agent ${agentId} updated.`);
+  console.log(`✓ LLM ${llmId} (agent ${agentId}) updated.`);
 }
 
 main().catch((err) => fail('unhandled error', err));

@@ -38,15 +38,25 @@ function ProjectCard({ p, idx }: { p: Project; idx: number }) {
   );
 }
 
-export default function WorkMasonry({ content = CONTENT }: { content?: SiteContent }) {
+export default function WorkMasonry({
+  content = CONTENT,
+  // Studio-only: the build catalog renders this in a height-measured iframe where the
+  // pinned `h-[100dvh]` track feeds back into an infinitely growing page. When set, we
+  // render the bounded static rail instead. The exported client page never passes it.
+  previewMode = false,
+}: {
+  content?: SiteContent;
+  previewMode?: boolean;
+}) {
   const reduce = useReducedMotion() ?? false;
   const { work } = content;
   const wrap = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const hidden = work.hidden || !work.projects.length;
+  const staticRail = reduce || previewMode;
 
   useEffect(() => {
-    if (hidden || reduce || !wrap.current || !track.current) return;
+    if (hidden || staticRail || !wrap.current || !track.current) return;
     gsap.registerPlugin(ScrollTrigger);
     const ctx = gsap.context(() => {
       const distance = () => track.current!.scrollWidth - window.innerWidth;
@@ -65,7 +75,7 @@ export default function WorkMasonry({ content = CONTENT }: { content?: SiteConte
       });
     }, wrap);
     return () => ctx.revert();
-  }, [hidden, reduce]);
+  }, [hidden, staticRail]);
 
   if (hidden) return null;
 
@@ -77,8 +87,8 @@ export default function WorkMasonry({ content = CONTENT }: { content?: SiteConte
         {work.sub && <p className="mt-3 max-w-xl text-inkSoft"><E p="work.sub">{work.sub}</E></p>}
       </div>
 
-      {reduce ? (
-        // Reduced motion: a plain horizontal scroll-snap rail (no pin/scrub).
+      {staticRail ? (
+        // Reduced motion / studio preview: a plain horizontal scroll-snap rail (no pin/scrub).
         <div className="mx-auto max-w-6xl overflow-x-auto px-6 py-12" style={{ scrollbarWidth: 'none' }}>
           <div className="flex gap-6" style={{ width: 'max-content' }}>
             {work.projects.map((p, i) => <ProjectCard key={i} p={p} idx={i} />)}

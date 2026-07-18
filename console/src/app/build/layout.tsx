@@ -4,7 +4,7 @@
 // subtree. The live per-vertical preview palette is applied by StudioApp on its <main>.
 export default function BuildLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="studio-chrome min-h-screen bg-uiCanvas font-chrome text-uiInk antialiased">
+    <div className="studio-chrome h-full bg-uiCanvas font-chrome text-uiInk antialiased">
       {children}
     </div>
   );

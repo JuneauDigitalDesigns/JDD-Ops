@@ -5,9 +5,11 @@ export type Plan = 'starter' | 'growth' | 'enterprise';
 export interface SiteEnv {
   RETELL_AGENT_ID?: string;
   TWILIO_NUMBER?: string;
+  CLIENT_FORWARD_PHONE?: string;
+  CLIENT_FORWARD_RING_SECONDS?: string;
   AIRTABLE_BASE_ID?: string;
   AIRTABLE_SITE_TAG?: string;
-  MAKE_WEBHOOK_URL?: string;
+  RETELL_POST_CALL_WEBHOOK_URL?: string;
   VERCEL_PROJECT_NAME?: string;
   LEAD_DELIVERY_MODE?: string;
   [k: string]: string | undefined;
@@ -68,7 +70,7 @@ export interface OpsConfig {
   retellPostCallWebhookUrl?: string; // jdd-ops/.env RETELL_POST_CALL_WEBHOOK_URL
   githubOrg?: string; // jdd-ops/.env GITHUB_ORG
   vercelTeamId?: string; // jdd-ops/.env VERCEL_TEAM_ID
-  makeDataStoreId?: string; // jdd-ops/.env MAKE_DATA_STORE_ID
+  makePostCallMasterScenarioId?: string; // jdd-ops/.env MAKE_POST_CALL_MASTER_SCENARIO_ID
   portalSignInUrl?: string; // agency NEXT_PUBLIC_CLERK_SIGN_IN_URL → absolute
   serviceAccountEmail?: string; // GOOGLE_SERVICE_ACCOUNT_KEY → client_email
 }

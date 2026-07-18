@@ -4,73 +4,71 @@ import { useEffect, useState } from 'react';
 import { Globe, Spinner, CheckCircle, Warning } from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
 import { deepMerge } from '@/lib/merge';
-import { mapScrapeToSiteContent, type ScrapedContent } from '@/data/firecrawl-schema';
+import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
+import { ALL_SECTIONS } from '@/lib/copy-schema';
 
-// Standalone "Seed from existing website" section, rendered below ImportPanel on the Finalize
-// page. Always available — usable with or without a prior import:
-//   • With an import: scraped values fill gaps, the operator-provided intake values win.
-//   • Without an import: the scrape becomes the imported content; the page-level
-//     deepMerge(VERTICAL_PRESETS[vertical], imported) fills the rest from the chosen vertical.
-// If the imported intake asked for a scrape (_meta.scrapeExistingWebsite), the URL is prefilled
-// and a badge is shown. Scraping clears that flag so it won't re-prompt.
-
-const TOTAL_CHECKS = 10; // mapScrapeToSiteContent tracks 10 key areas in _meta.missing_fields
+// "Seed from existing website" — rebuilt on Claude (replaces the old Firecrawl path).
+// Claude's web_fetch tool reads the client's homepage server-side, extracts all brand
+// copy/text, and returns a comprehensive content object. The result becomes the imported
+// (base) content, so the whole preview reseeds from the site; the chosen vertical fills any
+// gaps the site didn't cover.
+//
+// If an imported intake asked for a scrape (_meta.scrapeExistingWebsite), the URL is prefilled
+// and a badge is shown. Scanning clears that flag so it won't re-prompt.
 
 export default function ScrapePanel({
   imported,
   onImport,
+  vertical,
+  base,
 }: {
   imported: SiteContent | null;
   onImport: (site: SiteContent) => void;
+  vertical: VerticalId;
+  base: SiteContent;
 }) {
   const [url, setUrl] = useState('');
-  const [scraping, setScraping] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
 
   const requested = imported?._meta?.scrapeExistingWebsite === true;
   const prefill = imported?._meta?.scrapeWebsiteDomain ?? '';
 
-  // Prefill the URL when an import arrives carrying a requested domain.
   useEffect(() => {
     if (prefill) setUrl(prefill);
   }, [prefill]);
 
-  async function onScrape() {
+  async function onScan() {
     if (!url.trim()) return;
-    setScraping(true);
+    setScanning(true);
     setError('');
     setNote('');
     try {
-      const res = await fetch('/api/build/scrape', {
+      const res = await fetch('/api/build/generate-copy', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ vertical, base, url: url.trim(), sections: ALL_SECTIONS }),
       });
-      const data = (await res.json()) as { url?: string; extracted?: ScrapedContent; error?: string };
-      if (!res.ok || data.error) throw new Error(data.error || `Scrape failed (${res.status}).`);
+      const data = (await res.json()) as { generated?: Partial<SiteContent>; error?: string };
+      if (!res.ok || !data.generated) throw new Error(data.error || `Scan failed (${res.status}).`);
 
-      const usedUrl = data.url ?? url.trim();
-      const mapped = mapScrapeToSiteContent(data.extracted ?? {}, usedUrl);
-
-      // Scraped content is the floor; any operator-provided intake values override it.
-      const merged = deepMerge(mapped as unknown as SiteContent, imported ?? ({} as SiteContent));
+      // Replace everything from the site: scan output over a fresh vertical preset.
+      const merged = deepMerge(VERTICAL_PRESETS[vertical], data.generated) as SiteContent;
       const next: SiteContent = {
         ...merged,
-        _meta: { ...merged._meta, scrapeExistingWebsite: false, scrapeWebsiteDomain: usedUrl },
+        _meta: { ...merged._meta, scrapeExistingWebsite: false, scrapeWebsiteDomain: url.trim() },
       };
       onImport(next);
 
-      const filled = TOTAL_CHECKS - (mapped._meta?.missing_fields?.length ?? TOTAL_CHECKS);
+      const filled = Object.keys(data.generated).length;
       setNote(
-        filled > 0
-          ? `Scraped ${usedUrl} — pulled content into ${filled} key area${filled === 1 ? '' : 's'}. Remaining gaps fill from the vertical.`
-          : `Scraped ${usedUrl}, but found little structured content. Check the URL or fill fields manually.`,
+        `Scanned ${url.trim()} — pulled content into ${filled} section${filled === 1 ? '' : 's'}. Remaining gaps fill from the ${vertical} vertical, and everything stays editable in the preview.`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Scrape failed.');
+      setError(e instanceof Error ? e.message : 'Scan failed.');
     } finally {
-      setScraping(false);
+      setScanning(false);
     }
   }
 
@@ -89,8 +87,9 @@ export default function ScrapePanel({
       </div>
 
       <p className="text-sm text-uiInkSoft">
-        Pull content, branding, and metadata from the client&apos;s current homepage as a starting
-        point. Scraped values fill gaps only — anything an imported intake already provides is kept.
+        Claude reads the client&apos;s current homepage and rebuilds the whole preview from what it
+        finds — brand, services, about, reviews, and contact details. Anything the site doesn&apos;t
+        cover is written to match the selected vertical.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -99,22 +98,22 @@ export default function ScrapePanel({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="yourbusiness.com"
-          disabled={scraping}
+          disabled={scanning}
           className="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-uiInk disabled:opacity-50"
         />
         <button
           type="button"
-          onClick={onScrape}
-          disabled={scraping || !url.trim()}
+          onClick={onScan}
+          disabled={scanning || !url.trim()}
           className="inline-flex items-center gap-2 rounded-md bg-uiInk px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-uiInk/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {scraping ? (
+          {scanning ? (
             <>
-              <Spinner size={15} className="animate-spin" /> Scraping…
+              <Spinner size={15} className="animate-spin" /> Scanning…
             </>
           ) : (
             <>
-              <Globe size={15} /> Scrape site
+              <Globe size={15} /> Scan site
             </>
           )}
         </button>

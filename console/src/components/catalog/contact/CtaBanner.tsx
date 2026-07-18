@@ -12,6 +12,7 @@ export const meta = {
   label: 'CTA / Banner with quick form',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.cta', 'finalCta.frictionReducers', 'brand.phone', 'brand.phoneHref'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  leadMode: 'phone',
 } as const;
 
 type Status = 'idle' | 'sending' | 'sent' | 'error';

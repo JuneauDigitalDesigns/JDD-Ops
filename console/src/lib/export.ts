@@ -12,24 +12,27 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import type { SiteContent } from '@/data/site';
+import type { SiteContent, IntakeEnvelope } from '@jdd/schema';
+import { SITE_TYPES_SOURCE } from '@jdd/schema';
+import { CONTENT } from '@/data/site';
 import { basename, resolve } from 'node:path';
 import { findOpsRoot } from '@/lib/opsRoot';
+import { isValidSkin, supportsSkin } from '@/lib/skins';
 
 const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 
 // Allowlist of category -> component file names. Mirrors /api/source's ALLOWED and the
 // catalog registry in app/page.tsx; guards against path traversal via untrusted input.
 export const CATALOG: Record<string, readonly string[]> = {
-  nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta'],
-  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap'],
-  trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar'],
+  nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta', 'NavEmergencyBar'],
+  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap', 'HeroKinetic'],
+  trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar', 'TrustLicenseInsurance', 'TrustReviewsAggregate'],
   about:        ['AboutPillars', 'AboutFeature', 'AboutStatBand', 'AboutStory'],
-  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase'],
+  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight'],
   work:         ['WorkCarousel', 'WorkGrid', 'WorkSpotlight', 'WorkMasonry'],
   faq:          ['FaqAccordion', 'FaqTwoColumn', 'FaqStickyAside', 'FaqCentered'],
   testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsRotator', 'TestimonialsMarquee'],
-  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'FinalCtaGradient'],
+  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'FinalCtaGradient', 'FinalCtaQuote'],
   contact:      ['ContactSplit', 'CtaBanner', 'ContactCardOverlap', 'ContactInlineStrip'],
   footer:       ['FooterColumns', 'FooterMinimal', 'FooterBrandCta', 'FooterMega'],
   seo:          ['SeoDefault', 'SeoLocalBusiness'],
@@ -39,7 +42,7 @@ export const CATALOG: Record<string, readonly string[]> = {
 // wired as a generateMetadata re-export instead of a rendered element).
 const BODY_SLOTS = ['nav', 'hero', 'trust', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'contact', 'footer'];
 
-export type Entry = { categoryId: string; name: string; label?: string };
+export type Entry = { categoryId: string; name: string; label?: string; skin?: string };
 
 export function resolveRepoRoot(): string {
   const root = findOpsRoot();
@@ -85,6 +88,9 @@ export function validateEntries(entries: Entry[]): Entry[] {
     if (!allowed) throw new Error(`Unknown category "${e.categoryId}".`);
     if (!allowed.includes(e.name)) {
       throw new Error(`Unknown component "${e.name}" for category "${e.categoryId}".`);
+    }
+    if (e.skin && !isValidSkin(e.name, e.skin)) {
+      throw new Error(`Unknown skin "${e.skin}" for component "${e.name}".`);
     }
   }
   return entries;
@@ -172,8 +178,13 @@ export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void
   }
 
   // 3. Replace the whole body region with the selected components in order. The markers
-  //    are kept so the result stays re-wireable on a later export.
-  const body = bodyEntries.map((e) => `      <${e.name} />`).join('\n');
+  //    are kept so the result stays re-wireable on a later export. The chosen skin is baked
+  //    in as a literal prop ONLY for components that declare one (supportsSkin) — every other
+  //    component's props type has no `skin` field, so emitting it there would fail the client
+  //    repo's TypeScript build on an excess/unknown prop.
+  const body = bodyEntries
+    .map((e) => `      <${e.name}${e.skin && supportsSkin(e.name) ? ` skin="${e.skin}"` : ''} />`)
+    .join('\n');
   const bodyRegion = /\{\/\* @studio:body:start \*\/\}[\s\S]*?\{\/\* @studio:body:end \*\/\}/;
   src = src.replace(
     bodyRegion,
@@ -182,7 +193,8 @@ export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void
 
   // 4. The wired page renders components (each imports its own CONTENT), so the page's
   //    own top-level CONTENT import is now unused — drop it to avoid a build error.
-  src = src.replace(/^import \{ CONTENT \} from '@\/data\/site';\n/m, '');
+  //    `\r?\n` tolerates the template's CRLF line endings (Windows-authored file).
+  src = src.replace(/^import \{ CONTENT \} from '@\/data\/site';\r?\n/m, '');
 
   writeFileSync(resolve(repoDirFor(repoRoot, slug), 'src', 'app', 'page.tsx'), src, 'utf8');
 }
@@ -192,26 +204,21 @@ export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void
  * template's minimal placeholder schema so exported repos build with rich data.
  */
 export function copySiteData(repoRoot: string, slug: string): void {
-  const src = resolve(process.cwd(), 'src', 'data', 'site.ts');
-  const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
-  copyFileSync(src, dest);
+  // Fallback path (no edited content, no vertical preset): seed the client repo with the
+  // studio's preview CONTENT. Routed through writeSiteContent so the output is self-contained
+  // (inlines SITE_TYPES_SOURCE) — the console's own site.ts now only re-exports @jdd/schema
+  // types and must never be copied verbatim into a client repo.
+  writeSiteContent(repoRoot, slug, CONTENT);
 }
 
 /**
- * Write a SiteContent object as the client repo's site.ts. Preserves the full SiteContent
- * interface block from the studio's site.ts and replaces only the CONTENT object with the
- * serialized content. JSON.stringify makes this data-only (no code injection from edits).
+ * Write a SiteContent object as the client repo's site.ts. Inlines the canonical SiteContent
+ * interface text (SITE_TYPES_SOURCE from @jdd/schema) ahead of the serialized CONTENT so the
+ * generated repo defines its own local type and needs no @jdd/schema dependency on its own
+ * Vercel deploy. JSON.stringify makes this data-only (no code injection from edits).
  */
 export function writeSiteContent(repoRoot: string, slug: string, content: SiteContent): void {
-  const studioSitePath = resolve(process.cwd(), 'src', 'data', 'site.ts');
-  const studioSite = readFileSync(studioSitePath, 'utf8');
-  const marker = '\nexport const CONTENT: SiteContent = {';
-  const splitIdx = studioSite.indexOf(marker);
-  if (splitIdx === -1) {
-    throw new Error('Could not locate CONTENT declaration in site.ts');
-  }
-  const interfaceBlock = studioSite.slice(0, splitIdx);
-  const output = `${interfaceBlock}\nexport const CONTENT: SiteContent = ${JSON.stringify(content, null, 2)};\n`;
+  const output = `${SITE_TYPES_SOURCE}\nexport const CONTENT: SiteContent = ${JSON.stringify(content, null, 2)};\n`;
   const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
   writeFileSync(dest, output, 'utf8');
 }
@@ -219,4 +226,65 @@ export function writeSiteContent(repoRoot: string, slug: string, content: SiteCo
 /** @deprecated Use writeSiteContent. Kept as a thin alias for the vertical-preset path. */
 export function writeVerticalSiteTs(repoRoot: string, slug: string, verticalContent: SiteContent): void {
   writeSiteContent(repoRoot, slug, verticalContent);
+}
+
+/** The intake envelope onboard.js consumes: `export const INTAKE = { plan, siteCount, sites }`.
+ *  Canonical definition lives in @jdd/schema; re-exported here for existing import paths. */
+export type { IntakeEnvelope };
+
+/**
+ * Write an intake envelope to clients/<slug>/site.ts as `export const INTAKE`.
+ *
+ * This is the console's first writer at the CLIENT-FOLDER level (all other writers here
+ * target clients/<slug>/repo). onboard.js's loadIntake prefers the `INTAKE` export, so a
+ * signup pulled from the queue lands as the exact schema the orchestrator reads next.
+ *
+ * The agency site's Intake and the studio's SiteContent are the same schema family, so the
+ * object is serialized verbatim — no field mapping. Per CLAUDE.md we never invent values:
+ * `_meta.missing_fields` is preserved as-is for human review in the wizard's intake step.
+ * JSON.stringify keeps this data-only (no code injection from client-supplied strings).
+ */
+export function writeClientIntake(repoRoot: string, slug: string, intake: IntakeEnvelope): void {
+  if (!isValidSlug(slug)) throw new Error(`Invalid slug "${slug}".`);
+  const clientDir = resolve(repoRoot, 'clients', slug);
+  mkdirSync(clientDir, { recursive: true });
+  const header =
+    '// Client intake — generated from an agency-site signup pulled off the KV queue.\n' +
+    '// Source of truth for onboard.js (npm run onboard -- --schema clients/' + slug + '/site.ts).\n\n';
+  const output = `${header}export const INTAKE = ${JSON.stringify(intake, null, 2)};\n`;
+  writeFileSync(resolve(clientDir, 'site.ts'), output, 'utf8');
+}
+
+/**
+ * Walk the content tree; for every string value shaped "upload://<file>", copy the staged
+ * file from console/.uploads into clients/<slug>/repo/public/images and rewrite the value to
+ * "/images/<file>". Returns a deep clone with refs resolved; unknown refs collapse to "".
+ */
+export function resolveUploads(repoRoot: string, slug: string, content: SiteContent): SiteContent {
+  const stageDir = resolve(process.cwd(), '.uploads');
+  const publicImg = resolve(repoDirFor(repoRoot, slug), 'public', 'images');
+  let created = false;
+
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') {
+      if (!v.startsWith('upload://')) return v;
+      const file = v.slice('upload://'.length);
+      const src = resolve(stageDir, file);
+      if (!existsSync(src)) return '';
+      if (!created) {
+        mkdirSync(publicImg, { recursive: true });
+        created = true;
+      }
+      copyFileSync(src, resolve(publicImg, file));
+      return `/images/${file}`;
+    }
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v)) out[k] = walk(val);
+      return out;
+    }
+    return v;
+  };
+  return walk(content) as SiteContent;
 }

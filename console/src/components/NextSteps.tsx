@@ -116,18 +116,16 @@ const FALLBACK = {
 export default function NextSteps({
   errorText,
   slug,
-  onOpenSetup,
 }: {
   errorText: string;
   slug: string;
-  onOpenSetup?: () => void;
 }) {
   const remedy = REMEDIES.find((r) => r.match.test(errorText));
   const title = remedy?.title ?? FALLBACK.title;
   const steps = (remedy?.steps ?? FALLBACK.steps).map((s) => s.replaceAll('{slug}', slug));
   const command = remedy?.command?.replaceAll('{slug}', slug);
   const showBuild = remedy?.buildLink ?? false;
-  const showSetup = (remedy?.setup ?? FALLBACK.setup) && Boolean(onOpenSetup);
+  const showSetup = remedy?.setup ?? FALLBACK.setup;
 
   return (
     <div className="panel flex flex-col gap-3 p-5" style={{ borderColor: 'var(--rule-strong)' }}>
@@ -168,9 +166,9 @@ export default function NextSteps({
             </Link>
           )}
           {showSetup && (
-            <button type="button" onClick={onOpenSetup} className="btn btn-sm">
+            <Link href="/setup" className="btn btn-sm">
               <Wrench size={13} /> One-time setup
-            </button>
+            </Link>
           )}
         </div>
       )}

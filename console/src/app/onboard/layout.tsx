@@ -4,7 +4,7 @@
 // over the light /build canvas or the home page).
 export default function OnboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="onboard-chrome">
+    <div className="onboard-chrome h-full">
       <div className="dotfield" aria-hidden />
       {children}
       <div className="grain" aria-hidden />

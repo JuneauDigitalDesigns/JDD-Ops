@@ -57,7 +57,7 @@ export function readOpsConfig(): OpsConfig {
     retellPostCallWebhookUrl: ops.RETELL_POST_CALL_WEBHOOK_URL || undefined,
     githubOrg: ops.GITHUB_ORG || undefined,
     vercelTeamId: ops.VERCEL_TEAM_ID || undefined,
-    makeDataStoreId: ops.MAKE_DATA_STORE_ID || undefined,
+    makePostCallMasterScenarioId: ops.MAKE_POST_CALL_MASTER_SCENARIO_ID || undefined,
     portalSignInUrl,
     serviceAccountEmail: serviceAccountEmail(ops.GOOGLE_SERVICE_ACCOUNT_KEY || agency.GOOGLE_SERVICE_ACCOUNT_KEY),
   };

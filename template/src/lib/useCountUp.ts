@@ -7,13 +7,16 @@ import { animate } from 'framer-motion';
  * reduced motion (renders the final value immediately). Optional `delayMs` staggers
  * multiple instances.
  */
-export function useCountUp(target: string, run: boolean, reduce: boolean, delayMs = 0): string {
-  const [val, setVal] = useState(target);
+export function useCountUp(target: string | number | null | undefined, run: boolean, reduce: boolean, delayMs = 0): string {
+  // Content values can be null/number (empty intake fields become null; JSON edits vary),
+  // so coerce to a string before matching — never assume a string was passed.
+  const safe = target == null ? '' : String(target);
+  const [val, setVal] = useState(safe);
 
   useEffect(() => {
-    if (!run || reduce) { setVal(target); return; }
-    const m = target.match(/([^\d.]*)(\d+(?:\.\d+)?)([^\d.].*|$)/);
-    if (!m) { setVal(target); return; }
+    if (!run || reduce) { setVal(safe); return; }
+    const m = safe.match(/([^\d.]*)(\d+(?:\.\d+)?)([^\d.].*|$)/);
+    if (!m) { setVal(safe); return; }
     const [, pre, numStr, post] = m;
     const end = parseFloat(numStr);
 
@@ -30,7 +33,7 @@ export function useCountUp(target: string, run: boolean, reduce: boolean, delayM
     }, delayMs);
 
     return () => { clearTimeout(timer); controls?.stop(); };
-  }, [run, target, reduce, delayMs]);
+  }, [run, safe, reduce, delayMs]);
 
   return val;
 }

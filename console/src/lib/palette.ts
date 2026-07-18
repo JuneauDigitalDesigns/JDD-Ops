@@ -1,19 +1,42 @@
 import type { CSSProperties } from 'react';
 import type { Brand } from '@/data/site';
+import { tint, shade, mix, withAlpha } from '@/lib/color';
 
 // Maps the brand palette + typography onto CSS custom properties. layout.tsx
 // spreads these onto <body> so every component inherits them via Tailwind tokens
 // (bg-accent, text-ink, border-rule, …) and the font-sans / font-heading families.
+//
+// Beyond the 7 authored brand tokens, we derive a richer set at runtime (tint ramp,
+// gradient, and an on-brand dark "contrast" surface) so catalog components can reach
+// for premium tones without any change to the brand schema or vertical presets.
 export function paletteVars(brand: Brand): CSSProperties {
   const p = brand.palette;
+  const { accent, ink, bg } = p;
+  const accentStrong = shade(accent, 0.2);
+  const inkPanel = shade(ink, 0.08);
+  const onInk = readableOn(inkPanel); // '#ffffff' for dark panels
   return {
-    '--accent': p.accent,
-    '--accent-fg': p.accentFg ?? readableOn(p.accent, p.ink),
-    '--bg': p.bg,
+    // ── authored tokens (unchanged) ──
+    '--accent': accent,
+    '--accent-fg': p.accentFg ?? readableOn(accent, ink),
+    '--bg': bg,
     '--bg-soft': p.bgSoft,
-    '--ink': p.ink,
+    '--ink': ink,
     '--ink-soft': p.inkSoft,
     '--rule': p.rule,
+    // ── derived accent tones ──
+    '--accent-050': tint(accent, 0.92),
+    '--accent-100': tint(accent, 0.84),
+    '--accent-200': tint(accent, 0.68),
+    '--accent-strong': accentStrong,
+    '--accent-glow': withAlpha(accent, 0.32),
+    '--accent-grad': `linear-gradient(135deg, ${accent} 0%, ${accentStrong} 100%)`,
+    // ── on-brand dark ("contrast" skin) section tones ──
+    '--ink-panel': inkPanel,
+    '--ink-panel-2': mix(inkPanel, accent, 0.16),
+    '--on-ink': onInk,
+    '--on-ink-soft': withAlpha(onInk, 0.7),
+    '--rule-ink': withAlpha(onInk, 0.16),
   } as CSSProperties;
 }
 

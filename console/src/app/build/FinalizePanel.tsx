@@ -8,6 +8,7 @@ import {
   CircleNotch,
   DotsSixVertical,
   LockSimple,
+  ArrowsOut,
 } from '@phosphor-icons/react';
 import {
   DndContext,
@@ -22,16 +23,21 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { CategoryEntry } from './page';
-import type { Selections } from './StudioApp';
+import type { CategoryEntry } from './categories';
+import type { Selections, SkinSelections } from './StudioApp';
 import type { VerticalId } from '@/lib/verticals';
 import type { SiteContent } from '@/data/site';
+import { type Section } from '@/lib/copy-schema';
 import { EditProvider } from '@/lib/editable';
+import { defaultSkin, supportsSkin, type SkinId } from '@/lib/skins';
+import StyleToolbar from './StyleToolbar';
+import FullScreenPreview from './FullScreenPreview';
 import ImportPanel from './ImportPanel';
 import ScrapePanel from './ScrapePanel';
+import GenerateCopyPanel from './GenerateCopyPanel';
 
 type ClientInfo = { slug: string; hasRepo: boolean };
 
@@ -44,6 +50,8 @@ type Status =
 export default function FinalizePanel({
   categories,
   selections,
+  skins,
+  onSkinChange,
   order,
   onReorder,
   vertical,
@@ -52,10 +60,18 @@ export default function FinalizePanel({
   imported,
   onImport,
   onClearImport,
+  generated,
+  onGenerated,
+  onClearGenerated,
   onResetEdits,
+  onResetStyles,
+  hideSources = false,
+  lockedSlug,
 }: {
   categories: CategoryEntry[];
   selections: Selections;
+  skins: SkinSelections;
+  onSkinChange: (categoryId: string, skin: SkinId) => void;
   order: string[];
   onReorder: (activeId: string, overId: string) => void;
   vertical: VerticalId;
@@ -64,14 +80,37 @@ export default function FinalizePanel({
   imported: SiteContent | null;
   onImport: (site: SiteContent) => void;
   onClearImport: () => void;
+  generated: Partial<SiteContent> | null;
+  onGenerated: (p: Partial<SiteContent>) => void;
+  onClearGenerated: () => void;
   onResetEdits: () => void;
+  onResetStyles: () => void;
+  /** Hide the Import/Generate/Seed source tabs (they live in the wizard's intake step). */
+  hideSources?: boolean;
+  /** Lock the destination to a fixed slug (chosen in the wizard's client step). */
+  lockedSlug?: string;
 }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [source, setSource] = useState<'import' | 'generate' | 'seed'>('import');
   const [clients, setClients] = useState<ClientInfo[]>([]);
   const [mode, setMode] = useState<'existing' | 'new'>('new');
   const [selectedSlug, setSelectedSlug] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [overwrite, setOverwrite] = useState(false);
+  const [styleSel, setStyleSel] = useState<{ path: string; rect: DOMRect } | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // Close the style toolbar on scroll/resize — its anchor rect would go stale.
+  useEffect(() => {
+    if (!styleSel) return;
+    const close = () => setStyleSel(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [styleSel]);
 
   // Load existing client folders for the destination dropdown.
   useEffect(() => {
@@ -97,7 +136,13 @@ export default function FinalizePanel({
     const name = c ? selections[c.id] : undefined;
     const v = c && name ? c.variants.find((x) => x.name === name) : undefined;
     if (!c || !name || !v) return null;
-    return { categoryId: c.id, categoryLabel: c.label, name, label: v.label, id: v.id };
+    // `skin` drives the live preview (safe to pass regardless — render() ignores it when
+    // the component has no skin prop). `exportSkin` is undefined unless the component
+    // actually declares one, so the export payload never asks the server to bake a
+    // `skin="…"` attribute onto a component whose props type doesn't have it.
+    const skin = skins[c.id] ?? defaultSkin(name);
+    const exportSkin = supportsSkin(name) ? skin : undefined;
+    return { categoryId: c.id, categoryLabel: c.label, name, label: v.label, id: v.id, skin, exportSkin, variant: v };
   }
 
   // Body sections in the user-chosen sequence (order already pins nav first / footer last).
@@ -111,12 +156,16 @@ export default function FinalizePanel({
   // The export payload IS the page order: body sections in sequence, then seo.
   const exportEntries = seoEntry ? [...bodyEntries, seoEntry] : bodyEntries;
 
-  const effectiveSlug = (mode === 'new' ? newSlug : selectedSlug).trim();
+  // Copy sections map 1:1 to category ids; brand + announcement are always generated.
+  const COPY_SECTION_CATEGORIES: Section[] = ['trust', 'hero', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo'];
+  const selectedSections: Section[] = ['brand', 'announcement', ...COPY_SECTION_CATEGORIES.filter((c) => selections[c])];
+
+  const effectiveSlug = (lockedSlug ?? (mode === 'new' ? newSlug : selectedSlug)).trim();
   const slugHasRepo = clients.find((c) => c.slug === effectiveSlug)?.hasRepo ?? false;
   const busy = status.kind === 'running';
   const canExport = exportEntries.length > 0 && effectiveSlug.length > 0 && !busy;
 
-  // Sortable list: nav pinned top, footer pinned bottom, the rest reorder freely.
+  // Sortable strip: nav pinned first, footer pinned last, the rest reorder freely.
   const middle = order.filter((id) => id !== 'nav' && id !== 'footer');
   const hasNav = order.includes('nav');
   const hasFooter = order.includes('footer');
@@ -145,7 +194,7 @@ export default function FinalizePanel({
         body: JSON.stringify({
           slug: effectiveSlug,
           overwrite: slugHasRepo ? overwrite : false,
-          selections: exportEntries.map((e) => ({ categoryId: e.categoryId, name: e.name, label: e.label })),
+          selections: exportEntries.map((e) => ({ categoryId: e.categoryId, name: e.name, label: e.label, skin: e.exportSkin })),
           vertical,
           content: effective,
         }),
@@ -205,11 +254,10 @@ export default function FinalizePanel({
     <section className="space-y-10">
       <header>
         <p className="font-chromeMono text-xs uppercase tracking-widest text-uiInkSoft">Finalize</p>
-        <h1 className="mt-2 font-display text-3xl font-medium text-uiInk">Arrange &amp; build the client site</h1>
+        <h1 className="mt-2 font-display text-3xl font-medium text-uiInk">Dial in &amp; build the client site</h1>
         <p className="mt-2 max-w-prose text-sm text-zinc-500">
-          Drag the sections below to set the page order — what you see here is the order the
-          site is built in. Nav stays at the top and Footer at the bottom. Then pick a client and
-          export to{' '}
+          Set the page order, fine-tune copy and styling in the preview, open the Brand panel to
+          tune the whole page, then export to{' '}
           <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-chromeMono text-xs text-zinc-700">
             clients/&lt;slug&gt;/repo
           </code>
@@ -217,32 +265,63 @@ export default function FinalizePanel({
         </p>
       </header>
 
-      {/* ── Import onboarding JSON ───────────────────────────────────────── */}
-      <ImportPanel imported={imported} onImport={onImport} onClear={onClearImport} />
-
-      {/* ── Seed from existing website (Firecrawl) ───────────────────────── */}
-      <ScrapePanel imported={imported} onImport={onImport} />
-
-      {/* ── Page order (sortable) ───────────────────────────────────────── */}
+      {/* ── Copy source: Import JSON / Generate Copy / Seed from website ──── */}
+      {!hideSources && (
       <div className="space-y-4">
+        <div className="inline-flex rounded-md border border-uiCardRule bg-white p-1">
+          {([
+            ['import', 'Import JSON'],
+            ['generate', 'Generate Copy'],
+            ['seed', 'Seed from website'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSource(id)}
+              className={[
+                'rounded px-3 py-1.5 font-chromeMono text-[11px] uppercase tracking-widest transition-colors',
+                source === id ? 'bg-uiInk text-white' : 'text-zinc-500 hover:text-zinc-900',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {source === 'import' && (
+          <ImportPanel imported={imported} onImport={onImport} onClear={onClearImport} />
+        )}
+        {source === 'generate' && (
+          <GenerateCopyPanel
+            vertical={vertical}
+            base={effective}
+            sections={selectedSections}
+            generated={generated}
+            onGenerated={onGenerated}
+            onClearGenerated={onClearGenerated}
+          />
+        )}
+        {source === 'seed' && (
+          <ScrapePanel imported={imported} onImport={onImport} vertical={vertical} base={effective} />
+        )}
+      </div>
+      )}
+
+      {/* ── Page order — single horizontal strip, directly above the preview ── */}
+      <div className="space-y-3">
         <p className="font-chromeMono text-xs uppercase tracking-widest text-zinc-500">Page order</p>
         {order.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 bg-white px-6 py-10 text-center text-sm text-zinc-400">
-            No sections selected yet — pick components in the category tabs, then arrange them here.
+          <div className="rounded-lg border border-dashed border-zinc-300 bg-white px-6 py-8 text-center text-sm text-zinc-400">
+            No sections selected yet — pick components in the sidebar, then arrange them here.
           </div>
         ) : (
-          <div className="space-y-1.5">
-            {hasNav && <PinnedRow entry={entryFor('nav')} position={1} where="top" />}
-
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleSortEnd}
-            >
-              <SortableContext items={middle} strategy={verticalListSortingStrategy}>
-                <div className="space-y-1.5">
+          <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
+            {hasNav && <PinnedCard entry={entryFor('nav')} position={1} where="top" />}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortEnd}>
+              <SortableContext items={middle} strategy={horizontalListSortingStrategy}>
+                <div className="flex items-stretch gap-2">
                   {middle.map((id, i) => (
-                    <SortableRow
+                    <SortableCard
                       key={id}
                       id={id}
                       entry={entryFor(id)}
@@ -252,13 +331,9 @@ export default function FinalizePanel({
                 </div>
               </SortableContext>
             </DndContext>
-
-            {hasFooter && (
-              <PinnedRow entry={entryFor('footer')} position={order.length} where="bottom" />
-            )}
+            {hasFooter && <PinnedCard entry={entryFor('footer')} position={order.length} where="bottom" />}
           </div>
         )}
-
         {seoEntry && (
           <p className="font-chromeMono text-[11px] text-zinc-400">
             SEO ({seoEntry.label}) is wired into page metadata and has no position in the layout.
@@ -266,10 +341,95 @@ export default function FinalizePanel({
         )}
       </div>
 
-      {/* ── Destination ─────────────────────────────────────────────────── */}
+      {/* ── Live preview (in page order) ────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-chromeMono text-xs uppercase tracking-widest text-zinc-500">
+            Live preview — click text to edit; it stays selected to restyle color, size &amp; weight
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onResetStyles}
+              className="font-chromeMono text-xs text-zinc-400 underline-offset-2 hover:text-zinc-700 hover:underline"
+            >
+              Reset styles
+            </button>
+            <button
+              type="button"
+              onClick={onResetEdits}
+              className="font-chromeMono text-xs text-zinc-400 underline-offset-2 hover:text-zinc-700 hover:underline"
+            >
+              Reset text edits
+            </button>
+            <button
+              type="button"
+              onClick={() => setFullscreen(true)}
+              disabled={bodyEntries.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:border-zinc-500 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ArrowsOut size={13} weight="bold" />
+              Full screen
+            </button>
+          </div>
+        </div>
+        {bodyEntries.length === 0 ? (
+          <div className="flex items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 py-10">
+            <p className="text-sm text-zinc-400">No sections selected yet.</p>
+          </div>
+        ) : (
+          <EditProvider
+            setField={setField}
+            overrides={effective.overrides}
+            onSelect={(path, el) => setStyleSel({ path, rect: el.getBoundingClientRect() })}
+          >
+            <div className="overflow-hidden rounded-lg border border-zinc-200 bg-bg">
+              {bodyEntries.map((e) => (
+                <div key={e.categoryId} className="border-b border-zinc-100 last:border-0">
+                  {e.variant.render(e.skin)}
+                </div>
+              ))}
+            </div>
+          </EditProvider>
+        )}
+        <p className="font-chromeMono text-xs text-zinc-400">
+          SEO metadata is non-visual and not shown in the preview.
+        </p>
+      </section>
+
+      {styleSel && (
+        <StyleToolbar
+          path={styleSel.path}
+          rect={styleSel.rect}
+          overrides={effective.overrides}
+          setField={setField}
+          onClose={() => setStyleSel(null)}
+        />
+      )}
+
+      {fullscreen && (
+        <FullScreenPreview
+          brand={effective.brand}
+          title={effective.brand.short || effective.brand.name}
+          sections={bodyEntries.map((e) => ({ key: e.categoryId, node: e.variant.render(e.skin) }))}
+          onClose={() => setFullscreen(false)}
+        />
+      )}
+
+      {/* ── Destination (below the preview) ─────────────────────────────── */}
       <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6">
         <p className="font-chromeMono text-xs uppercase tracking-widest text-zinc-500">Destination</p>
 
+        {lockedSlug ? (
+          <p className="text-sm text-zinc-600">
+            Building for client{' '}
+            <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-chromeMono text-xs text-zinc-800">
+              {lockedSlug}
+            </code>{' '}
+            (chosen in step 1).
+          </p>
+        ) : (
+        <>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2">
             <input
@@ -317,6 +477,8 @@ export default function FinalizePanel({
             className="w-full max-w-sm rounded-md border border-zinc-300 px-3 py-2 font-chromeMono text-sm"
           />
         )}
+        </>
+        )}
 
         {effectiveSlug && (
           <p className="font-chromeMono text-xs text-zinc-500">
@@ -338,7 +500,7 @@ export default function FinalizePanel({
         )}
       </div>
 
-      {/* ── Action ──────────────────────────────────────────────────────── */}
+      {/* ── Action (below the preview) ──────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
@@ -408,64 +570,28 @@ export default function FinalizePanel({
           )}
         </div>
       )}
-
-      {/* ── Live preview (in page order) ────────────────────────────────── */}
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="font-chromeMono text-xs uppercase tracking-widest text-zinc-500">
-            Live preview — click any text to edit
-          </p>
-          <button
-            type="button"
-            onClick={onResetEdits}
-            className="font-chromeMono text-xs text-zinc-400 underline-offset-2 hover:text-zinc-700 hover:underline"
-          >
-            Reset text edits
-          </button>
-        </div>
-        {bodyEntries.length === 0 ? (
-          <div className="flex items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 py-10">
-            <p className="text-sm text-zinc-400">No sections selected yet.</p>
-          </div>
-        ) : (
-          <EditProvider setField={setField}>
-            <div className="overflow-hidden rounded-lg border border-zinc-200 bg-bg">
-              {bodyEntries.map((e) => {
-                const c = catById(e.categoryId);
-                const variant = c?.variants.find((v) => v.name === e.name);
-                return (
-                  <div key={e.categoryId} className="border-b border-zinc-100 last:border-0">
-                    {variant?.node}
-                  </div>
-                );
-              })}
-            </div>
-          </EditProvider>
-        )}
-        <p className="font-chromeMono text-xs text-zinc-400">
-          SEO metadata is non-visual and not shown in the preview.
-        </p>
-      </section>
     </section>
   );
 }
 
-// ─── Rows ──────────────────────────────────────────────────────────────────
+// ─── Horizontal order cards ────────────────────────────────────────────────────
 
-type RowEntry = { categoryLabel: string; label: string } | null;
+type CardEntry = { categoryLabel: string; label: string } | null;
 
-function RowShell({
+function CardShell({
   children,
   dragging,
+  pinned,
 }: {
   children: React.ReactNode;
   dragging?: boolean;
+  pinned?: boolean;
 }) {
   return (
     <div
       className={[
-        'flex items-center gap-3 rounded-md border bg-white px-3 py-2.5 text-sm',
-        dragging ? 'border-emerald-400 shadow-lg' : 'border-zinc-200',
+        'flex h-full w-28 shrink-0 flex-col justify-between rounded-md border bg-white p-2.5 text-xs',
+        dragging ? 'border-emerald-400 shadow-lg' : pinned ? 'border-zinc-200 bg-zinc-50' : 'border-zinc-200',
       ].join(' ')}
     >
       {children}
@@ -473,32 +599,19 @@ function RowShell({
   );
 }
 
-function RowBody({ entry, position }: { entry: RowEntry; position: number }) {
+function CardBody({ entry, position }: { entry: CardEntry; position: number }) {
   if (!entry) return null;
   return (
     <>
-      <span className="w-5 shrink-0 text-center font-chromeMono text-xs text-zinc-400">
-        {position}
+      <span className="font-chromeMono text-[10px] uppercase tracking-widest text-zinc-400">
+        {position} · {entry.categoryLabel}
       </span>
-      <div className="min-w-0 flex-1">
-        <span className="font-chromeMono text-[10px] uppercase tracking-widest text-zinc-400">
-          {entry.categoryLabel}
-        </span>
-        <p className="truncate text-zinc-900">{entry.label}</p>
-      </div>
+      <p className="mt-1 line-clamp-2 font-medium text-zinc-900">{entry.label}</p>
     </>
   );
 }
 
-function SortableRow({
-  id,
-  entry,
-  position,
-}: {
-  id: string;
-  entry: RowEntry;
-  position: number;
-}) {
+function SortableCard({ id, entry, position }: { id: string; entry: CardEntry; position: number }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -507,43 +620,32 @@ function SortableRow({
   };
   return (
     <div ref={setNodeRef} style={style}>
-      <RowShell dragging={isDragging}>
+      <CardShell dragging={isDragging}>
         <button
           type="button"
           {...attributes}
           {...listeners}
           aria-label={`Reorder ${entry?.categoryLabel ?? id}`}
-          className="shrink-0 cursor-grab rounded p-0.5 text-zinc-400 hover:text-zinc-700 active:cursor-grabbing"
+          className="mb-1 cursor-grab self-end rounded p-0.5 text-zinc-400 hover:text-zinc-700 active:cursor-grabbing"
         >
-          <DotsSixVertical size={16} />
+          <DotsSixVertical size={14} />
         </button>
-        <RowBody entry={entry} position={position} />
-      </RowShell>
+        <CardBody entry={entry} position={position} />
+      </CardShell>
     </div>
   );
 }
 
-function PinnedRow({
-  entry,
-  position,
-  where,
-}: {
-  entry: RowEntry;
-  position: number;
-  where: 'top' | 'bottom';
-}) {
+function PinnedCard({ entry, position, where }: { entry: CardEntry; position: number; where: 'top' | 'bottom' }) {
   return (
-    <RowShell>
+    <CardShell pinned>
       <span
-        className="shrink-0 rounded p-0.5 text-zinc-300"
-        title={where === 'top' ? 'Pinned to top' : 'Pinned to bottom'}
+        className="mb-1 self-end text-zinc-300"
+        title={where === 'top' ? 'Pinned first' : 'Pinned last'}
       >
-        <LockSimple size={16} />
+        <LockSimple size={14} />
       </span>
-      <RowBody entry={entry} position={position} />
-      <span className="shrink-0 font-chromeMono text-[10px] uppercase tracking-widest text-zinc-300">
-        {where === 'top' ? 'top' : 'bottom'}
-      </span>
-    </RowShell>
+      <CardBody entry={entry} position={position} />
+    </CardShell>
   );
 }

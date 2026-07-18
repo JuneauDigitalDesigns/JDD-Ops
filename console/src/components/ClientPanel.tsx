@@ -8,13 +8,7 @@ import LaunchPanel from './LaunchPanel';
 import StepGuide from './StepGuide';
 
 export default function ClientPanel({
-  ctx,
-  config,
-  clientState,
-  onSetStatus,
-  onToggleStep,
-  onRefresh,
-  onOpenSetup,
+  ctx, config, clientState, onSetStatus, onToggleStep, onRefresh,
 }: {
   ctx: ClientContext;
   config: OpsConfig;
@@ -22,18 +16,15 @@ export default function ClientPanel({
   onSetStatus: (status: ClientStatus) => void;
   onToggleStep: (id: string, done: boolean) => void;
   onRefresh: () => void;
-  onOpenSetup: () => void;
 }) {
   const phases = useMemo(() => buildRunbook(ctx, config), [ctx, config]);
-
   const done = useMemo(
     () => new Set(Object.entries(clientState?.steps ?? {}).filter(([, v]) => v).map(([k]) => k)),
     [clientState],
   );
   const effectiveStatus = clientState?.status ?? ctx.detectedStatus;
-
-  const total = phases.reduce((n, p) => n + p.steps.length, 0);
-  const completed = phases.reduce((n, p) => n + p.steps.filter((s) => done.has(s.id)).length, 0);
+  const total = phases.reduce((n, p) => n + p.steps.filter((s) => !s.auto).length, 0);
+  const completed = phases.reduce((n, p) => n + p.steps.filter((s) => !s.auto && done.has(s.id)).length, 0);
   const pct = total ? Math.round((completed / total) * 100) : 0;
 
   return (
@@ -42,9 +33,8 @@ export default function ClientPanel({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-6"
+      className="mx-auto flex w-full max-w-[760px] flex-col gap-8"
     >
-      {/* Header */}
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1.5">
@@ -57,14 +47,11 @@ export default function ClientPanel({
           </div>
           <div className="text-right">
             <div className="font-display text-[26px] font-medium leading-none text-accent">{pct}%</div>
-            <div className="kicker mt-1">
-              {completed}/{total} steps
-            </div>
+            <div className="kicker mt-1">{completed}/{total} steps</div>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-[3px] w-full overflow-hidden rounded-full" style={{ background: 'var(--rule)' }}>
+        <div className="h-[4px] w-full overflow-hidden rounded-full" style={{ background: 'var(--rule)' }}>
           <motion.div
             className="h-full rounded-full"
             style={{ background: 'var(--accent)', boxShadow: '0 0 12px var(--accent-glow)' }}
@@ -74,7 +61,6 @@ export default function ClientPanel({
           />
         </div>
 
-        {/* Enterprise site roster */}
         {ctx.isEnterprise && ctx.sites.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
             {ctx.sites.map((s) => (
@@ -87,8 +73,7 @@ export default function ClientPanel({
         )}
       </header>
 
-      <LaunchPanel ctx={ctx} onComplete={onRefresh} onOpenSetup={onOpenSetup} />
-
+      <LaunchPanel ctx={ctx} onComplete={onRefresh} />
       <StepGuide phases={phases} done={done} onToggle={(id) => onToggleStep(id, !done.has(id))} />
     </motion.div>
   );

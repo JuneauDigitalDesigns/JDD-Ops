@@ -48,17 +48,19 @@ function clerkMetadataJson(ctx: ClientContext): string {
   const primary = ctx.sites[0];
   const base: Record<string, unknown> = {
     slug: ctx.slug,
+    name: primary?.brandName ?? ctx.brandName,
     plan: ctx.plan,
     canonical: primary?.canonical ?? 'https://REPLACE_WITH_LIVE_URL',
     airtableBaseId:
       ctx.plan === 'starter' ? null : primary?.env.AIRTABLE_BASE_ID ?? 'appREPLACE_FROM_ENV_LOCAL',
-    ga4PropertyId: 'properties/REPLACE_WITH_GA4_PROPERTY_ID',
+    vercelProjectId: primary?.env.VERCEL_PROJECT_ID ?? 'prj_REPLACE_FROM_VERCEL',
   };
   if (ctx.isEnterprise) {
     base.sites = ctx.sites.map((s) => ({
       slug: s.slug,
+      name: s.brandName,
       canonical: s.canonical ?? 'https://REPLACE_WITH_LIVE_URL',
-      ga4PropertyId: 'properties/REPLACE_WITH_GA4_PROPERTY_ID',
+      vercelProjectId: s.env.VERCEL_PROJECT_ID ?? 'prj_REPLACE_FROM_VERCEL',
     }));
   }
   return JSON.stringify(base, null, 2);
@@ -105,7 +107,7 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
           {
             t: 'callout',
             tone: 'info',
-            body: 'Step 10 auto-creates the Clerk portal user (needs CLERK_SECRET_KEY in jdd-ops/.env) with slug, plan, canonical, airtableBaseId — and ga4PropertyId: null. You set GA4 later via --set-ga4 in the portal phase.',
+            body: 'Step 10 auto-creates the Clerk portal user (needs CLERK_SECRET_KEY in jdd-ops/.env) with slug, name, plan, canonical, airtableBaseId, and vercelProjectId (the client’s Vercel project). Enable Web Analytics on that project in the portal phase to light up the Traffic tab.',
           },
           {
             t: 'callout',
@@ -247,39 +249,23 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
       }),
       {
         id: 'post-call-webhook',
-        title: 'Wire each agent’s post-call webhook',
-        why: 'This is what fills the Airtable Call Log (and therefore the portal Calls tab). onboard.js creates the agent but does NOT set this — it must be done by hand, once per agent.',
+        title: 'Post-call webhook (set automatically)',
+        auto: true,
+        why: 'onboard.js now sets each agent’s post-call webhook to that client’s cloned scenario URL (step 8c). This is a verification, not a manual step — the per-client details live in the “Post-call logging & SMS” phase below.',
         blocks: [
-          {
-            t: 'callout',
-            tone: 'warn',
-            body: 'Manual step, easy to forget. Until it’s set, calls happen but nothing logs — the Calls tab stays empty.',
-          },
           {
             t: 'substeps',
             items: [
               { text: 'Retell dashboard → Agents → select this client’s agent (match the agent id from .env.local).' },
-              { text: 'Open the agent’s Settings / configuration panel.' },
-              { text: 'Find the “Post-call webhook URL” (a.k.a. Webhook URL) field.' },
-              { text: 'Paste the URL below and Save.' },
+              { text: 'Open the agent’s Settings and confirm the “Post-call webhook URL” is set.' },
+              { text: 'It should match RETELL_POST_CALL_WEBHOOK_URL in clients/{slug}/.env.local (the clone’s webhook).' },
             ],
           },
           { t: 'nav', app: 'Retell', path: ['Agents', '{agent}', 'Settings', 'Post-call webhook URL'] },
           {
-            t: 'context',
-            label: 'Post-call webhook URL',
-            from: config.retellPostCallWebhookUrl
-              ? 'jdd-ops/.env → RETELL_POST_CALL_WEBHOOK_URL (set in one-time Part A)'
-              : 'jdd-ops/.env → RETELL_POST_CALL_WEBHOOK_URL (set it up in one-time Part A first)',
-            to: 'the Retell agent’s Post-call webhook URL field',
-            value: config.retellPostCallWebhookUrl,
-            example: 'https://hook.us2.make.com/…',
-            pending: !config.retellPostCallWebhookUrl,
-          },
-          {
             t: 'callout',
             tone: 'info',
-            body: 'You should see: after a test call ends, a green run in the jdd-post-call-log Make scenario and a new row in the client’s Airtable Call Log within ~30s.',
+            body: 'You should see: after a test call ends, a green run in this client’s “Post-call: …” Make scenario and a new row in the client’s Airtable Call Log within ~30s.',
           },
         ],
       },
@@ -288,107 +274,91 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
 }
 
 function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[] {
-  const num = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
-  const agent = envVal(s.env.RETELL_AGENT_ID, 'agent_… (provision first)');
-  const webhook = envVal(s.env.MAKE_WEBHOOK_URL, 'https://hook.us1.make.com/… (your clone’s URL)');
+  const twilio = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
+  const webhook = envVal(s.env.RETELL_POST_CALL_WEBHOOK_URL, 'set by onboard.js after the clone');
+  const owner = envVal(s.env.CLIENT_FORWARD_PHONE, 'the owner number (brand.phone)');
+  const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? '25';
   const slugForCmd = ctx.isEnterprise ? `${ctx.slug}/site-${i + 1}` : ctx.slug;
   const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
+  const voiceUrl = `https://${s.slug.replace(/_/g, '-')}.vercel.app/api/voice`;
+  const isTollFree = /^\+1(800|833|844|855|866|877|888)/.test(twilio.value);
   return [
     {
-      id: `clone-scenario-${s.slug}`,
-      title: `Clone the outbound master scenario${label}`,
-      why: 'Each site needs its own clone — the HTTP module hardcodes this site’s from_number and agent id, so one scenario can serve exactly one site.',
+      id: `postcall-auto-${s.slug}`,
+      title: `Post-call logging + owner SMS (automated)${label}`,
+      auto: true,
+      why: 'onboard.js cloned the master post-call scenario for this client, pointed its Airtable + Twilio SMS modules at this client, activated it, and set the clone’s webhook on the Retell agent. Nothing to do here unless verification fails.',
       blocks: [
         {
           t: 'substeps',
           items: [
-            { text: 'Make.com → open the outbound master scenario (the deactivated “Lead → Retell” template).' },
-            { text: 'Click the ⋯ menu (top-right of the editor) → Clone.' },
-            { text: `Rename the clone: “Lead → Retell: ${s.brandShort ?? s.brandName}”.` },
-            { text: 'Open the clone’s Webhook trigger (module 1) → Copy address to clipboard. That is this site’s unique webhook URL — keep it for two steps from now.' },
-          ],
-        },
-        { t: 'nav', app: 'Make.com', path: ['master scenario', '⋯', 'Clone'] },
-        {
-          t: 'context',
-          label: 'This clone’s webhook URL',
-          from: 'the clone’s Webhook trigger (module 1) → Copy address to clipboard',
-          to: 'you’ll paste it into MAKE_WEBHOOK_URL two steps down (“Paste the webhook URL”)',
-          example: 'https://hook.us1.make.com/…',
-        },
-        { t: 'callout', tone: 'info', body: 'You should see: a new scenario in your list, still inactive, with its own webhook URL distinct from the master.' },
-      ],
-    },
-    {
-      id: `replace-placeholders-${s.slug}`,
-      title: `Replace the HTTP placeholders & activate${label}`,
-      why: 'Point the clone at this site’s Retell-provisioned number and agent, then turn it on.',
-      blocks: [
-        {
-          t: 'substeps',
-          items: [
-            { text: 'In the clone, open the HTTP module (module 2 — “Make a request”).' },
-            { text: 'In the Body (raw JSON), replace <<<TWILIO_NUMBER>>> with the number below (paste only the value, no angle brackets).' },
-            { text: 'Replace <<<RETELL_AGENT_ID>>> with the agent id below.' },
-            { text: 'Save the module, then toggle the scenario Active (switch, bottom-left of the editor).' },
-          ],
-        },
-        {
-          t: 'fields',
-          caption: `Copy each value (from clients/${slugForCmd}/.env.local) into the clone’s HTTP module Body:`,
-          rows: [
-            { label: '<<<TWILIO_NUMBER>>>', value: num.value, pending: num.pending },
-            { label: '<<<RETELL_AGENT_ID>>>', value: agent.value, pending: agent.pending },
-          ],
-        },
-        { t: 'callout', tone: 'warn', body: 'Gotcha: don’t leave any < or > brackets. A leftover placeholder makes Retell’s create-phone-call 4xx and the callback silently never fires.' },
-      ],
-    },
-    {
-      id: `wire-webhook-env-${s.slug}`,
-      title: `Paste the webhook URL & sync to Vercel${label}`,
-      why: 'The deployed /api/contact route reads MAKE_WEBHOOK_URL to know where to POST each lead.',
-      blocks: [
-        {
-          t: 'substeps',
-          items: [
-            { text: `Open clients/${slugForCmd}/.env.local.` },
-            { text: 'Set MAKE_WEBHOOK_URL to the clone’s webhook URL you copied.' },
-            { text: 'Run the sync command below to push it to the Vercel project.' },
-            { text: 'Redeploy so the live site picks up the new env (push any commit, or Vercel → Deployments → ⋯ → Redeploy).' },
+            { text: `Make.com → confirm a scenario “Post-call: ${s.brandName}” exists and is Active.` },
+            { text: 'Retell → Agents → this client’s agent → Settings → confirm the Post-call webhook URL matches the value below.' },
           ],
         },
         {
           t: 'context',
-          label: 'Make webhook URL',
-          from: 'the clone’s Webhook trigger → Copy address (from the “Clone…” step above)',
-          to: `clients/${slugForCmd}/.env.local → MAKE_WEBHOOK_URL`,
+          label: 'This client’s post-call webhook URL',
+          from: `clients/${slugForCmd}/.env.local → RETELL_POST_CALL_WEBHOOK_URL (written by onboard.js)`,
+          to: 'the Retell agent’s Post-call webhook (already set)',
           value: webhook.pending ? undefined : webhook.value,
-          example: 'https://hook.us1.make.com/…',
+          example: 'https://hook.us2.make.com/…',
           pending: webhook.pending,
         },
-        { t: 'env', file: `clients/${slugForCmd}/.env.local`, vars: [{ key: 'MAKE_WEBHOOK_URL', value: webhook.value, note: 'the clone’s webhook URL', pending: webhook.pending }] },
-        { t: 'cmd', command: `npm run sync-env -- --slug ${slugForCmd}`, cwd: 'jdd-ops/' },
+        {
+          t: 'callout',
+          tone: 'info',
+          body: `The clone hardcodes this client’s Airtable base, texts the owner at ${owner.value} from ${twilio.value}, and a filter right after the webhook drops anything the AI didn’t handle — so client-answered calls never log or text.`,
+        },
       ],
     },
     {
-      id: `checkpoint-3-${s.slug}`,
-      title: `Checkpoint 3 — live end-to-end test${label}`,
+      id: `twilio-sms-reg-${s.slug}`,
+      title: `Enable SMS on the Twilio number${label}`,
+      why: 'US carriers block outbound SMS from unregistered numbers. Until this number is registered/approved, the owner-notification texts silently fail.',
+      blocks: [
+        {
+          t: 'callout',
+          tone: 'warn',
+          body: isTollFree
+            ? 'This is a TOLL-FREE number → it needs per-number Toll-Free Verification (submit the form; approval ~1–3 weeks). SMS will not deliver until Verified.'
+            : 'This is a LOCAL 10DLC number → add it to the JDD A2P Messaging Service (campaign approved once in one-time setup).',
+        },
+        {
+          t: 'substeps',
+          items: isTollFree
+            ? [
+                { text: 'Twilio Console → Messaging → Regulatory Compliance → Toll-Free Verification → Create.' },
+                { text: `Select ${twilio.value}; business info; use-case “Customer Care / Notifications”; sample = the owner call-brief SMS; opt-in = business agreement.` },
+                { text: 'Submit; status must reach Verified before SMS delivers.' },
+              ]
+            : [
+                { text: 'Twilio Console → Messaging → Services → the JDD Messaging Service → Sender Pool.' },
+                { text: `Add ${twilio.value} to the pool so it sends under the approved A2P campaign.` },
+              ],
+        },
+        { t: 'copy', label: 'This site’s /api/voice URL (voice webhook — already set by onboard.js at purchase; paste to re-verify)', value: voiceUrl },
+        { t: 'nav', app: 'Twilio', path: ['Phone Numbers', twilio.value, 'Voice Configuration', 'A call comes in → Webhook'] },
+      ],
+    },
+    {
+      id: `checkpoint-postcall-${s.slug}`,
+      title: `Checkpoint — post-call log + owner SMS${label}`,
       est: '~15 min',
-      why: 'Proves the whole chain: form → Make → Retell callback → Airtable log.',
+      why: 'Proves the chain: AI-handled call → Make clone → Airtable row + owner SMS.',
       blocks: [
         {
           t: 'substeps',
           items: [
-            { text: 'On the deployed site, submit the lead form with your own phone number.' },
-            { text: 'Within ~60s the agent should call you back with this brand’s greeting.' },
-            { text: 'After you hang up, confirm a new row appears in the client’s Airtable Call Log.' },
+            { text: `Trigger an AI-handled call: submit the form with your number, or call ${twilio.value} and let it ring past ${ring}s so the AI answers.` },
+            { text: 'Finish the call and hang up.' },
+            { text: `Within ~30s confirm a new Airtable Call Log row AND a brief SMS to ${owner.value}.` },
           ],
         },
         {
           t: 'callout',
           tone: 'info',
-          body: 'If nothing in 90s, walk the chain: Vercel /api/contact logs (200 vs 500) → Make clone History (did the webhook fire? did the Retell request succeed?) → Retell outbound call logs → the jdd-post-call-log scenario → the Airtable row.',
+          body: `If nothing: Retell call log (did it complete?) → Make “Post-call: ${s.brandName}” History (webhook fired? filter passed? Airtable/Twilio module errors?) → Twilio Messaging logs (registration status).`,
         },
       ],
     },
@@ -398,8 +368,10 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
 function callbackPhase(ctx: ClientContext): Phase {
   return {
     id: 'callback',
-    title: 'Lead-callback (Make)',
-    subtitle: ctx.isEnterprise ? 'Clone the outbound scenario once per site.' : 'Wire the form → callback automation.',
+    title: 'Post-call logging & SMS (Make)',
+    subtitle: ctx.isEnterprise
+      ? 'One post-call clone per site (automated); register each number for SMS.'
+      : 'Post-call clone is automated; register the number for SMS.',
     steps: ctx.sites.flatMap((s, i) => callbackStepsForSite(ctx, s, i)),
   };
 }
@@ -407,135 +379,35 @@ function callbackPhase(ctx: ClientContext): Phase {
 function portalPhase(ctx: ClientContext, config: OpsConfig): Phase {
   const steps: Step[] = [];
 
-  ctx.sites.forEach((s) => {
-    const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
-    steps.push({
-      id: `ga4-property-${s.slug}`,
-      title: `Create the GA4 property${label}`,
-      why: 'The portal’s Traffic tab reads GA4 by Property ID. Enterprise gets one property per site. This step produces two IDs that later steps consume.',
-      blocks: [
-        {
-          t: 'substeps',
-          items: [
-            { text: 'Google Analytics → Admin → Create Property. Name it for the client (and site, if Enterprise).' },
-            { text: 'Set up a Web data stream pointing at the live site URL.' },
-            { text: 'Copy the Measurement ID (G-XXXXXXX) — this tags the site.' },
-            { text: 'Open Admin → Property Settings → copy the numeric Property ID, and prefix it: properties/123456789 — this goes in the portal.' },
-          ],
-        },
-        { t: 'nav', app: 'Google Analytics', path: ['Admin', 'Create Property', 'Web data stream'] },
-        {
-          t: 'context',
-          label: 'Measurement ID → feeds “Tag the client site”',
-          from: 'GA → the Web data stream you just created',
-          to: 'the next step (NEXT_PUBLIC_GA_MEASUREMENT_ID)',
-          example: 'G-XXXXXXX',
-        },
-        {
-          t: 'context',
-          label: 'Property ID → feeds “Set the GA4 Property ID”',
-          from: 'GA → Admin → Property Settings → Property ID',
-          to: 'the --set-ga4 command (with a properties/ prefix)',
-          example: 'properties/123456789',
-        },
-        { t: 'callout', tone: 'warn', body: 'Two different IDs, don’t mix them: the Measurement ID (G-…) tags the website; the Property ID (properties/…) goes into the portal user.' },
-        { t: 'link', label: 'Open Google Analytics', href: 'https://analytics.google.com' },
-      ],
-    });
-  });
-
   steps.push({
-    id: 'tag-site',
-    title: 'Tag the client site with GA4',
-    why: 'Without the measurement tag the property collects nothing and the Traffic tab stays empty — a property alone is not enough.',
-    blocks: [
-      { t: 'callout', tone: 'warn', body: 'Required — the exported site is NOT GA4-tagged by default (known template gap). Until the template ships a GA component, add it per client.' },
-      {
-        t: 'substeps',
-        items: [
-          { text: `Add NEXT_PUBLIC_GA_MEASUREMENT_ID=G-… to the client repo’s env (and on Vercel).` },
-          { text: 'Ensure a GA component renders it in the layout (e.g. @next/third-parties GoogleAnalytics) — add it if the template doesn’t yet.' },
-          { text: 'Commit + redeploy.' },
-          { text: 'Visit the live site, then check GA4 → Reports → Realtime. You should see your own visit within ~30s.' },
-        ],
-      },
-      {
-        t: 'context',
-        label: 'GA4 Measurement ID',
-        from: 'the GA4 Web data stream (captured in “Create the GA4 property”)',
-        to: `two places: clients/${ctx.slug}/repo .env AND the Vercel project → Settings → Environment Variables, as NEXT_PUBLIC_GA_MEASUREMENT_ID`,
-        example: 'G-XXXXXXX',
-      },
-      { t: 'env', file: `clients/${ctx.slug}/repo/.env.local`, vars: [{ key: 'NEXT_PUBLIC_GA_MEASUREMENT_ID', value: 'G-XXXXXXX', note: 'from the GA4 data stream', pending: true }] },
-    ],
-  });
-
-  steps.push({
-    id: 'grant-service-account',
-    title: 'Grant the JDD service account access',
-    why: 'The portal reads GA4 server-side using a Google service account; it must be a Viewer on each property or every Traffic call 403s.',
-    blocks: [
-      {
-        t: 'substeps',
-        items: [
-          { text: 'Google Analytics → Admin → Property Access Management (for this property).' },
-          { text: 'Click + (top-right) → Add users.' },
-          { text: 'Paste the service account email (below).' },
-          { text: 'Set role to Viewer, untick “Notify new users by email”, then Add.' },
-        ],
-      },
-      { t: 'nav', app: 'Google Analytics', path: ['Admin', 'Property Access Management', '+', 'Add users'] },
-      {
-        t: 'context',
-        label: 'Service account email',
-        from: config.serviceAccountEmail
-          ? 'GOOGLE_SERVICE_ACCOUNT_KEY → client_email (juneau-digital-designs/.env)'
-          : 'the client_email field inside GOOGLE_SERVICE_ACCOUNT_KEY in juneau-digital-designs/.env (set it up in Part A first)',
-        to: 'GA → Admin → Property Access Management → Add users, as a Viewer',
-        value: config.serviceAccountEmail,
-        example: 'jdd-portal@project.iam.gserviceaccount.com',
-        pending: !config.serviceAccountEmail,
-      },
-      { t: 'callout', tone: 'info', body: 'Skip this and the Traffic tab returns a permission error even with a correct Property ID set.' },
-    ],
-  });
-
-  steps.push({
-    id: 'set-ga4',
-    title: 'Set the GA4 Property ID on the portal user',
-    why: 'onboard.js step 10 created the Clerk user with ga4PropertyId: null. This one command fills it in — no Clerk dashboard editing.',
+    id: 'enable-web-analytics',
+    title: 'Enable Web Analytics on the client’s Vercel project',
+    why: 'The portal’s Traffic tab reads page views + visitors from the Vercel Web Analytics API, keyed by the user’s vercelProjectId. The exported site already renders <Analytics /> from @vercel/analytics (template root layout), so enabling Web Analytics is the only step — no GA4 property, no site tag, no service-account grant.',
     blocks: [
       {
         t: 'callout',
         tone: 'info',
-        body: 'The Clerk portal user already exists (CLERK_USER_ID is in this client’s .env.local). You only need to attach the GA4 property.',
-      },
-      {
-        t: 'context',
-        label: 'GA4 Property ID',
-        from: 'Google Analytics → Admin → Property Settings → Property ID (the number you copied in “Create the GA4 property”)',
-        to: 'replace properties/REPLACE_WITH_PROPERTY_ID in the command below — keep the properties/ prefix',
-        example: 'properties/123456789',
+        body: 'The Clerk portal user already exists with vercelProjectId set (onboard.js step 10 wrote it from the client’s Vercel project). You only need to switch Web Analytics on — no command, no Clerk edit.',
       },
       {
         t: 'substeps',
         items: [
-          { text: 'Swap the placeholder for your real Property ID (with the properties/ prefix).' },
-          { text: 'Run the command in your terminal from the jdd-ops folder.' },
-          { text: 'It prints the updated Clerk user id and a reminder to grant the service account (previous step).' },
+          { text: 'Vercel → the client’s project → Analytics → Enable Web Analytics.', detail: '@vercel/analytics is already in the template root layout, so no code change or redeploy is needed — the project starts collecting once enabled.' },
+          { text: 'The Traffic tab stays empty until the live site receives real visitors — visit the site once and confirm data appears within ~30s.' },
         ],
       },
-      { t: 'cmd', command: `npm run onboard -- --slug ${ctx.slug} --set-ga4 properties/REPLACE_WITH_PROPERTY_ID`, cwd: 'jdd-ops/' },
+      { t: 'nav', app: 'Vercel', path: ['Project', 'Analytics', 'Enable Web Analytics'] },
+      { t: 'link', label: 'Open Vercel dashboard', href: 'https://vercel.com/dashboard' },
       ...(ctx.isEnterprise
         ? ([
             {
               t: 'callout',
               tone: 'warn',
-              body: '--set-ga4 currently sets only the top-level property. For Enterprise per-site GA4, edit each site’s ga4PropertyId under publicMetadata.sites[] in the Clerk dashboard until the --site flag lands.',
+              body: 'Enterprise: enable Web Analytics on each site’s Vercel project. Every entry in publicMetadata.sites[] carries its own vercelProjectId, and each project needs Analytics switched on to light up that site’s Traffic tab.',
             } as Block,
           ])
         : []),
-      { t: 'json', label: 'publicMetadata shape (onboard set this; --set-ga4 fills ga4PropertyId)', json: clerkMetadataJson(ctx) },
+      { t: 'json', label: 'publicMetadata shape (onboard.js step 10 set this, including vercelProjectId)', json: clerkMetadataJson(ctx) },
     ],
   });
 
@@ -549,7 +421,7 @@ function portalPhase(ctx: ClientContext, config: OpsConfig): Phase {
         items: [
           { text: 'Clerk → Users → this client → Send invitation (or copy a sign-in link).' },
           { text: 'Have them sign in at the portal URL below.' },
-          { text: 'Confirm all relevant tabs load with data: Traffic (GA4), Performance (PageSpeed)' + (ctx.plan === 'starter' ? '.' : ', and Calls (Airtable).') },
+          { text: 'Confirm all relevant tabs load with data: Traffic (Vercel Web Analytics), Performance (PageSpeed)' + (ctx.plan === 'starter' ? '.' : ', and Calls (Airtable).') },
         ],
       },
       { t: 'nav', app: 'Clerk', path: ['Users', '{client}', 'Send invitation'] },
@@ -604,7 +476,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
               { text: 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN — console.twilio.com (Growth/Enterprise: step 8 buys each client’s number and sets human-first call routing).' },
               { text: 'AIRTABLE_API_KEY (data.records:write + schema.bases:write) + AIRTABLE_WORKSPACE_ID (wsp…).' },
               { text: 'GITHUB_TOKEN (repo + delete_repo) + GITHUB_ORG; VERCEL_TOKEN + VERCEL_TEAM_ID.' },
-              { text: 'MAKE_API_KEY + MAKE_DATA_STORE_ID + RETELL_POST_CALL_WEBHOOK_URL — from the Make setup below.' },
+              { text: 'MAKE_API_KEY + MAKE_POST_CALL_MASTER_SCENARIO_ID — from the Make setup below.' },
               { text: 'CLERK_SECRET_KEY — step 10 auto-creates the portal user. RESEND_API_KEY for Starter lead emails.' },
             ],
           },
@@ -637,75 +509,54 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
     ],
   },
   {
-    id: 'a-make-out',
-    title: 'Outbound master Make scenario',
-    subtitle: 'Built once, cloned per client.',
-    steps: [
-      {
-        id: 'a-make-out-build',
-        title: 'Build the lead-callback master scenario',
-        why: 'The template every per-client clone is made from. The master itself never runs.',
-        blocks: [
-          {
-            t: 'substeps',
-            items: [
-              { text: 'Make.com → Create a new scenario.' },
-              { text: 'Module 1: Webhooks → Custom webhook. Run once and POST a test lead payload so Make learns the body shape.' },
-              { text: 'Module 2: HTTP → Make a request. URL https://api.retellai.com/v2/create-phone-call, method POST.' },
-              { text: 'Headers: Authorization: Bearer <RETELL_API_KEY> (real key — clones inherit it) and Content-Type: application/json.' },
-              { text: 'Body type Raw → JSON, using the body below with the placeholders kept literal.' },
-              { text: 'Save, then Deactivate the master (bottom-left). Only clones run.' },
-            ],
-          },
-          {
-            t: 'json',
-            label: 'HTTP body (placeholders stay literal in the master)',
-            json: JSON.stringify({ from_number: '<<<TWILIO_NUMBER>>>', to_number: '{{1.phone}}', override_agent_id: '<<<RETELL_AGENT_ID>>>' }, null, 2),
-          },
-        ],
-      },
-    ],
-  },
-  {
     id: 'a-make-post',
-    title: 'Post-call logging scenario + Data Store',
-    subtitle: 'Shared (not cloned). Fills Airtable Call Log.',
+    title: 'Post-call master Make scenario',
+    subtitle: 'The one scenario onboard.js clones per client. Logs the call + texts the owner.',
     steps: [
       {
         id: 'a-make-post-build',
-        title: 'Build retell-agent-lookup + jdd-post-call-log',
-        why: 'Routes every completed call to the right client’s Airtable base by agent id — the data behind the portal Calls tab.',
+        title: 'Prepare the post-call master (Webhook → filter → Airtable → Twilio SMS)',
+        why: 'onboard.js clones this master per client and overwrites the Airtable base and the Twilio From/To. The master itself never runs.',
         blocks: [
           {
             t: 'substeps',
             items: [
-              { text: 'Make.com → Data stores → Create a data store named retell-agent-lookup with fields base_id, client_name, table_name.' },
-              { text: 'Copy its numeric ID into jdd-ops/.env as MAKE_DATA_STORE_ID. (onboard.js step 8c adds one row per Growth/Enterprise client automatically.)' },
-              { text: 'Create scenario jdd-post-call-log. Module 1: Custom webhook → copy its URL into .env as RETELL_POST_CALL_WEBHOOK_URL; Run once and POST a sample call_ended payload.' },
-              { text: 'Module 2: Data store → Get a record, store retell-agent-lookup, key {{1.agent_id}}.' },
-              { text: 'Module 3: Airtable → Create a Record, Base ID {{2.base_id}}, table Call Log; map Date / Caller name / Caller number / Summary / Duration / Call type / Outcome.' },
-              { text: 'Add a Resume error handler on module 2 (so an unknown agent_id doesn’t halt it), then Activate.' },
+              { text: 'Open your post-call scenario. Module 1: Custom webhook (Retell posts call_ended/call_analyzed here).' },
+              { text: 'Add a Filter immediately after the webhook that only passes AI-handled leads (e.g. event = call_analyzed AND custom_analysis_data.caller_name exists) — so client-answered calls never log or text.' },
+              { text: 'Module: Airtable → Create a Record, table Call Log; map Date / Caller name / Caller number / Summary / Duration / Call type / Outcome. Leave the Base as a PLACEHOLDER — onboard.js overwrites it per clone.' },
+              { text: 'Module: Twilio → Send a Message (JDD SID/auth connection). Leave From and To as PLACEHOLDERS — onboard.js sets From = client TWILIO_NUMBER and To = the owner (brand.phone) per clone.' },
+              { text: 'SMS body draws from the Retell analysis fields, e.g. “{{urgency}} — new lead: {{caller_name}}, {{callback_number}}”.' },
+              { text: 'Save, then Deactivate the master (only per-client clones run).' },
             ],
           },
           {
             t: 'context',
-            label: 'Data Store ID',
-            from: 'Make → Data stores → retell-agent-lookup → the numeric ID in the URL',
-            to: 'jdd-ops/.env → MAKE_DATA_STORE_ID (so step 8c can auto-register agents)',
-            value: config.makeDataStoreId,
-            example: '123456',
-            pending: !config.makeDataStoreId,
+            label: 'Master scenario ID',
+            from: 'Make → open the post-call master → the numeric ID in the URL',
+            to: 'jdd-ops/.env → MAKE_POST_CALL_MASTER_SCENARIO_ID (so step 8c can clone it)',
+            value: config.makePostCallMasterScenarioId,
+            example: '1234567',
+            pending: !config.makePostCallMasterScenarioId,
           },
+          { t: 'callout', tone: 'info', body: 'onboard.js reads the clone’s webhook URL and sets it on the Retell agent automatically. Exact Airtable field expressions are in retell-post-call-airtable-plan.md (repo root).' },
+        ],
+      },
+      {
+        id: 'a-twilio-a2p',
+        title: 'Register JDD for outbound SMS (A2P 10DLC / toll-free)',
+        why: 'US carriers block SMS from unregistered numbers. Register once so client numbers can text owners; per-number attach/verify happens during each onboarding.',
+        blocks: [
           {
-            t: 'context',
-            label: 'Post-call webhook URL',
-            from: 'the jdd-post-call-log scenario’s Custom webhook → Copy address',
-            to: 'jdd-ops/.env → RETELL_POST_CALL_WEBHOOK_URL (and onto each Retell agent later)',
-            value: config.retellPostCallWebhookUrl,
-            example: 'https://hook.us2.make.com/…',
-            pending: !config.retellPostCallWebhookUrl,
+            t: 'substeps',
+            items: [
+              { text: 'Twilio Console → Messaging → Regulatory Compliance → A2P 10DLC. Register the JDD Brand (business/EIN) once.' },
+              { text: 'Create a Campaign (use-case: Customer Care / account notifications; sample message = the owner call brief).' },
+              { text: 'Create/attach a Messaging Service whose Sender Pool holds the client numbers; local numbers get added here during onboarding.' },
+              { text: 'Toll-free numbers instead use per-number Toll-Free Verification (handled in each client’s onboarding step).' },
+            ],
           },
-          { t: 'callout', tone: 'info', body: 'Exact field expressions are in retell-post-call-airtable-plan.md (repo root).' },
+          { t: 'callout', tone: 'warn', body: 'Carrier approval takes days — do this early. Until a number’s registration is approved, owner SMS silently fails (call logging still works).' },
+          { t: 'link', label: 'Twilio A2P 10DLC', href: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/a2p-10dlc' },
         ],
       },
     ],
@@ -717,34 +568,30 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
     steps: [
       {
         id: 'a-portal-setup',
-        title: 'Clerk · Google service account · PageSpeed · Upstash',
+        title: 'Clerk · Vercel Web Analytics · PageSpeed · Upstash',
         why: 'The portal (route /portal) is configured by the agency repo’s env — set these once for all clients.',
         blocks: [
           {
             t: 'substeps',
             items: [
               { text: 'Clerk: create an application; set CLERK_SECRET_KEY + NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (and sign-in URL vars). The same CLERK_SECRET_KEY also goes in jdd-ops/.env for step 10.' },
-              { text: 'Google Cloud: create a service account, enable the Google Analytics Data API, download its JSON key into GOOGLE_SERVICE_ACCOUNT_KEY. Note the service account email.' },
-              { text: 'PAGESPEED_API_KEY — PageSpeed Insights API key.' },
+              { text: 'Vercel Web Analytics: set VERCEL_TOKEN (a read-scoped access token) and, if client projects live under a team, VERCEL_TEAM_ID. The portal’s Traffic tab reads every client’s traffic through the Vercel Web Analytics API — no per-client Google service account.' },
+              { text: 'PAGESPEED_API_KEY — PageSpeed Insights API key (still Google; one global key powers the Performance tab).' },
               { text: 'Upstash Redis: provision (Vercel → Storage) and confirm the env names match Redis.fromEnv() (UPSTASH_REDIS_REST_URL/_TOKEN).' },
               { text: 'AIRTABLE_API_KEY — the same JDD key; the portal reads each client’s Call Log.' },
             ],
           },
           { t: 'env', file: 'juneau-digital-designs/.env', vars: [
             { key: 'CLERK_SECRET_KEY + NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', value: 'Clerk app (auth for /portal)' },
-            { key: 'GOOGLE_SERVICE_ACCOUNT_KEY', value: 'service account JSON; enable GA4 Data API' },
+            { key: 'VERCEL_TOKEN + VERCEL_TEAM_ID', value: 'read-scoped token (+ team) — reads client traffic via Vercel Web Analytics API' },
             { key: 'PAGESPEED_API_KEY', value: 'PageSpeed Insights' },
             { key: 'AIRTABLE_API_KEY', value: 'same JDD key — reads each client Call Log' },
             { key: 'UPSTASH_REDIS_REST_URL + _TOKEN', value: 'cache + rate-limit (Redis.fromEnv())' },
           ] },
           {
-            t: 'context',
-            label: 'Service account email',
-            from: config.serviceAccountEmail ? 'GOOGLE_SERVICE_ACCOUNT_KEY → client_email' : 'the client_email field inside the GOOGLE_SERVICE_ACCOUNT_KEY JSON',
-            to: 'you grant it Viewer on every client GA4 property (portal phase)',
-            value: config.serviceAccountEmail,
-            example: 'jdd-portal@project.iam.gserviceaccount.com',
-            pending: !config.serviceAccountEmail,
+            t: 'callout',
+            tone: 'info',
+            body: 'Set VERCEL_TOKEN + VERCEL_TEAM_ID once here; per client you just flip on Web Analytics for that project (portal phase). No GA4 property, site tag, or service-account grant per client.',
           },
         ],
       },

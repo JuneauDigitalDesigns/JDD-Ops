@@ -9,6 +9,7 @@ import {
   repoDirFor,
   repoExists,
   resolveRepoRoot,
+  resolveUploads,
   validateEntries,
   wirePage,
   type Entry,
@@ -86,7 +87,9 @@ export async function POST(req: Request) {
               : 'Installing the content schema…',
         );
         if (content) {
-          writeSiteContent(repoRoot, slug, content);
+          step('Copying uploaded images into the site…');
+          const resolved = resolveUploads(repoRoot, slug, content);
+          writeSiteContent(repoRoot, slug, resolved);
         } else if (vertical) {
           writeVerticalSiteTs(repoRoot, slug, VERTICAL_PRESETS[vertical]);
         } else {

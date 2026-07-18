@@ -9,25 +9,15 @@ export default function VerticalPicker({
   onChange: (v: VerticalId) => void;
 }) {
   return (
-    <div className="flex items-center gap-2 border-b border-uiRule bg-uiBg px-4 py-2.5">
-      <span className="mr-1 font-chromeMono text-[10px] uppercase tracking-widest text-uiFg3">
-        Industry
-      </span>
+    <select
+      value={vertical}
+      onChange={(e) => onChange(e.target.value as VerticalId)}
+      aria-label="Industry"
+      className="rounded-md border border-uiRule bg-uiSurface px-2 py-1 font-chromeMono text-[11px] text-uiFg2 outline-none focus:border-uiAccent"
+    >
       {VERTICALS.map((v) => (
-        <button
-          key={v.id}
-          type="button"
-          onClick={() => onChange(v.id)}
-          className={[
-            'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-            vertical === v.id
-              ? 'bg-uiAccent text-uiAccentInk'
-              : 'border border-uiRule bg-uiSurface text-uiFg2 hover:border-uiRuleStrong hover:text-uiFg',
-          ].join(' ')}
-        >
-          {v.label}
-        </button>
+        <option key={v.id} value={v.id}>{v.label}</option>
       ))}
-    </div>
+    </select>
   );
 }
