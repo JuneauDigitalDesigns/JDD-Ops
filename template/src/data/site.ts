@@ -29,6 +29,8 @@ export type Typography = {
   bodyWeight: number;
 };
 
+export type ElementStyle = { color?: string; fontSize?: number; fontWeight?: number };
+
 export type Brand = {
   name: string;
   short: string;
@@ -75,6 +77,7 @@ export type SiteContent = {
   testimonials?: { items: TestimonialItem[] };
   seo: Seo;
   _meta: Meta;
+  overrides?: Record<string, unknown>;
 };
 
 // The default placeholder content. Valid against SiteContent so `npm run build`

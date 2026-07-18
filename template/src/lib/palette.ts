@@ -1,19 +1,50 @@
 import type { CSSProperties } from 'react';
 import type { Brand } from '@/data/site';
+import { shade, mix, withAlpha } from '@/lib/color';
 
 // Maps the brand palette + typography onto CSS custom properties. layout.tsx
 // spreads these onto <body> so every component inherits them via Tailwind tokens
 // (bg-accent, text-ink, border-rule, …) and the font-sans / font-heading families.
+//
+// Beyond the 7 authored brand tokens, we derive a richer set at runtime (tint ramp,
+// gradient, and an on-brand dark "contrast" surface) so catalog components can reach
+// for premium tones without any change to the brand schema.
 export function paletteVars(brand: Brand): CSSProperties {
   const p = brand.palette;
+  const { accent, ink, bg } = p;
+  const accentStrong = shade(accent, 0.2);
+
+  // On a dark palette `ink` is a near-white, so shading it produces a LIGHT panel
+  // and `--on-ink` resolves to white-on-white. Anchor the contrast surface to the
+  // background instead, and run the accent tint ramp toward bg rather than white
+  // (tinting toward white on a dark page washes the ramp out to nothing).
+  const dark = isDarkHex(bg);
+  const inkPanel = dark ? shade(bg, 0.25) : shade(ink, 0.08);
+  const onInk = readableOn(inkPanel, dark ? ink : '#0f1b2d');
+  const rampTarget = dark ? bg : '#ffffff';
+
   return {
-    '--accent': p.accent,
-    '--accent-fg': p.accentFg ?? readableOn(p.accent, p.ink),
-    '--bg': p.bg,
+    // ── authored tokens (unchanged) ──
+    '--accent': accent,
+    '--accent-fg': p.accentFg ?? readableOn(accent, ink),
+    '--bg': bg,
     '--bg-soft': p.bgSoft,
-    '--ink': p.ink,
+    '--ink': ink,
     '--ink-soft': p.inkSoft,
     '--rule': p.rule,
+    // ── derived accent tones ──
+    '--accent-050': mix(accent, rampTarget, 0.92),
+    '--accent-100': mix(accent, rampTarget, 0.84),
+    '--accent-200': mix(accent, rampTarget, 0.68),
+    '--accent-strong': accentStrong,
+    '--accent-glow': withAlpha(accent, 0.32),
+    '--accent-grad': `linear-gradient(135deg, ${accent} 0%, ${accentStrong} 100%)`,
+    // ── on-brand dark ("contrast" skin) section tones ──
+    '--ink-panel': inkPanel,
+    '--ink-panel-2': mix(inkPanel, accent, 0.16),
+    '--on-ink': onInk,
+    '--on-ink-soft': withAlpha(onInk, 0.7),
+    '--rule-ink': withAlpha(onInk, 0.16),
   } as CSSProperties;
 }
 
@@ -45,6 +76,15 @@ function contrastRatio(a: number, b: number): number {
   const hi = Math.max(a, b);
   const lo = Math.min(a, b);
   return (hi + 0.05) / (lo + 0.05);
+}
+
+/** True for backgrounds dark enough that light-palette assumptions invert. */
+function isDarkHex(hex: string): boolean {
+  try {
+    return relLuminance(hex) < 0.18;
+  } catch {
+    return false;
+  }
 }
 
 /** White or `dark` (brand ink), whichever contrasts better against `bg`. */

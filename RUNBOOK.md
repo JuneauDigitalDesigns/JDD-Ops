@@ -82,6 +82,12 @@ auto-deploy on push. Without this, project creation/link will 403.
 
 ### A3. Build the outbound lead-callback master Make scenario
 
+> **DEPRECATED (no longer needed).** The lead callback is now placed **directly** by
+> the site's `/api/contact` route (Retell `create-phone-call`), owned by onboard.js
+> (`lib/site-routes/contact.route.ts`). There is no Make webhook, no per-client clone
+> (Part D), and no `MAKE_WEBHOOK_URL`. Skip A3 and Part D. The shared **post-call
+> logging** scenario + Data Store (A4) and inbound voice routing are unaffected.
+
 Make.com is the orchestration glue: client lead form → Make webhook → Retell
 `create-phone-call` → the agent dials the lead back. The master scenario is a template you
 build **once**, then **clone per client** (each client has a different `from_number` and
@@ -155,11 +161,12 @@ by **that** repo's `.env`, not this one. Do this once:
 1. **Clerk** — create a Clerk application; set `CLERK_SECRET_KEY` +
    `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (and the sign-in URL vars) in the agency `.env` and on
    Vercel. The portal protects `/portal` and `/api/portal/*` via Clerk middleware.
-2. **Google service account + GA4 Data API** — in Google Cloud, create a service account,
-   enable the **Google Analytics Data API**, download its JSON key, and put the whole JSON in
-   `GOOGLE_SERVICE_ACCOUNT_KEY`. Note the service account **email** — you grant it Viewer on
-   each client's GA4 property (Part F).
-3. **PageSpeed Insights API key** → `PAGESPEED_API_KEY`.
+2. **Vercel Web Analytics access** — the portal's Traffic tab reads each client's traffic via
+   the Vercel Web Analytics API. Set `VERCEL_TOKEN` (a read-scoped access token) and, if the
+   projects live under a team, `VERCEL_TEAM_ID` in the **agency** `.env` and on the portal's
+   Vercel project. No per-client Google service account is needed.
+3. **PageSpeed Insights API key** → `PAGESPEED_API_KEY` (still Google; one global key, powers the
+   Performance tab).
 4. **Upstash Redis** (cache + rate-limit) — provision via Vercel → Storage; confirm the env
    var names match what `portal-kv.ts` reads (`Redis.fromEnv()`).
 5. **Airtable** — `AIRTABLE_API_KEY` (the same JDD key) so the portal can read each client's
@@ -236,6 +243,12 @@ checkpoint next-steps.
 
 ## Part D — Wire the lead-callback (per Growth/Enterprise site, Checkpoint 3)
 
+> **DEPRECATED (no longer needed).** The lead callback is placed directly by the site's
+> `/api/contact` route — no Make clone, no `MAKE_WEBHOOK_URL`, no `sync-env` step for it.
+> onboard.js already writes the route and syncs `RETELL_API_KEY` / `TWILIO_NUMBER` /
+> `RETELL_AGENT_ID` to Vercel. Skip this entire part. (Still do D8's post-call webhook
+> check via A4 if you rely on Airtable call logging.)
+
 For Enterprise, repeat **once per site** (`site-1`, `site-2`, …) — each gets its own clone.
 
 ### D1. Clone the outbound master scenario
@@ -278,49 +291,42 @@ Push any commit to the client repo (Vercel auto-deploys), or Vercel → project 
 
 ## Part E — Set up the client portal (per client)
 
-Gives the client a `/portal` login showing Traffic (GA4), Calls (Airtable), and Performance
-(PageSpeed). The portal reads everything from the client's **Clerk user metadata**.
+Gives the client a `/portal` login showing Traffic (Vercel Web Analytics), Calls (Airtable), and
+Performance (PageSpeed). The portal reads everything from the client's **Clerk user metadata**.
 
-### E1. Create a GA4 property
-Google Analytics → **Admin → Create Property** (one per site for Enterprise) → add a **Web
-data stream** for the live site URL. Capture both the **Measurement ID** (`G-XXXXXXX`) and the
-numeric **Property ID** (`properties/123456789`).
+### E1. Enable Web Analytics on the client's Vercel project
+Vercel → the client's project → **Analytics → Enable Web Analytics**. The exported site already
+renders `<Analytics />` from `@vercel/analytics` (in the template root layout), so once enabled
+the project starts collecting page views + visitors automatically — no per-client Google setup,
+no service-account grant. The Traffic tab stays empty until the site receives real visitors.
 
-### E2. Tag the client site with GA4
-> **Required — the exported site is not GA4-tagged by default.** Without the tag the property
-> collects nothing and the portal's Traffic tab stays empty.
-
-Add the Measurement ID to the client site (`NEXT_PUBLIC_GA_MEASUREMENT_ID` + a GA component)
-and redeploy. *(See the open template task — once the template ships a GA component, this is a
-single env var per client.)*
-
-### E3. Grant the JDD service account access
-GA4 → **Admin → Property Access Management** → add the service account **email** (from
-`GOOGLE_SERVICE_ACCOUNT_KEY`) as **Viewer**.
-
-### E4. Create the client's Clerk user + metadata
+### E2. Create the client's Clerk user + metadata
+`onboard.js` normally writes this automatically (including `vercelProjectId`). To do it by hand:
 Clerk dashboard → **Users → Create user** for the client. Set **publicMetadata** to:
 ```json
 {
   "slug": "{slug}",
+  "name": "Client Brand Name",
   "plan": "growth",
   "canonical": "https://clientsite.com",
   "airtableBaseId": "appXXXXXXXXXXXXXX",
-  "ga4PropertyId": "properties/123456789"
+  "vercelProjectId": "prj_XXXXXXXXXXXXXXXX"
 }
 ```
-- `slug`, `plan`, `canonical` come from `clients/{slug}/site.ts`.
+- `slug`, `name`, `plan`, `canonical` come from `clients/{slug}/site.ts`.
 - `airtableBaseId` comes from `clients/{slug}/.env.local` (`AIRTABLE_BASE_ID`). **Starter:**
   set `airtableBaseId` to `null` (no call data).
+- `vercelProjectId` is the project's `prj_…` id (Vercel → project → **Settings → General**).
+  Leave `null` to hide the Traffic tab.
 - **Enterprise:** add a `sites` array, one entry per site:
   ```json
   "sites": [
-    { "slug": "{slug}-1", "canonical": "https://site1.com", "ga4PropertyId": "properties/111" },
-    { "slug": "{slug}-2", "canonical": "https://site2.com", "ga4PropertyId": "properties/222" }
+    { "slug": "{slug}-1", "name": "Site One", "canonical": "https://site1.com", "vercelProjectId": "prj_111" },
+    { "slug": "{slug}-2", "name": "Site Two", "canonical": "https://site2.com", "vercelProjectId": "prj_222" }
   ]
   ```
 
-### E5. Invite the client
+### E3. Invite the client
 Send them the `/portal/sign-in` link (or a Clerk invitation). Confirm the three tabs render
 with real data.
 

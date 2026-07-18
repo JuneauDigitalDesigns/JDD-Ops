@@ -3,60 +3,114 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────
-   JDD Console — global chrome = "Aurora Glass / warm editorial" (cohesive with
-   juneaudigitaldesigns.com). Deep navy field, warm parchment accent, Cabinet
-   Grotesk display, IBM Plex Sans body, JetBrains Mono for IDs/commands.
-   These globals dress the home page (/) and the Onboarding Runbook (/onboard).
-   The Studio builder (/build) re-scopes its own light client-preview palette via
-   the `.studio-chrome` block at the bottom + the build layout's inline vars.
+   JDD Console — palette + type mirror juneaudigitaldesigns.com. Light default
+   is warm cream; dark is near-black. next-themes flips [data-theme]. The `ui-*`
+   tokens are the /build chrome (rails, top bar, working canvas) and are themed
+   here too. The /build CLIENT preview keeps its own palette (studio-chrome +
+   paletteVars), so previews stay true in either console theme.
    ──────────────────────────────────────────────────────────────────────── */
 :root {
-  --bg: #07101e;
-  --bg-deep: #050b15;
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --panel: #0c1726;
-  --panel-2: #0e1a2b;
+  --bg: #f4ecd8;
+  --bg-deep: #ddd0b3;
+  --surface: rgba(20, 18, 12, 0.04);
+  --surface-2: rgba(20, 18, 12, 0.06);
+  --panel: #fbf5e6;
+  --panel-2: #f0e6cd;
 
-  --accent: #f5edd6;
-  --accent-ink: #06121a;
-  --accent-glow: rgba(245, 237, 214, 0.25);
+  --accent: #1f6f78;            /* teal */
+  --accent-2: #d2542f;          /* coral */
+  --accent-ink: #f4ecd8;        /* text on teal */
+  --on-accent-2: #f4ecd8;       /* text on coral */
+  --accent-glow: rgba(210, 84, 47, 0.28);
 
-  --fg: #f4f6fb;
-  --fg-2: rgba(244, 246, 251, 0.74);
-  --fg-3: rgba(244, 246, 251, 0.46);
-  --rule: rgba(244, 246, 251, 0.1);
-  --rule-strong: rgba(244, 246, 251, 0.22);
+  --fg: #14120c;
+  --fg-2: #43402c;
+  --fg-3: #7a715a;
+  --rule: rgba(20, 18, 12, 0.16);
+  --rule-strong: rgba(20, 18, 12, 0.28);
+  --rule-weak: rgba(20, 18, 12, 0.06);
 
-  --ok: #84d49a;
-  --ok-glow: rgba(132, 212, 154, 0.18);
-  --warn: #f0c577;
-  --warn-glow: rgba(240, 197, 119, 0.16);
-  --danger: #e8836b;
-  --danger-glow: rgba(232, 131, 107, 0.16);
+  --ok: #3f8f5c;   --ok-glow: rgba(63, 143, 92, 0.16);
+  --warn: #c8842a; --warn-glow: rgba(200, 132, 42, 0.16);
+  --danger: #d2542f; --danger-glow: rgba(210, 84, 47, 0.16);
 
   --tracking-widest: 0.14em;
+
+  /* /build chrome (rails + canvas) */
+  --ui-bg: #fbf5e6;
+  --ui-bg-soft: #f0e6cd;
+  --ui-surface: rgba(20, 18, 12, 0.04);
+  --ui-surface-2: rgba(20, 18, 12, 0.07);
+  --ui-fg: #14120c;
+  --ui-fg-2: rgba(20, 18, 12, 0.72);
+  --ui-fg-3: rgba(20, 18, 12, 0.48);
+  --ui-accent: #d2542f;
+  --ui-accent-ink: #f4ecd8;
+  --ui-rule: rgba(20, 18, 12, 0.12);
+  --ui-rule-strong: rgba(20, 18, 12, 0.24);
+  --ui-canvas: #f4ecd8;
+  --ui-ink: #1f6f78;
+  --ui-ink-soft: #7a715a;
+  --ui-card-rule: #e3ddcb;
+}
+
+[data-theme='dark'] {
+  --bg: #14120c;
+  --bg-deep: #0a0906;
+  --surface: rgba(240, 231, 210, 0.04);
+  --surface-2: rgba(240, 231, 210, 0.06);
+  --panel: #0e0d08;
+  --panel-2: #1a1810;
+
+  --accent: #3fa9b3;
+  --accent-2: #ff6b4a;
+  --accent-ink: #14120c;
+  --on-accent-2: #14120c;
+  --accent-glow: rgba(255, 107, 74, 0.30);
+
+  --fg: #f0e7d2;
+  --fg-2: #d6ccb2;
+  --fg-3: #9a9075;
+  --rule: rgba(240, 231, 210, 0.16);
+  --rule-strong: rgba(240, 231, 210, 0.28);
+  --rule-weak: rgba(240, 231, 210, 0.06);
+
+  --ok: #7ad79a;   --ok-glow: rgba(122, 215, 154, 0.18);
+  --warn: #f0c577; --warn-glow: rgba(240, 197, 119, 0.16);
+  --danger: #ff8a6b; --danger-glow: rgba(255, 138, 107, 0.16);
+
+  --ui-bg: #0e0d08;
+  --ui-bg-soft: #1a1810;
+  --ui-surface: rgba(240, 231, 210, 0.04);
+  --ui-surface-2: rgba(240, 231, 210, 0.07);
+  --ui-fg: #f0e7d2;
+  --ui-fg-2: rgba(240, 231, 210, 0.74);
+  --ui-fg-3: rgba(240, 231, 210, 0.48);
+  --ui-accent: #ff6b4a;
+  --ui-accent-ink: #14120c;
+  --ui-rule: rgba(240, 231, 210, 0.10);
+  --ui-rule-strong: rgba(240, 231, 210, 0.24);
+  --ui-canvas: #14120c;
+  --ui-ink: #3fa9b3;
+  --ui-ink-soft: #9a9075;
+  --ui-card-rule: rgba(240, 231, 210, 0.12);
 }
 
 @layer base {
-  * {
-    border-color: var(--rule);
-  }
-  html {
-    overflow-x: hidden;
-  }
+  * { border-color: var(--rule); }
+  html { overflow-x: hidden; }
   body {
     background: var(--bg);
     color: var(--fg);
-    font-family: var(--font-ibm-plex-sans), 'IBM Plex Sans', sans-serif;
+    font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-cabinet), 'Cabinet Grotesk', sans-serif;
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    line-height: 1.08;
+    font-family: var(--font-big-shoulders), 'Big Shoulders', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
     color: var(--fg);
   }
   /* Console feels calmer with a thin custom scrollbar */
@@ -74,11 +128,11 @@
   /* ── /build (Studio) scope ───────────────────────────────────────────────
      The build layout sets the live client palette + typography vars inline on
      the .studio-chrome element; these are SSR/first-paint fallbacks. The
-     descendant heading rule neutralizes the global Aurora-Glass h1–h6 base above
-     within /build. Kept in @layer base so catalog utility classes (font-heading,
-     text-ink, …) in @layer utilities still win on top. `var(--rule)` resolves to
-     the client rule inside this subtree, so the `* { border-color }` rule above
-     auto-recolors for the preview. */
+     descendant heading rule neutralizes the global heading base above within
+     /build. Kept in @layer base so catalog utility classes (font-heading,
+     text-ink, …) in @layer utilities still win on top. `var(--rule)` resolves
+     to the client rule inside this subtree, so the `* { border-color }` rule
+     above auto-recolors for the preview. */
   .studio-chrome {
     --accent: #1e6fbf;
     --accent-fg: #ffffff;
@@ -87,6 +141,18 @@
     --ink: #0f1b2d;
     --ink-soft: #4a5568;
     --rule: #cbd5e1;
+    /* Derived-tone SSR/first-paint fallbacks (runtime values come from palette.ts). */
+    --accent-050: #eaf1f9;
+    --accent-100: #d2e2f2;
+    --accent-200: #a6c5e5;
+    --accent-strong: #185a99;
+    --accent-glow: rgba(30, 111, 191, 0.32);
+    --accent-grad: linear-gradient(135deg, #1e6fbf 0%, #185a99 100%);
+    --ink-panel: #0e1929;
+    --ink-panel-2: #16283f;
+    --on-ink: #ffffff;
+    --on-ink-soft: rgba(255, 255, 255, 0.7);
+    --rule-ink: rgba(255, 255, 255, 0.16);
     --font-sans: -apple-system, BlinkMacSystemFont, sans-serif;
     --font-heading: -apple-system, BlinkMacSystemFont, sans-serif;
     --heading-weight: 700;
@@ -100,6 +166,17 @@
     color: inherit;
   }
 }
+
+/* ── Build-catalog card preview: tighten large section padding ───────────────
+   Preview-only. `.studio-preview-card` is added to the iframe <html> by
+   PreviewFrame for the build-step catalog cards only (ComponentCard) — NOT the
+   finalize full-page preview, and NEVER shipped to client repos. These rules are
+   deliberately UNLAYERED so they outrank Tailwind's `.py-*` utilities (which live
+   in @layer utilities); a layered override would lose to the layer cascade. */
+.studio-preview-card .py-32 { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+.studio-preview-card .py-28 { padding-top: 3.25rem; padding-bottom: 3.25rem; }
+.studio-preview-card .py-24 { padding-top: 3rem; padding-bottom: 3rem; }
+.studio-preview-card .py-20 { padding-top: 2.75rem; padding-bottom: 2.75rem; }
 
 @layer components {
   /* ── Atmosphere: fixed grain + parchment dot field (mounted only on /onboard) ── */
@@ -118,8 +195,8 @@
     z-index: 0;
     pointer-events: none;
     background-image:
-      radial-gradient(circle, rgba(245, 237, 214, 0.07) 1px, transparent 1px),
-      radial-gradient(circle, rgba(245, 237, 214, 0.04) 1px, transparent 1px);
+      radial-gradient(circle, var(--rule-weak) 1px, transparent 1px),
+      radial-gradient(circle, var(--rule-weak) 1px, transparent 1px);
     background-size: 42px 42px, 84px 84px;
     background-position: 0 0, 21px 21px;
     mask-image: radial-gradient(ellipse at 30% 0%, rgba(0, 0, 0, 0.6) 10%, transparent 60%);
@@ -128,7 +205,7 @@
 
   /* ── Eyebrow / kicker label ─────────────────────────────────────────── */
   .kicker {
-    font-family: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+    font-family: var(--font-dm-mono), 'DM Mono', monospace;
     font-size: 10.5px;
     font-weight: 500;
     letter-spacing: var(--tracking-widest);
@@ -143,7 +220,7 @@
       var(--panel);
     border: 1px solid var(--rule);
     border-radius: 18px;
-    box-shadow: 0 30px 80px -34px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 30px 80px -34px rgba(0, 0, 0, 0.35);
   }
 
   /* ── Status badge ───────────────────────────────────────────────────── */
@@ -153,7 +230,7 @@
     gap: 6px;
     padding: 3px 9px 4px;
     border-radius: 999px;
-    font-family: var(--font-jetbrains-mono), monospace;
+    font-family: var(--font-dm-mono), monospace;
     font-size: 10px;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -170,10 +247,10 @@
     background: currentColor;
     box-shadow: 0 0 8px 1px currentColor;
   }
-  .badge-ok { color: var(--ok); border-color: rgba(132, 212, 154, 0.35); background: var(--ok-glow); }
-  .badge-warn { color: var(--warn); border-color: rgba(240, 197, 119, 0.35); background: var(--warn-glow); }
-  .badge-danger { color: var(--danger); border-color: rgba(232, 131, 107, 0.35); background: var(--danger-glow); }
-  .badge-accent { color: var(--accent); border-color: rgba(245, 237, 214, 0.35); background: var(--accent-glow); }
+  .badge-ok { color: var(--ok); border-color: var(--rule-strong); background: var(--ok-glow); }
+  .badge-warn { color: var(--warn); border-color: var(--rule-strong); background: var(--warn-glow); }
+  .badge-danger { color: var(--danger); border-color: var(--rule-strong); background: var(--danger-glow); }
+  .badge-accent { color: var(--accent); border-color: var(--rule-strong); background: var(--accent-glow); }
 
   /* ── Buttons ────────────────────────────────────────────────────────── */
   .btn {
@@ -183,7 +260,7 @@
     gap: 8px;
     padding: 9px 16px;
     border-radius: 10px;
-    font-family: var(--font-ibm-plex-sans), sans-serif;
+    font-family: var(--font-hanken), sans-serif;
     font-weight: 500;
     font-size: 13.5px;
     cursor: pointer;
@@ -193,31 +270,32 @@
     transition: all 0.18s ease;
     white-space: nowrap;
   }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn:disabled:hover { border-color: var(--rule-strong); color: var(--fg); }
   .btn-primary {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border-color: var(--accent);
+    background: var(--accent-2);
+    color: var(--on-accent-2);
+    border-color: var(--accent-2);
     box-shadow: 0 12px 40px -14px var(--accent-glow);
   }
-  .btn-primary:hover { color: var(--accent-ink); transform: translateY(-1px); box-shadow: 0 16px 48px -12px var(--accent-glow); }
-  .btn-danger { border-color: rgba(232, 131, 107, 0.5); color: var(--danger); }
-  .btn-danger:hover { background: var(--danger); color: #1a0a06; border-color: var(--danger); }
+  .btn-primary:hover { background: var(--fg); color: var(--bg); border-color: var(--fg); transform: translateY(-1px); }
+  .btn-danger { border-color: var(--rule-strong); color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: var(--bg); border-color: var(--danger); }
   .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
+  .btn-xs { padding: 4px 9px; font-size: 11.5px; border-radius: 7px; gap: 6px; }
 
   /* ── Mono code chip ─────────────────────────────────────────────────── */
   .mono {
-    font-family: var(--font-jetbrains-mono), monospace;
+    font-family: var(--font-dm-mono), monospace;
     font-size: 12.5px;
   }
   .codechip {
-    font-family: var(--font-jetbrains-mono), monospace;
+    font-family: var(--font-dm-mono), monospace;
     font-size: 12px;
     padding: 2px 7px;
     border-radius: 6px;
-    background: var(--bg-deep);
+    background: var(--surface-2);
     border: 1px solid var(--rule);
     color: var(--fg-2);
     word-break: break-all;
@@ -232,6 +310,9 @@
     width: 1px;
     background: linear-gradient(var(--rule-strong), transparent);
   }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /* ── Form controls (dark) — scoped to the /onboard subtree so the light /build
@@ -241,7 +322,7 @@
 .onboard-chrome input[type='search'],
 .onboard-chrome textarea,
 .onboard-chrome select {
-  background: var(--bg-deep);
+  background: var(--surface);
   border: 1px solid var(--rule-strong);
   color: var(--fg);
   border-radius: 9px;

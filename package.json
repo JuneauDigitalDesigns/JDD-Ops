@@ -9,6 +9,7 @@
   },
   "scripts": {
     "onboard": "node onboard.js",
+    "link-portal": "node onboard.js --link-portal",
     "new-client": "node scripts/new-client.js",
     "hydrate": "node scripts/hydrate.js",
     "update-prompt": "node scripts/update-agent-prompt.js",

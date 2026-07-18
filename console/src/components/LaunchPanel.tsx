@@ -27,11 +27,9 @@ const LINE_COLOR: Record<LogLine['kind'], string> = {
 export default function LaunchPanel({
   ctx,
   onComplete,
-  onOpenSetup,
 }: {
   ctx: ClientContext;
   onComplete: () => void;
-  onOpenSetup?: () => void;
 }) {
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
@@ -237,7 +235,7 @@ export default function LaunchPanel({
 
       {/* Next steps — interpret the failure and show how to fix it (this + future errors) */}
       {!running && errored && (
-        <NextSteps errorText={errorLines.join('\n')} slug={ctx.slug} onOpenSetup={onOpenSetup} />
+        <NextSteps errorText={errorLines.join('\n')} slug={ctx.slug} />
       )}
 
       {/* Confirm modal for a real run */}

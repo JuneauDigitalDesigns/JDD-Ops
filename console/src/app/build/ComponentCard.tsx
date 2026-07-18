@@ -2,21 +2,32 @@
 
 import { useDraggable } from '@dnd-kit/core';
 import { DotsSixVertical } from '@phosphor-icons/react';
-import type { VariantEntry } from './page';
+import type { VariantEntry } from './categories';
+import type { SkinId } from '@/lib/skins';
+import type { Brand } from '@/data/site';
+import PreviewFrame from './PreviewFrame';
 
 export default function ComponentCard({
   variant,
   categoryId,
+  brand,
   selected,
+  skin,
+  onSkinChange,
 }: {
   variant: VariantEntry;
   categoryId: string;
+  brand: Brand;
   selected: boolean;
+  skin: SkinId;
+  onSkinChange: (skin: SkinId) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `${categoryId}::${variant.name}`,
     data: { categoryId, variantName: variant.name, label: variant.label },
   });
+
+  const showSkinToggle = selected && variant.skins.length > 1;
 
   return (
     <article
@@ -47,7 +58,34 @@ export default function ComponentCard({
         </div>
         <DotsSixVertical size={18} className="text-uiInkSoft shrink-0" />
       </header>
-      <div className="bg-bg">{variant.node}</div>
+
+      {showSkinToggle && (
+        <div
+          className="flex items-center gap-1 border-b border-uiCardRule bg-white px-6 py-2"
+          // Not draggable — clicking a skin button shouldn't start the drag-to-select gesture.
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="mr-1 font-chromeMono text-[10px] uppercase tracking-widest text-uiInkSoft">Skin</span>
+          {variant.skins.map((sk) => (
+            <button
+              key={sk.id}
+              type="button"
+              onClick={() => onSkinChange(sk.id)}
+              className={[
+                'rounded-full px-3 py-1 font-chromeMono text-[11px] uppercase tracking-widest transition-colors',
+                sk.id === skin ? 'bg-uiInk text-white' : 'text-uiInkSoft hover:bg-uiSurface2',
+              ].join(' ')}
+            >
+              {sk.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Rendered inside an iframe so viewport units + breakpoints resolve like the live site. */}
+      <PreviewFrame brand={brand} mode="scaled" virtualWidth={1280} rootClass="studio-preview-card">
+        {variant.render(skin)}
+      </PreviewFrame>
     </article>
   );
 }

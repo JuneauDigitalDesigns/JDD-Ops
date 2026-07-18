@@ -1,4 +1,10 @@
 'use client';
+// ─────────────────────────────────────────────────────────────────────────────
+// AboutPillars — recomposed as a numbered pillar index (see DESIGN-LANGUAGE.md).
+// Full-width numbered pillar rows (big numerals, hairline rules) over a count-up
+// stat band. Pillar-led editorial index; distinct from the story split / image
+// feature / stat stack.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, Clock, Tag, Star } from '@phosphor-icons/react';
@@ -61,30 +67,35 @@ export default function AboutPillars({ content = CONTENT }: { content?: SiteCont
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent"><E p="about.eyebrow">{about.eyebrow}</E></p>
-          <h2 className="mt-3 font-heading text-3xl text-ink md:text-4xl"><E p="about.title">{about.title}</E></h2>
+          <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] text-accent">
+            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
+            <E p="about.eyebrow">{about.eyebrow}</E>
+          </p>
+          <h2 className="mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] text-ink md:text-5xl"><E p="about.title">{about.title}</E></h2>
           <p className="mt-4 leading-relaxed text-inkSoft"><E p="about.body">{about.body}</E></p>
         </motion.div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Numbered pillar index */}
+        <div className="mt-12 border-t border-rule">
           {about.pillars.map((p, i) => {
             const Icon = ICON_MAP[p.k];
             return (
               <motion.div
                 key={p.k}
-                className="rounded-xl border border-rule bg-bgSoft p-6"
-                initial={reduce ? false : { opacity: 0, y: 20 }}
+                className="grid grid-cols-[auto_1fr] gap-5 border-b border-rule py-7 sm:gap-8"
+                initial={reduce ? false : { opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: i * 0.06 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: i * 0.05 }}
               >
-                {Icon && (
-                  <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
-                    <Icon size={20} className="text-accent" />
-                  </div>
-                )}
-                <h3 className="font-heading text-base font-semibold text-ink"><E p={`about.pillars.${i}.t`}>{p.t}</E></h3>
-                <p className="mt-2 text-sm leading-relaxed text-inkSoft"><E p={`about.pillars.${i}.d`}>{p.d}</E></p>
+                <span className="font-heading text-4xl font-black leading-none tabular-nums text-ink/20 sm:text-5xl">{String(i + 1).padStart(2, '0')}</span>
+                <div>
+                  <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-ink">
+                    {Icon && <Icon size={19} className="text-accent" />}
+                    <E p={`about.pillars.${i}.t`}>{p.t}</E>
+                  </h3>
+                  <p className="mt-2 max-w-2xl leading-relaxed text-inkSoft"><E p={`about.pillars.${i}.d`}>{p.d}</E></p>
+                </div>
               </motion.div>
             );
           })}

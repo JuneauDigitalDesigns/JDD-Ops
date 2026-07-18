@@ -3,8 +3,8 @@
  * scripts/sync-vercel-env.js — re-push env vars from clients/{slug}/.env.local
  * to the client's Vercel project.
  *
- * Used at Checkpoint 3 after pasting a real MAKE_WEBHOOK_URL (cloned from the
- * Make.com scenario) into clients/{slug}/.env.local.
+ * Run after editing clients/{slug}/.env.local (e.g. updating RETELL_* or
+ * TWILIO_NUMBER) to re-push the values and trigger a fresh deploy.
  *
  * Usage:
  *   npm run sync-env -- --slug <slug>

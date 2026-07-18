@@ -16,7 +16,7 @@ Two files per client:
    Exports `CONTENT` typed as `SiteContent`. This is the single source of truth.
 2. `clients/{slug}/.env.local` — secrets only (`RETELL_AGENT_ID`, `RETELL_API_KEY`,
    `RETELL_SIP_DOMAIN`, `TWILIO_NUMBER`, `CLIENT_FORWARD_PHONE`,
-   `CLIENT_FORWARD_RING_SECONDS`, `AIRTABLE_BASE_ID`, `MAKE_WEBHOOK_URL`, `VERCEL_PROJECT_NAME`).
+   `CLIENT_FORWARD_RING_SECONDS`, `AIRTABLE_BASE_ID`, `VERCEL_PROJECT_NAME`).
 
 ## Plan tiers
 
@@ -25,8 +25,8 @@ The intake schema's top-level `plan` field gates which provisioning steps run.
 | Plan       | Site(s) | Voice agent | Twilio number | Airtable base | Lead delivery |
 |------------|---------|-------------|---------------|---------------|---------------|
 | starter    | 1       | —           | —             | —             | Resend email to `brand.email` |
-| growth     | 1       | ✓           | ✓             | ✓ (1)         | Make webhook → Retell |
-| enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Make webhook → Retell |
+| growth     | 1       | ✓           | ✓             | ✓ (1)         | Site `/api/contact` → Retell `create-phone-call` |
+| enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Site `/api/contact` → Retell `create-phone-call` |
 
 Enterprise sites share the master Retell account's minute pool. Per-site
 Twilio numbers route inbound calls through `/api/voice` (human-first) then to
@@ -113,7 +113,10 @@ Call type, Outcome.
 
 After step 8 commits and pushes the client repo, step 9 pushes env vars from
 `clients/{slug}/.env.local` to the client's Vercel project so the deployed
-`/api/contact` route has `MAKE_WEBHOOK_URL`.
+`/api/contact` route has what it needs. For Growth/Enterprise the lead callback
+is placed **directly** by `/api/contact` (Retell `create-phone-call`), so the
+synced vars that matter are `RETELL_API_KEY`, `TWILIO_NUMBER`, and
+`RETELL_AGENT_ID` (all written by onboard.js). No Make webhook is involved.
 
 Prerequisites (one-time setup):
 - `VERCEL_TOKEN` set in `.env`
@@ -122,16 +125,26 @@ Prerequisites (one-time setup):
   auto-detects new client repos). If a project doesn't exist when sync runs,
   step 9 creates it programmatically linked to `GITHUB_ORG/{slug}`.
 
-`MAKE_WEBHOOK_URL` is typically empty on the first `onboard.js` run because
-the Make scenario isn't cloned yet. Step 9 logs a clear warning. After
-Checkpoint 3 (cloning the Make scenario), paste the webhook URL into
-`clients/{slug}/.env.local` and run:
+If you edit `clients/{slug}/.env.local` after provisioning, re-sync and redeploy:
 
 ```
 npm run sync-env -- --slug {slug}
 ```
 
-Then trigger a redeploy on Vercel for the new env to take effect.
+## Lead callback (Growth/Enterprise)
+
+The final-CTA form POSTs `{name, phone}` to `/api/contact`. With
+`LEAD_DELIVERY_MODE=callback`, the route normalizes the phone to E.164 and calls
+`POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`,
+body `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID }`)
+so the Retell agent dials the lead back. Starter uses `LEAD_DELIVERY_MODE=email`
+(Resend): the route sends the owner a formatted HTML lead email (subject/heading
+personalized via `LEAD_BRAND_NAME`, a labeled field table built from all posted form
+fields, `reply_to` set to the lead's email when present) and returns HTTP 502 if the
+Resend send fails rather than silently reporting success. **The `/api/contact`,
+`/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
+(`lib/site-routes/*.ts`) and written into the repo on every run — it is not sourced
+from `template/` or the client repo.
 
 ## When uncertain
 

@@ -4,8 +4,9 @@ import { CONTENT as roofingContent } from '@/data/verticals/roofing';
 import { CONTENT as plumbingContent } from '@/data/verticals/plumbing';
 import { CONTENT as lawnCareContent } from '@/data/verticals/lawn-care';
 import { CONTENT as carDetailingContent } from '@/data/verticals/car-detailing';
+import { CONTENT as healthContent } from '@/data/verticals/health';
 
-export type VerticalId = 'hvac' | 'roofing' | 'plumbing' | 'lawn-care' | 'car-detailing';
+export type VerticalId = 'hvac' | 'roofing' | 'plumbing' | 'lawn-care' | 'car-detailing' | 'health';
 
 export interface Vertical {
   id: VerticalId;
@@ -18,6 +19,7 @@ export const VERTICALS: Vertical[] = [
   { id: 'plumbing',      label: 'Plumbing' },
   { id: 'lawn-care',     label: 'Lawn Care' },
   { id: 'car-detailing', label: 'Car Detailing' },
+  { id: 'health',        label: 'Health & Wellness' },
 ];
 
 export const VERTICAL_PRESETS: Record<VerticalId, SiteContent> = {
@@ -26,4 +28,5 @@ export const VERTICAL_PRESETS: Record<VerticalId, SiteContent> = {
   'plumbing':      plumbingContent,
   'lawn-care':     lawnCareContent,
   'car-detailing': carDetailingContent,
+  'health':        healthContent,
 };

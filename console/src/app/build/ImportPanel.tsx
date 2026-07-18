@@ -9,8 +9,8 @@ import type { SiteContent } from '@/data/site';
 // bare SiteContent. No schema validation — missing fields are intentional and get filled
 // from the selected industry vertical downstream.
 //
-// Seeding from an existing website lives in the separate ScrapePanel (rendered right below
-// this one on the Finalize page).
+// Seeding from an existing website lives in the separate ScrapePanel (the "Seed from website"
+// tab on the Finalize page).
 
 type Parsed =
   | { kind: 'envelope'; sites: SiteContent[] }

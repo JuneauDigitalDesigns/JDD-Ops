@@ -40,7 +40,7 @@ function isProvisioned(plan: Plan, s: SiteInfo): boolean {
 
 function isCallbackWired(plan: Plan, s: SiteInfo): boolean {
   if (plan === 'starter') return true; // starter has no Make scenario
-  return Boolean(s.env.MAKE_WEBHOOK_URL);
+  return Boolean(s.env.RETELL_POST_CALL_WEBHOOK_URL); // set by onboard.js after the clone
 }
 
 function deriveStatus(plan: Plan, sites: SiteInfo[]): ClientStatus {
