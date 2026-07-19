@@ -1,43 +1,33 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { LinkSimple, Play, Flask, Warning } from '@phosphor-icons/react';
+import { useEffect, useMemo, useState } from 'react';
+import { LinkSimple, Play, Flask, Warning, CheckCircle, XCircle } from '@phosphor-icons/react';
 import type { ClientContext } from '@/lib/types';
 
-type LogLine = { kind: 'meta' | 'step' | 'log' | 'ok' | 'error'; text: string };
-
-function classify(line: string): LogLine['kind'] {
-  if (/\bFAIL\b|✗|Error:|error\b/i.test(line)) return 'error';
-  if (/\[step\b|\[pre-flight\]|\[dry-run\]|\[link-portal\]/.test(line)) return 'step';
-  if (/✓|passed|Provisioned|Updated|Clerk user:|done/i.test(line)) return 'ok';
-  return 'log';
-}
-
-const LINE_COLOR: Record<LogLine['kind'], string> = {
-  meta: 'var(--fg-3)',
-  step: 'var(--accent)',
-  log: 'var(--fg-2)',
-  ok: 'var(--ok)',
-  error: 'var(--danger)',
+type Result = {
+  slug: string;
+  ok: boolean;
+  attached?: string[];
+  sitesOnAccount?: number;
+  error?: string;
 };
 
-/** Portal-link status hint from the client's saved CLERK_USER_ID. */
-function linkHint(ctx: ClientContext): { label: string; linked: boolean } {
-  const linked = Boolean(ctx.sites?.[0]?.env?.CLERK_USER_ID);
-  return { linked, label: linked ? 'Previously linked' : 'Not yet linked' };
-}
+type Response = {
+  ok?: boolean;
+  dryRun?: boolean;
+  email?: string;
+  results?: Result[];
+  error?: string;
+};
 
 export default function ManagePortalLink() {
   const [clients, setClients] = useState<ClientContext[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [slug, setSlug] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [email, setEmail] = useState('');
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
-  const [logs, setLogs] = useState<LogLine[]>([]);
-  const [exitCode, setExitCode] = useState<number | null>(null);
-  const feedRef = useRef<HTMLDivElement>(null);
+  const [response, setResponse] = useState<Response | null>(null);
 
-  // Load the client list from the existing runbook endpoint.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -46,7 +36,7 @@ export default function ManagePortalLink() {
         const data = (await res.json()) as { clients?: ClientContext[]; error?: string };
         if (cancelled) return;
         if (data.error) setLoadError(data.error);
-        // Only clients with an intake schema can be linked (onboard.js reads site.ts).
+        // Only clients with an intake can be attached (we read site.ts for their details).
         setClients((data.clients ?? []).filter((c) => c.hasIntake));
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load clients.');
@@ -57,51 +47,38 @@ export default function ManagePortalLink() {
     };
   }, []);
 
-  useEffect(() => {
-    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
-  }, [logs]);
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canRun = selected.size > 0 && emailValid && !running;
 
-  const selected = useMemo(() => clients?.find((c) => c.slug === slug) ?? null, [clients, slug]);
+  const totalSites = useMemo(
+    () =>
+      (clients ?? [])
+        .filter((c) => selected.has(c.slug))
+        .reduce((n, c) => n + Math.max(1, c.sites.length), 0),
+    [clients, selected],
+  );
+
+  function toggle(slug: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
 
   async function run() {
-    if (!slug) return;
     setRunning(true);
-    setExitCode(null);
-    setLogs([{ kind: 'meta', text: dryRun ? '— dry run (no Clerk writes) —' : '— REAL RUN —' }]);
-
+    setResponse(null);
     try {
       const res = await fetch('/api/manage/link-portal', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug, email: email.trim() || undefined, dryRun }),
+        body: JSON.stringify({ slugs: [...selected], email: email.trim(), dryRun }),
       });
-      if (!res.body) throw new Error('No response stream.');
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split('\n');
-        buf = parts.pop() ?? '';
-        for (const part of parts) {
-          if (!part.trim()) continue;
-          let ev: { type: string; line?: string; message?: string; command?: string; code?: number };
-          try {
-            ev = JSON.parse(part);
-          } catch {
-            continue;
-          }
-          if (ev.type === 'start') setLogs((l) => [...l, { kind: 'meta', text: `$ ${ev.command}` }]);
-          else if (ev.type === 'log' && ev.line) setLogs((l) => [...l, { kind: classify(ev.line!), text: ev.line! }]);
-          else if (ev.type === 'error') setLogs((l) => [...l, { kind: 'error', text: ev.message ?? 'Error' }]);
-          else if (ev.type === 'exit') setExitCode(ev.code ?? 1);
-        }
-      }
+      setResponse((await res.json()) as Response);
     } catch (err) {
-      setLogs((l) => [...l, { kind: 'error', text: err instanceof Error ? err.message : 'Run failed.' }]);
-      setExitCode(1);
+      setResponse({ error: err instanceof Error ? err.message : 'Request failed.' });
     } finally {
       setRunning(false);
     }
@@ -114,10 +91,10 @@ export default function ManagePortalLink() {
         <h3 className="font-display text-[16px] font-medium">Repair portal link</h3>
       </div>
       <p className="text-[12.5px] leading-[1.5] text-fg3">
-        Re-applies a client&apos;s Clerk <code className="codechip">publicMetadata</code> so their
-        portal loads. Use this if a client is unlinked from their site (deleted &amp; re-signed-up,
-        wrong metadata, or they signed up with a different email). Runs{' '}
-        <code className="codechip">onboard.js --link-portal</code>.
+        Attaches client sites to a portal account so their <code className="codechip">/portal</code>{' '}
+        loads. Use this if a client is unlinked from one or several sites (deleted &amp;
+        re-signed-up, or they signed up with a different email). Each attach is an upsert —
+        sites already on the account are <strong className="text-fg">never</strong> removed.
       </p>
 
       {loadError && (
@@ -126,58 +103,73 @@ export default function ManagePortalLink() {
         </div>
       )}
 
-      {/* Client picker */}
+      {/* Account email — names the account being written to, so it's required. */}
       <label className="flex flex-col gap-1.5">
-        <span className="kicker">Client</span>
-        <select
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          disabled={running || !clients}
-          className="rounded-[10px] border border-rule bg-[var(--bg-deep)] px-3 py-2 text-[13px] text-fg"
-        >
-          <option value="">{clients ? 'Select a client…' : 'Loading…'}</option>
-          {clients?.map((c) => (
-            <option key={c.slug} value={c.slug}>
-              {c.brandName} — {c.slug} ({c.plan})
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {selected && (
-        <div className="flex items-center gap-2 text-[12px] text-fg3">
-          <span
-            className="badge"
-            style={{ color: linkHint(selected).linked ? 'var(--ok)' : 'var(--fg-3)' }}
-          >
-            <span className="dot" /> {linkHint(selected).label}
-          </span>
-          <span>·</span>
-          <span>{selected.plan}</span>
-        </div>
-      )}
-
-      {/* Email override */}
-      <label className="flex flex-col gap-1.5">
-        <span className="kicker">Sign-up email (optional)</span>
+        <span className="kicker">Account email</span>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={running}
-          placeholder="Defaults to the business email in site.ts — enter the email the client actually signed up with if different"
+          placeholder="The email the client signed up to the portal with"
           className="rounded-[10px] border border-rule bg-[var(--bg-deep)] px-3 py-2 text-[13px] text-fg placeholder:text-fg3"
         />
+        <span className="text-[11.5px] text-fg3">
+          Every selected site is attached to this one account. It must be the address they
+          actually signed up with — not necessarily the business email in site.ts.
+        </span>
       </label>
 
+      {/* Client multi-select */}
+      <div className="flex flex-col gap-1.5">
+        <span className="kicker">Sites to attach</span>
+        <div className="max-h-[220px] overflow-y-auto rounded-[10px] border border-rule bg-[var(--bg-deep)] p-1">
+          {!clients && <div className="px-3 py-2 text-[12.5px] text-fg3">Loading…</div>}
+          {clients?.length === 0 && (
+            <div className="px-3 py-2 text-[12.5px] text-fg3">No clients with an intake schema.</div>
+          )}
+          {clients?.map((c) => {
+            const linked = Boolean(c.sites?.[0]?.env?.CLERK_USER_ID);
+            return (
+              <label
+                key={c.slug}
+                className="flex cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2 hover:bg-[var(--surface)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(c.slug)}
+                  onChange={() => toggle(c.slug)}
+                  disabled={running}
+                />
+                <span className="flex-1 text-[13px] text-fg">
+                  {c.brandName}{' '}
+                  <span className="text-fg3">
+                    — {c.slug} ({c.plan}
+                    {c.sites.length > 1 ? `, ${c.sites.length} sites` : ''})
+                  </span>
+                </span>
+                <span className="text-[11px]" style={{ color: linked ? 'var(--ok)' : 'var(--fg-3)' }}>
+                  {linked ? 'previously linked' : 'not linked'}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        {selected.size > 0 && (
+          <span className="text-[11.5px] text-fg3">
+            {selected.size} client{selected.size === 1 ? '' : 's'} selected → {totalSites} site
+            {totalSites === 1 ? '' : 's'} will be attached.
+          </span>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Dry-run toggle (defaults ON) */}
         <button
           type="button"
           onClick={() => setDryRun((d) => !d)}
           disabled={running}
           className="flex items-center gap-2 text-[12.5px]"
-          title="Dry runs write nothing to Clerk — just preview the metadata"
+          title="Dry runs write nothing — just show what would be attached"
         >
           <span
             className="relative h-[18px] w-[32px] rounded-full transition-colors"
@@ -196,47 +188,57 @@ export default function ManagePortalLink() {
 
         <button
           type="button"
-          disabled={running || !slug}
+          disabled={!canRun}
           onClick={run}
           className={dryRun ? 'btn btn-sm' : 'btn btn-primary btn-sm'}
         >
           <Play size={13} weight="fill" />
-          {running ? 'Running…' : dryRun ? 'Preview (dry run)' : 'Link / Repair portal'}
+          {running ? 'Working…' : dryRun ? 'Preview (dry run)' : 'Attach to account'}
         </button>
       </div>
 
-      {/* Live feed */}
-      {logs.length > 0 && (
-        <div
-          ref={feedRef}
-          className="no-scrollbar max-h-[300px] overflow-y-auto rounded-[10px] border border-rule bg-[var(--bg-deep)] p-3"
-        >
-          {logs.map((l, i) => (
-            <div key={i} className="mono whitespace-pre-wrap text-[11.5px] leading-[1.55]" style={{ color: LINE_COLOR[l.kind] }}>
-              {l.text}
-            </div>
-          ))}
-          {running && (
-            <div className="mono mt-1 text-[11.5px]" style={{ color: 'var(--accent)' }}>
-              <span className="inline-block animate-pulse">▍</span>
+      {/* Results */}
+      {response && (
+        <div className="flex flex-col gap-2 rounded-[10px] border border-rule bg-[var(--bg-deep)] p-3">
+          {response.error && (
+            <div className="flex items-center gap-2 text-[12.5px]" style={{ color: 'var(--danger)' }}>
+              <XCircle size={14} weight="fill" /> {response.error}
             </div>
           )}
-        </div>
-      )}
-
-      {exitCode !== null && (
-        <div className="flex items-center gap-2">
-          <span className={`badge ${exitCode === 0 ? 'badge-ok' : 'badge-danger'}`}>
-            <span className="dot" />
-            {exitCode === 0 ? 'Completed' : `Exited ${exitCode}`}
-          </span>
-          <span className="text-[12px] text-fg3">
-            {exitCode === 0
-              ? dryRun
-                ? 'Dry run clean — flip the toggle off to apply for real.'
-                : 'Linked. Have the client reload /portal (or sign in again).'
-              : 'See the log above.'}
-          </span>
+          {response.results?.map((r) => (
+            <div key={r.slug} className="flex items-start gap-2 text-[12.5px]">
+              {r.ok ? (
+                <CheckCircle size={14} weight="fill" style={{ color: 'var(--ok)', flexShrink: 0, marginTop: 2 }} />
+              ) : (
+                <XCircle size={14} weight="fill" style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 2 }} />
+              )}
+              <span className="text-fg2">
+                <span className="text-fg">{r.slug}</span>
+                {r.ok ? (
+                  <>
+                    {' '}
+                    — {response.dryRun ? 'would attach' : 'attached'} {r.attached?.join(', ')}
+                    {typeof r.sitesOnAccount === 'number' && (
+                      <span className="text-fg3"> ({r.sitesOnAccount} site
+                        {r.sitesOnAccount === 1 ? '' : 's'} now on {response.email})</span>
+                    )}
+                  </>
+                ) : (
+                  <> — {r.error}</>
+                )}
+              </span>
+            </div>
+          ))}
+          {response.results && response.ok && !response.dryRun && (
+            <span className="text-[11.5px] text-fg3">
+              Done. Have the client reload /portal (or sign in again).
+            </span>
+          )}
+          {response.dryRun && response.ok && (
+            <span className="text-[11.5px] text-fg3">
+              Dry run clean — flip the toggle off to write.
+            </span>
+          )}
         </div>
       )}
     </div>

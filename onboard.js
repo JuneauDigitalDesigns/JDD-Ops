@@ -34,6 +34,7 @@ import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
 import { syncEnvToVercel, sanitizeProjectName, getVercelProjectId } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
+import { attachSiteToAccount, accountStoreConfigured } from './lib/account-store.js';
 
 const TOTAL_STEPS = 10;
 
@@ -1036,13 +1037,7 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
 // ───────────────────────────────────────────────────────────────────────────
 
 async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug, forceRelink = false, emailOverride = null }) {
-  log(10, `Provision Clerk portal user`);
-
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
-    console.warn(`  ⚠ CLERK_SECRET_KEY not set — skipping Clerk user creation. Run CLERK setup first (see RUNBOOK.md).`);
-    return;
-  }
+  log(10, `Link portal account`);
 
   // For single-site: clients/{slug}/.env.local
   // For enterprise: clients/{slug}/site-1/.env.local (the primary site dir)
@@ -1050,14 +1045,11 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
     ? resolve('clients', baseSlug)
     : resolve('clients', baseSlug, 'site-1');
 
-  const existingUserId = readEnvLocal(primaryClientDir).CLERK_USER_ID;
-
-  // Test clients (e2e slugs, or forced via --test-portal) get a self-contained
-  // portal login: your own email + a known password, so you can sign in without
-  // owning the placeholder brand.email inbox. Real clients self-serve sign up
-  // after onboarding (juneau-digital-designs /portal/sign-up), which creates
-  // their Clerk user at status "building"; this run looks that user up by email
-  // and updates its metadata (flipping status → "live").
+  // Test clients (e2e slugs, or --test-portal) additionally get a real Clerk login with
+  // a known password, so you can sign in without owning the placeholder brand.email
+  // inbox. REAL clients are deliberately never pre-created in Clerk — they self-serve
+  // sign up at /portal/sign-up, and an account that already exists for their email
+  // would block that signup. Their portal access comes from the account record below.
   const isTestClient = baseSlug.startsWith('_e2e') || FORCE_TEST_PORTAL;
   const testEmail = process.env.PORTAL_TEST_EMAIL || null;
   const testPassword = process.env.PORTAL_TEST_PASSWORD || null;
@@ -1066,91 +1058,96 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
     console.warn(`  ⚠ Test client but PORTAL_TEST_EMAIL / PORTAL_TEST_PASSWORD not set in .env — falling back to brand.email with no password.`);
   }
 
-  // Repair path: an explicit --email targets the account the client actually signed
-  // up with (which may differ from brand.email). When given, it also means we should
-  // NOT trust the saved CLERK_USER_ID — resolve the account by that email instead.
+  // An explicit --email selects WHICH account the site attaches to, for when the client
+  // signed up with a different address than brand.email.
+  // (`forceRelink` is retained for call-site compatibility but no longer gates anything:
+  // attaching is an idempotent upsert, so there is nothing to skip or force.)
+  void forceRelink;
   const overrideEmail = emailOverride && emailOverride.trim() ? emailOverride.trim() : null;
-  const email = overrideEmail ?? (useTestLogin ? testEmail : intake.sites[0].brand.email);
-
-  // The id we consider "already linked". Ignored when an --email override is supplied,
-  // so the override account (resolved below by email) wins.
-  const targetById = overrideEmail ? null : existingUserId;
+  const email = overrideEmail ?? (useTestLogin ? testEmail : intake.sites[0]?.brand?.email);
+  if (!email) {
+    console.warn(`  ⚠ No email available (brand.email empty and no --email given) — skipping portal link.`);
+    return;
+  }
 
   // For test clients, point canonical at the live Vercel URL so the portal's
   // Performance tab pings a real host instead of the placeholder domain.
   const testCanonical = `https://${sanitizeProjectName(baseSlug).replace(/_/g, '-')}.vercel.app`;
-  const canonical = useTestLogin ? testCanonical : (intake.sites[0].seo?.canonical ?? '');
-
-  // Non-test client already linked → nothing to do (preserves prior behavior).
-  // The repair path (--link-portal sets forceRelink, or --email is supplied) skips
-  // this so it can re-apply metadata to an already-linked-but-broken client.
-  if (targetById && !useTestLogin && !forceRelink) {
-    console.log(`  Reusing existing Clerk user ${targetById} (skipping create)`);
-    return targetById;
-  }
-
-  if (DRY_RUN) {
-    dryLog(`would ${targetById ? 'update' : 'create/resolve'} Clerk user for ${email}${useTestLogin ? ' (+ test password)' : ''}${forceRelink ? ' [repair]' : ''}`);
-    dryLog(`would set publicMetadata: { slug: "${baseSlug}", name: "${intake.sites[0]?.brand?.name ?? ''}", plan: "${intake.plan}", status: "live", canonical: "${canonical}", airtableBaseId: ..., vercelProjectId: ... }`);
-    dryLog(`would patch CLERK_USER_ID into ${primaryClientDir}/.env.local`);
-    return;
-  }
-
-  const clerk = createClerkClient({ secretKey });
+  const canonical = useTestLogin ? testCanonical : (intake.sites[0]?.seo?.canonical ?? '');
 
   const airtableBaseId = intake.plan !== 'starter'
     ? (sharedBaseId || readEnvLocal(primaryClientDir).AIRTABLE_BASE_ID || null)
     : null;
 
-  // Resolve the Vercel project id(s) so the portal can query Web Analytics.
-  // Null when VERCEL_TOKEN is unset or the project isn't created yet — the
-  // portal degrades to "analytics not connected yet".
-  const vercelProjectId = await getVercelProjectId(baseSlug);
+  // The site entries to attach. Enterprise attaches one per site (sharing the Airtable
+  // base, separated in the portal by the Call Log's `Site` column); everything else
+  // attaches the single base slug. Vercel project ids let the portal query Web
+  // Analytics — null when VERCEL_TOKEN is unset or the project isn't created yet, and
+  // the portal degrades to "analytics not connected yet".
+  const sitesToAttach = intake.plan === 'enterprise'
+    ? await Promise.all(intake.sites.map(async (s, i) => {
+        const siteSlug = provisioned[i]?.siteSlug ?? `${baseSlug}-${i + 1}`;
+        return {
+          slug: siteSlug,
+          name: s?.brand?.name ?? '',
+          canonical: s?.seo?.canonical ?? '',
+          plan: intake.plan,
+          status: 'live',
+          airtableBaseId,
+          vercelProjectId: await getVercelProjectId(siteSlug),
+        };
+      }))
+    : [{
+        slug: baseSlug,
+        name: intake.sites[0]?.brand?.name ?? '',
+        canonical,
+        plan: intake.plan,
+        status: 'live',
+        airtableBaseId,
+        vercelProjectId: await getVercelProjectId(baseSlug),
+      }];
 
-  let siteMeta = [];
-  if (intake.plan === 'enterprise') {
-    siteMeta = await Promise.all(intake.sites.map(async (s, i) => {
-      const siteSlug = provisioned[i]?.siteSlug ?? `${baseSlug}-${i + 1}`;
-      return {
-        slug: siteSlug,
-        name: s?.brand?.name ?? '',
-        canonical: s.seo?.canonical ?? '',
-        vercelProjectId: await getVercelProjectId(siteSlug),
-      };
-    }));
+  if (DRY_RUN) {
+    for (const s of sitesToAttach) {
+      dryLog(`would upsert site "${s.slug}" (plan ${s.plan}, status live) into account ${email}`);
+    }
+    dryLog(`any other sites already on that account would be preserved`);
+    if (useTestLogin) dryLog(`would create/update Clerk test login ${email} (+ password)`);
+    return;
   }
 
-  const publicMetadata = {
-    slug: baseSlug,
-    name: intake.sites[0]?.brand?.name ?? '',
-    plan: intake.plan,
-    // "live" ⇒ the site is provisioned and the portal shows the real dashboard.
-    // Self-serve signups start at status "building" (set at sign-up); this flip
-    // graduates them to the live dashboard. See juneau-digital-designs
-    // app/portal/page.tsx (status gate).
-    status: 'live',
-    canonical,
-    airtableBaseId,
-    vercelProjectId,
-    ...(intake.plan === 'enterprise' ? { sites: siteMeta } : {}),
-  };
+  if (!accountStoreConfigured()) {
+    console.warn(`  ⚠ KV not configured — skipping portal link. Set KV_REST_API_URL / KV_REST_API_TOKEN in jdd-ops/.env (same Upstash instance the agency site uses).`);
+    return;
+  }
 
-  // Already linked (test client re-run, or repair of a client with a saved id) →
-  // update metadata + (re)set password in place. If the saved id no longer resolves
-  // (e.g. the user was deleted in the Clerk dashboard), fall through to resolve the
-  // account by email rather than failing the whole run.
-  if (targetById) {
+  // Upsert each site. Other sites on the account are preserved, so provisioning a
+  // returning client's second site never disturbs their first.
+  for (const s of sitesToAttach) {
+    const account = await attachSiteToAccount(email, s);
+    const n = account.sites.length;
+    console.log(`  Linked "${s.slug}" → ${email} (${n} site${n === 1 ? '' : 's'} on account)`);
+  }
+
+  // Test clients only: ensure a Clerk login exists with a known password.
+  if (!useTestLogin) return;
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) {
+    console.warn(`  ⚠ CLERK_SECRET_KEY not set — portal account linked, but no test login created.`);
+    return;
+  }
+
+  const clerk = createClerkClient({ secretKey });
+  const existingUserId = readEnvLocal(primaryClientDir).CLERK_USER_ID;
+
+  if (existingUserId) {
     try {
-      await clerk.users.updateUserMetadata(targetById, { publicMetadata });
-      if (useTestLogin) {
-        await clerk.users.updateUser(targetById, { password: testPassword, skipPasswordChecks: true });
-      }
-      console.log(`  Updated Clerk user ${targetById} (${email})${useTestLogin ? ' + password' : ''}`);
-      if (useTestLogin) console.log(`  Portal test login → ${email} / ${testPassword}`);
-      return targetById;
+      await clerk.users.updateUser(existingUserId, { password: testPassword, skipPasswordChecks: true });
+      console.log(`  Portal test login → ${email} / ${testPassword}`);
+      return existingUserId;
     } catch (err) {
-      console.warn(`  ⚠ Saved CLERK_USER_ID ${targetById} did not update (${err?.message ?? err}); resolving by email…`);
-      // fall through to create/resolve-by-email below
+      console.warn(`  ⚠ Saved CLERK_USER_ID ${existingUserId} did not update (${err?.message ?? err}); resolving by email…`);
     }
   }
 
@@ -1158,32 +1155,26 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
   try {
     user = await clerk.users.createUser({
       emailAddress: [email],
-      publicMetadata,
-      ...(useTestLogin ? { password: testPassword, skipPasswordChecks: true } : {}),
+      password: testPassword,
+      skipPasswordChecks: true,
     });
   } catch (err) {
-    // If user already exists (e.g. email reused), look them up and update instead.
     if (err?.errors?.[0]?.code === 'form_identifier_exists') {
       const list = await clerk.users.getUserList({ emailAddress: [email] });
       user = list.data?.[0];
       if (user) {
-        console.log(`  Clerk user already exists (${user.id}) — updating metadata`);
-        await clerk.users.updateUserMetadata(user.id, { publicMetadata });
-        if (useTestLogin) {
-          await clerk.users.updateUser(user.id, { password: testPassword, skipPasswordChecks: true });
-        }
+        await clerk.users.updateUser(user.id, { password: testPassword, skipPasswordChecks: true });
       } else {
-        console.warn(`  ⚠ Could not create or find Clerk user for ${email}`);
+        console.warn(`  ⚠ Could not create or find Clerk test user for ${email}`);
         return;
       }
     } else {
-      console.warn(`  ⚠ Clerk user creation failed: ${err?.message ?? err}`);
+      console.warn(`  ⚠ Clerk test user creation failed: ${err?.message ?? err}`);
       return;
     }
   }
 
-  console.log(`  Clerk user: ${user.id} (${email})`);
-  if (useTestLogin) console.log(`  Portal test login → ${email} / ${testPassword}`);
+  console.log(`  Portal test login → ${email} / ${testPassword} (user ${user.id})`);
   patchEnvLocal(primaryClientDir, 'CLERK_USER_ID', user.id);
   return user.id;
 }

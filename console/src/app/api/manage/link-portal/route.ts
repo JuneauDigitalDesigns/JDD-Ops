@@ -1,108 +1,135 @@
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { opsRoot, clientDir } from '@/lib/paths';
+import { NextResponse } from 'next/server';
+import type { PortalPlan, PortalSiteInput, PortalSiteStatus } from '@jdd/schema';
+import { getClientContext } from '@/lib/clients';
+import { accountStoreConfigured, attachSiteToAccount } from '@/lib/accountStore';
+import type { ClientContext } from '@/lib/types';
 
-// Spawn `npm run onboard -- --slug {slug} --link-portal [--email addr] [--dry-run]` in the
-// jdd-ops root, streaming each output line as NDJSON so the UI narrates progress live.
-// Mirrors the provisioning stream in api/runbook/onboard. Linking is low-risk + idempotent
-// (it only (re)writes a Clerk user's publicMetadata), so unlike onboard this defaults to a
-// REAL run — the caller opts into a dry-run preview.
+/**
+ * Repair a client's portal link: attach one or more client sites to a portal account.
+ *
+ * Writes the account record (`jdd:account:{email}`) directly — no onboard.js subprocess,
+ * because the account record (not Clerk metadata) is the source of truth now. Each write
+ * is an upsert, so attaching site B never disturbs site A.
+ */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Body = { slug?: string; email?: string; dryRun?: boolean };
+type Body = { slugs?: string[]; slug?: string; email?: string; dryRun?: boolean };
 
 const SLUG_RE = /^[A-Za-z0-9_-]+$/;
-// Deliberately simple — a sanity gate before handing the value to onboard.js, not RFC 5322.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A client that hasn't been built/provisioned yet should land in the portal's "building" state. */
+function statusFor(ctx: ClientContext): PortalSiteStatus {
+  return ctx.detectedStatus === 'needs-build' || ctx.detectedStatus === 'ready'
+    ? 'building'
+    : 'live';
+}
+
+/**
+ * Site entries for one client. Single-site clients yield one; enterprise yields one per
+ * site (sharing the Airtable base, as onboard.js does).
+ *
+ * `vercelProjectId` is deliberately omitted: resolving it needs a Vercel API call the
+ * console isn't credentialed for. Because upsert merges only *defined* fields, omitting
+ * it preserves whatever is already stored — and a never-provisioned site simply shows
+ * "analytics not connected yet" until a normal onboard/sync run fills it in.
+ */
+function siteEntriesFor(ctx: ClientContext): PortalSiteInput[] {
+  const status = statusFor(ctx);
+  const plan = ctx.plan as PortalPlan;
+  const sharedBase = ctx.sites[0]?.env?.AIRTABLE_BASE_ID ?? null;
+
+  return ctx.sites.map((s) => ({
+    slug: s.slug,
+    name: s.brandName,
+    canonical: s.canonical ?? undefined,
+    plan,
+    status,
+    airtableBaseId: plan === 'starter' ? null : (s.env?.AIRTABLE_BASE_ID ?? sharedBase),
+  }));
+}
 
 export async function POST(req: Request) {
   let body: Body;
   try {
     body = (await req.json()) as Body;
   } catch {
-    return new Response('Invalid JSON body.', { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const slug = (body.slug ?? '').trim();
+  // Accept `slugs: []`, or a single `slug` for convenience.
+  const slugs = (body.slugs ?? (body.slug ? [body.slug] : []))
+    .map((s) => s.trim())
+    .filter(Boolean);
   const email = (body.email ?? '').trim();
   const dryRun = body.dryRun === true;
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
+  if (slugs.length === 0) {
+    return NextResponse.json({ error: 'Select at least one client site.' }, { status: 400 });
+  }
+  if (slugs.some((s) => !SLUG_RE.test(s))) {
+    return NextResponse.json({ error: 'Invalid client slug.' }, { status: 400 });
+  }
+  if (!EMAIL_RE.test(email)) {
+    // Required even for a single site: it names the account being written to.
+    return NextResponse.json({ error: 'A valid account email is required.' }, { status: 400 });
+  }
+  if (!accountStoreConfigured()) {
+    return NextResponse.json(
+      { error: 'KV not configured — set KV_REST_API_URL / KV_REST_API_TOKEN.' },
+      { status: 500 },
+    );
+  }
 
-      // Validate before spawning.
-      if (!slug || !SLUG_RE.test(slug)) {
-        send({ type: 'error', message: 'Invalid or missing client slug.' });
-        controller.close();
-        return;
-      }
-      if (email && !EMAIL_RE.test(email)) {
-        send({ type: 'error', message: 'Invalid email address.' });
-        controller.close();
-        return;
-      }
+  const results: Array<{
+    slug: string;
+    ok: boolean;
+    sites?: string[];
+    attached?: string[];
+    sitesOnAccount?: number;
+    error?: string;
+  }> = [];
 
-      let root: string;
-      try {
-        root = opsRoot();
-      } catch (err) {
-        send({ type: 'error', message: err instanceof Error ? err.message : 'Cannot locate jdd-ops.' });
-        controller.close();
-        return;
-      }
-
-      // Guard: the client folder must have an intake schema (single or enterprise primary).
-      const hasSchema =
-        existsSync(resolve(clientDir(slug), 'site.ts')) ||
-        existsSync(resolve(clientDir(slug), 'site-1', 'site.ts'));
-      if (!hasSchema) {
-        send({ type: 'error', message: `No intake at clients/${slug}/site.ts.` });
-        controller.close();
-        return;
+  for (const slug of slugs) {
+    try {
+      const ctx = await getClientContext(slug);
+      if (!ctx || !ctx.hasIntake) {
+        results.push({ slug, ok: false, error: `No intake at clients/${slug}/site.ts` });
+        continue;
       }
 
-      const args = ['run', 'onboard', '--', '--slug', slug, '--link-portal'];
-      if (email) args.push('--email', email);
-      if (dryRun) args.push('--dry-run');
+      const entries = siteEntriesFor(ctx);
+      if (dryRun) {
+        results.push({ slug, ok: true, attached: entries.map((e) => e.slug) });
+        continue;
+      }
 
-      send({ type: 'start', dryRun, command: `npm ${args.join(' ')}` });
-
-      // Strip NODE_ENV so it doesn't leak the dev server's "development" into the child.
-      const { NODE_ENV: _drop, ...strippedEnv } = process.env;
-      // shell:true so Windows resolves npm.cmd; args are validated/not user-controlled.
-      const child = spawn('npm', args, { cwd: root, shell: true, env: strippedEnv as NodeJS.ProcessEnv });
-
-      let buffer = '';
-      const flush = (chunk: Buffer) => {
-        buffer += chunk.toString();
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (line.length) send({ type: 'log', line });
-        }
-      };
-      child.stdout.on('data', flush);
-      child.stderr.on('data', flush);
-      child.on('error', (e) => {
-        send({ type: 'error', message: String(e) });
-        controller.close();
+      let sitesOnAccount = 0;
+      for (const entry of entries) {
+        const account = await attachSiteToAccount(email, entry);
+        sitesOnAccount = account.sites.length;
+      }
+      results.push({
+        slug,
+        ok: true,
+        attached: entries.map((e) => e.slug),
+        sitesOnAccount,
       });
-      child.on('close', (code) => {
-        if (buffer.trim()) send({ type: 'log', line: buffer });
-        send({ type: 'exit', code: code ?? 1 });
-        controller.close();
+    } catch (err) {
+      results.push({
+        slug,
+        ok: false,
+        error: err instanceof Error ? err.message : 'Attach failed.',
       });
-    },
-  });
+    }
+  }
 
-  return new Response(stream, {
-    headers: {
-      'content-type': 'application/x-ndjson; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+  const failed = results.filter((r) => !r.ok).length;
+  return NextResponse.json({
+    ok: failed === 0,
+    dryRun,
+    email,
+    results,
   });
 }
