@@ -15,6 +15,7 @@ import {
   type EnvField,
 } from '@/lib/envFields';
 import { accountStoreConfigured, attachSiteToAccount, getAccountEmailByUserId } from '@/lib/accountStore';
+import { appendAudit } from '@/lib/audit';
 import type { ClientContext, Plan, SiteEnv } from '@/lib/types';
 
 /**
@@ -121,31 +122,48 @@ function dirForSite(ctx: ClientContext, siteSlug: string): string | null {
 }
 
 export async function GET(req: Request) {
-  const slug = (new URL(req.url).searchParams.get('slug') ?? '').trim();
+  const params = new URL(req.url).searchParams;
+  const slug = (params.get('slug') ?? '').trim();
   if (!slug || !SLUG_RE.test(slug)) {
     return NextResponse.json({ error: 'Invalid or missing client slug.' }, { status: 400 });
   }
+  // Which site's drift to resolve. Absent = all of them, which is what the old
+  // single-page UI needed; the sectioned UI always names one.
+  const onlySite = (params.get('site') ?? '').trim();
+  // `drift=0` skips the Vercel comparison entirely so the editor can paint fields
+  // immediately and fill the chips from a second request.
+  const wantDrift = params.get('drift') !== '0';
 
   const ctx = await getClientContext(slug);
-  if (!ctx || !ctx.hasIntake) {
+  if (!ctx || ctx.sites.length === 0) {
     return NextResponse.json({ error: `No intake at clients/${slug}/site.ts` }, { status: 404 });
   }
 
-  const hasVercel = loadVercelCredentials();
+  const hasVercel = wantDrift && loadVercelCredentials();
   const vercel = hasVercel ? await loadVercelSync() : null;
 
   const sites: SiteView[] = [];
   for (let i = 0; i < ctx.sites.length; i++) {
     const site = ctx.sites[i];
     const env = readEnvLocal(siteDirFor(ctx.slug, ctx.sites.length, i));
+    // Drift costs one Vercel request PER KEY (see listProjectEnv). For a 3-site
+    // enterprise client that is ~33 requests if we resolve every site, so scope it to
+    // the site actually being viewed.
+    const resolveDrift = Boolean(vercel) && (!onlySite || onlySite === site.slug);
 
+    // Three distinct "no drift" cases, and the UI shows this reason verbatim — so
+    // "not checked" must not masquerade as "not configured".
     let remote: ProjectEnv = {
       ok: false,
       projectName: site.slug,
-      reason: 'VERCEL_TOKEN is not set in jdd-ops/.env',
+      reason: !wantDrift
+        ? 'Drift not checked yet.'
+        : !loadVercelCredentials()
+          ? 'VERCEL_TOKEN is not set in jdd-ops/.env'
+          : 'Drift not checked for this site.',
       vars: {},
     };
-    if (vercel) {
+    if (vercel && resolveDrift) {
       try {
         // One extra request per key, so resolve only what we can meaningfully compare:
         // non-secret keys that exist on disk. Master credentials stay unfetched.
@@ -274,6 +292,16 @@ export async function POST(req: Request) {
   const written = applyEnvUpdates(dir, resolved);
   const changed = [...written.updated, ...written.added];
 
+  // Key NAMES only — the audit file is plaintext on disk.
+  appendAudit({
+    slug,
+    siteSlug,
+    action: 'env.save',
+    ok: true,
+    summary: `Wrote ${changed.join(', ')} to .env.local`,
+    detail: { updated: written.updated, added: written.added },
+  });
+
   // Mirror AIRTABLE_BASE_ID onto the portal account record. The portal reads
   // PortalSite.airtableBaseId, not .env.local — changing only one side points the
   // client's call log at a base that no longer receives their calls.
@@ -307,6 +335,14 @@ export async function POST(req: Request) {
       extraEnv: site?.brandName ? { NEXT_PUBLIC_BRAND_NAME: site.brandName } : {},
       log: () => {},
     });
+    appendAudit({
+      slug,
+      siteSlug,
+      action: 'env.sync',
+      ok: true,
+      summary: `Synced to Vercel — ${result.created.length} created, ${result.updated.length} updated`,
+      detail: { created: result.created, updated: result.updated, warnings: result.warnings },
+    });
     return NextResponse.json({
       ok: true,
       written,
@@ -315,12 +351,14 @@ export async function POST(req: Request) {
       needsRedeploy: result.created.length > 0 || result.updated.length > 0,
     });
   } catch (err) {
+    const syncError = err instanceof Error ? err.message : 'Vercel sync failed.';
+    appendAudit({ slug, siteSlug, action: 'env.sync', ok: false, summary: syncError });
     return NextResponse.json({
       ok: true, // disk write succeeded; only the push failed
       written,
       kv,
       synced: null,
-      syncError: err instanceof Error ? err.message : 'Vercel sync failed.',
+      syncError,
       needsRedeploy: false,
     });
   }

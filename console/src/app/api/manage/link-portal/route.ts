@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { PortalPlan, PortalSiteInput, PortalSiteStatus } from '@jdd/schema';
 import { getClientContext } from '@/lib/clients';
 import { accountStoreConfigured, attachSiteToAccount } from '@/lib/accountStore';
+import { appendAudit } from '@/lib/audit';
 import type { ClientContext } from '@/lib/types';
 
 /**
@@ -116,12 +117,20 @@ export async function POST(req: Request) {
         attached: entries.map((e) => e.slug),
         sitesOnAccount,
       });
-    } catch (err) {
-      results.push({
+      // Dry runs write nothing, so they are deliberately not audited.
+      appendAudit({
         slug,
-        ok: false,
-        error: err instanceof Error ? err.message : 'Attach failed.',
+        action: 'portal.attach',
+        ok: true,
+        summary: `Attached ${entries.length} site${entries.length === 1 ? '' : 's'} to ${email}`,
+        detail: { email, attached: entries.map((e) => e.slug), sitesOnAccount },
       });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Attach failed.';
+      results.push({ slug, ok: false, error: message });
+      if (!dryRun) {
+        appendAudit({ slug, action: 'portal.attach', ok: false, summary: message });
+      }
     }
   }
 

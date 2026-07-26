@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getClientContext } from '@/lib/clients';
 import { loadVercelCredentials } from '@/lib/opsSecrets';
 import { loadVercelSync } from '@/lib/vercelSync';
+import { appendAudit } from '@/lib/audit';
 
 /**
  * Kick a production deployment so env vars synced by ../route.ts actually take effect.
@@ -47,11 +48,18 @@ export async function POST(req: Request) {
   try {
     const { triggerRedeploy } = await loadVercelSync();
     const deployment = await triggerRedeploy({ slug: siteSlug, log: () => {} });
+    appendAudit({
+      slug,
+      siteSlug,
+      action: 'deploy.trigger',
+      ok: true,
+      summary: `Redeployed ${siteSlug} (${deployment.source}) — ${deployment.id}`,
+      detail: { deploymentId: deployment.id, source: deployment.source },
+    });
     return NextResponse.json({ ok: true, deployment });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Redeploy failed.' },
-      { status: 502 },
-    );
+    const message = err instanceof Error ? err.message : 'Redeploy failed.';
+    appendAudit({ slug, siteSlug, action: 'deploy.trigger', ok: false, summary: message });
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

@@ -49,3 +49,19 @@ export function loadVercelCredentials(): boolean {
   }
   return Boolean(process.env.VERCEL_TOKEN);
 }
+
+/**
+ * The master Retell key, for pushing a tuned agent prompt from /manage. Same contract as
+ * loadVercelCredentials: copies out of jdd-ops/.env into process.env, never into a
+ * response body.
+ *
+ * Returns the key rather than a boolean because, unlike the Vercel path (where
+ * lib/vercel-sync.js reads process.env itself), the caller does the fetch.
+ */
+export function loadRetellApiKey(): string | null {
+  if (!process.env.RETELL_API_KEY) {
+    const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+    if (ops.RETELL_API_KEY) process.env.RETELL_API_KEY = ops.RETELL_API_KEY;
+  }
+  return process.env.RETELL_API_KEY ?? null;
+}

@@ -157,7 +157,13 @@ export const SECRET_MASK = '••••••••';
 
 const SECRET_KEY_RE = /(_KEY|_TOKEN|_SECRET|_PASSWORD|AUTH)$/;
 
-/** Master credentials synced per-project — never round-tripped through the browser in full. */
+/**
+ * Master credentials synced per-project. Masked in every LIST response — nothing that
+ * returns many values at once ever carries these in full.
+ *
+ * The one exception is /api/manage/env/reveal, which returns a single explicitly-named
+ * key for the reveal-on-click affordance. See that route for why.
+ */
 export function isSecretKey(key: string): boolean {
   return SECRET_KEY_RE.test(key);
 }
