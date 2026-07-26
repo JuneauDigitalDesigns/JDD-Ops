@@ -143,6 +143,45 @@
     line-height: var(--heading-line-height, 1.15);
     color: inherit;
   }
+
+  /* ── /manage scope ───────────────────────────────────────────────────────
+     A control panel, not an editorial page. /manage is the console's only
+     production-write surface — it edits .env.local, pushes to Vercel, and
+     redeploys live client sites — so it gets its own accent as a mode signal.
+
+     Indigo (~250°) is clear of the teal accent (~185°) and of the coral/amber/
+     green already spoken for by --danger/--warn/--ok, which stay put so status
+     keeps meaning the same thing everywhere.
+
+     --accent-2 must be overridden TOO: .btn-primary and .btn:hover key off
+     --accent-2, not --accent. Overriding only --accent leaves every primary
+     button coral while the focus rings turn indigo, which reads as a bug.
+
+     Unlike .studio-chrome this does NOT re-scope the whole palette — the warm
+     cream ground is shared console furniture. Only the accent pair and the
+     control metrics change. */
+  .manage-chrome {
+    --accent: #4a3f8f;
+    --accent-ink: #f6f2e6;
+    --accent-2: #4a3f8f;
+    --on-accent-2: #f6f2e6;
+    --accent-glow: rgba(74, 63, 143, 0.2);
+
+    /* Denser than the rest of the console — this screen is tables and key/value
+       rows, not a form you fill in once. */
+    --control-h: 34px;
+    --control-h-sm: 28px;
+    --radius-control: 8px;
+  }
+}
+
+/* /manage stacks many panels down one stage; the root 80px drop shadow reads as
+   noise at that density. Unlayered so it outranks the @layer components .panel. */
+.manage-chrome .panel {
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgba(20, 18, 12, 0.04),
+    0 8px 24px -16px rgba(20, 18, 12, 0.28);
 }
 
 /* ── Build-catalog card preview: tighten large section padding ───────────────
@@ -383,13 +422,26 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* ── Form controls — scoped to the /onboard subtree so the /build builder keeps
-   its own input styling. The onboard layout wraps content in `.onboard-chrome`.
-   Sizing tracks the shared --control-* tokens. ───────────────────────────────── */
+/* ── Form controls — scoped to the /onboard and /manage subtrees so the /build
+   builder keeps its own input styling. Those layouts wrap content in
+   `.onboard-chrome` / `.manage-chrome`. Sizing tracks the shared --control-*
+   tokens, so /manage's tighter --control-h flows through for free.
+
+   Both scopes share ONE rule rather than each owning a copy — two copies is how
+   the two scopes silently drift apart. `email` and `number` were missing here,
+   which is why ManagePortalLink's email field rendered unstyled. ───────────── */
 .onboard-chrome input[type='text'],
 .onboard-chrome input[type='search'],
+.onboard-chrome input[type='email'],
+.onboard-chrome input[type='number'],
 .onboard-chrome textarea,
-.onboard-chrome select {
+.onboard-chrome select,
+.manage-chrome input[type='text'],
+.manage-chrome input[type='search'],
+.manage-chrome input[type='email'],
+.manage-chrome input[type='number'],
+.manage-chrome textarea,
+.manage-chrome select {
   background: var(--surface);
   border: 1px solid var(--rule-strong);
   color: var(--fg);
@@ -398,16 +450,41 @@
   padding: 0 12px;
   font-size: 15px;
 }
-.onboard-chrome textarea { min-height: 88px; padding: 10px 12px; line-height: 1.55; }
+.onboard-chrome textarea,
+.manage-chrome textarea { min-height: 88px; padding: 10px 12px; line-height: 1.55; }
 .onboard-chrome input[type='text']::placeholder,
-.onboard-chrome input[type='search']::placeholder { color: var(--fg-3); }
+.onboard-chrome input[type='search']::placeholder,
+.onboard-chrome input[type='email']::placeholder,
+.onboard-chrome input[type='number']::placeholder,
+.onboard-chrome textarea::placeholder,
+.manage-chrome input[type='text']::placeholder,
+.manage-chrome input[type='search']::placeholder,
+.manage-chrome input[type='email']::placeholder,
+.manage-chrome input[type='number']::placeholder,
+.manage-chrome textarea::placeholder { color: var(--fg-3); }
 .onboard-chrome input[type='text']:focus,
 .onboard-chrome input[type='search']:focus,
+.onboard-chrome input[type='email']:focus,
+.onboard-chrome input[type='number']:focus,
 .onboard-chrome textarea:focus,
-.onboard-chrome select:focus {
+.onboard-chrome select:focus,
+.manage-chrome input[type='text']:focus,
+.manage-chrome input[type='search']:focus,
+.manage-chrome input[type='email']:focus,
+.manage-chrome input[type='number']:focus,
+.manage-chrome textarea:focus,
+.manage-chrome select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* Monospace value fields — the advanced env table and the agent prompt editor.
+   Opt-in via className so ordinary text inputs are unaffected. */
+.manage-chrome input.mono-field,
+.manage-chrome textarea.mono-field {
+  font-family: var(--font-dm-mono), 'DM Mono', ui-monospace, monospace;
+  font-size: 13px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default function ManagePage() {
   return (
-    <main className="relative z-10 mx-auto max-w-3xl px-5 py-10">
+    <main className="no-scrollbar relative z-10 mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-5 py-10">
       <header className="mb-8">
         <span className="kicker">Manage</span>
         <h1 className="mt-2 font-display text-3xl font-medium tracking-tightish text-fg">

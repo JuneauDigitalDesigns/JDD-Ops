@@ -42,8 +42,48 @@ export interface Deployment {
   source: 'redeploy' | 'git';
 }
 
+/** One entry from the deployment history — distinct from the Deployment a redeploy returns. */
+export interface DeploymentRecord {
+  id: string;
+  url: string | null;
+  inspectorUrl: string | null;
+  /** READY | ERROR | BUILDING | QUEUED | CANCELED | INITIALIZING | UNKNOWN */
+  state: string;
+  target: string | null;
+  createdAt: number | null;
+  readyAt: number | null;
+  commitSha: string | null;
+  commitMessage: string | null;
+  creator: string | null;
+}
+
+export interface DeploymentList {
+  ok: boolean;
+  projectName: string;
+  reason?: string;
+  deployments: DeploymentRecord[];
+}
+
+export interface ProjectDomain {
+  name: string;
+  apexName: string | null;
+  verified: boolean;
+  redirect: string | null;
+  gitBranch: string | null;
+  createdAt: number | null;
+}
+
+export interface DomainList {
+  ok: boolean;
+  projectName: string;
+  reason?: string;
+  domains: ProjectDomain[];
+}
+
 interface VercelSyncModule {
   sanitizeProjectName(slug: string): string;
+  /** Exported by the module but previously undeclared here. */
+  getVercelProjectId(slug: string): Promise<string | null>;
   syncEnvToVercel(opts: {
     slug: string;
     extraEnv?: Record<string, string>;
@@ -51,6 +91,14 @@ interface VercelSyncModule {
     log?: (line: string) => void;
   }): Promise<SyncResult>;
   listProjectEnv(slug: string, opts?: { resolveKeys?: string[] }): Promise<ProjectEnv>;
+  /** Never throws — degrades to { ok: false, reason }. */
+  listDeployments(
+    slug: string,
+    opts?: { limit?: number; target?: string | null },
+  ): Promise<DeploymentList>;
+  /** Never throws — degrades to { ok: false, reason }. */
+  listProjectDomains(slug: string): Promise<DomainList>;
+  /** Throws, unlike the list* functions. */
   triggerRedeploy(opts: { slug: string; log?: (line: string) => void }): Promise<Deployment>;
 }
 

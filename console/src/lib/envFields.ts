@@ -13,12 +13,38 @@ import type { Plan } from './types';
 
 export type FieldKind = 'phone' | 'int' | 'email' | 'text' | 'select';
 
+/**
+ * Which panel a key belongs to on /manage → Environment. Purely presentational —
+ * the API route never reads it, so a wrong guess is cosmetic, never a validation bug.
+ */
+export type EnvGroupId = 'routing' | 'leads' | 'integrations' | 'advanced';
+
+export const ENV_GROUPS: Array<{ id: EnvGroupId; label: string; help: string }> = [
+  {
+    id: 'routing',
+    label: 'Call routing',
+    help: 'How an inbound call reaches the owner, and where it falls through to the AI agent.',
+  },
+  {
+    id: 'leads',
+    label: 'Lead delivery',
+    help: 'What happens when someone submits the form on the site.',
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    help: 'External services this site reads from and writes to.',
+  },
+];
+
 export interface EnvField {
   key: string;
   label: string;
   help: string;
   kind: FieldKind;
   plans: Plan[];
+  /** Panel this field renders under. Optional so existing literals stay valid. */
+  group?: EnvGroupId;
   options?: string[];
   placeholder?: string;
   /** Masked in responses; an unchanged mask sentinel is ignored on write. */
@@ -35,6 +61,7 @@ const ALL: Plan[] = ['starter', 'growth', 'enterprise'];
 export const ENV_FIELDS: EnvField[] = [
   {
     key: 'CLIENT_FORWARD_PHONE',
+    group: 'routing',
     label: 'Forward phone',
     help: "Owner's real number. Inbound Twilio calls ring here first, before the AI picks up.",
     kind: 'phone',
@@ -44,6 +71,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'CLIENT_FORWARD_RING_SECONDS',
+    group: 'routing',
     label: 'Ring seconds',
     help: 'How long the owner’s phone rings before the call falls through to the Retell agent.',
     kind: 'int',
@@ -54,6 +82,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'AIRTABLE_BASE_ID',
+    group: 'integrations',
     label: 'Airtable base ID',
     help: 'Base holding the Call Log table. Also mirrored onto the portal account record.',
     kind: 'text',
@@ -62,6 +91,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'TWILIO_NUMBER',
+    group: 'routing',
     label: 'Twilio number',
     help: 'JDD-owned number for this site. Used as the forward leg caller ID and callback origin.',
     kind: 'phone',
@@ -70,6 +100,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'RETELL_AGENT_ID',
+    group: 'routing',
     label: 'Retell agent ID',
     help: 'The per-client voice agent dialed on no-answer and for lead callbacks.',
     kind: 'text',
@@ -78,6 +109,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'RETELL_SIP_DOMAIN',
+    group: 'routing',
     label: 'Retell SIP domain',
     help: 'Where /api/voice/no-answer hands the call off. Leave as sip.retellai.com unless told otherwise.',
     kind: 'text',
@@ -86,6 +118,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'LEAD_DELIVERY_MODE',
+    group: 'leads',
     label: 'Lead delivery',
     help: '“callback” has the agent dial the lead back; “email” sends the owner a Resend email.',
     kind: 'select',
@@ -94,6 +127,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'LEAD_TO_EMAIL',
+    group: 'leads',
     label: 'Lead email recipient',
     help: 'Where starter lead emails land — normally brand.email from the intake.',
     kind: 'email',
@@ -101,6 +135,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'LEAD_BRAND_NAME',
+    group: 'leads',
     label: 'Lead email brand name',
     help: 'Personalizes the lead email subject and heading.',
     kind: 'text',
@@ -108,6 +143,7 @@ export const ENV_FIELDS: EnvField[] = [
   },
   {
     key: 'RESEND_FROM_EMAIL',
+    group: 'leads',
     label: 'Resend from address',
     help: 'Sender for lead emails. Must be on a Resend-verified domain.',
     kind: 'email',
@@ -133,6 +169,38 @@ export function maskSecret(value: string): string {
 
 export function fieldsForPlan(plan: Plan): EnvField[] {
   return ENV_FIELDS.filter((f) => f.plans.includes(plan));
+}
+
+/**
+ * Curated fields for a plan, bucketed into panels in ENV_GROUPS order.
+ *
+ * Empty groups are dropped, which matters: a starter client has fields in `leads`
+ * only, so rendering all three headers would give it two empty boxes.
+ */
+export function groupedFieldsForPlan(
+  plan: Plan,
+): Array<{ group: (typeof ENV_GROUPS)[number]; fields: EnvField[] }> {
+  const forPlan = fieldsForPlan(plan);
+  return ENV_GROUPS.map((group) => ({
+    group,
+    fields: forPlan.filter((f) => (f.group ?? 'advanced') === group.id),
+  })).filter((g) => g.fields.length > 0);
+}
+
+/**
+ * Group for ANY key, curated or not, so the advanced table can sort uncurated keys
+ * into the same panels instead of dumping RETELL_POST_CALL_WEBHOOK_URL next to a
+ * one-field Integrations panel. UI-only — the API never calls this.
+ */
+export function groupForKey(key: string): EnvGroupId {
+  const field = findField(key);
+  if (field?.group) return field.group;
+  if (/^(AIRTABLE|RESEND|MAKE)_/.test(key) || key.startsWith('RETELL_POST_CALL_')) {
+    return 'integrations';
+  }
+  if (/^(TWILIO|CLIENT_FORWARD)_/.test(key) || key.startsWith('RETELL_')) return 'routing';
+  if (key.startsWith('LEAD_')) return 'leads';
+  return 'advanced';
 }
 
 export function findField(key: string): EnvField | undefined {
