@@ -67,6 +67,56 @@ export function resolveSite(ctx: ClientContext, siteSlug?: string): ResolvedSite
   return { site: ctx.sites[i], dir, env: readEnvLocal(dir) };
 }
 
+/**
+ * The disk-only half of a roster row.
+ *
+ * Split out so the page can server-render rows instantly and the roster API can return
+ * the same shape with health attached — without the two drifting. Reading clients/ is a
+ * few milliseconds; the health checks are what take seconds, so they arrive separately.
+ */
+export interface RosterBase {
+  slug: string;
+  brandName: string;
+  plan: ClientContext['plan'];
+  isEnterprise: boolean;
+  detectedStatus: ClientContext['detectedStatus'];
+  hasIntake: boolean;
+  manageable: boolean;
+  reason: string | null;
+  siteCount: number;
+  liveUrl: string | null;
+}
+
+/**
+ * The URL to treat as "the live site": the custom domain when set, else the Vercel alias.
+ *
+ * The hyphenation is not cosmetic — underscores are legal in a Vercel project name but
+ * not in a DNS hostname, and Vercel serves the project at the hyphenated form. onboard.js
+ * applies the same rule to the Twilio voiceUrl (see CLAUDE.md).
+ */
+export function liveUrlFor(ctx: ClientContext): string | null {
+  const canonical = ctx.sites[0]?.canonical;
+  if (canonical) return canonical.startsWith('http') ? canonical : `https://${canonical}`;
+  const project = ctx.sites[0]?.env?.VERCEL_PROJECT_NAME;
+  if (!project) return null;
+  return `https://${project.toLowerCase().replace(/[^a-z0-9-]/g, '-')}.vercel.app`;
+}
+
+export function rosterBase(ctx: ClientContext): RosterBase {
+  return {
+    slug: ctx.slug,
+    brandName: ctx.brandName,
+    plan: ctx.plan,
+    isEnterprise: ctx.isEnterprise,
+    detectedStatus: ctx.detectedStatus,
+    hasIntake: ctx.hasIntake,
+    manageable: isManageable(ctx),
+    reason: unmanageableReason(ctx),
+    siteCount: ctx.sites.length,
+    liveUrl: liveUrlFor(ctx),
+  };
+}
+
 export type LoadResult =
   | { ok: true; ctx: ClientContext; resolved: ResolvedSite }
   | { ok: false; error: string; status: number };

@@ -2,32 +2,24 @@ import { NextResponse } from 'next/server';
 import { listClientContexts } from '@/lib/clients';
 import { loadVercelCredentials } from '@/lib/opsSecrets';
 import { loadVercelSync } from '@/lib/vercelSync';
-import { isManageable, unmanageableReason } from '@/lib/manageSites';
-import type { ClientContext } from '@/lib/types';
+import { isManageable, liveUrlFor } from '@/lib/manageSites';
 
 /**
- * The /manage landing roster: every client, with enough live signal to spot a broken one
- * without opening it.
+ * Live health for the /manage roster, keyed by slug.
  *
- * Runs the CHEAP checks only — last deployment state and an HTTP probe of the live site.
- * Env drift is deliberately absent: resolving it costs one Vercel request per key per
- * site (see listProjectEnv), so fanning it across the whole roster would be dozens of
- * requests on every page load. Drift is resolved when you open a client.
+ * Returns ONLY the health — the rows themselves are server-rendered from disk by
+ * manage/page.tsx, which is instant. Splitting them matters: the HTTP probe alone can
+ * take seconds against an unreachable domain, and blocking the whole roster on that
+ * would mean staring at a spinner before you can even see the client list.
  *
- * Every per-client check is independently failable and independently timed out — one
- * unreachable site must never blank the roster.
+ * Runs the CHEAP checks only. Env drift is deliberately absent — resolving it costs one
+ * Vercel request per key per site (see listProjectEnv), so it is an explicit button on
+ * the roster rather than something that fires on every page load.
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const PROBE_TIMEOUT_MS = 4000;
-
-interface DeployView {
-  state: string;
-  createdAt: number | null;
-  url: string | null;
-  inspectorUrl: string | null;
-}
 
 interface HttpView {
   ok: boolean;
@@ -37,26 +29,19 @@ interface HttpView {
 }
 
 /**
- * HEAD the live site. Falls back to GET on 405 — some hosts reject HEAD outright, and
+ * HEAD the live site, falling back to GET on 405 — some hosts reject HEAD outright and
  * "405" would otherwise read as an outage.
  */
 async function probe(url: string): Promise<HttpView> {
   const started = Date.now();
+  const opts = {
+    redirect: 'follow' as const,
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    cache: 'no-store' as const,
+  };
   try {
-    let res = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-      cache: 'no-store',
-    });
-    if (res.status === 405) {
-      res = await fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-        cache: 'no-store',
-      });
-    }
+    let res = await fetch(url, { method: 'HEAD', ...opts });
+    if (res.status === 405) res = await fetch(url, { method: 'GET', ...opts });
     return { ok: res.ok, status: res.status, ms: Date.now() - started };
   } catch (err) {
     return {
@@ -68,80 +53,39 @@ async function probe(url: string): Promise<HttpView> {
   }
 }
 
-/**
- * The URL to probe: the client's custom domain when set, else the Vercel alias.
- *
- * The `.replace(/_/g, '-')` is not cosmetic — underscores are legal in a Vercel project
- * name but not in a DNS hostname, and Vercel serves the project at the hyphenated form.
- * onboard.js applies the same rule when it sets the Twilio voiceUrl (see CLAUDE.md);
- * without it, `_e2e_test_growth` probes a hostname that cannot resolve.
- */
-function liveUrlFor(ctx: ClientContext): string | null {
-  const canonical = ctx.sites[0]?.canonical;
-  if (canonical) return canonical.startsWith('http') ? canonical : `https://${canonical}`;
-  const project = ctx.sites[0]?.env?.VERCEL_PROJECT_NAME;
-  if (!project) return null;
-  const host = project.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  return `https://${host}.vercel.app`;
-}
-
 export async function GET() {
-  let clients: ClientContext[] = [];
-  try {
-    clients = await listClientContexts();
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to read clients/', rows: [] },
-      { status: 500 },
-    );
-  }
-
+  const clients = await listClientContexts().catch(() => []);
   const vercelConfigured = loadVercelCredentials();
   const vercel = vercelConfigured ? await loadVercelSync().catch(() => null) : null;
 
-  const rows = await Promise.all(
-    clients.map(async (ctx) => {
-      const manageable = isManageable(ctx);
-      const liveUrl = liveUrlFor(ctx);
-      const siteSlug = ctx.sites[0]?.slug ?? ctx.slug;
+  const health: Record<
+    string,
+    { deploy: unknown; http: HttpView | null }
+  > = {};
 
-      // Only probe clients that actually have something deployed to look at.
+  await Promise.all(
+    clients.filter(isManageable).map(async (ctx) => {
+      const siteSlug = ctx.sites[0]?.slug ?? ctx.slug;
+      const liveUrl = liveUrlFor(ctx);
+
       const [deploy, http] = await Promise.all([
-        manageable && vercel
+        vercel
           ? vercel
               .listDeployments(siteSlug, { limit: 1 })
-              .then((r): DeployView | null => {
+              .then((r) => {
                 const d = r.deployments[0];
                 return d
-                  ? {
-                      state: d.state,
-                      createdAt: d.createdAt,
-                      url: d.url,
-                      inspectorUrl: d.inspectorUrl,
-                    }
+                  ? { state: d.state, createdAt: d.createdAt, url: d.url, inspectorUrl: d.inspectorUrl }
                   : null;
               })
               .catch(() => null)
           : Promise.resolve(null),
-        manageable && liveUrl ? probe(liveUrl) : Promise.resolve(null),
+        liveUrl ? probe(liveUrl) : Promise.resolve(null),
       ]);
 
-      return {
-        slug: ctx.slug,
-        brandName: ctx.brandName,
-        plan: ctx.plan,
-        isEnterprise: ctx.isEnterprise,
-        detectedStatus: ctx.detectedStatus,
-        hasIntake: ctx.hasIntake,
-        manageable,
-        reason: unmanageableReason(ctx),
-        siteCount: ctx.sites.length,
-        liveUrl,
-        deploy,
-        http,
-      };
+      health[ctx.slug] = { deploy, http };
     }),
   );
 
-  return NextResponse.json({ vercelConfigured, rows });
+  return NextResponse.json({ vercelConfigured, health });
 }

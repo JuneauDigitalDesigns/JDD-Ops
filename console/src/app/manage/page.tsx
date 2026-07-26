@@ -1,25 +1,19 @@
-import ManagePortalLink from '@/components/ManagePortalLink';
-import ManageClientEnv from '@/components/ManageClientEnv';
+import { listClientContexts } from '@/lib/clients';
+import { rosterBase } from '@/lib/manageSites';
+import ManageRoster from '@/components/manage/ManageRoster';
 
-// /manage — ops management tools: repair a client's portal link, and edit + sync their
-// env vars without opening the Vercel dashboard.
-// More management features will be added to this route over time.
+/**
+ * /manage — the ops control panel landing: every client with live health signal, opening
+ * into the per-client rail + stage shell under /manage/[slug]/[section].
+ *
+ * The rows are built HERE, on the server, from disk. That read is a few milliseconds, so
+ * the client list paints immediately; the health columns arrive separately from
+ * /api/manage/roster because one unreachable domain can hold that request open for
+ * seconds and must not delay the list.
+ */
 export const dynamic = 'force-dynamic';
 
-export default function ManagePage() {
-  return (
-    <main className="no-scrollbar relative z-10 mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-5 py-10">
-      <header className="mb-8">
-        <span className="kicker">Manage</span>
-        <h1 className="mt-2 font-display text-3xl font-medium tracking-tightish text-fg">
-          Management tools
-        </h1>
-      </header>
-
-      <div className="flex flex-col gap-6">
-        <ManageClientEnv />
-        <ManagePortalLink />
-      </div>
-    </main>
-  );
+export default async function ManagePage() {
+  const clients = await listClientContexts().catch(() => []);
+  return <ManageRoster rows={clients.map(rosterBase)} />;
 }
