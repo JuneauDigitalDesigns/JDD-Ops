@@ -131,6 +131,16 @@ If you edit `clients/{slug}/.env.local` after provisioning, re-sync and redeploy
 npm run sync-env -- --slug {slug}
 ```
 
+Or use the console: **`/manage` → Client environment** does the whole loop in the UI —
+validated edits to the operational vars (`CLIENT_FORWARD_PHONE`,
+`CLIENT_FORWARD_RING_SECONDS`, `AIRTABLE_BASE_ID`, `TWILIO_NUMBER`, `RETELL_AGENT_ID`,
+lead-delivery settings), writes `.env.local`, pushes to Vercel via the same
+`syncEnvToVercel`, and offers a redeploy button. It also shows per-key drift between disk
+and Vercel, so "edited but never synced" is visible instead of silent. Master credentials
+are masked and `VERCEL_PROJECT_NAME` / `CLERK_USER_ID` / `RETELL_LLM_ID` are read-only
+there, since onboard.js owns them. Changing `AIRTABLE_BASE_ID` also updates the portal
+account record, which stores its own copy.
+
 ## Lead callback (Growth/Enterprise)
 
 The final-CTA form POSTs `{name, phone}` to `/api/contact`. With

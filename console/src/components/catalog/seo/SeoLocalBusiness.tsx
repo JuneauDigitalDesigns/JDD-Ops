@@ -31,49 +31,15 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function SeoLocalBusiness() {
-  const { brand, seo, extensions } = CONTENT;
-  const review = extensions.reviewBadge;
-  const hours = extensions.hours;
-  const contact = extensions.contactDetails;
-
-  const jsonLd: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: brand.long || brand.name,
-    description: seo.description || brand.tagline,
-    telephone: brand.phone,
-    email: brand.email,
-    address: contact
-      ? { '@type': 'PostalAddress', streetAddress: contact.address }
-      : { '@type': 'PostalAddress', streetAddress: brand.address },
-    ...(seo.canonical ? { url: seo.canonical } : {}),
-    ...(brand.established ? { foundingDate: brand.established } : {}),
-    ...(review
-      ? {
-          aggregateRating: {
-            '@type': 'AggregateRating',
-            ratingValue: String(review.rating),
-            reviewCount: String(review.count),
-          },
-        }
-      : {}),
-    ...(hours
-      ? {
-          openingHoursSpecification: Object.entries(hours).map(([day, time]) => ({
-            '@type': 'OpeningHoursSpecification',
-            dayOfWeek: day,
-            opens: time.split('-')[0]?.trim() ?? time,
-            closes: time.split('-')[1]?.trim() ?? time,
-          })),
-        }
-      : {}),
-  };
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-    />
-  );
-}
+// No default export by design — this variant contributes metadata only.
+//
+// It used to default-export a <script type="application/ld+json">, but that never reached a
+// client site: wirePage() injects only `export { generateMetadata }`, and `seo` is not a
+// BODY_SLOT, so the default was never imported. The markup existed solely in the console's
+// own preview.
+//
+// Structured data now comes from template/src/lib/structuredData.ts, emitted by the template
+// layout, which reaches every client regardless of the SEO variant chosen. That version also
+// fixes this one's openingHoursSpecification (it split the range on "-" and passed "9:00 AM"
+// through where Google requires 24-hour HH:MM, and turned "Closed" into a bogus range) and
+// adds the FAQPage / Review / Service nodes this never had.

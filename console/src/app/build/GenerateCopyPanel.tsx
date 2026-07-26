@@ -1,14 +1,15 @@
 'use client';
 import { useState } from 'react';
-import { Sparkle, CircleNotch, ArrowCounterClockwise, Warning, CheckCircle } from '@phosphor-icons/react';
+import { Sparkle, CircleNotch, ArrowCounterClockwise, Warning, CheckCircle, Circle } from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
 import type { VerticalId } from '@/lib/verticals';
 import type { Section } from '@/lib/copy-schema';
+import { labelFor } from '@/lib/section-labels';
 
 type State = { kind: 'idle' } | { kind: 'running' } | { kind: 'error'; message: string };
 
 export default function GenerateCopyPanel({
-  vertical, base, sections, generated, onGenerated, onClearGenerated,
+  vertical, base, sections, generated, onGenerated, onClearGenerated, onReviewSection,
 }: {
   vertical: VerticalId;
   base: SiteContent;
@@ -16,6 +17,8 @@ export default function GenerateCopyPanel({
   generated: Partial<SiteContent> | null;
   onGenerated: (p: Partial<SiteContent>) => void;
   onClearGenerated: () => void;
+  /** Open the read-only review modal for a section (click on a checklist item). */
+  onReviewSection: (s: Section) => void;
 }) {
   const [state, setState] = useState<State>({ kind: 'idle' });
   const [url, setUrl] = useState('');       // ephemeral — optional site to scan
@@ -42,8 +45,11 @@ export default function GenerateCopyPanel({
   }
 
   const busy = state.kind === 'running';
-  // Sections that will actually get copy (brand is an always-on tagline, not shown as a chip).
+  // Sections that will actually get copy (brand is an always-on tagline, not listed).
   const sectionLabels = sections.filter((s) => s !== 'brand');
+  // A section is "generated" once it appears in the generated layer.
+  const isGen = (s: Section) => Boolean(generated && s in generated);
+  const genCount = sectionLabels.filter(isGen).length;
 
   return (
     <div className="space-y-3 rounded-lg border border-uiCardRule bg-white p-6">
@@ -59,31 +65,57 @@ export default function GenerateCopyPanel({
           </button>
         )}
       </div>
-      <p className="text-sm text-zinc-500">
-        Writes real marketing copy for the sections you&apos;ve selected, grounded in the{' '}
-        <strong className="text-zinc-700">{vertical}</strong> vertical
-        {sectionLabels.length > 0 && (
-          <> — <span className="text-zinc-600">{sectionLabels.join(', ')}</span></>
-        )}
-        . It fills the preview below and stays editable — your manual edits always win.
-      </p>
+      {/* Status checklist — grey = not yet written, teal accent = written. Compact 2-column. */}
+      {sectionLabels.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-chromeMono text-xs uppercase tracking-widest text-uiInkSoft">Brand copy</span>
+              <span className="badge badge-accent">{vertical}</span>
+            </div>
+            <span className="font-chromeMono text-xs tabular-nums text-zinc-400">
+              {genCount} / {sectionLabels.length}
+            </span>
+          </div>
+          {/* Each item opens the read-only review modal for that section. */}
+          <ul className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+            {sectionLabels.map((s) => {
+              const done = isGen(s);
+              return (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => onReviewSection(s)}
+                    aria-label={`Review ${labelFor(s)} copy`}
+                    className={[
+                      'flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-xs transition-colors hover:bg-black/[0.04]',
+                      done ? 'text-accent' : 'text-zinc-400',
+                    ].join(' ')}
+                  >
+                    {done ? <CheckCircle size={14} weight="fill" /> : <Circle size={14} />}
+                    {labelFor(s)}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
-      <label className="block space-y-1.5">
-        <span className="font-chromeMono text-[11px] uppercase tracking-widest text-zinc-400">
-          Scan an existing site (optional)
-        </span>
+      <label className="block">
+        <span className="field-label">Scan an existing site (optional)</span>
         <input
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="theirbusiness.com — Claude reads it and grounds the copy in real details"
+          placeholder="theirbusiness.com"
           disabled={busy}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-uiInk disabled:opacity-50"
+          className="input disabled:opacity-50"
         />
       </label>
 
       <label className="block space-y-1.5">
-        <span className="font-chromeMono text-[11px] uppercase tracking-widest text-zinc-400">
+        <span className="font-chromeMono text-xs uppercase tracking-widest text-zinc-400">
           Additional brand details (optional)
         </span>
         <textarea

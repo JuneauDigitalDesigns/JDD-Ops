@@ -15,9 +15,13 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // The template is the source of truth for code that ships to client repos. The console
+      // imports from it rather than keeping a second copy — the previous hand-duplicated
+      // JSON-LD in categories.tsx had already drifted from the component it mirrored.
+      "@template/*": ["../template/src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../template/src/lib/structuredData.ts"],
   "exclude": ["node_modules"]
 }

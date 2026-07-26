@@ -17,7 +17,7 @@ import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 export const meta = {
   id: 'finalcta-starter-editorial',
   category: 'finalCta',
-  label: 'Final CTA / Starter — Editorial',
+  label: 'Final CTA / Starter Editorial',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
   skins: ['editorial', 'contrast'],
@@ -90,7 +90,7 @@ export default function FinalCtaStarterEditorial({
 
         {status === 'done' ? (
           <div className={`mt-10 border-t ${s.rule} pt-10`}>
-            <p className={`font-heading text-2xl font-bold ${s.heading}`}>Thanks — we&apos;ll email you back.</p>
+            <p className={`font-heading text-2xl font-bold ${s.heading}`}>Thanks, we&apos;ll email you back.</p>
             <p className={`mt-2 ${s.body}`}>Usually within a business day.</p>
           </div>
         ) : (

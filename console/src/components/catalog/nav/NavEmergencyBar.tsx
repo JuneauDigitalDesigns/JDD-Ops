@@ -22,7 +22,7 @@ export default function NavEmergencyBar({
 }) {
   const s = skinClasses(skin);
   const { brand, announcement } = content;
-  const msg = announcement ?? '24/7 emergency service — we answer day or night.';
+  const msg = announcement ?? '24/7 emergency service. We answer day or night.';
   return (
     <header>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-accent px-6 py-2.5 text-center text-sm font-medium text-accentFg">

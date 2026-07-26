@@ -7,6 +7,7 @@
 // color/size/weight tuned in the studio ship to the live site without any editing scaffolding.
 
 import type { CSSProperties, ReactNode } from 'react';
+import type { Icon, IconWeight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { ElementStyle } from '@/data/site';
 
@@ -31,6 +32,25 @@ function styleFor(o?: ElementStyle): CSSProperties | undefined {
 export function E({ p, children }: { p?: string; children: ReactNode; fit?: boolean }) {
   const style = p ? styleFor(getPath(CONTENT.overrides, p) as ElementStyle | undefined) : undefined;
   return style ? <span style={style}>{children}</span> : <>{children}</>;
+}
+
+// Passthrough of the studio's <Ico>. Client repos have no icon-picker UI, so it just
+// renders the already-resolved icon. `p` is accepted and ignored to match the studio's
+// signature (catalog source is shared verbatim). Must export the same name the studio
+// does, or catalog components that import { Ico } break the client build.
+export function Ico({
+  icon: IconComp,
+  size = 20,
+  weight,
+  className,
+}: {
+  p?: string;
+  icon: Icon;
+  size?: number;
+  weight?: IconWeight;
+  className?: string;
+}) {
+  return <IconComp size={size} weight={weight} className={className} />;
 }
 
 export function useEditing(): boolean {

@@ -30,15 +30,18 @@ export interface PatchInput {
   slug: string;
   status?: ClientStatus;
   step?: { id: string; done: boolean };
+  /** Kanban sort position — see ClientState.order. */
+  order?: number;
 }
 
 /** Merge an update for one client and persist. Returns that client's new state. */
-export function patchClientState({ slug, status, step }: PatchInput): ClientState {
+export function patchClientState({ slug, status, step, order }: PatchInput): ClientState {
   const state = readState();
   const prev: ClientState = state[slug] ?? { steps: {} };
   const next: ClientState = { ...prev, steps: { ...prev.steps } };
 
   if (status !== undefined) next.status = status;
+  if (order !== undefined) next.order = order;
   if (step) {
     if (step.done) next.steps[step.id] = true;
     else delete next.steps[step.id];

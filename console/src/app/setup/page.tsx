@@ -50,7 +50,7 @@ export default function SetupPage() {
         <div className="mb-6 flex flex-col gap-1">
           <span className="kicker">One-time · Part A</span>
           <h1 className="font-display text-[30px] font-semibold tracking-tightest">Master setup</h1>
-          <p className="text-[12.5px] text-fg3">Do these once, before your first paid client.</p>
+          <p className="text-xs text-fg3">Do these once, before your first paid client.</p>
         </div>
         <StepGuide
           phases={phases}

@@ -47,8 +47,11 @@ import FooterColumns, { meta as footerColumnsMeta } from '@/components/catalog/f
 import FooterMinimal, { meta as footerMinimalMeta } from '@/components/catalog/footer/FooterMinimal';
 import FooterBrandCta, { meta as footerBrandCtaMeta } from '@/components/catalog/footer/FooterBrandCta';
 import FooterMega, { meta as footerMegaMeta } from '@/components/catalog/footer/FooterMega';
-import SeoDefault, { meta as seoDefaultMeta } from '@/components/catalog/seo/SeoDefault';
-import SeoLocalBusiness, { meta as seoLocalBusinessMeta } from '@/components/catalog/seo/SeoLocalBusiness';
+// Neither SEO variant has a default export — their only rendered output was code that
+// wirePage never imported. SeoPreviewBody shows what each variant actually produces.
+import { meta as seoDefaultMeta } from '@/components/catalog/seo/SeoDefault';
+import { buildJsonLd } from '@template/lib/structuredData';
+import { meta as seoLocalBusinessMeta } from '@/components/catalog/seo/SeoLocalBusiness';
 // New trade-specific + motion-flagship variants
 import NavEmergencyBar, { meta as navEmergencyMeta } from '@/components/catalog/nav/NavEmergencyBar';
 import HeroKinetic, { meta as heroKineticMeta } from '@/components/catalog/hero/HeroKinetic';
@@ -236,17 +239,14 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
           label: seoDefaultMeta.label,
           skins: skinsFor('SeoDefault'),
           render: () => (
-            <>
-              <SeoDefault />
-              <SeoPreviewBody
-                metadata={{
-                  title: effective.seo.title,
-                  description: effective.seo.description,
-                  alternates: { canonical: effective.seo.canonical },
-                }}
-                jsonLd={null}
-              />
-            </>
+            <SeoPreviewBody
+              metadata={{
+                title: effective.seo.title,
+                description: effective.seo.description,
+                alternates: { canonical: effective.seo.canonical },
+              }}
+              jsonLd={null}
+            />
           ),
         },
         {
@@ -255,27 +255,18 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
           label: seoLocalBusinessMeta.label,
           skins: skinsFor('SeoLocalBusiness'),
           render: () => (
-            <>
-              <SeoLocalBusiness />
-              <SeoPreviewBody
-                metadata={{
-                  title: effective.seo.title || effective.brand.name,
-                  description: effective.seo.description || effective.brand.tagline,
-                  alternates: { canonical: effective.seo.canonical },
-                }}
-                jsonLd={{
-                  '@context': 'https://schema.org',
-                  '@type': 'LocalBusiness',
-                  name: effective.brand.long || effective.brand.name,
-                  description: effective.seo.description || effective.brand.tagline,
-                  telephone: effective.brand.phone,
-                  email: effective.brand.email,
-                  address: effective.brand.address,
-                  ...(effective.seo.canonical ? { url: effective.seo.canonical } : {}),
-                  ...(effective.brand.established ? { foundingDate: effective.brand.established } : {}),
-                }}
-              />
-            </>
+            <SeoPreviewBody
+              metadata={{
+                title: effective.seo.title || effective.brand.name,
+                description: effective.seo.description || effective.brand.tagline,
+                alternates: { canonical: effective.seo.canonical },
+              }}
+              // The real builder the template ships, not a hand-copy. The previous inline
+              // object had already drifted from the component it mirrored — it was missing
+              // aggregateRating and openingHoursSpecification entirely, so the preview
+              // disagreed with the (non-)output in both directions.
+              jsonLd={buildJsonLd(effective)}
+            />
           ),
         },
       ],

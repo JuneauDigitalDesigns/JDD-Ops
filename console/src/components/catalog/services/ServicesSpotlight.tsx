@@ -6,10 +6,10 @@
 // across a larger surface. Distinct structure from the other services variants.
 // ─────────────────────────────────────────────────────────────────────────────
 import { motion, useReducedMotion } from 'framer-motion';
-import { Wrench, Lightning, Drop, Wind, Tree, HardHat, House, ArrowRight } from '@phosphor-icons/react';
-import type { Icon } from '@phosphor-icons/react';
+import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import { E } from '@/lib/editable';
+import { E, Ico } from '@/lib/editable';
+import { serviceIcon } from '@/lib/icons';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
@@ -18,15 +18,9 @@ export const meta = {
   category: 'services',
   label: 'Services / Spotlight',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/icons'],
   skins: ['contrast', 'editorial', 'quiet'],
 } as const;
-
-const TAG_ICONS: Record<string, Icon> = {
-  electrical: Lightning, plumbing: Drop, hvac: Wind, landscaping: Tree,
-  construction: HardHat, roofing: HardHat, flooring: House,
-};
-const getIcon = (tag: string | null | undefined): Icon => TAG_ICONS[(tag ?? '').toLowerCase()] ?? Wrench;
 
 export default function ServicesSpotlight({
   content = CONTENT,
@@ -63,7 +57,7 @@ export default function ServicesSpotlight({
 
         <div className="mt-11 flex flex-col gap-4">
           {services.items.map((item, i) => {
-            const IconComp = getIcon(item.tag);
+            const IconComp = serviceIcon(item.icon, item.tag);
             const nn = String(item.n ?? i + 1).padStart(2, '0');
             return (
               <motion.div
@@ -77,7 +71,7 @@ export default function ServicesSpotlight({
                 transition={{ duration: 0.45, ease: EASE, delay: still ? 0 : i * 0.05 }}
               >
                 <div className="flex items-start gap-5 sm:gap-7">
-                  <div className="inline-flex shrink-0 rounded-xl bg-accent/15 p-3"><IconComp size={30} className="text-accent" /></div>
+                  <div className="inline-flex shrink-0 rounded-xl bg-accent/15 p-3"><Ico p={`services.items.${i}.icon`} icon={IconComp} size={30} className="text-accent" /></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-4">
                       <span className="text-xs font-medium uppercase tracking-widest text-accent"><E p={`services.items.${i}.tag`}>{item.tag}</E></span>

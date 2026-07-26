@@ -16,7 +16,7 @@ import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 export const meta = {
   id: 'contact-split-starter',
   category: 'contact',
-  label: 'Contact / Split — Starter (email)',
+  label: 'Contact / Split (Starter, email)',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'extensions.contactDetails'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
   skins: ['editorial', 'contrast', 'quiet'],

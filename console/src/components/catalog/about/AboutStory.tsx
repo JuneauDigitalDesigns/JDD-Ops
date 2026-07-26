@@ -5,9 +5,9 @@
 // Narrative-led; distinct from the image feature / stat stack / pillar index.
 // ─────────────────────────────────────────────────────────────────────────────
 import { motion, useReducedMotion } from 'framer-motion';
-import { ShieldCheck, Clock, Tag, Star } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import { E } from '@/lib/editable';
+import { E, Ico } from '@/lib/editable';
+import { pillarIcon } from '@/lib/icons';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
@@ -16,16 +16,9 @@ export const meta = {
   category: 'about',
   label: 'About / Story',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/icons'],
   skins: ['editorial', 'quiet'],
 } as const;
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
-  shield: ShieldCheck,
-  clock: Clock,
-  tag: Tag,
-  star: Star,
-};
 
 export default function AboutStory({
   content = CONTENT,
@@ -62,7 +55,7 @@ export default function AboutStory({
         {about.pillars.length > 0 && (
           <div className={`border-t divide-y divide-rule ${s.rule}`}>
             {about.pillars.map((p, i) => {
-              const Icon = ICON_MAP[p.k];
+              const Icon = pillarIcon(p.icon, p.k);
               return (
                 <motion.div
                   key={p.k}
@@ -75,7 +68,7 @@ export default function AboutStory({
                   <span className={`font-heading text-2xl font-black leading-none tabular-nums ${s.heading} opacity-25`}>{String(i + 1).padStart(2, '0')}</span>
                   <div className="flex-1">
                     <h3 className={`flex items-center gap-2 font-heading text-lg font-bold ${s.heading}`}>
-                      {Icon && <Icon size={19} className="text-accent" />}
+                      {Icon && <Ico p={`about.pillars.${i}.icon`} icon={Icon} size={19} className="text-accent" />}
                       <E p={`about.pillars.${i}.t`}>{p.t}</E>
                     </h3>
                     <p className={`mt-2 leading-relaxed ${s.body}`}><E p={`about.pillars.${i}.d`}>{p.d}</E></p>

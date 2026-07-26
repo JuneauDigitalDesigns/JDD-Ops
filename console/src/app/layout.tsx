@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Big_Shoulders_Display, Hanken_Grotesk, DM_Mono } from 'next/font/google';
 import './globals.css';
-import { ThemeProvider } from './components/theme/ThemeProvider';
 import ConsoleNav from '@/components/ConsoleNav';
 import { industryFontVars } from '@/lib/fonts.loader';
 
@@ -35,23 +34,21 @@ export const metadata: Metadata = {
   description: 'Unified internal console — Studio site builder + Onboarding Runbook.',
 };
 
-// Root layout loads fonts + theme provider. The home page (/) and /onboard use the
-// global JDD palette from globals.css (light/dark via data-theme); /build re-scopes
-// a light client-preview palette in its own nested layout (see app/build/layout.tsx).
+// Root layout loads fonts. The console chrome is light-only — there is no theme
+// provider and no toggle. The home page (/) and /onboard use the global JDD palette
+// from globals.css; /build re-scopes a client-preview palette in its own nested
+// layout (see app/build/layout.tsx) so client sites render true.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      suppressHydrationWarning
       className={`${bigShoulders.variable} ${hanken.variable} ${dmMono.variable} ${industryFontVars}`}
     >
       <body className="antialiased">
-        <ThemeProvider>
-          <div className="flex h-[100dvh] flex-col overflow-hidden">
-            <ConsoleNav />
-            <div className="min-h-0 flex-1">{children}</div>
-          </div>
-        </ThemeProvider>
+        <div className="flex h-[100dvh] flex-col overflow-hidden">
+          <ConsoleNav />
+          <div className="min-h-0 flex-1">{children}</div>
+        </div>
       </body>
     </html>
   );

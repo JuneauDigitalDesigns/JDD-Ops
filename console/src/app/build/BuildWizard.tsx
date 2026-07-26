@@ -1,37 +1,39 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, Check, ArrowUUpLeft, ArrowUUpRight } from '@phosphor-icons/react';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
 import { deepMerge, applyEdits } from '@/lib/merge';
 import { EASE } from '@/lib/motion';
-import { paletteVars, typographyVars } from '@/lib/palette';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import {
   reconcileOrder,
   enforcePins,
   type Selections,
   type SkinSelections,
-} from './StudioApp';
+} from './page-order';
 import { buildCategories } from './categories';
 import { injectImagePlaceholders } from '@/data/preview-placeholders';
-import StudioApp from './StudioApp';
-import FinalizePanel from './FinalizePanel';
-import BrandDrawer from './BrandDrawer';
+import StudioStep from './StudioStep';
 import ClientSelectStep from '@/components/wizard/ClientSelectStep';
 import IntakeReviewStep from '@/components/wizard/IntakeReviewStep';
+import PlanChip from '@/components/PlanChip';
+import NavSlot from '@/components/NavSlot';
+import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
 const bundleKey = (slug: string) => `jdd-wizard:${slug}`;
 
+// Three steps, not four. Build and Finalize were merged into one Studio: composing the
+// page and editing it are the same activity, and the old split meant assembling blind in
+// step 3 then discovering the result in step 4.
 const STEPS = [
   { id: 'client', label: 'Client' },
   { id: 'intake', label: 'Intake' },
-  { id: 'builder', label: 'Build' },
-  { id: 'finalize', label: 'Finalize' },
+  { id: 'studio', label: 'Studio' },
 ] as const;
 type StepId = (typeof STEPS)[number]['id'];
 
@@ -73,6 +75,9 @@ export default function BuildWizard() {
   const [dir, setDir] = useState(1);
   const [slug, setSlug] = useState('');
   const step: StepId = STEPS[stepIndex].id;
+  // A one-shot "scroll Studio to this section" request, set by the Intake review modal's
+  // "Edit in Studio" jump and consumed once by StudioStep on entry.
+  const [focusSection, setFocusSection] = useState<string | null>(null);
 
   // ── Content layer ───────────────────────────────────────────────────────────
   const [vertical, setVertical] = useState<VerticalId>(DEFAULT_VERTICAL);
@@ -84,16 +89,33 @@ export default function BuildWizard() {
   const [selections, setSelections] = useState<Selections>({});
   const [skins, setSkins] = useState<SkinSelections>({});
   const [order, setOrder] = useState<string[]>([]);
+  // A one-shot position request from select(…, atIndex), consumed by the reconcile effect.
+  // A ref rather than state: it must not itself trigger a render, and it is always read in
+  // the same tick the selection it describes is reconciled.
+  const pendingInsert = useRef<{ id: string; at: number } | null>(null);
 
   // Effective = vertical preset ← imported ← generated ← user edits (top).
   const effective = useMemo(
-    () =>
-      applyEdits(
+    () => {
+      const merged = applyEdits(
         deepMerge(deepMerge(VERTICAL_PRESETS[vertical], imported ?? {}), generated ?? {}),
         edits,
-      ),
+      );
+      // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
+      // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
+      // content. Left hidden while empty, so an untouched Work section stays off (and the
+      // preview still injects sample projects via injectImagePlaceholders).
+      if (merged.work?.projects?.length && merged.work.hidden) {
+        return { ...merged, work: { ...merged.work, hidden: false } };
+      }
+      return merged;
+    },
     [vertical, imported, generated, edits],
   );
+  // Tier shown in the header. Every vertical preset stamps _meta.selectedPlan and
+  // ClientSelectStep's withPlan() overrides it from real intake, so this is almost always
+  // present; 'growth' matches the fallback loadIntake() already uses (lib/intake.ts).
+  const planTier = effective._meta?.selectedPlan ?? 'growth';
   // Preview-only: fill empty/preset image slots with per-vertical topical stock so
   // the build catalog renders (esp. Work). Export still uses the untouched `effective`.
   const previewContent = useMemo(
@@ -103,8 +125,28 @@ export default function BuildWizard() {
   const categories = useMemo(() => buildCategories(previewContent), [previewContent]);
 
   // Reconcile body order whenever selections change.
+  //
+  // Order is DERIVED: select() writes `selections`, then this recomputes `order` via
+  // reconcileOrder(), which drops new categories at their canonical slot. A caller asking
+  // for a specific position (the between-sections "+") therefore can't set it directly —
+  // it parks the request here and we apply it after reconcile has run.
   useEffect(() => {
-    setOrder((prev) => reconcileOrder(prev, selections));
+    // Read and clear the request HERE, not inside the updater below. A setState updater
+    // must be pure: StrictMode invokes it twice in dev and keeps the second result, so
+    // clearing the ref inside it made the second pass see null and silently fall back to
+    // canonical placement — the position was dropped every time.
+    const p = pendingInsert.current;
+    pendingInsert.current = null;
+    setOrder((prev) => {
+      const next = reconcileOrder(prev, selections);
+      // Only reposition a genuinely NEW section. Re-picking a variant for a section already
+      // on the page must not silently relocate it.
+      if (!p || prev.includes(p.id) || !next.includes(p.id)) return next;
+      const from = next.indexOf(p.id);
+      const to = Math.max(0, Math.min(p.at, next.length - 1));
+      // enforcePins keeps nav first / footer last, so an insert aimed past either resolves.
+      return enforcePins(arrayMove(next, from, to));
+    });
   }, [selections]);
 
   // Persist the per-client bundle on any change (only once a client is chosen).
@@ -118,10 +160,82 @@ export default function BuildWizard() {
     }
   }, [slug, vertical, imported, generated, edits, selections, skins, order]);
 
+  // ── Undo/redo — two view-scoped stacks (Intake vs Studio) ─────────────────
+  // Each step's undo/redo drives its own stack. Both snapshots include `edits` (shared: the
+  // Intake missing-field queue and Studio inline editing both write it). Accepted limitation:
+  // editing an Intake field AFTER a Studio snapshot, then undoing in Studio, can revert that
+  // Intake edit — rare in the linear Intake → Studio flow.
+  const applyIntakeSnapshot = useCallback((s: ContentSnapshot) => {
+    setVertical(s.vertical);
+    setImported(s.imported);
+    setGenerated(s.generated);
+    setEdits(s.edits);
+  }, []);
+  const intakeHistory = useHistory({ vertical, imported, generated, edits }, applyIntakeSnapshot);
+
+  const applyStudioSnapshot = useCallback(
+    (s: { edits: Record<string, unknown>; selections: Selections; skins: SkinSelections; order: string[] }) => {
+      setEdits(s.edits);
+      setSelections(s.selections);
+      setSkins(s.skins);
+      setOrder(s.order);
+    },
+    [],
+  );
+  const studioHistory = useHistory({ edits, selections, skins, order }, applyStudioSnapshot);
+
+  // Stable per-stack checkpoint fns (the hook memoizes these; the returned object is fresh
+  // each render but its members are stable, so downstream callbacks stay referentially stable).
+  const intakeCheckpoint = intakeHistory.checkpoint;
+  const intakeCheckpointEdit = intakeHistory.checkpointEdit;
+  const studioCheckpoint = studioHistory.checkpoint;
+  const studioCheckpointEdit = studioHistory.checkpointEdit;
+
+  // The active step's undo/redo — drives the keyboard shortcut and, for Intake, the navbar.
+  const activeUndo = step === 'studio' ? studioHistory.undo : step === 'intake' ? intakeHistory.undo : null;
+  const activeRedo = step === 'studio' ? studioHistory.redo : step === 'intake' ? intakeHistory.redo : null;
+
+  // Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z (and Ctrl+Y), routed to the active step's stack. Skipped while
+  // a contenteditable has focus: that's the preview's inline <E> editor, where the browser's own
+  // text-level undo is what the operator means. Bound here (not in the hook) so the two stacks
+  // don't both listen; only the active step responds.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el?.isContentEditable) return;
+      if (!activeUndo || !activeRedo) return;
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) activeRedo();
+      else activeUndo();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeUndo, activeRedo]);
+
+  // Switching vertical swaps the whole preset baseline — undoable on the Intake stack.
+  const changeVertical = useCallback((v: VerticalId) => {
+    intakeCheckpoint();
+    setVertical(v);
+  }, [intakeCheckpoint]);
+
   // ── Content setters ──────────────────────────────────────────────────────
   const setField = useCallback((path: string, value: unknown) => {
-    setEdits((e) => ({ ...e, [path]: value }));
-  }, []);
+    (step === 'studio' ? studioCheckpointEdit : intakeCheckpointEdit)();
+    setEdits((e) => {
+      // A whole-array write (Brand-drawer add/remove/reorder) supersedes any per-item leaf edits
+      // beneath it. Without this, stale leaves like `work.projects.<i>.image.url` / `.t` get
+      // re-applied by applyEdits ONTO the shortened array — resurrecting deleted items and
+      // corrupting survivors. Their values are already baked into `value` (read from `effective`),
+      // so dropping the descendants is lossless.
+      const base = Array.isArray(value)
+        ? Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith(path + '.')))
+        : e;
+      return { ...base, [path]: value };
+    });
+  }, [step, studioCheckpointEdit, intakeCheckpointEdit]);
   const applyBundle = useCallback((b: WizardBundle) => {
     setVertical(b.vertical);
     setImported(b.imported);
@@ -131,25 +245,43 @@ export default function BuildWizard() {
     setSkins(b.skins);
     setOrder(b.order);
   }, []);
-  const importSite = useCallback((site: SiteContent) => setImported(site), []);
-  const clearImport = useCallback(() => { setImported(null); setGenerated(null); }, []);
-  const applyGenerated = useCallback((partial: Partial<SiteContent>) => setGenerated(partial), []);
-  const clearGenerated = useCallback(() => setGenerated(null), []);
-  const resetEdits = useCallback(() => setEdits({}), []);
-  const resetStyles = useCallback(
-    () => setEdits((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('overrides.')))),
-    [],
-  );
+  // Each of these replaces a whole content layer, so each is one undo step (Intake stack).
+  const importSite = useCallback((site: SiteContent) => {
+    intakeCheckpoint();
+    setImported(site);
+  }, [intakeCheckpoint]);
+  const applyGenerated = useCallback((partial: Partial<SiteContent>) => {
+    intakeCheckpoint();
+    setGenerated(partial);
+  }, [intakeCheckpoint]);
+  const clearGenerated = useCallback(() => {
+    intakeCheckpoint();
+    setGenerated(null);
+  }, [intakeCheckpoint]);
+  // The Styles/Text reset buttons live in the Studio control bar — one undo step on the Studio stack.
+  const resetEdits = useCallback(() => {
+    studioCheckpoint();
+    setEdits({});
+  }, [studioCheckpoint]);
+  const resetStyles = useCallback(() => {
+    studioCheckpoint();
+    setEdits((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('overrides.'))));
+  }, [studioCheckpoint]);
   // Replace the whole working copy from the JSON editor: the pasted object becomes the
   // imported baseline and per-field edits/generated are cleared so it's authoritative.
   const replaceContent = useCallback((site: SiteContent) => {
+    intakeCheckpoint();
     setImported(site);
     setGenerated(null);
     setEdits({});
-  }, []);
+  }, [intakeCheckpoint]);
 
   // ── Builder setters ──────────────────────────────────────────────────────
-  const select = useCallback((categoryId: string, componentName: string) => {
+  const select = useCallback((categoryId: string, componentName: string, atIndex?: number) => {
+    studioCheckpoint();
+    // Parked for the reconcile effect above — order is derived from selections, so the
+    // position can only be applied once reconcileOrder has placed the new id.
+    pendingInsert.current = atIndex === undefined ? null : { id: categoryId, at: atIndex };
     setSelections((prev) => ({ ...prev, [categoryId]: componentName }));
     setSkins((prev) => {
       const current = prev[categoryId];
@@ -157,22 +289,25 @@ export default function BuildWizard() {
         ? prev
         : { ...prev, [categoryId]: defaultSkin(componentName) };
     });
-  }, []);
+  }, [studioCheckpoint]);
   const selectSkin = useCallback((categoryId: string, skin: SkinId) => {
+    studioCheckpoint();
     setSkins((prev) => ({ ...prev, [categoryId]: skin }));
-  }, []);
+  }, [studioCheckpoint]);
   const deselect = useCallback((categoryId: string) => {
+    studioCheckpoint();
     setSelections((prev) => { const next = { ...prev }; delete next[categoryId]; return next; });
     setSkins((prev) => { const next = { ...prev }; delete next[categoryId]; return next; });
-  }, []);
+  }, [studioCheckpoint]);
   const reorder = useCallback((activeId: string, overId: string) => {
-    setOrder((prev) => {
-      const oldIndex = prev.indexOf(activeId);
-      const newIndex = prev.indexOf(overId);
-      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev;
-      return enforcePins(arrayMove(prev, oldIndex, newIndex));
-    });
-  }, []);
+    // Guard the no-op reorder before checkpointing so an idle drop doesn't add an undo step.
+    // Indices read from `order` (== the committed list; no concurrent mutation mid-drag).
+    const oldIndex = order.indexOf(activeId);
+    const newIndex = order.indexOf(overId);
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+    studioCheckpoint();
+    setOrder((prev) => enforcePins(arrayMove(prev, oldIndex, newIndex)));
+  }, [order, studioCheckpoint]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
   const canAdvance = step === 'client' ? slug.trim().length > 0 : true;
@@ -194,6 +329,9 @@ export default function BuildWizard() {
       /* ignore malformed storage */
     }
     applyBundle(bundle ?? freshBundle(seed));
+    // Undoing across a client switch would restore another client's content into this one.
+    intakeHistory.clear();
+    studioHistory.clear();
     setSlug(chosenSlug);
     go(1);
   }
@@ -205,10 +343,11 @@ export default function BuildWizard() {
   };
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-uiCanvas">
-      {/* ── Top chrome: step indicator + Back/Next ─────────────────────────── */}
-      <header className="flex shrink-0 items-center justify-between border-b border-uiRule px-5 py-3">
-        <div className="flex items-center gap-2">
+    <div className="flex h-full flex-col overflow-hidden bg-uiCanvas">
+      {/* ── Wizard chrome, rendered up into the global ConsoleNav so /build shows ONE bar,
+             not two. Step rail · client + plan · undo/redo · Back/Next. ──────────────── */}
+      <NavSlot>
+        <div className="flex shrink-0 items-center gap-1.5">
           {STEPS.map((s, i) => {
             const state = i === stepIndex ? 'active' : i < stepIndex ? 'done' : 'todo';
             return (
@@ -220,19 +359,19 @@ export default function BuildWizard() {
                 className={[
                   'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
                   state === 'active'
-                    ? 'bg-uiInk text-white'
+                    ? 'bg-accent text-[var(--accent-ink)]'
                     : state === 'done'
-                    ? 'text-uiInk hover:bg-uiSurface'
-                    : 'text-uiInkSoft/60 cursor-default',
+                    ? 'text-accent hover:bg-surface'
+                    : 'cursor-default text-fg3/60',
                 ].join(' ')}
               >
                 <span
                   className={[
-                    'flex h-4 w-4 items-center justify-center rounded-full text-[9px]',
+                    'flex h-4 w-4 items-center justify-center rounded-full text-2xs',
                     state === 'active'
-                      ? 'bg-white text-uiInk'
+                      ? 'bg-[var(--accent-ink)] text-accent'
                       : state === 'done'
-                      ? 'bg-uiInk text-white'
+                      ? 'bg-accent text-[var(--accent-ink)]'
                       : 'border border-current',
                   ].join(' ')}
                 >
@@ -244,13 +383,47 @@ export default function BuildWizard() {
           })}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Who you're building for. Absent on step 1 (no client chosen yet). */}
+        {slug && (
+          <div className="flex min-w-0 items-center gap-2 border-l border-rule pl-3">
+            <span className="min-w-0 truncate font-display text-sm font-medium text-fg">
+              {effective.brand.name}
+            </span>
+            <span className="hidden shrink-0 font-chromeMono text-kicker text-fg3 lg:inline">
+              {slug}
+            </span>
+            <PlanChip plan={planTier} />
+          </div>
+        )}
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* Undo/redo for the Intake step only — it drives the Intake stack (vertical, generated
+              copy, seed, missing-field edits). The Studio step has its own undo/redo down in the
+              Studio control bar, scoped to page composition + inline edits. */}
+          {step === 'intake' && (
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={intakeHistory.undo}
+                disabled={!intakeHistory.canUndo}
+                aria-label="Undo"
+                className="rounded-md p-1.5 text-fg3 hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowUUpLeft size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={intakeHistory.redo}
+                disabled={!intakeHistory.canRedo}
+                aria-label="Redo"
+                className="rounded-md p-1.5 text-fg3 hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowUUpRight size={15} />
+              </button>
+            </div>
+          )}
           {stepIndex > 0 && (
-            <button
-              type="button"
-              onClick={() => go(stepIndex - 1)}
-              className="flex items-center gap-1 rounded-md border border-uiRule px-3 py-1.5 text-sm text-uiInk hover:border-uiInk"
-            >
+            <button type="button" onClick={() => go(stepIndex - 1)} className="btn btn-sm">
               <ArrowLeft size={14} /> Back
             </button>
           )}
@@ -259,13 +432,13 @@ export default function BuildWizard() {
               type="button"
               onClick={() => go(stepIndex + 1)}
               disabled={!canAdvance}
-              className="flex items-center gap-1 rounded-md bg-uiInk px-4 py-1.5 text-sm font-medium text-white hover:bg-uiInk/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn btn-sm btn-primary"
             >
               Next <ArrowRight size={14} />
             </button>
           )}
         </div>
-      </header>
+      </NavSlot>
 
       {/* ── Sliding step viewport ──────────────────────────────────────────── */}
       <div className="relative flex-1 overflow-hidden">
@@ -291,63 +464,45 @@ export default function BuildWizard() {
                 <IntakeReviewStep
                   slug={slug}
                   vertical={vertical}
-                  onVerticalChange={setVertical}
+                  onVerticalChange={changeVertical}
                   effective={effective}
                   setField={setField}
                   generated={generated}
                   onGenerated={applyGenerated}
                   onClearGenerated={clearGenerated}
                   onReplaceContent={replaceContent}
+                  imported={imported}
+                  onImport={importSite}
+                  onDone={() => go(2)}
+                  onEditInStudio={(s) => { setFocusSection(s); go(2); }}
                 />
               </div>
             )}
 
-            {step === 'builder' && (
+            {step === 'studio' && (
               <div className="h-full">
-                <StudioApp
+                <StudioStep
                   categories={categories}
                   effective={effective}
                   selections={selections}
                   skins={skins}
+                  order={order}
+                  vertical={vertical}
+                  slug={slug}
                   onSelect={select}
                   onSelectSkin={selectSkin}
                   onDeselect={deselect}
-                  onClearAll={() => { setSelections({}); setSkins({}); }}
+                  onReorder={reorder}
+                  setField={setField}
+                  onResetEdits={resetEdits}
+                  onResetStyles={resetStyles}
+                  onUndo={studioHistory.undo}
+                  onRedo={studioHistory.redo}
+                  canUndo={studioHistory.canUndo}
+                  canRedo={studioHistory.canRedo}
+                  focusSection={focusSection}
+                  onFocusHandled={() => setFocusSection(null)}
                 />
-              </div>
-            )}
-
-            {step === 'finalize' && (
-              <div className="flex h-full overflow-hidden">
-                <main
-                  className="flex-1 overflow-y-auto"
-                  style={{ ...paletteVars(effective.brand), ...typographyVars(effective.brand) }}
-                >
-                  <div className="mx-auto max-w-5xl px-6 py-10">
-                    <FinalizePanel
-                      categories={categories}
-                      selections={selections}
-                      skins={skins}
-                      onSkinChange={selectSkin}
-                      order={order}
-                      onReorder={reorder}
-                      vertical={vertical}
-                      effective={effective}
-                      setField={setField}
-                      imported={imported}
-                      onImport={importSite}
-                      onClearImport={clearImport}
-                      generated={generated}
-                      onGenerated={applyGenerated}
-                      onClearGenerated={clearGenerated}
-                      onResetEdits={resetEdits}
-                      onResetStyles={resetStyles}
-                      hideSources
-                      lockedSlug={slug}
-                    />
-                  </div>
-                </main>
-                <BrandDrawer content={effective} setField={setField} />
               </div>
             )}
           </motion.div>

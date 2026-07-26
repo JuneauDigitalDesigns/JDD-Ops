@@ -80,17 +80,11 @@ export default function ScrapePanel({
           Seed from existing website
         </p>
         {requested && (
-          <span className="rounded-full border border-uiInk/15 bg-uiAccent px-2 py-0.5 font-chromeMono text-[10px] uppercase tracking-widest text-uiInk">
+          <span className="badge badge-accent">
             client requested
           </span>
         )}
       </div>
-
-      <p className="text-sm text-uiInkSoft">
-        Claude reads the client&apos;s current homepage and rebuilds the whole preview from what it
-        finds — brand, services, about, reviews, and contact details. Anything the site doesn&apos;t
-        cover is written to match the selected vertical.
-      </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <input

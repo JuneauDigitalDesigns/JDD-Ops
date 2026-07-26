@@ -8,13 +8,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import {
-  Wrench, Lightning, Drop, PaintBrush, Wind, Tree, HardHat,
-  Broom, Scissors, Hammer, House, ArrowRight,
-} from '@phosphor-icons/react';
-import type { Icon } from '@phosphor-icons/react';
+import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import { E } from '@/lib/editable';
+import { E, Ico } from '@/lib/editable';
+import { serviceIcon } from '@/lib/icons';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
@@ -23,17 +20,9 @@ export const meta = {
   category: 'services',
   label: 'Services / Grid',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/icons'],
   skins: ['editorial', 'contrast'],
 } as const;
-
-const TAG_ICONS: Record<string, Icon> = {
-  cleaning: Broom, electrical: Lightning, plumbing: Drop, painting: PaintBrush,
-  hvac: Wind, landscaping: Tree, construction: HardHat, roofing: HardHat,
-  flooring: House, trimming: Scissors, carpentry: Hammer,
-  general: Wrench, repair: Wrench, maintenance: Wrench,
-};
-function getIcon(tag: string | null | undefined): Icon { return TAG_ICONS[(tag ?? '').toLowerCase()] ?? Wrench; }
 
 export default function ServicesGrid({
   content = CONTENT,
@@ -126,7 +115,7 @@ export default function ServicesGrid({
             transition={{ duration: 0.55, ease: EASE }}
           >
             {services.items.map((item, i) => {
-              const IconComp = getIcon(item.tag);
+              const IconComp = serviceIcon(item.icon, item.tag);
               const on = i === idx;
               return (
                 <li key={item.n ?? i}>
@@ -148,7 +137,7 @@ export default function ServicesGrid({
                       <span className={`block font-heading text-base font-bold leading-snug ${s.heading}`}><E p={`services.items.${i}.t`}>{item.t}</E></span>
                       <span className="mt-0.5 block text-[11px] font-semibold uppercase tracking-wider text-accent"><E p={`services.items.${i}.tag`}>{item.tag}</E></span>
                     </span>
-                    <IconComp size={20} className={`shrink-0 transition-colors ${on ? 'text-accent' : `${s.body} opacity-50`}`} />
+                    <Ico p={`services.items.${i}.icon`} icon={IconComp} size={20} className={`shrink-0 transition-colors ${on ? 'text-accent' : `${s.body} opacity-50`}`} />
                   </button>
                 </li>
               );

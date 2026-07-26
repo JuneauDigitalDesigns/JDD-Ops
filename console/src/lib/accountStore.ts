@@ -2,6 +2,7 @@ import 'server-only';
 import { Redis } from '@upstash/redis';
 import {
   accountKey,
+  accountByUserKey,
   createAccount,
   upsertSite,
   type PortalAccount,
@@ -43,6 +44,16 @@ function getRedis(): Redis {
 export async function getAccount(email: string): Promise<PortalAccount | null> {
   const raw = await getRedis().get<PortalAccount>(accountKey(email));
   return raw ?? null;
+}
+
+/**
+ * Resolve the account email for a Clerk user id via the `jdd:account-by-user:` index.
+ * Lets tools that only know a client's CLERK_USER_ID (written into their .env.local)
+ * find the account record without asking the operator to retype the email.
+ */
+export async function getAccountEmailByUserId(clerkUserId: string): Promise<string | null> {
+  const email = await getRedis().get<string>(accountByUserKey(clerkUserId));
+  return email ?? null;
 }
 
 /**

@@ -131,7 +131,7 @@ export default function NextSteps({
     <div className="panel flex flex-col gap-3 p-5" style={{ borderColor: 'var(--rule-strong)' }}>
       <div className="flex items-center gap-2">
         <Lightbulb size={17} weight="fill" style={{ color: 'var(--warn)' }} />
-        <h3 className="font-display text-[16px] font-medium">Next steps</h3>
+        <h3 className="font-display text-base font-medium">Next steps</h3>
       </div>
       <p className="kicker" style={{ color: 'var(--warn)' }}>
         {title}
@@ -139,9 +139,9 @@ export default function NextSteps({
 
       <ol className="flex flex-col gap-2">
         {steps.map((s, i) => (
-          <li key={i} className="flex gap-2.5 text-[13px] leading-[1.6] text-fg2">
+          <li key={i} className="flex gap-2.5 text-xs leading-[1.6] text-fg2">
             <span
-              className="mono mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px]"
+              className="mono mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-kicker"
               style={{ border: '1px solid var(--rule-strong)', color: 'var(--fg-3)' }}
             >
               {i + 1}

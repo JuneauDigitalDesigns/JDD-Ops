@@ -27,7 +27,17 @@ export async function PATCH(req: Request) {
   if (body.step && (typeof body.step.id !== 'string' || typeof body.step.done !== 'boolean')) {
     return NextResponse.json({ error: 'step must be { id: string, done: boolean }.' }, { status: 400 });
   }
+  // Fractional, so any finite number is legal — but NaN/Infinity would poison the column's sort
+  // and survive in progress.json, so reject them at the door.
+  if (body.order !== undefined && !Number.isFinite(body.order)) {
+    return NextResponse.json({ error: 'order must be a finite number.' }, { status: 400 });
+  }
 
-  const updated = patchClientState({ slug: body.slug, status: body.status, step: body.step });
+  const updated = patchClientState({
+    slug: body.slug,
+    status: body.status,
+    step: body.step,
+    order: body.order,
+  });
   return NextResponse.json({ slug: body.slug, state: updated });
 }

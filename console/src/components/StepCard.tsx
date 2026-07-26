@@ -28,7 +28,7 @@ export default function StepCard({
             type="button"
             onClick={onToggle}
             aria-label={done ? 'Mark step not done' : 'Mark step done'}
-            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium transition-colors"
+            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium transition-colors"
             style={
               done
                 ? { background: 'var(--accent)', borderColor: 'var(--accent)', color: 'var(--accent-ink)' }
@@ -42,7 +42,7 @@ export default function StepCard({
         <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <h4
-              className="font-display text-[15px] font-medium"
+              className="font-display text-sm font-medium"
               style={done ? { textDecoration: 'line-through', color: 'var(--fg-2)' } : undefined}
             >
               {step.title}
@@ -72,7 +72,7 @@ export default function StepCard({
             className="overflow-hidden"
           >
             <div className="flex flex-col gap-4 pb-5 pl-[38px]">
-              {step.why && <p className="text-[13px] leading-[1.6] text-fg2">{step.why}</p>}
+              {step.why && <p className="text-xs leading-[1.6] text-fg2">{step.why}</p>}
               {step.blocks.map((b, i) => (<BlockView key={i} block={b} />))}
               {!isReference && (
                 <div className="pt-1">

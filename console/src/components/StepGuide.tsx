@@ -61,8 +61,8 @@ export default function StepGuide({
                 style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }}
               />
               <div className="min-w-0 flex-1">
-                <h3 className="font-display text-[18px] font-medium tracking-tightish">{phase.title}</h3>
-                {phase.subtitle && isOpen && <p className="mt-0.5 text-[12.5px] text-fg3">{phase.subtitle}</p>}
+                <h3 className="font-display text-lg font-medium tracking-tightish">{phase.title}</h3>
+                {phase.subtitle && isOpen && <p className="mt-0.5 text-xs text-fg3">{phase.subtitle}</p>}
               </div>
               <span className="kicker shrink-0">{completed}/{actionable} done</span>
             </button>

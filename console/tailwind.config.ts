@@ -1,19 +1,41 @@
 import type { Config } from 'tailwindcss';
 
-// Unified token set for the JDD Console (merge of studio + runbook).
-//   • Client-brand tokens (accent/bg/ink/rule…) bind to CSS vars set per-route by the
-//     /build layout from CONTENT.brand — used only by catalog preview components.
-//   • ui* tokens are the JDD studio chrome, bound to themed CSS vars (see globals.css
-//     :root / [data-theme="dark"]) so /build chrome follows the light/dark toggle while
-//     the client-brand preview above stays true to the client's own palette.
-//   • Runbook chrome tokens (surface/panel/fg*/ok/warn/danger) bind to CSS vars from the
-//     global :root in globals.css — used by /onboard + the home page.
-// accent/bg/rule are shared keys that map to the same CSS var in both worlds; their value
-// is resolved per-route by whichever layout sets the var (see globals.css + build/layout).
+// Token set for the JDD Console. TWO worlds, deliberately:
+//   • CLIENT-BRAND tokens (accent/bg/ink/rule/accent050…) bind to CSS vars set per-route
+//     by the /build layout from CONTENT.brand — used ONLY by catalog preview components.
+//     A client may have a dark palette; that must keep rendering correctly. Never unify
+//     these with chrome.
+//   • CHROME tokens are the console's own UI. The console is LIGHT-ONLY (warm cream);
+//     there is no dark theme. `surface/panel/fg*/rule*` are canonical. The `ui*` keys are
+//     retained ALIASES of the same underlying vars (globals.css maps --ui-* → canonical)
+//     so /build and /onboard can no longer drift apart. Prefer the canonical names in new
+//     code; the ui* spellings are migrated opportunistically.
+//
+// SIZING LIVES HERE. fontSize and spacing below are the single source of truth — the app
+// previously had no scale at all, so sizes were re-typed inline in ~23 files. Change the
+// scale here, not in components.
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // Type scale — ~15-20% larger than stock Tailwind at the small end, which is where
+      // this app actually lives (text-sm/text-xs are the workhorses). Bumping these grows
+      // the whole console without touching every file. [size, lineHeight] pairs.
+      fontSize: {
+        '2xs': ['12px', { lineHeight: '1.45' }],   // smallest legal size; badges only
+        xs: ['13px', { lineHeight: '1.5' }],       // secondary / meta
+        sm: ['15px', { lineHeight: '1.55' }],      // BASE BODY — the workhorse
+        base: ['16px', { lineHeight: '1.6' }],
+        lg: ['18px', { lineHeight: '1.5' }],
+        xl: ['20px', { lineHeight: '1.4' }],       // section headers
+        '2xl': ['24px', { lineHeight: '1.25' }],
+        '3xl': ['28px', { lineHeight: '1.15' }],   // screen titles
+        '4xl': ['36px', { lineHeight: '1.1' }],
+        '5xl': ['46px', { lineHeight: '1.05' }],
+        // Semantic sizes for chrome — use these instead of arbitrary values.
+        label: ['14px', { lineHeight: '1.4' }],    // form field labels
+        kicker: ['11.5px', { lineHeight: '1.4' }], // section eyebrows only
+      },
       colors: {
         // Client-brand tokens — bound to CSS vars set per previewed site. Reserved
         // for catalog components; never used by studio chrome.
@@ -38,7 +60,10 @@ const config: Config = {
         ruleInk: 'var(--rule-ink)',
         // Runbook chrome tokens — bound to global :root vars (JDD light/dark palette).
         surface: 'var(--surface)',
+        surface2: 'var(--surface-2)',
         panel: 'var(--panel)',
+        panel2: 'var(--panel-2)',
+        bgDeep: 'var(--bg-deep)',
         fg: 'var(--fg)',
         fg2: 'var(--fg-2)',
         fg3: 'var(--fg-3)',
@@ -82,8 +107,14 @@ const config: Config = {
         wideish: '0.08em',
         widest2: '0.14em',
       },
+      // Elevation ladder — layering is what makes the console read as an app rather
+      // than a page. Ascending: raised (cards) → panel (drawers) → overlay (catalog
+      // picker) → floating (contextual toolbars pinned over the canvas).
       boxShadow: {
-        panel: '0 30px 80px -30px rgba(0,0,0,0.4)',
+        raised: '0 1px 2px rgba(20,18,12,0.04), 0 4px 12px -4px rgba(20,18,12,0.10)',
+        panel: '0 2px 6px rgba(20,18,12,0.05), 0 24px 60px -28px rgba(20,18,12,0.32)',
+        overlay: '0 8px 20px rgba(20,18,12,0.10), 0 48px 100px -32px rgba(20,18,12,0.42)',
+        floating: '0 2px 8px rgba(20,18,12,0.10), 0 12px 32px -10px rgba(20,18,12,0.28)',
         glow: '0 12px 40px -10px var(--accent-glow)',
       },
       borderRadius: {

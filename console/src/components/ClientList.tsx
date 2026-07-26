@@ -45,13 +45,13 @@ export default function ClientList({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search clients…"
-          className="w-full py-2 pl-9 pr-3 text-[13px]"
+          className="w-full py-2 pl-9 pr-3 text-xs"
         />
       </div>
 
       <div className="no-scrollbar flex flex-1 flex-col gap-1.5 overflow-y-auto pb-4">
         {filtered.length === 0 && (
-          <p className="px-1 py-6 text-center text-[12.5px] text-fg3">
+          <p className="px-1 py-6 text-center text-xs text-fg3">
             {clients.length === 0 ? 'No clients under clients/ yet.' : 'No matches.'}
           </p>
         )}
@@ -74,12 +74,12 @@ export default function ClientList({
                   className="h-[7px] w-[7px] shrink-0 rounded-full"
                   style={{ background: STATUS_DOT[status], boxShadow: `0 0 8px 1px ${STATUS_DOT[status]}` }}
                 />
-                <span className="truncate font-display text-[14px] font-medium" style={{ color: active ? 'var(--fg)' : 'var(--fg-2)' }}>
+                <span className="truncate font-display text-label font-medium" style={{ color: active ? 'var(--fg)' : 'var(--fg-2)' }}>
                   {c.brandName}
                 </span>
               </div>
               <div className="mt-1 flex items-center gap-2 pl-[15px]">
-                <span className="mono text-[10.5px] text-fg3">{c.slug}</span>
+                <span className="mono text-kicker text-fg3">{c.slug}</span>
                 <span className="kicker" style={{ fontSize: 9.5 }}>
                   {PLAN_LABEL[c.plan]}
                   {c.isEnterprise && c.sites.length > 1 ? ` · ${c.sites.length} sites` : ''}

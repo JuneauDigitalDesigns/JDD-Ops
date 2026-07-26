@@ -16,7 +16,7 @@ import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 export const meta = {
   id: 'finalcta-starter-centered',
   category: 'finalCta',
-  label: 'Final CTA / Starter — Card',
+  label: 'Final CTA / Starter Card',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
   skins: ['editorial', 'contrast', 'quiet'],
@@ -78,7 +78,7 @@ export default function FinalCtaStarterCentered({
         {status === 'done' ? (
           <div className="rounded-2xl bg-accent/10 p-8 text-center">
             <EnvelopeSimple size={28} weight="fill" className="mx-auto text-accent" />
-            <p className={`mt-3 font-heading text-lg font-bold ${s.heading}`}>Thanks — we&apos;ll email you back.</p>
+            <p className={`mt-3 font-heading text-lg font-bold ${s.heading}`}>Thanks, we&apos;ll email you back.</p>
             <p className={`mt-2 text-sm ${s.body}`}>Usually within a business day.</p>
           </div>
         ) : (

@@ -26,7 +26,10 @@ export function useRunbookState() {
   }, [reload]);
 
   const patch = useCallback(
-    async (slug: string, body: { status?: ClientStatus; step?: { id: string; done: boolean } }) => {
+    async (
+      slug: string,
+      body: { status?: ClientStatus; step?: { id: string; done: boolean }; order?: number },
+    ) => {
       // Optimistic local update.
       setState((prev) => {
         const cur = prev[slug] ?? { steps: {} };
@@ -35,7 +38,15 @@ export function useRunbookState() {
           if (body.step.done) steps[body.step.id] = true;
           else delete steps[body.step.id];
         }
-        return { ...prev, [slug]: { ...cur, status: body.status ?? cur.status, steps } };
+        return {
+          ...prev,
+          [slug]: {
+            ...cur,
+            status: body.status ?? cur.status,
+            order: body.order ?? cur.order,
+            steps,
+          },
+        };
       });
       try {
         await fetch('/api/runbook/state', {
@@ -55,6 +66,11 @@ export function useRunbookState() {
     (slug: string, id: string, done: boolean) => patch(slug, { step: { id, done } }),
     [patch],
   );
+  /** Kanban drop: status and/or sort position, in one write. */
+  const place = useCallback(
+    (slug: string, next: { status?: ClientStatus; order?: number }) => patch(slug, next),
+    [patch],
+  );
 
-  return { state, loaded, setStatus, toggleStep, reload };
+  return { state, loaded, setStatus, toggleStep, place, reload };
 }

@@ -10,7 +10,8 @@ import type { ClientContext, ClientStatus, Plan, SiteInfo } from './types';
 function siteSlugFor(baseSlug: string, count: number, i: number): string {
   return count === 1 ? baseSlug : `${baseSlug}-${i + 1}`;
 }
-function siteDirFor(baseSlug: string, count: number, i: number): string {
+/** Absolute folder for one provisioning site. Exported so /manage can locate its .env.local. */
+export function siteDirFor(baseSlug: string, count: number, i: number): string {
   return count === 1 ? clientDir(baseSlug) : resolve(clientDir(baseSlug), `site-${i + 1}`);
 }
 

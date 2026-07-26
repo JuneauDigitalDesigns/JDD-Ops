@@ -7,9 +7,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ShieldCheck, Clock, Tag, Star } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import { E } from '@/lib/editable';
+import { E, Ico } from '@/lib/editable';
+import { pillarIcon } from '@/lib/icons';
 import { useCountUp } from '@/lib/useCountUp';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
@@ -19,16 +19,9 @@ export const meta = {
   category: 'about',
   label: 'About / Stat band',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.stats', 'about.pillars'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useCountUp', '@/lib/skins', '@/lib/motion'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useCountUp', '@/lib/skins', '@/lib/motion', '@/lib/icons'],
   skins: ['contrast', 'editorial'],
 } as const;
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
-  shield: ShieldCheck,
-  clock: Clock,
-  tag: Tag,
-  star: Star,
-};
 
 export default function AboutStatBand({
   content = CONTENT,
@@ -78,10 +71,10 @@ export default function AboutStatBand({
           {about.pillars.length > 0 && (
             <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3">
               {about.pillars.map((p, i) => {
-                const Icon = ICON_MAP[p.k];
+                const Icon = pillarIcon(p.icon, p.k);
                 return (
                   <span key={p.k} className={`flex items-center gap-2 text-sm font-medium ${s.heading}`}>
-                    {Icon && <Icon size={18} className="text-accent" />}
+                    {Icon && <Ico p={`about.pillars.${i}.icon`} icon={Icon} size={18} className="text-accent" />}
                     <E p={`about.pillars.${i}.t`}>{p.t}</E>
                   </span>
                 );

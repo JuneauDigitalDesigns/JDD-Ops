@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { CloudArrowDown, Folder, Plus, CircleNotch, Warning } from '@phosphor-icons/react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  CloudArrowDown, Folder, Plus, CircleNotch, Warning, PencilSimple, Check, X,
+} from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
+import PlanChip from '@/components/PlanChip';
 
 type IntakeSummary = {
   id: string;
@@ -12,16 +15,8 @@ type IntakeSummary = {
   receivedAt: number;
   missingFieldsCount: number;
 };
-type ClientInfo = { slug: string; hasRepo: boolean };
-
-function planBadge(plan: string) {
-  const map: Record<string, string> = {
-    starter: 'bg-sky-100 text-sky-700',
-    growth: 'bg-emerald-100 text-emerald-700',
-    enterprise: 'bg-violet-100 text-violet-700',
-  };
-  return map[plan] ?? 'bg-zinc-100 text-zinc-600';
-}
+// name/plan are null when clients/<slug>/site.ts is missing or unparseable.
+type ClientInfo = { slug: string; hasRepo: boolean; name: string | null; plan: string | null };
 
 /**
  * Stamp the loaded client's plan onto the seed content's `_meta.selectedPlan`, so the
@@ -32,6 +27,137 @@ function withPlan(seed: SiteContent | null, plan: unknown): SiteContent | null {
   if (!seed) return seed;
   if (plan !== 'starter' && plan !== 'growth' && plan !== 'enterprise') return seed;
   return { ...seed, _meta: { ...seed._meta, selectedPlan: plan } };
+}
+
+/**
+ * One existing-client card. It is a div rather than a button because it contains its own
+ * interactive controls (the rename pencil, and the input it swaps in) — nesting those in a
+ * <button> is invalid HTML and behaves erratically. Keyboard parity is restored with
+ * role/tabIndex/onKeyDown, and every edit control stops propagation so editing the name
+ * never doubles as selecting the client.
+ */
+function ExistingClientCard({
+  client, selected, busy, onChoose, onRename,
+}: {
+  client: ClientInfo;
+  selected: boolean;
+  busy: boolean;
+  onChoose: () => void;
+  onRename: (name: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const display = client.name ?? client.slug;
+
+  function begin(e: React.MouseEvent) {
+    e.stopPropagation();
+    setDraft(client.name ?? '');
+    setEditing(true);
+    // Focus after the input mounts.
+    requestAnimationFrame(() => inputRef.current?.select());
+  }
+
+  async function commit() {
+    const next = draft.trim();
+    if (!next || next === client.name) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    await onRename(next);
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={editing ? -1 : 0}
+      aria-disabled={busy}
+      onClick={() => !busy && !editing && onChoose()}
+      onKeyDown={(e) => {
+        if (editing || busy) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onChoose();
+        }
+      }}
+      className={[
+        'flex cursor-pointer items-start justify-between gap-2 rounded-lg border bg-white p-4 text-left transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-uiAccent',
+        busy ? 'opacity-60' : 'hover:border-uiInk',
+        selected ? 'border-uiInk' : 'border-uiRule',
+      ].join(' ')}
+    >
+      <div className="min-w-0 flex-1">
+        {editing ? (
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') setEditing(false);
+              }}
+              onBlur={commit}
+              disabled={saving}
+              placeholder="Display name"
+              className="min-w-0 flex-1 rounded border border-uiInk px-1.5 py-0.5 font-display text-sm text-uiInk outline-none disabled:opacity-50"
+            />
+            {saving ? (
+              <CircleNotch size={14} className="shrink-0 animate-spin text-uiInkSoft" />
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()} // keep blur from firing first
+                  onClick={commit}
+                  aria-label="Save name"
+                  className="shrink-0 text-uiInkSoft hover:text-uiInk"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setEditing(false)}
+                  aria-label="Cancel rename"
+                  className="shrink-0 text-uiInkSoft hover:text-uiInk"
+                >
+                  <X size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <p className="min-w-0 truncate font-display text-sm font-medium text-uiInk">{display}</p>
+            <button
+              type="button"
+              onClick={begin}
+              aria-label={`Rename ${display}`}
+              className="shrink-0 rounded p-0.5 text-uiInkSoft/60 transition-colors hover:bg-uiSurface hover:text-uiInk focus-visible:ring-2 focus-visible:ring-uiAccent"
+            >
+              <PencilSimple size={13} />
+            </button>
+          </div>
+        )}
+        {client.name && <p className="truncate font-chromeMono text-kicker text-uiInkSoft">{client.slug}</p>}
+        <p className="mt-1 font-chromeMono text-kicker uppercase tracking-wide text-uiInkSoft">
+          {client.hasRepo ? 'has repo' : 'no repo yet'}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {client.plan && <PlanChip plan={client.plan} />}
+        {busy && <CircleNotch size={15} className="animate-spin text-uiInkSoft" />}
+      </div>
+    </div>
+  );
 }
 
 function ago(ts: number): string {
@@ -154,14 +280,28 @@ export default function ClientSelectStep({
     }
   }
 
+  /** Commit an edited display name to clients/<slug>/site.ts, then refresh the list. */
+  async function renameClient(slug: string, name: string) {
+    setError(null);
+    try {
+      const res = await fetch('/api/build/rename-client', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Rename failed.');
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Rename failed.');
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="step-body max-w-5xl">
       <header className="mb-8">
         <p className="font-chromeMono text-xs uppercase tracking-widest text-uiInkSoft">Step 1</p>
         <h1 className="mt-2 font-display text-3xl font-medium text-uiInk">Choose a client</h1>
-        <p className="mt-2 max-w-prose text-sm text-uiInkSoft">
-          Pick up a new signup from your agency site, continue an existing client, or start blank.
-        </p>
       </header>
 
       {error && (
@@ -208,10 +348,8 @@ export default function ClientSelectStep({
                 className="group flex flex-col rounded-lg border border-uiRule bg-white p-4 text-left transition-colors hover:border-uiInk"
               >
                 <div className="flex items-center justify-between">
-                  <span className={`rounded px-2 py-0.5 font-chromeMono text-[10px] uppercase tracking-wide ${planBadge(it.plan)}`}>
-                    {it.plan}
-                  </span>
-                  <span className="font-chromeMono text-[10px] text-uiInkSoft">{ago(it.receivedAt)}</span>
+                  <PlanChip plan={it.plan} />
+                  <span className="font-chromeMono text-kicker text-uiInkSoft">{ago(it.receivedAt)}</span>
                 </div>
                 <p className="mt-2 font-display text-lg font-medium text-uiInk">{it.brandName}</p>
                 <p className="font-chromeMono text-xs text-uiInkSoft">{it.slugGuess}</p>
@@ -236,24 +374,14 @@ export default function ClientSelectStep({
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {clients.map((c) => (
-              <button
+              <ExistingClientCard
                 key={c.slug}
-                type="button"
-                onClick={() => chooseExisting(c.slug)}
-                disabled={busy === c.slug}
-                className={[
-                  'flex items-center justify-between rounded-lg border bg-white p-4 text-left transition-colors hover:border-uiInk',
-                  selectedSlug === c.slug ? 'border-uiInk' : 'border-uiRule',
-                ].join(' ')}
-              >
-                <div>
-                  <p className="font-chromeMono text-sm text-uiInk">{c.slug}</p>
-                  <p className="font-chromeMono text-[10px] uppercase tracking-wide text-uiInkSoft">
-                    {c.hasRepo ? 'has repo' : 'no repo yet'}
-                  </p>
-                </div>
-                {busy === c.slug && <CircleNotch size={15} className="animate-spin text-uiInkSoft" />}
-              </button>
+                client={c}
+                selected={selectedSlug === c.slug}
+                busy={busy === c.slug}
+                onChoose={() => chooseExisting(c.slug)}
+                onRename={(name) => renameClient(c.slug, name)}
+              />
             ))}
           </div>
         )}

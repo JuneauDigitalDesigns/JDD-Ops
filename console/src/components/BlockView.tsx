@@ -1,7 +1,12 @@
 'use client';
-import { CaretRight, Terminal, Warning, Info, ArrowSquareOut, Crosshair, ArrowBendDownRight } from '@phosphor-icons/react';
+import { CaretRight, Terminal, Warning, Info, ArrowSquareOut, Crosshair, ArrowBendDownRight, Eye } from '@phosphor-icons/react';
 import type { Block } from '@/lib/runbook-content';
+import { expectedPhases, mergeRun, restingPhases } from '@/lib/run-plan';
 import CopyButton from './CopyButton';
+import { useRunbookCtx } from './RunbookContext';
+import CallRoutingFlow from './flow/CallRoutingFlow';
+import PipelineFlow from './flow/PipelineFlow';
+import PostCallFlow from './flow/PostCallFlow';
 
 const CALLOUT_TONE = {
   info: { color: 'var(--accent)', bg: 'var(--accent-glow)', Icon: Info },
@@ -14,9 +19,13 @@ function PendingNote() {
 }
 
 export default function BlockView({ block }: { block: Block }) {
+  // Hooks must run unconditionally, so this sits above the switch. Null on /setup, where
+  // there is no client — the `diagram` case handles that by rendering nothing.
+  const rb = useRunbookCtx();
+
   switch (block.t) {
     case 'text':
-      return <p className="text-[13.5px] leading-[1.65] text-fg2">{block.body}</p>;
+      return <p className="text-sm leading-[1.65] text-fg2">{block.body}</p>;
 
     case 'callout': {
       const { color, bg, Icon } = CALLOUT_TONE[block.tone];
@@ -26,12 +35,52 @@ export default function BlockView({ block }: { block: Block }) {
           style={{ background: bg, border: `1px solid ${color}33` }}
         >
           <Icon size={16} weight="fill" style={{ color, flexShrink: 0, marginTop: 1 }} />
-          <p className="text-[12.5px] leading-[1.55]" style={{ color: 'var(--fg-2)' }}>
-            {block.body}
-          </p>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {block.title && (
+              <span className="text-xs font-semibold" style={{ color }}>
+                {block.title}
+              </span>
+            )}
+            <p className="text-xs leading-[1.55]" style={{ color: 'var(--fg-2)' }}>
+              {block.body}
+            </p>
+          </div>
         </div>
       );
     }
+
+    case 'diagram': {
+      if (!rb) return null;
+      const { ctx, run } = rb;
+      if (block.kind === 'pipeline') {
+        const phases = run ? mergeRun(expectedPhases(ctx), run) : restingPhases(ctx);
+        return <PipelineFlow phases={phases} ctx={ctx} />;
+      }
+      const site = (block.siteSlug ? ctx.sites.find((s) => s.slug === block.siteSlug) : ctx.sites[0]) ?? ctx.sites[0];
+      if (!site) return null;
+      return block.kind === 'call-routing' ? <CallRoutingFlow site={site} /> : <PostCallFlow site={site} />;
+    }
+
+    case 'verify':
+      return (
+        <div className="rounded-[10px] border px-3.5 py-3" style={{ borderColor: 'var(--ok)', background: 'var(--ok-glow)' }}>
+          <div className="mb-2 flex items-center gap-2">
+            <Eye size={15} weight="fill" style={{ color: 'var(--ok)' }} />
+            <span className="kicker" style={{ color: 'var(--ok)' }}>{block.title ?? 'You should see'}</span>
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {block.items.map((item, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full" style={{ background: 'var(--ok)' }} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs leading-[1.5] text-fg2">{item.text}</p>
+                  {item.detail && <p className="mt-0.5 text-2xs leading-[1.45] text-fg3">{item.detail}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
 
     case 'nav':
       return (
@@ -82,7 +131,7 @@ export default function BlockView({ block }: { block: Block }) {
     case 'fields':
       return (
         <div className="flex flex-col gap-2">
-          {block.caption && <p className="text-[12.5px] text-fg3">{block.caption}</p>}
+          {block.caption && <p className="text-xs text-fg3">{block.caption}</p>}
           {block.rows.map((row, i) => (
             <div key={i} className="flex items-center gap-2.5">
               <code className="mono w-44 shrink-0 text-fg3">{row.label}</code>
@@ -103,9 +152,9 @@ export default function BlockView({ block }: { block: Block }) {
             {block.vars.map((v, i) => (
               <div key={i} className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
-                  <code className="mono text-[12px] text-accent">{v.key}</code>
+                  <code className="mono text-2xs text-accent">{v.key}</code>
                   <span className="text-fg3">=</span>
-                  <code className="mono text-[12px] text-fg2">{v.value}</code>
+                  <code className="mono text-2xs text-fg2">{v.value}</code>
                   {v.pending && <PendingNote />}
                 </div>
                 {v.note && <span className="pl-0.5 text-[11.5px] text-fg3">↳ {v.note}</span>}
@@ -121,14 +170,14 @@ export default function BlockView({ block }: { block: Block }) {
           {block.items.map((item, i) => (
             <li key={i} className="flex gap-2.5">
               <span
-                className="mono mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px]"
+                className="mono mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-kicker"
                 style={{ background: 'var(--surface-2)', border: '1px solid var(--rule-strong)', color: 'var(--accent)' }}
               >
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] leading-[1.5] text-fg2">{item.text}</p>
-                {item.detail && <p className="mt-0.5 text-[12px] leading-[1.45] text-fg3">{item.detail}</p>}
+                <p className="text-xs leading-[1.5] text-fg2">{item.text}</p>
+                {item.detail && <p className="mt-0.5 text-2xs leading-[1.45] text-fg3">{item.detail}</p>}
               </div>
             </li>
           ))}
@@ -145,14 +194,14 @@ export default function BlockView({ block }: { block: Block }) {
           <div className="flex flex-col gap-1.5 px-3 py-2.5">
             <div className="flex gap-2">
               <Crosshair size={13} weight="bold" style={{ color: 'var(--fg-3)', flexShrink: 0, marginTop: 2 }} />
-              <p className="text-[12.5px] leading-[1.5] text-fg2">
+              <p className="text-xs leading-[1.5] text-fg2">
                 <span className="kicker mr-1.5" style={{ fontSize: 9.5 }}>from</span>
                 {block.from}
               </p>
             </div>
             <div className="flex gap-2">
               <ArrowBendDownRight size={13} weight="bold" style={{ color: 'var(--fg-3)', flexShrink: 0, marginTop: 2 }} />
-              <p className="text-[12.5px] leading-[1.5] text-fg2">
+              <p className="text-xs leading-[1.5] text-fg2">
                 <span className="kicker mr-1.5" style={{ fontSize: 9.5 }}>put in</span>
                 {block.to}
               </p>
@@ -175,7 +224,7 @@ export default function BlockView({ block }: { block: Block }) {
             <span className="kicker">{block.label}</span>
             <CopyButton value={block.json} />
           </div>
-          <pre className="mono overflow-x-auto px-3 py-2.5 text-[12px] leading-[1.6] text-fg2 no-scrollbar">
+          <pre className="mono overflow-x-auto px-3 py-2.5 text-2xs leading-[1.6] text-fg2 no-scrollbar">
             {block.json}
           </pre>
         </div>
@@ -183,7 +232,7 @@ export default function BlockView({ block }: { block: Block }) {
 
     case 'link':
       if (block.href === '#') {
-        return <span className="text-[12.5px] text-fg3">↳ {block.label}</span>;
+        return <span className="text-xs text-fg3">↳ {block.label}</span>;
       }
       return (
         <a href={block.href} target="_blank" rel="noreferrer" className="btn btn-sm inline-flex w-fit">

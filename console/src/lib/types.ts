@@ -59,6 +59,12 @@ export interface ClientContext {
 export interface ClientState {
   status?: ClientStatus; // manual override; falls back to ClientContext.detectedStatus
   steps: Record<string, boolean>; // stepId → done
+  /**
+   * Manual sort position within its Kanban column. Fractional by design: a drop writes the
+   * midpoint of its two new neighbours, so reordering touches exactly ONE client instead of
+   * reindexing the whole column. Absent = never dragged; those sort last, alphabetically.
+   */
+  order?: number;
   updatedAt?: string;
 }
 

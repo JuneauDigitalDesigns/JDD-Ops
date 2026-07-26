@@ -88,17 +88,11 @@ export default function ManagePortalLink() {
     <div className="panel flex flex-col gap-4 p-5">
       <div className="flex items-center gap-2">
         <LinkSimple size={17} weight="fill" style={{ color: 'var(--accent)' }} />
-        <h3 className="font-display text-[16px] font-medium">Repair portal link</h3>
+        <h3 className="font-display text-base font-medium">Repair portal link</h3>
       </div>
-      <p className="text-[12.5px] leading-[1.5] text-fg3">
-        Attaches client sites to a portal account so their <code className="codechip">/portal</code>{' '}
-        loads. Use this if a client is unlinked from one or several sites (deleted &amp;
-        re-signed-up, or they signed up with a different email). Each attach is an upsert —
-        sites already on the account are <strong className="text-fg">never</strong> removed.
-      </p>
 
       {loadError && (
-        <div className="flex items-center gap-2 text-[12.5px]" style={{ color: 'var(--danger)' }}>
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--danger)' }}>
           <Warning size={14} /> {loadError}
         </div>
       )}
@@ -112,21 +106,17 @@ export default function ManagePortalLink() {
           onChange={(e) => setEmail(e.target.value)}
           disabled={running}
           placeholder="The email the client signed up to the portal with"
-          className="rounded-[10px] border border-rule bg-[var(--bg-deep)] px-3 py-2 text-[13px] text-fg placeholder:text-fg3"
+          className="rounded-[10px] border border-rule bg-[var(--bg-deep)] px-3 py-2 text-xs text-fg placeholder:text-fg3"
         />
-        <span className="text-[11.5px] text-fg3">
-          Every selected site is attached to this one account. It must be the address they
-          actually signed up with — not necessarily the business email in site.ts.
-        </span>
       </label>
 
       {/* Client multi-select */}
       <div className="flex flex-col gap-1.5">
         <span className="kicker">Sites to attach</span>
         <div className="max-h-[220px] overflow-y-auto rounded-[10px] border border-rule bg-[var(--bg-deep)] p-1">
-          {!clients && <div className="px-3 py-2 text-[12.5px] text-fg3">Loading…</div>}
+          {!clients && <div className="px-3 py-2 text-xs text-fg3">Loading…</div>}
           {clients?.length === 0 && (
-            <div className="px-3 py-2 text-[12.5px] text-fg3">No clients with an intake schema.</div>
+            <div className="px-3 py-2 text-xs text-fg3">No clients with an intake schema.</div>
           )}
           {clients?.map((c) => {
             const linked = Boolean(c.sites?.[0]?.env?.CLERK_USER_ID);
@@ -141,14 +131,14 @@ export default function ManagePortalLink() {
                   onChange={() => toggle(c.slug)}
                   disabled={running}
                 />
-                <span className="flex-1 text-[13px] text-fg">
+                <span className="flex-1 text-xs text-fg">
                   {c.brandName}{' '}
                   <span className="text-fg3">
                     — {c.slug} ({c.plan}
                     {c.sites.length > 1 ? `, ${c.sites.length} sites` : ''})
                   </span>
                 </span>
-                <span className="text-[11px]" style={{ color: linked ? 'var(--ok)' : 'var(--fg-3)' }}>
+                <span className="text-xs" style={{ color: linked ? 'var(--ok)' : 'var(--fg-3)' }}>
                   {linked ? 'previously linked' : 'not linked'}
                 </span>
               </label>
@@ -168,8 +158,7 @@ export default function ManagePortalLink() {
           type="button"
           onClick={() => setDryRun((d) => !d)}
           disabled={running}
-          className="flex items-center gap-2 text-[12.5px]"
-          title="Dry runs write nothing — just show what would be attached"
+          className="flex items-center gap-2 text-xs"
         >
           <span
             className="relative h-[18px] w-[32px] rounded-full transition-colors"
@@ -201,12 +190,12 @@ export default function ManagePortalLink() {
       {response && (
         <div className="flex flex-col gap-2 rounded-[10px] border border-rule bg-[var(--bg-deep)] p-3">
           {response.error && (
-            <div className="flex items-center gap-2 text-[12.5px]" style={{ color: 'var(--danger)' }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--danger)' }}>
               <XCircle size={14} weight="fill" /> {response.error}
             </div>
           )}
           {response.results?.map((r) => (
-            <div key={r.slug} className="flex items-start gap-2 text-[12.5px]">
+            <div key={r.slug} className="flex items-start gap-2 text-xs">
               {r.ok ? (
                 <CheckCircle size={14} weight="fill" style={{ color: 'var(--ok)', flexShrink: 0, marginTop: 2 }} />
               ) : (

@@ -7,10 +7,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ShieldCheck, Clock, Tag, Star } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
-import { E } from '@/lib/editable';
+import { E, Ico } from '@/lib/editable';
+import { pillarIcon } from '@/lib/icons';
 import { useCountUp } from '@/lib/useCountUp';
 
 export const meta = {
@@ -18,15 +18,8 @@ export const meta = {
   category: 'about',
   label: 'About / Pillars + stats',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars', 'about.stats'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useCountUp'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useCountUp', '@/lib/icons'],
 } as const;
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
-  shield: ShieldCheck,
-  clock:  Clock,
-  tag:    Tag,
-  star:   Star,
-};
 
 function StatCell({ n, l, np, lp, run, reduce }: { n: string; l: string; np: string; lp: string; run: boolean; reduce: boolean }) {
   const v = useCountUp(n, run, reduce);
@@ -78,7 +71,7 @@ export default function AboutPillars({ content = CONTENT }: { content?: SiteCont
         {/* Numbered pillar index */}
         <div className="mt-12 border-t border-rule">
           {about.pillars.map((p, i) => {
-            const Icon = ICON_MAP[p.k];
+            const Icon = pillarIcon(p.icon, p.k);
             return (
               <motion.div
                 key={p.k}
@@ -91,7 +84,7 @@ export default function AboutPillars({ content = CONTENT }: { content?: SiteCont
                 <span className="font-heading text-4xl font-black leading-none tabular-nums text-ink/20 sm:text-5xl">{String(i + 1).padStart(2, '0')}</span>
                 <div>
                   <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-ink">
-                    {Icon && <Icon size={19} className="text-accent" />}
+                    {Icon && <Ico p={`about.pillars.${i}.icon`} icon={Icon} size={19} className="text-accent" />}
                     <E p={`about.pillars.${i}.t`}>{p.t}</E>
                   </h3>
                   <p className="mt-2 max-w-2xl leading-relaxed text-inkSoft"><E p={`about.pillars.${i}.d`}>{p.d}</E></p>

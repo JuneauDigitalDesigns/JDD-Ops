@@ -43,8 +43,8 @@ export default function StyleToolbar({
       // Keep the underlying <E> focused while interacting with the toolbar.
       onMouseDown={(e) => e.preventDefault()}
     >
-      <label className="flex items-center gap-1.5" title="Text color">
-        <span className="font-chromeMono text-[10px] uppercase tracking-widest text-zinc-400">Color</span>
+      <label className="flex items-center gap-1.5">
+        <span className="text-label font-medium text-zinc-500">Color</span>
         <input
           type="color"
           value={/^#[0-9a-fA-F]{6}$/.test(cur.color ?? '') ? (cur.color as string) : '#000000'}
@@ -53,8 +53,8 @@ export default function StyleToolbar({
         />
       </label>
 
-      <label className="flex items-center gap-1.5" title="Font size">
-        <span className="font-chromeMono text-[10px] uppercase tracking-widest text-zinc-400">Size</span>
+      <label className="flex items-center gap-1.5">
+        <span className="text-label font-medium text-zinc-500">Size</span>
         <input
           type="range"
           min={10}
@@ -71,8 +71,8 @@ export default function StyleToolbar({
         <span className="w-8 font-chromeMono text-xs text-zinc-600">{size}</span>
       </label>
 
-      <label className="flex items-center gap-1.5" title="Weight">
-        <span className="font-chromeMono text-[10px] uppercase tracking-widest text-zinc-400">Weight</span>
+      <label className="flex items-center gap-1.5">
+        <span className="text-label font-medium text-zinc-500">Weight</span>
         <select
           value={cur.fontWeight ?? ''}
           onChange={(e) => set('fontWeight', e.target.value ? Number(e.target.value) : undefined)}

@@ -15,7 +15,7 @@ import { E } from '@/lib/editable';
 export const meta = {
   id: 'contact-banner-starter',
   category: 'contact',
-  label: 'Contact / Banner — Starter (email)',
+  label: 'Contact / Banner (Starter, email)',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.cta', 'finalCta.frictionReducers', 'brand.email'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
   leadMode: 'email',

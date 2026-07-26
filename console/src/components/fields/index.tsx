@@ -19,9 +19,15 @@ import { FONT_OPTIONS } from '@/lib/fonts';
 
 export type SetField = (path: string, value: unknown) => void;
 
+// Sizing comes from the scale in tailwind.config.ts / globals.css — do not hardcode
+// px here. `text-sm` is 15px, `text-label` is 14px (see the fontSize scale).
 export const INPUT_CLS =
-  'w-full rounded-md border border-uiRuleStrong bg-uiSurface px-2.5 py-1.5 text-sm text-uiFg placeholder-uiFg3 outline-none focus:border-uiAccent';
-export const LABEL_CLS = 'mb-1 block font-chromeMono text-[10px] uppercase tracking-widest text-uiFg3';
+  'block w-full min-h-[var(--control-h)] rounded-[var(--radius-control)] border border-ruleStrong bg-panel px-3 text-sm text-fg placeholder-fg3 outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]';
+
+// Field labels are sentence-case body text, NOT eyebrows. The 10px uppercase mono
+// treatment this replaced was applied to every field in the app and was the single
+// largest source of eye strain. Eyebrows (.kicker) are for section headers only.
+export const LABEL_CLS = 'mb-1.5 block font-chrome text-label font-medium text-fg2';
 
 function str(content: SiteContent, path: string): string {
   const v = getPath(content, path);
@@ -31,7 +37,7 @@ function str(content: SiteContent, path: string): string {
 /** Small amber chip marking a field/section flagged in _meta.missing_fields. */
 export function ReviewBadge() {
   return (
-    <span className="rounded bg-amber-100 px-1.5 py-0.5 font-chromeMono text-[9px] uppercase tracking-wide text-amber-700">
+    <span className="rounded bg-amber-100 px-2 py-0.5 font-chromeMono text-2xs uppercase tracking-wide text-amber-700">
       review
     </span>
   );
@@ -53,6 +59,9 @@ export function Field({
         value={str(content, path)}
         placeholder={placeholder}
         onChange={(e) => setField(path, type === 'number' ? Number(e.target.value) : e.target.value)}
+        // Mirrors <E>'s data-edit-path so lib/focusPath can target drawer inputs too
+        // (used by the Cmd+K field palette and the SEO coverage readout's fix links).
+        data-field-path={path}
         className={INPUT_CLS}
       />
     </label>
@@ -69,7 +78,13 @@ export function Area({
       <span className={`${LABEL_CLS} flex items-center gap-2`}>
         {label} {flagged && <ReviewBadge />}
       </span>
-      <textarea rows={3} value={str(content, path)} onChange={(e) => setField(path, e.target.value)} className={INPUT_CLS} />
+      <textarea
+        rows={3}
+        value={str(content, path)}
+        onChange={(e) => setField(path, e.target.value)}
+        data-field-path={path}
+        className={INPUT_CLS}
+      />
     </label>
   );
 }
@@ -94,24 +109,33 @@ export function Color({
   content: SiteContent; setField: SetField; path: string; label: string;
 }) {
   const v = str(content, path) || '#000000';
+  const safe = /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000';
   return (
-    <label className="flex items-center justify-between gap-2">
-      <span className="font-chromeMono text-[10px] uppercase tracking-widest text-uiFg3">{label}</span>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-label font-medium text-fg2">{label}</span>
       <span className="flex items-center gap-2">
+        {/* Swatch first: the colour is the control. The hex box is the fallback for exact
+            values, not the primary way to change it. */}
+        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-ruleStrong">
+          <span className="absolute inset-0" style={{ backgroundColor: safe }} />
+          <input
+            type="color"
+            value={safe}
+            onChange={(e) => setField(path, e.target.value)}
+            aria-label={label}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </span>
         <input
           type="text"
           value={str(content, path)}
           onChange={(e) => setField(path, e.target.value)}
-          className="w-20 rounded border border-uiRuleStrong bg-uiSurface px-1.5 py-1 font-chromeMono text-xs text-uiFg"
-        />
-        <input
-          type="color"
-          value={/^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000'}
-          onChange={(e) => setField(path, e.target.value)}
-          className="h-7 w-7 cursor-pointer rounded border border-uiRuleStrong bg-transparent"
+          aria-label={`${label} hex`}
+          data-field-path={path}
+          className="w-24 rounded-md border border-ruleStrong bg-panel px-2 py-1.5 font-chromeMono text-xs text-fg2 outline-none focus:border-accent"
         />
       </span>
-    </label>
+    </div>
   );
 }
 
@@ -160,39 +184,58 @@ export function ImageSlot({
     }
   }
 
+  const shown = val && !val.startsWith('upload://') && /^https?:|^\//.test(val) ? val : null;
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <span className={LABEL_CLS}>{label}</span>
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={val}
-          onChange={(e) => setField(path, e.target.value)}
-          placeholder="url or upload"
-          className="min-w-0 flex-1 rounded-md border border-uiRuleStrong bg-uiSurface px-2.5 py-1.5 text-sm text-uiFg outline-none focus:border-uiAccent"
-        />
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-uiRuleStrong px-2 py-1.5 text-xs text-uiFg2 hover:border-uiAccent hover:text-uiAccent disabled:opacity-50"
+
+      {/* The picture is the control. Clicking the tile opens the file picker; the URL box
+          below is the secondary path for images already hosted somewhere. */}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        aria-label={`Upload ${label}`}
+        className="group relative flex h-28 w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-ruleStrong bg-surface transition-colors hover:border-accent disabled:opacity-50"
+      >
+        {shown && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={shown} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <span
+          className={[
+            'relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-opacity',
+            shown
+              ? 'bg-panel/90 text-fg opacity-0 group-hover:opacity-100'
+              : 'text-fg3 group-hover:text-accent',
+          ].join(' ')}
         >
-          <UploadSimple size={13} /> {busy ? '…' : 'Upload'}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
-        />
-      </div>
-      {val && !val.startsWith('upload://') && /^https?:|^\//.test(val) && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={val} alt="" className="mt-1 h-16 w-full rounded border border-uiRule object-cover" />
-      )}
+          {busy ? <CircleNotch size={15} className="animate-spin" /> : <UploadSimple size={15} />}
+          {busy ? 'Uploading…' : shown ? 'Replace' : 'Upload an image'}
+        </span>
+      </button>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
+      />
+
+      <input
+        type="text"
+        value={val}
+        onChange={(e) => setField(path, e.target.value)}
+        placeholder="or paste a URL"
+        data-field-path={path}
+        className="w-full rounded-md border border-ruleStrong bg-panel px-2.5 py-1.5 text-xs text-fg2 outline-none focus:border-accent"
+      />
+
+      {/* Staged uploads read as a chip, not a sentence — the filename IS the message. */}
       {val.startsWith('upload://') && (
-        <p className="font-chromeMono text-[10px] text-uiFg3">Staged: {val.slice('upload://'.length)} → /images at export</p>
+        <span className="codechip inline-block">{val.slice('upload://'.length)}</span>
       )}
     </div>
   );
@@ -221,7 +264,7 @@ export function GenerateSectionButton({ onClick, busy }: { onClick: () => void; 
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="inline-flex items-center gap-1 rounded-md border border-uiRuleStrong px-2 py-1 font-chromeMono text-[10px] uppercase tracking-widest text-uiFg2 hover:border-uiAccent hover:text-uiAccent disabled:opacity-50"
+      className="btn btn-xs disabled:opacity-50"
     >
       {busy ? <CircleNotch size={12} className="animate-spin" /> : <Sparkle size={12} />} Generate
     </button>
@@ -262,7 +305,7 @@ function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-uiRuleStrong px-3 py-1.5 text-xs font-medium text-uiFg2 hover:border-uiAccent hover:text-uiAccent"
+      className="btn btn-sm border-dashed"
     >
       <Plus size={13} /> Add {label}
     </button>
@@ -311,7 +354,6 @@ export function ListSection<T extends Record<string, unknown>>({
         </SortableContext>
       </DndContext>
       <AddButton onClick={() => write([...arr, makeBlank()])} label={title.replace(/s$/, '').toLowerCase()} />
-      <p className="font-chromeMono text-[10px] text-uiFg3">Drag to reorder · edit each item&apos;s text in the live preview.</p>
     </Section>
   );
 }

@@ -6,7 +6,7 @@ import type { ClientContext, OpsConfig, Plan, SiteInfo } from './types';
 
 export type Block =
   | { t: 'text'; body: string }
-  | { t: 'callout'; tone: 'info' | 'warn' | 'danger'; body: string }
+  | { t: 'callout'; tone: 'info' | 'warn' | 'danger'; title?: string; body: string }
   | { t: 'nav'; app: string; path: string[] }
   | { t: 'cmd'; command: string; cwd?: string; note?: string }
   | { t: 'copy'; label: string; value: string; pending?: boolean }
@@ -17,7 +17,26 @@ export type Block =
   // "Get it from → Put it here → looks like" context card. value (when known) renders a copy
   // button; otherwise example shows the format.
   | { t: 'context'; label: string; from: string; to: string; example?: string; value?: string; pending?: boolean }
-  | { t: 'link'; label: string; href: string };
+  | { t: 'link'; label: string; href: string }
+  // A live, data-bound architecture diagram. Deliberately thin: the node/edge model is derived
+  // inside the component from ClientContext, so the env plumbing lives in ONE place instead of
+  // being restated at every call site. `siteSlug` picks the site on enterprise; omit for the
+  // primary site. Only rendered on /onboard — Part A has no client, so BlockView drops it.
+  | { t: 'diagram'; kind: 'call-routing' | 'pipeline' | 'post-call'; siteSlug?: string }
+  // Success criteria: what you should observe if the step worked. Previously written as a
+  // trailing "You should see: …" info callout, which read as advice rather than a check.
+  | { t: 'verify'; title?: string; items: { text: string; detail?: string }[] };
+
+/**
+ * Which blocks break out of the stage's prose column.
+ *
+ * The stage is a reading column (~70ch) because that's what body text needs. Diagrams are not
+ * text and were being squeezed into it — that's what clipped them. One place decides, so the
+ * two stages can't disagree.
+ */
+export function isWideBlock(b: Block): boolean {
+  return b.t === 'diagram';
+}
 
 export interface Step {
   id: string;
@@ -25,6 +44,14 @@ export interface Step {
   why?: string;
   est?: string;
   auto?: boolean; // performed automatically by onboard.js (shown for context, not a manual to-do)
+  /**
+   * The site this step belongs to, when a phase fans out per site (enterprise). The rail groups
+   * consecutive steps sharing a site under one sub-header — without it a 3-site client renders
+   * ~20 undifferentiated rows.
+   */
+  site?: string;
+  /** This step IS the provisioning run: the stage hands off to the launch screen. */
+  launch?: boolean;
   blocks: Block[];
 }
 
@@ -79,19 +106,14 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
     steps: [
       {
         id: 'run-onboard',
+        launch: true,
         title: 'Launch onboard.js',
         why: 'One command stands up the whole stack: GitHub repo, schema, build, Vercel deploy — plus (Growth/Enterprise) the Retell agent, phone number, Airtable base, Make Data Store row, and the Clerk portal user.',
         blocks: [
-          {
-            t: 'substeps',
-            items: [
-              { text: 'In the launch panel above, leave Dry run ON and click “Run dry run”.', detail: 'Rehearses all 10 steps — hits no APIs, writes no files.' },
-              { text: 'Read the streamed log to the end. It should reach [step 10/10] and print an ONBOARDED summary with no FAIL / ✗ lines.' },
-              { text: 'Flip the Dry run toggle OFF, click “Provision for real”, and confirm in the modal.' },
-              { text: 'Watch the summary for the repo URL' + (voice ? ', Retell agent id, phone number, Airtable base,' : ' and') + ' Clerk user id.' },
-            ],
-          },
-          { t: 'cmd', command: `npm run onboard -- --schema ${ctx.schemaPath}`, cwd: 'jdd-ops/', note: 'the launch panel runs this for you; shown for reference' },
+          // The step-by-step "click dry run, then click provision" instructions used to live
+          // here. They're gone: the launch screen IS those instructions, and a checklist that
+          // narrates the button next to it is the exact "dump of info" this redesign removes.
+          { t: 'diagram', kind: 'pipeline' },
           {
             t: 'context',
             label: 'GitHub repo it creates',
@@ -101,18 +123,21 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
           },
           {
             t: 'callout',
-            tone: 'info',
-            body: 'Step 8 buys a JDD-owned Twilio number and points its voiceUrl at /api/voice on the client site — inbound calls ring the client’s real phone first (25s, set by CLIENT_FORWARD_RING_SECONDS), then fall back to the Retell agent over SIP. The number is saved as TWILIO_NUMBER (also the Make scenario’s from_number). Full chain in the Voice agent phase.',
-          },
-          {
-            t: 'callout',
-            tone: 'info',
-            body: 'Step 10 auto-creates the Clerk portal user (needs CLERK_SECRET_KEY in jdd-ops/.env) with slug, name, plan, canonical, airtableBaseId, and vercelProjectId (the client’s Vercel project). Enable Web Analytics on that project in the portal phase to light up the Traffic tab.',
-          },
-          {
-            t: 'callout',
             tone: 'warn',
+            title: 'Re-running is safe',
             body: 'If a step FAILs: fix the cause in jdd-ops/.env and re-run. onboard.js is idempotent — it reuses already-provisioned IDs from .env.local, so re-runs won’t double-charge or duplicate resources.',
+          },
+          {
+            t: 'verify',
+            title: 'A clean run ends with',
+            items: [
+              { text: 'The log reaching [step 10/10] and printing an ONBOARDED summary, with no FAIL or ✗ lines.' },
+              {
+                text: voice
+                  ? 'A repo URL, Retell agent id, phone number, Airtable base, and Clerk user id in that summary.'
+                  : 'A repo URL and a Clerk user id in that summary.',
+              },
+            ],
           },
         ],
       },
@@ -163,44 +188,27 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
     auto: true,
     why: 'onboard.js (step 8) and the site template wire this automatically — there is no manual Twilio or Retell console step for routing. Understand it before you test-call: the Retell agent only answers when the client misses the call.',
     blocks: [
-      {
-        t: 'substeps',
-        items: [
-          { text: 'A customer dials the Twilio number → Twilio POSTs to /api/voice on the deployed client site.', detail: 'voiceUrl is set to https://{slug}.vercel.app/api/voice at number-purchase time — the .vercel.app URL stays live permanently, so a custom domain later needs no change.' },
-          { text: '/api/voice normalizes CLIENT_FORWARD_PHONE to E.164 and returns <Dial timeout="25"> to the client’s real phone.', detail: 'The 25s ring window is set by CLIENT_FORWARD_RING_SECONDS in .env.local — change that env var (no code edit) to tune it per client.' },
-          { text: 'If the client answers within 25s → normal connected call, the AI never engages.' },
-          { text: 'If no-answer / busy / failed → /api/voice/no-answer calls Retell POST /v2/register-phone-call (Bearer RETELL_API_KEY) and gets back a call_id.' },
-          { text: 'It then returns <Dial><Sip>sip:{call_id}@{RETELL_SIP_DOMAIN}</Sip></Dial> — Twilio connects the caller to the Retell agent over SIP.', detail: 'RETELL_SIP_DOMAIN defaults to sip.retellai.com. No bridge server, no Twilio SIP trunk, no number import needed — plain outbound <Dial><Sip> works out of the box.' },
-        ],
-      },
-      ...ctx.sites.map((s): Block => {
-        const num = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
-        const forward = envVal(s.env.CLIENT_FORWARD_PHONE, 'client’s real phone (from brand.phone)');
-        const agent = envVal(s.env.RETELL_AGENT_ID, 'agent_… (provision first)');
-        return {
-          t: 'fields',
-          caption: ctx.isEnterprise ? `Routing for ${s.brandName}:` : 'This client’s routing chain:',
-          rows: [
-            { label: 'Customers dial — TWILIO_NUMBER', value: num.value, pending: num.pending },
-            { label: 'Rings first, 25s — CLIENT_FORWARD_PHONE', value: forward.value, pending: forward.pending },
-            { label: 'AI fallback on no-answer (SIP) — RETELL_AGENT_ID', value: agent.value, pending: agent.pending },
-          ],
-        };
-      }),
+      // The 5-step substeps list and the per-site `fields` table that used to sit here are
+      // both gone — the diagram carries the sequence AND binds the same three env values, so
+      // keeping either would print every number on this screen twice.
+      ...ctx.sites.map((s): Block => ({ t: 'diagram', kind: 'call-routing', siteSlug: s.slug })),
       {
         t: 'callout',
         tone: 'danger',
-        body: 'Do NOT import this Twilio number into the Retell dashboard or set up SIP trunking there. A Retell-managed / SIP-trunked number bypasses /api/voice entirely, which kills the human-first ring (calls go straight to the AI). The number must stay JDD/Twilio-owned with its voiceUrl pointed at /api/voice — onboard.js sets this automatically.',
-      },
-      {
-        t: 'callout',
-        tone: 'info',
-        body: '/api/voice/no-answer needs RETELL_API_KEY and RETELL_SIP_DOMAIN at runtime to register the call and build the SIP URI. onboard.js writes both into .env.local and Vercel sync pushes them — no manual step. If the AI leg 500s after the ring, confirm RETELL_API_KEY exists on the Vercel project.',
+        title: 'Never import this number into Retell',
+        body: 'A Retell-managed / SIP-trunked number bypasses /api/voice entirely, which kills the human-first ring — every call would go straight to the AI. The number must stay JDD/Twilio-owned with its voiceUrl pointed at /api/voice, which onboard.js sets automatically.',
       },
       {
         t: 'callout',
         tone: 'warn',
-        body: 'Routing only works once the client repo is deployed to Vercel with env synced — Twilio must reach /api/voice at the .vercel.app URL (local dev gets no Twilio webhooks without a tunnel). To change the ring window, set CLIENT_FORWARD_RING_SECONDS in .env.local and re-sync (no code edit).',
+        title: 'Only works once deployed',
+        body: 'Twilio has to reach /api/voice at the .vercel.app URL, so routing is dead until the repo is deployed with env synced (local dev gets no Twilio webhooks without a tunnel). To change the ring window, set CLIENT_FORWARD_RING_SECONDS in .env.local and re-sync — no code edit.',
+      },
+      {
+        t: 'callout',
+        tone: 'info',
+        title: 'If the AI leg 500s after the ring',
+        body: '/api/voice/no-answer needs RETELL_API_KEY and RETELL_SIP_DOMAIN at runtime to register the call and build the SIP URI. onboard.js writes both and Vercel sync pushes them — so if it fails, confirm RETELL_API_KEY actually exists on the Vercel project.',
       },
     ],
   };
@@ -216,6 +224,7 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
         const slugForCmd = ctx.isEnterprise ? `${ctx.slug}/site-${i + 1}` : ctx.slug;
         return {
           id: `checkpoint-2-${s.slug}`,
+          site: s.slug,
           title: ctx.isEnterprise ? `Checkpoint 2 — test-call & tune (${s.brandName})` : 'Checkpoint 2 — test-call & tune the agent',
           est: '~20 min',
           why: 'Hear the greeting and qualifying flow on a real call, fix anything wrong in the prompt, and re-upload.',
@@ -240,42 +249,28 @@ function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
             },
             { t: 'cmd', command: `npm run update-prompt -- ${agent.value} --slug ${slugForCmd}`, cwd: 'jdd-ops/' },
             {
-              t: 'callout',
-              tone: 'info',
-              body: 'You should hear: a warm greeting with the exact business name, FAQ answers drawn only from the intake, pricing deferred to the owner, and the agent collecting name + callback number.',
+              t: 'verify',
+              title: 'You should hear',
+              items: [
+                { text: 'A warm greeting using the exact business name.' },
+                { text: 'FAQ answers drawn only from the intake — nothing invented.' },
+                { text: 'Pricing deferred to the owner.', detail: 'The agent should never quote a price.' },
+                { text: 'The agent collecting a name and a callback number.' },
+              ],
             },
           ],
         };
       }),
-      {
-        id: 'post-call-webhook',
-        title: 'Post-call webhook (set automatically)',
-        auto: true,
-        why: 'onboard.js now sets each agent’s post-call webhook to that client’s cloned scenario URL (step 8c). This is a verification, not a manual step — the per-client details live in the “Post-call logging & SMS” phase below.',
-        blocks: [
-          {
-            t: 'substeps',
-            items: [
-              { text: 'Retell dashboard → Agents → select this client’s agent (match the agent id from .env.local).' },
-              { text: 'Open the agent’s Settings and confirm the “Post-call webhook URL” is set.' },
-              { text: 'It should match RETELL_POST_CALL_WEBHOOK_URL in clients/{slug}/.env.local (the clone’s webhook).' },
-            ],
-          },
-          { t: 'nav', app: 'Retell', path: ['Agents', '{agent}', 'Settings', 'Post-call webhook URL'] },
-          {
-            t: 'callout',
-            tone: 'info',
-            body: 'You should see: after a test call ends, a green run in this client’s “Post-call: …” Make scenario and a new row in the client’s Airtable Call Log within ~30s.',
-          },
-        ],
-      },
+      // The old `post-call-webhook` reference step lived here. It and `postcall-auto-{slug}`
+      // (in the Post-call phase) both said "confirm the webhook URL matches" — two rail rows
+      // per site for one fact. Merged into the latter, which is where the per-client values
+      // already were. At enterprise N=3 that's three fewer near-duplicate rows.
     ],
   };
 }
 
 function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[] {
   const twilio = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
-  const webhook = envVal(s.env.RETELL_POST_CALL_WEBHOOK_URL, 'set by onboard.js after the clone');
   const owner = envVal(s.env.CLIENT_FORWARD_PHONE, 'the owner number (brand.phone)');
   const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? '25';
   const slugForCmd = ctx.isEnterprise ? `${ctx.slug}/site-${i + 1}` : ctx.slug;
@@ -285,35 +280,31 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
   return [
     {
       id: `postcall-auto-${s.slug}`,
+      site: s.slug,
       title: `Post-call logging + owner SMS (automated)${label}`,
       auto: true,
       why: 'onboard.js cloned the master post-call scenario for this client, pointed its Airtable + Twilio SMS modules at this client, activated it, and set the clone’s webhook on the Retell agent. Nothing to do here unless verification fails.',
       blocks: [
+        // The diagram binds the webhook URL, Airtable base, owner number and Twilio number, so
+        // the `context` card and the info callout that restated all four are gone.
+        { t: 'diagram', kind: 'post-call', siteSlug: s.slug },
         {
-          t: 'substeps',
+          t: 'verify',
+          title: 'Two things to confirm',
           items: [
-            { text: `Make.com → confirm a scenario “Post-call: ${s.brandName}” exists and is Active.` },
-            { text: 'Retell → Agents → this client’s agent → Settings → confirm the Post-call webhook URL matches the value below.' },
+            { text: `Make.com has a scenario “Post-call: ${s.brandName}” and it is Active.` },
+            {
+              text: 'The Retell agent’s Post-call webhook URL matches the one in the diagram.',
+              detail: `Retell → Agents → this client’s agent → Settings. The value is RETELL_POST_CALL_WEBHOOK_URL in clients/${slugForCmd}/.env.local, written by onboard.js.`,
+            },
           ],
         },
-        {
-          t: 'context',
-          label: 'This client’s post-call webhook URL',
-          from: `clients/${slugForCmd}/.env.local → RETELL_POST_CALL_WEBHOOK_URL (written by onboard.js)`,
-          to: 'the Retell agent’s Post-call webhook (already set)',
-          value: webhook.pending ? undefined : webhook.value,
-          example: 'https://hook.us2.make.com/…',
-          pending: webhook.pending,
-        },
-        {
-          t: 'callout',
-          tone: 'info',
-          body: `The clone hardcodes this client’s Airtable base, texts the owner at ${owner.value} from ${twilio.value}, and a filter right after the webhook drops anything the AI didn’t handle — so client-answered calls never log or text.`,
-        },
+        { t: 'nav', app: 'Retell', path: ['Agents', '{agent}', 'Settings', 'Post-call webhook URL'] },
       ],
     },
     {
       id: `twilio-sms-reg-${s.slug}`,
+      site: s.slug,
       title: `Enable SMS on the Twilio number${label}`,
       why: 'US carriers block outbound SMS from unregistered numbers. Until this number is registered/approved, the owner-notification texts silently fail.',
       blocks: [
@@ -343,6 +334,7 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
     },
     {
       id: `checkpoint-postcall-${s.slug}`,
+      site: s.slug,
       title: `Checkpoint — post-call log + owner SMS${label}`,
       est: '~15 min',
       why: 'Proves the chain: AI-handled call → Make clone → Airtable row + owner SMS.',
@@ -356,9 +348,18 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
           ],
         },
         {
+          t: 'verify',
+          title: 'Within ~30 seconds',
+          items: [
+            { text: 'A new row in the client’s Airtable Call Log.' },
+            { text: `A brief SMS to ${owner.value}.` },
+          ],
+        },
+        {
           t: 'callout',
-          tone: 'info',
-          body: `If nothing: Retell call log (did it complete?) → Make “Post-call: ${s.brandName}” History (webhook fired? filter passed? Airtable/Twilio module errors?) → Twilio Messaging logs (registration status).`,
+          tone: 'warn',
+          title: 'If nothing arrives',
+          body: `Walk it backwards: Retell call log (did the call complete?) → Make “Post-call: ${s.brandName}” History (webhook fired? filter passed? module errors?) → Twilio Messaging logs (is the number registered yet?).`,
         },
       ],
     },

@@ -16,7 +16,7 @@ import { E } from '@/lib/editable';
 export const meta = {
   id: 'finalcta-starter-banner',
   category: 'finalCta',
-  label: 'Final CTA / Starter — Banner',
+  label: 'Final CTA / Starter Banner',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
   leadMode: 'email',
@@ -100,7 +100,7 @@ export default function FinalCtaStarterBanner({ content = CONTENT }: { content?:
         >
           {status === 'done' ? (
             <div className="rounded-xl bg-white/10 p-8 text-center">
-              <p className="font-heading text-lg font-semibold text-bg">Thanks — we&apos;ll email you back.</p>
+              <p className="font-heading text-lg font-semibold text-bg">Thanks, we&apos;ll email you back.</p>
               <p className="mt-2 text-sm text-bg/70">Usually within a business day.</p>
             </div>
           ) : (

@@ -256,6 +256,39 @@ export function writeClientIntake(repoRoot: string, slug: string, intake: Intake
 }
 
 /**
+ * Rewrite the data object in clients/<slug>/site.ts **in place**, preserving everything
+ * that precedes it.
+ *
+ * That file comes in two shapes, both of which loadIntake() understands:
+ *   • `export const INTAKE = { plan, siteCount, sites }` — written by writeClientIntake
+ *     for signups pulled off the KV queue.
+ *   • `export const CONTENT: SiteContent = {…}` — blank/vertical clients, whose files
+ *     carry a doc header plus ~240 lines of inline TypeScript interfaces above the data.
+ *
+ * Regenerating either from scratch would discard that prelude (and, for CONTENT files,
+ * the interface declarations the file exports), so we splice: keep the source up to the
+ * export statement, re-serialize the object, keep nothing after it. The export keyword,
+ * name, and type annotation are preserved verbatim from the original.
+ *
+ * Returns false if no recognized export is found, so callers can 4xx rather than write
+ * a file they don't understand. JSON.stringify keeps this data-only — no code injection
+ * from client-supplied strings.
+ */
+export function rewriteClientSchema(repoRoot: string, slug: string, data: unknown): boolean {
+  if (!isValidSlug(slug)) throw new Error(`Invalid slug "${slug}".`);
+  const file = resolve(repoRoot, 'clients', slug, 'site.ts');
+  if (!existsSync(file)) return false;
+  const src = readFileSync(file, 'utf8');
+  // Match the declaration head only — `export const CONTENT: SiteContent = ` / `export const INTAKE = `.
+  const m = /^export\s+const\s+(INTAKE|CONTENT)\s*(:\s*[A-Za-z_$][\w$]*)?\s*=\s*/m.exec(src);
+  if (!m) return false;
+  const head = src.slice(0, m.index);
+  const decl = `export const ${m[1]}${m[2] ?? ''} = `;
+  writeFileSync(file, `${head}${decl}${JSON.stringify(data, null, 2)};\n`, 'utf8');
+  return true;
+}
+
+/**
  * Walk the content tree; for every string value shaped "upload://<file>", copy the staged
  * file from console/.uploads into clients/<slug>/repo/public/images and rewrite the value to
  * "/images/<file>". Returns a deep clone with refs resolved; unknown refs collapse to "".

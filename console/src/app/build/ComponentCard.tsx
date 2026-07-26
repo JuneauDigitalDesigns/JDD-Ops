@@ -1,7 +1,7 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
-import { DotsSixVertical } from '@phosphor-icons/react';
+import { DotsSixVertical, Plus } from '@phosphor-icons/react';
 import type { VariantEntry } from './categories';
 import type { SkinId } from '@/lib/skins';
 import type { Brand } from '@/data/site';
@@ -14,6 +14,7 @@ export default function ComponentCard({
   selected,
   skin,
   onSkinChange,
+  onPick,
 }: {
   variant: VariantEntry;
   categoryId: string;
@@ -21,6 +22,8 @@ export default function ComponentCard({
   selected: boolean;
   skin: SkinId;
   onSkinChange: (skin: SkinId) => void;
+  /** Click-to-add. Optional so the card stays usable anywhere drag is the only path. */
+  onPick?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `${categoryId}::${variant.name}`,
@@ -51,12 +54,27 @@ export default function ComponentCard({
           <h2 className="font-display text-sm font-medium text-uiInk">{variant.label}</h2>
           <span className="font-chromeMono text-xs text-uiInkSoft">{variant.id}</span>
           {selected && (
-            <span className="rounded-full bg-uiAccent px-2 py-0.5 font-chromeMono text-[10px] font-medium text-uiInk">
+            <span className="rounded-full bg-uiAccent px-2 py-0.5 font-chromeMono text-kicker font-medium text-uiInk">
               selected
             </span>
           )}
         </div>
-        <DotsSixVertical size={18} className="text-uiInkSoft shrink-0" />
+        <div className="flex shrink-0 items-center gap-3">
+          {onPick && (
+            <button
+              type="button"
+              onClick={onPick}
+              // The <header> carries the drag listeners, so this button must swallow
+              // pointerdown — otherwise the PointerSensor's 4px activation constraint
+              // starts a drag and the click never fires.
+              onPointerDown={(e) => e.stopPropagation()}
+              className="btn btn-xs btn-primary"
+            >
+              <Plus size={14} weight="bold" /> {selected ? 'Replace' : 'Add to page'}
+            </button>
+          )}
+          <DotsSixVertical size={18} className="text-uiInkSoft" />
+        </div>
       </header>
 
       {showSkinToggle && (
@@ -65,14 +83,14 @@ export default function ComponentCard({
           // Not draggable — clicking a skin button shouldn't start the drag-to-select gesture.
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <span className="mr-1 font-chromeMono text-[10px] uppercase tracking-widest text-uiInkSoft">Skin</span>
+          <span className="mr-1 text-label font-medium text-uiInkSoft">Skin</span>
           {variant.skins.map((sk) => (
             <button
               key={sk.id}
               type="button"
               onClick={() => onSkinChange(sk.id)}
               className={[
-                'rounded-full px-3 py-1 font-chromeMono text-[11px] uppercase tracking-widest transition-colors',
+                'rounded-full px-3 py-1 font-chromeMono text-xs uppercase tracking-widest transition-colors',
                 sk.id === skin ? 'bg-uiInk text-white' : 'text-uiInkSoft hover:bg-uiSurface2',
               ].join(' ')}
             >

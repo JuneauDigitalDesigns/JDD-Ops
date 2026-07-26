@@ -47,6 +47,20 @@ export function typographyVars(brand: Brand): CSSProperties {
     '--font-heading': t.fontHeading,
     '--heading-weight': String(t.headingWeight),
     '--body-weight': String(t.bodyWeight),
+    '--heading-tracking': t.headingTracking ?? 'normal',
+    '--heading-line-height': String(t.headingLineHeight ?? 1.15),
+    // Actually APPLY the body font to the preview subtree.
+    //
+    // globals.css gives headings `font-family: var(--font-heading)` inside .studio-chrome,
+    // but nothing claimed body text — so it inherited the console's own chrome font from
+    // <body> and picking a body font in the drawer did nothing visible. Setting it here
+    // scopes it exactly to the elements that receive these vars (the finalize <main>, the
+    // build-step preview cards) instead of leaking into the wizard/drawer chrome.
+    //
+    // Headings are unaffected: the .studio-chrome :where(h1..h6) rule matches those
+    // elements directly, which beats an inherited value from this ancestor.
+    fontFamily: 'var(--font-sans)',
+    fontWeight: 'var(--body-weight)',
   } as CSSProperties;
 }
 
@@ -68,6 +82,19 @@ function contrastRatio(a: number, b: number): number {
   const hi = Math.max(a, b);
   const lo = Math.min(a, b);
   return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * WCAG contrast ratio between two hex colors (1–21). Wraps the private helpers above so
+ * the brand drawer's palette pane can show an AA readout without duplicating the math.
+ * Returns 1 (worst case, so the UI flags it) on an unparseable color.
+ */
+export function contrast(a: string, b: string): number {
+  try {
+    return contrastRatio(relLuminance(a), relLuminance(b));
+  } catch {
+    return 1;
+  }
 }
 
 /** White or `dark` (brand ink), whichever contrasts better against `bg`. */

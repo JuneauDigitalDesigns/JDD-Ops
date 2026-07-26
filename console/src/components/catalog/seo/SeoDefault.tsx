@@ -5,7 +5,7 @@ export const meta = {
   id: 'seo-default',
   category: 'seo',
   label: 'SEO / Default (title + description + canonical)',
-  consumes: ['seo.title', 'seo.description', 'seo.canonical', 'seo.googleAnalyticsId', 'seo.facebookPixelId', 'brand.name'],
+  consumes: ['seo.title', 'seo.description', 'seo.canonical', 'brand.name'],
   sharedDeps: [],
 } as const;
 
@@ -31,30 +31,14 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function SeoDefault() {
-  const { seo } = CONTENT;
-  return (
-    <>
-      {seo.googleAnalyticsId && (
-        <>
-          <script
-            async
-            src={`https://www.googletagmanager.com/gtag/js?id=${seo.googleAnalyticsId}`}
-          />
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${seo.googleAnalyticsId}');`,
-            }}
-          />
-        </>
-      )}
-      {seo.facebookPixelId && (
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${seo.facebookPixelId}');fbq('track','PageView');`,
-          }}
-        />
-      )}
-    </>
-  );
-}
+// No default export by design.
+//
+// This file previously default-exported a component that injected gtag.js and the Facebook
+// pixel from seo.googleAnalyticsId / seo.facebookPixelId. It never ran: wirePage() injects
+// only `export { generateMetadata }` at the @studio:metadata anchor, and `seo` is not in
+// BODY_SLOTS, so nothing ever imported the default. The console collected both IDs in three
+// separate forms and they reached no client site.
+//
+// Removed rather than wired up, because Vercel Analytics is already in the template layout
+// and adding two more trackers isn't a decision this cleanup should make silently. If GA or
+// Pixel is wanted later, add it in template/src/app/layout.tsx where it will actually load.

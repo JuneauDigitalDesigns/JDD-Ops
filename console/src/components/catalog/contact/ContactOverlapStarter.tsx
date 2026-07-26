@@ -16,7 +16,7 @@ import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 export const meta = {
   id: 'contact-overlap-starter',
   category: 'contact',
-  label: 'Contact / Overlap — Starter (email)',
+  label: 'Contact / Overlap (Starter, email)',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'extensions.contactDetails'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
   skins: ['editorial', 'contrast'],

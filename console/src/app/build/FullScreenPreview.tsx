@@ -44,7 +44,7 @@ export default function FullScreenPreview({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-500 hover:text-zinc-900"
+            className="btn btn-sm"
           >
             <ArrowLeft size={14} weight="bold" />
             Back to Finalize
@@ -53,7 +53,7 @@ export default function FullScreenPreview({
             Full-screen preview{title ? ` — ${title}` : ''}
           </span>
         </div>
-        <span className="hidden font-chromeMono text-[11px] text-zinc-400 md:block">
+        <span className="hidden font-chromeMono text-xs text-zinc-400 md:block">
           Resize the window or use dev tools (F12) to test mobile
         </span>
       </div>

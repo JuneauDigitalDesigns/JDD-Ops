@@ -7,30 +7,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import {
-  Wrench, Lightning, Drop, PaintBrush, Wind, Tree, HardHat,
-  Broom, Scissors, Hammer, House, CaretDown, ArrowRight,
-} from '@phosphor-icons/react';
-import type { Icon } from '@phosphor-icons/react';
+import { CaretDown, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
-import { E } from '@/lib/editable';
+import { E, Ico } from '@/lib/editable';
+import { serviceIcon } from '@/lib/icons';
 
 export const meta = {
   id: 'services-accordion',
   category: 'services',
   label: 'Services / Accordion',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/icons'],
 } as const;
-
-const TAG_ICONS: Record<string, Icon> = {
-  cleaning: Broom, electrical: Lightning, plumbing: Drop, painting: PaintBrush,
-  hvac: Wind, landscaping: Tree, construction: HardHat, roofing: HardHat,
-  flooring: House, trimming: Scissors, carpentry: Hammer,
-  general: Wrench, repair: Wrench, maintenance: Wrench,
-};
-function getIcon(tag: string | null | undefined): Icon { return TAG_ICONS[(tag ?? '').toLowerCase()] ?? Wrench; }
 
 export default function ServicesAccordion({ content = CONTENT }: { content?: SiteContent }) {
   const reduce = useReducedMotion() ?? false;
@@ -64,7 +53,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
           {/* Left: controlled accordion */}
           <ul className="border-y border-rule">
             {services.items.map((item, i) => {
-              const IconComp = getIcon(item.tag);
+              const IconComp = serviceIcon(item.icon, item.tag);
               const on = i === openIdx;
               const nn = String(item.n ?? i + 1).padStart(2, '0');
               return (
@@ -76,7 +65,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                     className="flex w-full items-center gap-4 py-5 text-left"
                   >
                     <span className={`shrink-0 font-heading text-2xl font-black leading-none tabular-nums ${on ? 'text-accent' : 'text-ink/25'}`}>{nn}</span>
-                    <IconComp size={20} className={`shrink-0 ${on ? 'text-accent' : 'text-inkSoft'}`} />
+                    <Ico p={`services.items.${i}.icon`} icon={IconComp} size={20} className={`shrink-0 ${on ? 'text-accent' : 'text-inkSoft'}`} />
                     <h3 className="flex-1 font-heading text-lg text-ink"><E p={`services.items.${i}.t`}>{item.t}</E></h3>
                     <CaretDown size={18} className={`shrink-0 transition-transform duration-200 ${on ? '-rotate-180 text-accent' : 'text-inkSoft'}`} aria-hidden="true" />
                   </button>

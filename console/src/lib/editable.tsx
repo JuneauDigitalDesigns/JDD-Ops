@@ -17,11 +17,15 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import type { Icon, IconWeight } from '@phosphor-icons/react';
 import { getPath } from '@/lib/merge';
 import type { ElementStyle } from '@/data/site';
+import { ICON_REGISTRY, ICON_PICKER_KEYS } from '@/lib/icons';
+import AnchoredPopover from '@/components/AnchoredPopover';
 
 type Ctx = {
   enabled: boolean;
@@ -136,5 +140,75 @@ export function E({
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * Editable icon bound to a content path. `icon` MUST be the already-resolved Phosphor
+ * component (call sites use serviceIcon()/pillarIcon() from lib/icons). Outside an
+ * EditProvider — every client repo, via the passthrough twin — it renders the icon plain.
+ * Inside one, clicking it opens a picker that writes the chosen registry key to `p`.
+ *
+ * A <span role="button">, not a <button>: catalog icons frequently render inside a row
+ * <button>, and nesting real buttons is invalid HTML.
+ */
+export function Ico({
+  p,
+  icon: IconComp,
+  size = 20,
+  weight,
+  className,
+}: {
+  p?: string;
+  icon: Icon;
+  size?: number;
+  weight?: IconWeight;
+  className?: string;
+}) {
+  const ctx = useContext(EditCtx);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  if (!ctx?.enabled || !p) return <IconComp size={size} weight={weight} className={className} />;
+
+  return (
+    <>
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label="Change icon"
+        data-edit-path={p}
+        onClick={(e) => { e.stopPropagation(); setRect(e.currentTarget.getBoundingClientRect()); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setRect((e.currentTarget as HTMLElement).getBoundingClientRect());
+          }
+        }}
+        className="inline-flex cursor-pointer rounded outline-none ring-amber-300 transition hover:ring-2 focus:ring-2"
+      >
+        <IconComp size={size} weight={weight} className={className} />
+      </span>
+      {rect && (
+        <AnchoredPopover rect={rect} onClose={() => setRect(null)} width={232}>
+          <p className="kicker px-1.5 py-1">Choose an icon</p>
+          <div className="grid grid-cols-6 gap-1">
+            {ICON_PICKER_KEYS.map((key) => {
+              const K = ICON_REGISTRY[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-label={key}
+                  onClick={() => { ctx.setField(p, key); setRect(null); }}
+                  className="flex aspect-square items-center justify-center rounded-md text-fg2 hover:bg-surface hover:text-accent"
+                >
+                  <K size={20} />
+                </button>
+              );
+            })}
+          </div>
+        </AnchoredPopover>
+      )}
+    </>
   );
 }
