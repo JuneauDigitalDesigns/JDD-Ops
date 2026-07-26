@@ -1,7 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { getManageClient, SLUG_RE } from '@/lib/manageSites';
 import { DEFAULT_SECTION, findSection, MANAGE_SECTIONS } from '@/lib/manageSections';
-import SectionHeader from '@/components/manage/SectionHeader';
+import OverviewSection from '@/components/manage/OverviewSection';
+import EnvironmentSection from '@/components/manage/EnvironmentSection';
+import DeploymentsSection from '@/components/manage/DeploymentsSection';
+import VoiceAgentSection from '@/components/manage/VoiceAgentSection';
+import PortalSection from '@/components/manage/PortalSection';
 
 /**
  * The stage. One dynamic [section] segment rather than five named folders, so the plan
@@ -30,12 +34,19 @@ export default async function ManageSectionPage({
     notFound();
   }
 
-  return (
-    <div className="mx-auto w-full max-w-[1180px] px-8 py-8 lg:px-10">
-      <SectionHeader title={section.label} lede={section.lede} />
-      <div className="panel p-5 text-sm text-fg3">
-        {section.label} section — built in the next phase.
-      </div>
-    </div>
-  );
+  // Each section owns its own layout width and its own data fetching — they have very
+  // different shapes (a 900px form column vs a tile grid), so a shared wrapper here would
+  // just be something each one fights.
+  switch (section.id) {
+    case 'overview':
+      return <OverviewSection />;
+    case 'environment':
+      return <EnvironmentSection />;
+    case 'deployments':
+      return <DeploymentsSection />;
+    case 'voice-agent':
+      return <VoiceAgentSection />;
+    case 'portal':
+      return <PortalSection />;
+  }
 }
