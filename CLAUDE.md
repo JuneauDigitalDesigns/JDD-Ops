@@ -131,15 +131,40 @@ If you edit `clients/{slug}/.env.local` after provisioning, re-sync and redeploy
 npm run sync-env -- --slug {slug}
 ```
 
-Or use the console: **`/manage` → Client environment** does the whole loop in the UI —
-validated edits to the operational vars (`CLIENT_FORWARD_PHONE`,
-`CLIENT_FORWARD_RING_SECONDS`, `AIRTABLE_BASE_ID`, `TWILIO_NUMBER`, `RETELL_AGENT_ID`,
-lead-delivery settings), writes `.env.local`, pushes to Vercel via the same
-`syncEnvToVercel`, and offers a redeploy button. It also shows per-key drift between disk
-and Vercel, so "edited but never synced" is visible instead of silent. Master credentials
-are masked and `VERCEL_PROJECT_NAME` / `CLERK_USER_ID` / `RETELL_LLM_ID` are read-only
-there, since onboard.js owns them. Changing `AIRTABLE_BASE_ID` also updates the portal
-account record, which stores its own copy.
+Or use the console: **`/manage` → Environment** does the whole loop in the UI — see below.
+
+## The console `/manage` route
+
+A client-first control panel. `/manage` lists every client that has a `.env.local`, with
+last-deploy state and an HTTP probe of the live site; opening one gives a rail + stage
+shell at `/manage/{slug}/{section}` (enterprise site selection rides on `?site=`).
+
+| Section | What it does |
+|---|---|
+| Overview | Health tiles (deploy, domain attached+verified, env drift) + recent activity |
+| Environment | Edit `.env.local` → push to Vercel → redeploy |
+| Deployments | Last 10 builds, redeploy |
+| Voice agent | Edit `agent-prompt.txt`, push to the client's Retell LLM (growth/enterprise) |
+| Portal | Which account the client signs in with; attach/repair |
+
+Things worth knowing:
+
+- **Env drift is never automatic.** Resolving it costs one Vercel request *per key*
+  (`listProjectEnv`), so it is an explicit button on the roster and on Overview, and is
+  scoped to the viewed site via `?site=`.
+- Curated fields are grouped Call routing / Lead delivery / Integrations; starter clients
+  only have the middle one, and empty groups hide themselves.
+- Master credentials are masked, with reveal-on-click via `/api/manage/env/reveal` (one
+  named key, disk only — localhost-only assumption; delete that route first if the console
+  is ever deployed). `VERCEL_PROJECT_NAME` / `CLERK_USER_ID` / `RETELL_LLM_ID` are
+  read-only, since onboard.js owns them.
+- Changing `AIRTABLE_BASE_ID` also updates the portal account record, which stores its own
+  copy.
+- **Every write is appended to `console/.state/audit.ndjson`** (key names, never values)
+  and shown as Recent activity. This is the only accountability the console has — it still
+  has no auth of any kind.
+- The voice-agent editor reads `agent-prompt.txt` from disk. There is no read-back from
+  Retell, so it can lag a change made in the Retell dashboard; the UI says so.
 
 ## Lead callback (Growth/Enterprise)
 

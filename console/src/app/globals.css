@@ -428,8 +428,8 @@
    tokens, so /manage's tighter --control-h flows through for free.
 
    Both scopes share ONE rule rather than each owning a copy — two copies is how
-   the two scopes silently drift apart. `email` and `number` were missing here,
-   which is why ManagePortalLink's email field rendered unstyled. ───────────── */
+   the two scopes silently drift apart. `email` and `number` are included because
+   they were previously missing, so those inputs rendered unstyled. ─────────── */
 .onboard-chrome input[type='text'],
 .onboard-chrome input[type='search'],
 .onboard-chrome input[type='email'],
