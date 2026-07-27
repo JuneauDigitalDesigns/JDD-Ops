@@ -27,7 +27,10 @@ export type AuditAction =
   | 'deploy.trigger'
   | 'portal.attach'
   | 'agent.prompt.save'
-  | 'agent.prompt.push';
+  | 'agent.prompt.push'
+  | 'domain.add'
+  | 'domain.verify'
+  | 'canonical.set';
 
 export interface AuditEntry {
   /** ISO timestamp. */

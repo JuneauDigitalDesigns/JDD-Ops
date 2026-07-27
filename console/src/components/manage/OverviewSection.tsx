@@ -36,7 +36,9 @@ interface DeployInfo {
 }
 
 export default function OverviewSection() {
-  const { ctx, site } = useManage();
+  // `domains` comes from the shared context — the rail and the Domain section read the same
+  // object, so the three can't disagree about where the site lives.
+  const { ctx, site, domains } = useManage();
   const params = useSearchParams();
   const qs = params.get('site') ? `?site=${encodeURIComponent(params.get('site') as string)}` : '';
 
@@ -44,13 +46,6 @@ export default function OverviewSection() {
     loading: true,
     data: null,
   });
-  const [domains, setDomains] = useState<{
-    loading: boolean;
-    verified: boolean | null;
-    names: string[];
-    canonical: string | null;
-    reason?: string;
-  }>({ loading: true, verified: null, names: [], canonical: null });
   const [drift, setDrift] = useState<{ loading: boolean; count: number | null; reason?: string }>({
     loading: false,
     count: null,
@@ -77,39 +72,6 @@ export default function OverviewSection() {
         }
       } catch {
         if (!cancelled) setDeploy({ loading: false, data: null, reason: 'Lookup failed.' });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ctx.slug, site.slug]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const q = new URLSearchParams({ slug: ctx.slug, site: site.slug });
-      try {
-        const res = await fetch(`/api/manage/domains?${q.toString()}`, { cache: 'no-store' });
-        const body = (await res.json()) as {
-          domains?: Array<{ name: string; verified: boolean }>;
-          canonical?: string | null;
-          reason?: string;
-          error?: string;
-        };
-        if (cancelled) return;
-        // Vercel always attaches a *.vercel.app domain; a CUSTOM domain is the interesting one.
-        const custom = (body.domains ?? []).filter((d) => !d.name.endsWith('.vercel.app'));
-        setDomains({
-          loading: false,
-          verified: custom.length ? custom.every((d) => d.verified) : null,
-          names: custom.map((d) => d.name),
-          canonical: body.canonical ?? null,
-          reason: body.error ?? body.reason,
-        });
-      } catch {
-        if (!cancelled) {
-          setDomains({ loading: false, verified: null, names: [], canonical: null, reason: 'Lookup failed.' });
-        }
       }
     })();
     return () => {
@@ -158,11 +120,37 @@ export default function OverviewSection() {
     }
   }, [ctx.slug, site.slug]);
 
-  const liveUrl = site.canonical
-    ? site.canonical.startsWith('http')
-      ? site.canonical
-      : `https://${site.canonical}`
-    : null;
+  const liveUrl = domains.liveUrl;
+
+  // Three genuinely different situations the old tile blurred together:
+  //   - serving on the Vercel alias with no custom domain — normal, not a problem
+  //   - a custom domain attached and verified — the goal
+  //   - site.ts advertising a canonical that nothing serves — actually wrong
+  const custom = domains.domains.filter((d) => !d.name.endsWith('.vercel.app'));
+  const canonicalMismatch =
+    Boolean(domains.canonical) &&
+    Boolean(domains.liveUrl) &&
+    domains.canonical!.replace(/\/$/, '') !== domains.liveUrl!.replace(/\/$/, '');
+
+  const domainTone: Tone = domains.loading
+    ? 'idle'
+    : canonicalMismatch
+      ? 'warn'
+      : custom.length && custom.every((d) => d.verified)
+        ? 'ok'
+        : custom.length
+          ? 'warn'
+          : 'idle';
+
+  const domainDetail = domains.reason
+    ? domains.reason
+    : canonicalMismatch
+      ? `site.ts still says ${domains.canonical} — fix in Domain`
+      : custom.length
+        ? custom.every((d) => d.verified)
+          ? 'custom domain attached and verified'
+          : 'custom domain attached, DNS pending'
+        : 'serving on the Vercel alias — no custom domain';
 
   return (
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
@@ -201,18 +189,11 @@ export default function OverviewSection() {
           icon={<Globe size={15} weight="fill" />}
           label="Domain"
           loading={domains.loading}
-          tone={domains.verified === null ? 'idle' : domains.verified ? 'ok' : 'warn'}
-          value={domains.names[0] ?? 'none attached'}
-          detail={
-            domains.reason ??
-            (domains.verified === null
-              ? domains.canonical
-                ? 'site.ts sets a canonical, but no custom domain is attached'
-                : 'serving on the vercel.app alias'
-              : domains.verified
-                ? 'attached and verified'
-                : 'attached, not verified')
+          tone={domainTone}
+          value={
+            domains.liveUrl ? domains.liveUrl.replace(/^https?:\/\//, '') : 'not resolved'
           }
+          detail={domainDetail}
         />
 
         <Tile

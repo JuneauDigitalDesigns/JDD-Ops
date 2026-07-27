@@ -64,6 +64,14 @@ export interface DeploymentList {
   deployments: DeploymentRecord[];
 }
 
+/** A DNS record the registrar must add before Vercel will serve the domain. */
+export interface DomainVerification {
+  type: string;
+  domain: string;
+  value: string;
+  reason: string | null;
+}
+
 export interface ProjectDomain {
   name: string;
   apexName: string | null;
@@ -71,6 +79,8 @@ export interface ProjectDomain {
   redirect: string | null;
   gitBranch: string | null;
   createdAt: number | null;
+  /** Only populated while unverified — Vercel drops the field once the domain passes. */
+  verification: DomainVerification[];
 }
 
 export interface DomainList {
@@ -78,6 +88,36 @@ export interface DomainList {
   projectName: string;
   reason?: string;
   domains: ProjectDomain[];
+}
+
+export interface AddDomainResult {
+  ok: boolean;
+  projectName: string;
+  reason?: string;
+  domain?: ProjectDomain;
+}
+
+export interface VerifyDomainResult {
+  ok: boolean;
+  projectName: string;
+  verified: boolean;
+  reason?: string;
+  domain?: ProjectDomain;
+}
+
+/** Where a domain's DNS actually points right now. Account-level — works unattached. */
+export interface DomainConfig {
+  ok: boolean;
+  domain: string;
+  reason?: string;
+  /** null = not pointed at Vercel. 'A' | 'CNAME' | 'http' = it is. */
+  configuredBy: string | null;
+  misconfigured: boolean;
+  nameservers: string[];
+  aValues: string[];
+  cnames: string[];
+  conflicts: unknown[];
+  acceptedChallenges: string[];
 }
 
 interface VercelSyncModule {
@@ -98,6 +138,12 @@ interface VercelSyncModule {
   ): Promise<DeploymentList>;
   /** Never throws — degrades to { ok: false, reason }. */
   listProjectDomains(slug: string): Promise<DomainList>;
+  /** Attaches but does not verify; a 409 comes back as { ok:false, reason }. */
+  addProjectDomain(slug: string, domain: string): Promise<AddDomainResult>;
+  /** Re-checks a pending domain after the operator updates DNS. */
+  verifyProjectDomain(slug: string, domain: string): Promise<VerifyDomainResult>;
+  /** Takes a bare domain, not a slug — the endpoint is account-level. */
+  getDomainConfig(domain: string): Promise<DomainConfig>;
   /** Throws, unlike the list* functions. */
   triggerRedeploy(opts: { slug: string; log?: (line: string) => void }): Promise<Deployment>;
 }

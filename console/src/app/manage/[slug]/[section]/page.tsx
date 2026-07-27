@@ -4,6 +4,7 @@ import { DEFAULT_SECTION, findSection, MANAGE_SECTIONS } from '@/lib/manageSecti
 import OverviewSection from '@/components/manage/OverviewSection';
 import EnvironmentSection from '@/components/manage/EnvironmentSection';
 import DeploymentsSection from '@/components/manage/DeploymentsSection';
+import DomainSection from '@/components/manage/DomainSection';
 import VoiceAgentSection from '@/components/manage/VoiceAgentSection';
 import PortalSection from '@/components/manage/PortalSection';
 
@@ -44,6 +45,8 @@ export default async function ManageSectionPage({
       return <EnvironmentSection />;
     case 'deployments':
       return <DeploymentsSection />;
+    case 'domain':
+      return <DomainSection />;
     case 'voice-agent':
       return <VoiceAgentSection />;
     case 'portal':

@@ -32,7 +32,12 @@ import { execSync } from 'node:child_process';
 import Anthropic from '@anthropic-ai/sdk';
 import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
-import { syncEnvToVercel, sanitizeProjectName, getVercelProjectId } from './lib/vercel-sync.js';
+import {
+  syncEnvToVercel,
+  sanitizeProjectName,
+  getVercelProjectId,
+  listProjectDomains,
+} from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
 import { attachSiteToAccount, accountStoreConfigured } from './lib/account-store.js';
 
@@ -1036,6 +1041,26 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
 // Step 10: Provision Clerk portal user
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * The host Vercel actually serves this project at.
+ *
+ * Vercel's auto-generated alias is NOT a predictable transform of the project name — it
+ * strips underscores, where the obvious guess hyphenates them, so deriving the host gives
+ * a 404 for any slug containing `_`. Ask for the domain list instead and take the
+ * `.vercel.app` entry; fall back to the derived form only when the lookup fails, so a
+ * missing VERCEL_TOKEN degrades to the old behaviour rather than an empty canonical.
+ */
+async function resolveVercelHost(slug) {
+  const derived = `https://${sanitizeProjectName(slug).replace(/_/g, '-')}.vercel.app`;
+  try {
+    const result = await listProjectDomains(slug);
+    const alias = result.domains.find((d) => d.name.endsWith('.vercel.app') && !d.redirect);
+    return alias ? `https://${alias.name}` : derived;
+  } catch {
+    return derived;
+  }
+}
+
 async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug, forceRelink = false, emailOverride = null }) {
   log(10, `Link portal account`);
 
@@ -1063,6 +1088,7 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
   // (`forceRelink` is retained for call-site compatibility but no longer gates anything:
   // attaching is an idempotent upsert, so there is nothing to skip or force.)
   void forceRelink;
+
   const overrideEmail = emailOverride && emailOverride.trim() ? emailOverride.trim() : null;
   const email = overrideEmail ?? (useTestLogin ? testEmail : intake.sites[0]?.brand?.email);
   if (!email) {
@@ -1072,8 +1098,16 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
 
   // For test clients, point canonical at the live Vercel URL so the portal's
   // Performance tab pings a real host instead of the placeholder domain.
-  const testCanonical = `https://${sanitizeProjectName(baseSlug).replace(/_/g, '-')}.vercel.app`;
-  const canonical = useTestLogin ? testCanonical : (intake.sites[0]?.seo?.canonical ?? '');
+  //
+  // ASK Vercel for the host rather than deriving it. Vercel STRIPS underscores when it
+  // mints the alias, so `_e2e_test_growth` is served at e2etestgrowth.vercel.app, while
+  // the old `.replace(/_/g, '-')` guess produced e2e-test-growth.vercel.app — a 404 that
+  // then got written into the client's portal record. By this step the project exists, so
+  // the domain list is authoritative; the derived form stays only as a fallback for when
+  // the lookup fails.
+  const canonical = useTestLogin
+    ? await resolveVercelHost(baseSlug)
+    : (intake.sites[0]?.seo?.canonical ?? '');
 
   const airtableBaseId = intake.plan !== 'starter'
     ? (sharedBaseId || readEnvLocal(primaryClientDir).AIRTABLE_BASE_ID || null)

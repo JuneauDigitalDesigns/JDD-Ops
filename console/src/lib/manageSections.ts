@@ -10,7 +10,13 @@ import type { Plan } from './types';
  * problem. ManageRail maps `icon` to a Phosphor component on its side.
  */
 
-export type SectionId = 'overview' | 'environment' | 'deployments' | 'voice-agent' | 'portal';
+export type SectionId =
+  | 'overview'
+  | 'environment'
+  | 'deployments'
+  | 'domain'
+  | 'voice-agent'
+  | 'portal';
 
 export interface ManageSection {
   id: SectionId;
@@ -18,7 +24,7 @@ export interface ManageSection {
   /** One line under the section title. */
   lede: string;
   /** Key into ManageRail's icon map. */
-  icon: 'gauge' | 'sliders' | 'rocket' | 'microphone' | 'portal';
+  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'portal';
   /** Which plans get this section. */
   plans: Plan[];
 }
@@ -47,6 +53,13 @@ export const MANAGE_SECTIONS: ManageSection[] = [
     label: 'Deployments',
     lede: 'Recent builds, and a redeploy when env changes need to take effect.',
     icon: 'rocket',
+    plans: ALL,
+  },
+  {
+    id: 'domain',
+    label: 'Domain',
+    lede: 'Where this site actually serves, and how to point a real domain at it.',
+    icon: 'globe',
     plans: ALL,
   },
   {

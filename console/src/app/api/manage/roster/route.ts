@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { listClientContexts } from '@/lib/clients';
 import { loadVercelCredentials } from '@/lib/opsSecrets';
 import { loadVercelSync } from '@/lib/vercelSync';
-import { isManageable, liveUrlFor } from '@/lib/manageSites';
+import { isManageable, resolveLiveUrl } from '@/lib/manageSites';
+import { probeUrl, type ProbeResult } from '@/lib/probe';
 
 /**
  * Live health for the /manage roster, keyed by slug.
@@ -19,39 +20,7 @@ import { isManageable, liveUrlFor } from '@/lib/manageSites';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const PROBE_TIMEOUT_MS = 4000;
-
-interface HttpView {
-  ok: boolean;
-  status: number | null;
-  ms: number;
-  error?: string;
-}
-
-/**
- * HEAD the live site, falling back to GET on 405 — some hosts reject HEAD outright and
- * "405" would otherwise read as an outage.
- */
-async function probe(url: string): Promise<HttpView> {
-  const started = Date.now();
-  const opts = {
-    redirect: 'follow' as const,
-    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    cache: 'no-store' as const,
-  };
-  try {
-    let res = await fetch(url, { method: 'HEAD', ...opts });
-    if (res.status === 405) res = await fetch(url, { method: 'GET', ...opts });
-    return { ok: res.ok, status: res.status, ms: Date.now() - started };
-  } catch (err) {
-    return {
-      ok: false,
-      status: null,
-      ms: Date.now() - started,
-      error: err instanceof Error ? err.message : 'unreachable',
-    };
-  }
-}
+type HttpView = ProbeResult;
 
 export async function GET() {
   const clients = await listClientContexts().catch(() => []);
@@ -60,15 +29,19 @@ export async function GET() {
 
   const health: Record<
     string,
-    { deploy: unknown; http: HttpView | null }
+    { deploy: unknown; http: HttpView | null; liveUrl: string | null; urlSource: string }
   > = {};
 
   await Promise.all(
     clients.filter(isManageable).map(async (ctx) => {
       const siteSlug = ctx.sites[0]?.slug ?? ctx.slug;
-      const liveUrl = liveUrlFor(ctx);
+      const canonical = ctx.sites[0]?.canonical ?? null;
 
-      const [deploy, http] = await Promise.all([
+      // Ask Vercel where the site actually lives BEFORE probing. Probing seo.canonical
+      // reported healthy clients as down, because that field is a placeholder until
+      // someone fills it in. One extra request per client — the same order of cost as
+      // the deployment lookup, and nothing like drift's per-key fan-out.
+      const [deploy, resolved] = await Promise.all([
         vercel
           ? vercel
               .listDeployments(siteSlug, { limit: 1 })
@@ -80,10 +53,16 @@ export async function GET() {
               })
               .catch(() => null)
           : Promise.resolve(null),
-        liveUrl ? probe(liveUrl) : Promise.resolve(null),
+        vercel
+          ? vercel
+              .listProjectDomains(siteSlug)
+              .then((r) => resolveLiveUrl(r.ok ? r.domains : [], canonical))
+              .catch(() => resolveLiveUrl([], canonical))
+          : Promise.resolve(resolveLiveUrl([], canonical)),
       ]);
 
-      health[ctx.slug] = { deploy, http };
+      const http = resolved.url ? await probeUrl(resolved.url) : null;
+      health[ctx.slug] = { deploy, http, liveUrl: resolved.url, urlSource: resolved.source };
     }),
   );
 

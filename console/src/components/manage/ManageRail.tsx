@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowSquareOut,
   Gauge,
+  Globe,
   Microphone,
   RocketLaunch,
   Sliders,
@@ -29,6 +30,7 @@ const ICONS: Record<ManageSection['icon'], Icon> = {
   gauge: Gauge,
   sliders: Sliders,
   rocket: RocketLaunch,
+  globe: Globe,
   microphone: Microphone,
   portal: UserCircle,
 };
@@ -39,7 +41,7 @@ export default function ManageRail({
 }: {
   badges?: Partial<Record<ManageSection['id'], number>>;
 }) {
-  const { ctx, site, siteSlug, multiSite } = useManage();
+  const { ctx, siteSlug, multiSite, domains } = useManage();
   const active = useSelectedLayoutSegment();
   const params = useSearchParams();
 
@@ -47,11 +49,10 @@ export default function ManageRail({
   // Carry ?site= across section links so the enterprise selection survives navigation.
   const qs = params.get('site') ? `?site=${encodeURIComponent(params.get('site') as string)}` : '';
 
-  const liveUrl = site.canonical
-    ? site.canonical.startsWith('http')
-      ? site.canonical
-      : `https://${site.canonical}`
-    : null;
+  // From Vercel, not from seo.canonical — that field is a placeholder until someone fills
+  // it in, and linking to it sent you to a domain the client never owned.
+  const liveUrl = domains.liveUrl;
+  const unverifiedUrl = domains.source === 'canonical';
 
   return (
     <nav
@@ -78,9 +79,16 @@ export default function ManageRail({
             href={liveUrl}
             target="_blank"
             rel="noreferrer"
+            title={
+              unverifiedUrl
+                ? "Couldn't reach Vercel — this is what site.ts claims, which may be a placeholder."
+                : liveUrl
+            }
             className="flex w-fit items-center gap-1.5 text-xs text-fg3 transition-colors hover:text-accent"
           >
-            {liveUrl.replace(/^https?:\/\//, '')} <ArrowSquareOut size={12} />
+            {liveUrl.replace(/^https?:\/\//, '')}
+            {unverifiedUrl && <span style={{ color: 'var(--warn)' }}>?</span>}
+            <ArrowSquareOut size={12} />
           </a>
         )}
       </div>

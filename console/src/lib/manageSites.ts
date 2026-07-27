@@ -87,19 +87,60 @@ export interface RosterBase {
   liveUrl: string | null;
 }
 
+/** Where a live-site URL came from, so the UI can say how much to trust it. */
+export type LiveUrlSource = 'custom' | 'vercel-alias' | 'canonical' | 'none';
+
+export interface ResolvedLiveUrl {
+  url: string | null;
+  source: LiveUrlSource;
+}
+
+function withScheme(value: string): string {
+  return value.startsWith('http') ? value : `https://${value}`;
+}
+
 /**
- * The URL to treat as "the live site": the custom domain when set, else the Vercel alias.
+ * What actually serves this site.
  *
- * The hyphenation is not cosmetic — underscores are legal in a Vercel project name but
- * not in a DNS hostname, and Vercel serves the project at the hyphenated form. onboard.js
- * applies the same rule to the Twilio voiceUrl (see CLAUDE.md).
+ * **Never constructs a hostname.** The previous version preferred `seo.canonical` and fell
+ * back to building `{project}.vercel.app` from the project name, and both were wrong:
+ *
+ *   - `seo.canonical` is a placeholder by design. Every vertical preset ships one
+ *     (`data/verticals/hvac.ts` → yourhvaccompany.com) and lists `seo.canonical` in
+ *     `_meta.missing_fields`, so an unfilled value is the expected state, not an anomaly.
+ *   - Vercel STRIPS underscores when it mints the alias; the hyphenating transform gave
+ *     `e2e-test-growth.vercel.app` (404) where Vercel actually serves
+ *     `e2etestgrowth.vercel.app` (200).
+ *
+ * So we ask Vercel and rank what it reports. `canonical` remains only as a last resort for
+ * when Vercel is unreachable, and the returned `source` tells the caller it is a guess.
+ */
+export function resolveLiveUrl(
+  domains: Array<{ name: string; verified: boolean; redirect: string | null }>,
+  canonical: string | null,
+): ResolvedLiveUrl {
+  // A redirect domain forwards elsewhere — it isn't where the site lives.
+  const usable = domains.filter((d) => d.name && !d.redirect);
+  const custom = usable.find((d) => d.verified && !d.name.endsWith('.vercel.app'));
+  if (custom) return { url: `https://${custom.name}`, source: 'custom' };
+
+  const alias = usable.find((d) => d.name.endsWith('.vercel.app'));
+  if (alias) return { url: `https://${alias.name}`, source: 'vercel-alias' };
+
+  if (canonical) return { url: withScheme(canonical), source: 'canonical' };
+  return { url: null, source: 'none' };
+}
+
+/**
+ * Offline fallback for when there is no Vercel token to ask.
+ *
+ * Deliberately returns only what site.ts claims — the hostname-construction branch that
+ * used to live here produced a dead host and has been removed. If Vercel can be reached,
+ * use resolveLiveUrl instead.
  */
 export function liveUrlFor(ctx: ClientContext): string | null {
   const canonical = ctx.sites[0]?.canonical;
-  if (canonical) return canonical.startsWith('http') ? canonical : `https://${canonical}`;
-  const project = ctx.sites[0]?.env?.VERCEL_PROJECT_NAME;
-  if (!project) return null;
-  return `https://${project.toLowerCase().replace(/[^a-z0-9-]/g, '-')}.vercel.app`;
+  return canonical ? withScheme(canonical) : null;
 }
 
 export function rosterBase(ctx: ClientContext): RosterBase {
