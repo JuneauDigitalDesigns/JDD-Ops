@@ -5,7 +5,13 @@
  * Used at Checkpoint 2 after manually editing clients/{slug}/agent-prompt.txt.
  *
  * Usage:
- *   npm run update-prompt -- <agentId> --slug <slug>
+ *   npm run update-prompt -- <agentId> --slug <slug>          # clients/{slug}/agent-prompt.txt
+ *   npm run update-prompt -- <agentId> --file <path>          # any path, relative to repo root
+ *
+ * `--file` exists for JDD's own demo-line agent, whose prompt lives at demo/agent-prompt.txt
+ * rather than under clients/. It isn't a client — it's the sales script on the public demo
+ * number — and .gitignore excludes /clients/*, so keeping it there meant it was never
+ * version-controlled. `--file` wins when both are given.
  */
 
 import 'dotenv/config';
@@ -19,10 +25,13 @@ function fail(msg, err) {
 }
 
 function parseArgs(argv) {
-  const args = { agentId: null, slug: null };
+  const args = { agentId: null, slug: null, file: null };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--slug' && argv[i + 1]) {
       args.slug = argv[i + 1];
+      i++;
+    } else if (argv[i] === '--file' && argv[i + 1]) {
+      args.file = argv[i + 1];
       i++;
     } else if (!args.agentId && !argv[i].startsWith('--')) {
       args.agentId = argv[i];
@@ -32,13 +41,14 @@ function parseArgs(argv) {
 }
 
 async function main() {
-  const { agentId, slug } = parseArgs(process.argv);
+  const { agentId, slug, file } = parseArgs(process.argv);
   if (!agentId) fail('Missing <agentId>. Usage: npm run update-prompt -- <agentId> --slug <slug>');
-  if (!slug) fail('Missing --slug <slug>');
+  if (!slug && !file) fail('Missing --slug <slug> or --file <path>');
   const apiKey = process.env.RETELL_API_KEY;
   if (!apiKey) fail('RETELL_API_KEY not set in .env');
 
-  const promptPath = resolve('clients', slug, 'agent-prompt.txt');
+  // --file wins, so a caller who passes an explicit path never silently gets a client's prompt.
+  const promptPath = file ? resolve(file) : resolve('clients', slug, 'agent-prompt.txt');
   if (!existsSync(promptPath)) fail(`Prompt file not found: ${promptPath}`);
   const prompt = readFileSync(promptPath, 'utf8').trim();
   if (!prompt) fail(`Prompt file is empty: ${promptPath}`);
