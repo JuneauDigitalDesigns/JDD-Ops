@@ -21,13 +21,22 @@ export default function ScrapePanel({
   onImport,
   vertical,
   base,
+  url,
+  onUrlChange,
 }: {
   imported: SiteContent | null;
   onImport: (site: SiteContent) => void;
   vertical: VerticalId;
   base: SiteContent;
+  /**
+   * The client's existing site, owned by the wizard bundle and shared with the Generate
+   * pane — one client has one website, so typing it in one pane shouldn't be lost when you
+   * switch panes or leave the step.
+   */
+  url: string;
+  onUrlChange: (v: string) => void;
 }) {
-  const [url, setUrl] = useState('');
+  const setUrl = onUrlChange;
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
@@ -35,9 +44,12 @@ export default function ScrapePanel({
   const requested = imported?._meta?.scrapeExistingWebsite === true;
   const prefill = imported?._meta?.scrapeWebsiteDomain ?? '';
 
+  // Seed from the intake only while the field is genuinely empty. This could run freely
+  // when `url` was local state and reset to '' on every mount; now that it persists, an
+  // unconditional set would overwrite what you typed each time the step remounts.
   useEffect(() => {
-    if (prefill) setUrl(prefill);
-  }, [prefill]);
+    if (prefill && !url) onUrlChange(prefill);
+  }, [prefill, url, onUrlChange]);
 
   async function onScan() {
     if (!url.trim()) return;

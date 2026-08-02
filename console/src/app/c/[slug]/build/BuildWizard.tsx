@@ -9,6 +9,8 @@ import { VERTICALS, VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
 import { deepMerge, applyEdits } from '@/lib/merge';
 import { EASE } from '@/lib/motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
+import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import type { SourceId } from '@/components/wizard/IntakeReviewStep';
 import {
   reconcileOrder,
   enforcePins,
@@ -38,7 +40,18 @@ const STEPS = [
 ] as const;
 type StepId = (typeof STEPS)[number]['id'];
 
-/** The full per-client wizard bundle persisted under jdd-wizard:{slug}. */
+/** Index of the Studio step. Derived, so it can't drift out of range if STEPS changes again. */
+const STUDIO_STEP = STEPS.length - 1;
+
+/**
+ * The full per-client wizard bundle persisted under jdd-wizard:{slug}.
+ *
+ * The four intake-input fields below were local component state until they kept getting
+ * thrown away: the step tree unmounts on navigation (AnimatePresence keys on `step`), so
+ * anything typed into the intake vanished the moment you looked at the Studio. The output
+ * of generation persisted while the input that produced it did not, which made "tweak the
+ * brief and re-run" impossible.
+ */
 type WizardBundle = {
   vertical: VerticalId;
   imported: SiteContent | null;
@@ -47,7 +60,25 @@ type WizardBundle = {
   selections: Selections;
   skins: SkinSelections;
   order: string[];
+  /** Operator guidance for the copywriter. Editable and re-runnable. */
+  details: string;
+  /** The client's existing website. Shared by both source panes — one client, one URL. */
+  scanUrl: string;
+  /** Which intake source pane was open. */
+  source: SourceId;
+  /** Sections ticked for the next generation run. */
+  genSections: Section[];
 };
+
+/** Read a client's saved bundle. Partial because older ones predate the intake-input fields. */
+function readBundle(slug: string): Partial<WizardBundle> | null {
+  try {
+    const raw = window.localStorage.getItem(bundleKey(slug));
+    return raw ? (JSON.parse(raw) as Partial<WizardBundle>) : null;
+  } catch {
+    return null; // malformed or unavailable storage
+  }
+}
 
 function freshBundle(seed: SiteContent | null): WizardBundle {
   return {
@@ -58,6 +89,11 @@ function freshBundle(seed: SiteContent | null): WizardBundle {
     selections: {},
     skins: {},
     order: [],
+    details: '',
+    scanUrl: '',
+    source: 'generate',
+    // A brand-new client has nothing generated, so the first run should write everything.
+    genSections: [...ALL_SECTIONS],
   };
 }
 
@@ -105,6 +141,15 @@ export default function BuildWizard({
   const [imported, setImported] = useState<SiteContent | null>(null);
   const [generated, setGenerated] = useState<Partial<SiteContent> | null>(null);
   const [edits, setEdits] = useState<Record<string, unknown>>({});
+
+  // ── Intake inputs ─────────────────────────────────────────────────────────
+  // Lifted out of GenerateCopyPanel / ScrapePanel / IntakeReviewStep so they land in the
+  // bundle. They were local state in components that unmount on step change, which is the
+  // whole reason typed guidance kept disappearing.
+  const [details, setDetails] = useState('');
+  const [scanUrl, setScanUrl] = useState('');
+  const [source, setSource] = useState<SourceId>('generate');
+  const [genSections, setGenSections] = useState<Section[]>([...ALL_SECTIONS]);
 
   // ── Builder layer ─────────────────────────────────────────────────────────
   const [selections, setSelections] = useState<Selections>({});
@@ -179,12 +224,18 @@ export default function BuildWizard({
   useEffect(() => {
     if (!hydrated.current) return;
     try {
-      const bundle: WizardBundle = { vertical, imported, generated, edits, selections, skins, order };
+      const bundle: WizardBundle = {
+        vertical, imported, generated, edits, selections, skins, order,
+        details, scanUrl, source, genSections,
+      };
       window.localStorage.setItem(bundleKey(slug), JSON.stringify(bundle));
     } catch {
       /* storage full or unavailable */
     }
-  }, [slug, vertical, imported, generated, edits, selections, skins, order]);
+  }, [
+    slug, vertical, imported, generated, edits, selections, skins, order,
+    details, scanUrl, source, genSections,
+  ]);
 
   // ── Undo/redo — two view-scoped stacks (Intake vs Studio) ─────────────────
   // Each step's undo/redo drives its own stack. Both snapshots include `edits` (shared: the
@@ -262,14 +313,26 @@ export default function BuildWizard({
       return { ...base, [path]: value };
     });
   }, [step, studioCheckpointEdit, intakeCheckpointEdit]);
-  const applyBundle = useCallback((b: WizardBundle) => {
-    setVertical(b.vertical);
-    setImported(b.imported);
-    setGenerated(b.generated);
-    setEdits(b.edits);
-    setSelections(b.selections);
-    setSkins(b.skins);
-    setOrder(b.order);
+  /**
+   * Apply a saved bundle to state.
+   *
+   * Takes a Partial deliberately: every bundle written before the intake-input fields
+   * existed is missing them, so this has to default rather than assign `undefined` into a
+   * controlled input (React would flip the textarea to uncontrolled and warn).
+   */
+  const applyBundle = useCallback((b: Partial<WizardBundle>) => {
+    setVertical(b.vertical ?? DEFAULT_VERTICAL);
+    setImported(b.imported ?? null);
+    setGenerated(b.generated ?? null);
+    setEdits(b.edits ?? {});
+    setSelections(b.selections ?? {});
+    setSkins(b.skins ?? {});
+    setOrder(b.order ?? []);
+    setDetails(b.details ?? '');
+    setScanUrl(b.scanUrl ?? '');
+    setSource(b.source ?? 'generate');
+    // An old bundle has no selection; a fresh run should write everything.
+    setGenSections(b.genSections?.length ? b.genSections : [...ALL_SECTIONS]);
   }, []);
   // Each of these replaces a whole content layer, so each is one undo step (Intake stack).
   const importSite = useCallback((site: SiteContent) => {
@@ -430,12 +493,18 @@ export default function BuildWizard({
   useEffect(() => {
     hydrated.current = false;
 
+    const saved = readBundle(slug);
+
     if (composition) {
-      // ── Already exported: DISK WINS. ────────────────────────────────────────────────
+      // ── Already exported: DISK WINS, for CONTENT. ───────────────────────────────────
       // The repo is what the client's site actually is, so opening the studio shows that
       // and nothing else. A stale localStorage draft from some earlier session must not
       // quietly present itself as the live page — being wrong about what's deployed is far
       // worse than losing an unsaved experiment, and deploying is how work is saved now.
+      //
+      // The intake INPUTS are carried across anyway. They aren't content and can't
+      // misrepresent what's deployed — they're the brief you wrote — and an exported client
+      // is precisely when you come back to tweak the guidance and regenerate.
       applyBundle({
         vertical: DEFAULT_VERTICAL,
         imported: seed,
@@ -444,17 +513,14 @@ export default function BuildWizard({
         selections: composition.selections,
         skins: composition.skins,
         order: composition.order,
+        details: saved?.details,
+        scanUrl: saved?.scanUrl,
+        source: saved?.source,
+        genSections: saved?.genSections,
       });
     } else {
       // ── Never exported: the local draft is the only record there is. ────────────────
-      let bundle: WizardBundle | null = null;
-      try {
-        const raw = window.localStorage.getItem(bundleKey(slug));
-        if (raw) bundle = JSON.parse(raw) as WizardBundle;
-      } catch {
-        /* ignore malformed storage */
-      }
-      applyBundle(bundle ?? freshBundle(seed));
+      applyBundle(saved ?? freshBundle(seed));
     }
 
     // Undo across a client switch would restore another client's content into this one.
@@ -604,8 +670,19 @@ export default function BuildWizard({
                   onReplaceContent={replaceContent}
                   imported={imported}
                   onImport={importSite}
-                  onDone={() => go(2)}
-                  onEditInStudio={(s) => { setFocusSection(s); go(2); }}
+                  // go(2) — both of these were dead. STEPS has two entries and go() rejects
+                  // anything past the last index, so "Go to Studio" and "Edit in Studio"
+                  // silently did nothing. Left over from when picking a client was step 0.
+                  onDone={() => go(STUDIO_STEP)}
+                  onEditInStudio={(s) => { setFocusSection(s); go(STUDIO_STEP); }}
+                  details={details}
+                  onDetailsChange={setDetails}
+                  scanUrl={scanUrl}
+                  onScanUrlChange={setScanUrl}
+                  source={source}
+                  onSourceChange={setSource}
+                  genSections={genSections}
+                  onGenSectionsChange={setGenSections}
                 />
               </div>
             )}

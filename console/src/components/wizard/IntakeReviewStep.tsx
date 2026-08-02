@@ -25,7 +25,7 @@ import MissingFieldQueue from './MissingFieldQueue';
  * stays as the escape hatch for bulk work.
  */
 
-type SourceId = 'generate' | 'seed';
+export type SourceId = 'generate' | 'seed';
 
 const SOURCES: ReadonlyArray<{ id: SourceId; label: string; Icon: typeof Sparkle }> = [
   { id: 'generate', label: 'Generate copy', Icon: Sparkle },
@@ -46,6 +46,14 @@ export default function IntakeReviewStep({
   onImport,
   onDone,
   onEditInStudio,
+  details,
+  onDetailsChange,
+  scanUrl,
+  onScanUrlChange,
+  source,
+  onSourceChange,
+  genSections,
+  onGenSectionsChange,
 }: {
   slug: string;
   vertical: VerticalId;
@@ -62,8 +70,19 @@ export default function IntakeReviewStep({
   onDone: () => void;
   /** Jump to Studio focused on a section (from the review modal). */
   onEditInStudio: (s: Section) => void;
+  /**
+   * The intake inputs live in the wizard bundle, not here — they used to be local state
+   * and were destroyed every time this step unmounted on navigation.
+   */
+  details: string;
+  onDetailsChange: (v: string) => void;
+  scanUrl: string;
+  onScanUrlChange: (v: string) => void;
+  source: SourceId;
+  onSourceChange: (v: SourceId) => void;
+  genSections: Section[];
+  onGenSectionsChange: (v: Section[]) => void;
 }) {
-  const [source, setSource] = useState<SourceId>('generate');
   const [reviewSection, setReviewSection] = useState<Section | null>(null);
   const missing = effective._meta?.missing_fields ?? [];
 
@@ -131,7 +150,7 @@ export default function IntakeReviewStep({
             <button
               key={id}
               type="button"
-              onClick={() => setSource(id)}
+              onClick={() => onSourceChange(id)}
               className={[
                 'inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors',
                 source === id ? 'bg-uiInk text-white' : 'text-fg2 hover:text-fg',
@@ -146,7 +165,12 @@ export default function IntakeReviewStep({
           <GenerateCopyPanel
             vertical={vertical}
             base={effective}
-            sections={ALL_SECTIONS}
+            sections={genSections}
+            onSectionsChange={onGenSectionsChange}
+            details={details}
+            onDetailsChange={onDetailsChange}
+            scanUrl={scanUrl}
+            onScanUrlChange={onScanUrlChange}
             generated={generated}
             onGenerated={onGenerated}
             onClearGenerated={onClearGenerated}
@@ -154,7 +178,14 @@ export default function IntakeReviewStep({
           />
         )}
         {source === 'seed' && (
-          <ScrapePanel imported={imported} onImport={onImport} vertical={vertical} base={effective} />
+          <ScrapePanel
+            imported={imported}
+            onImport={onImport}
+            vertical={vertical}
+            base={effective}
+            url={scanUrl}
+            onUrlChange={onScanUrlChange}
+          />
         )}
       </section>
 
