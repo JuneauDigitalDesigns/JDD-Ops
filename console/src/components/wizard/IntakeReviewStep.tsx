@@ -10,7 +10,8 @@ import GenerateCopyPanel from '@/app/c/[slug]/build/GenerateCopyPanel';
 import ScrapePanel from '@/app/c/[slug]/build/ScrapePanel';
 import SectionCopyModal from '@/app/c/[slug]/build/SectionCopyModal';
 import VerticalPicker from '@/app/c/[slug]/build/VerticalPicker';
-import MissingFieldQueue from './MissingFieldQueue';
+import MissingFieldList from './MissingFieldList';
+import IntakeReviewRail from './IntakeReviewRail';
 
 /**
  * Step 2 — where content comes FROM, and what's still missing.
@@ -127,7 +128,11 @@ export default function IntakeReviewStep({
   }
 
   return (
-    <div className="step-body max-w-3xl">
+    <div className="flex h-full min-h-0">
+      {/* Work column. Keeps max-w-3xl inside: the extra width buys the rail, not wider
+          inputs — long-form copy past ~70ch gets harder to read, not easier. */}
+      <div className="no-scrollbar min-w-0 flex-1 overflow-y-auto">
+        <div className="step-body max-w-3xl">
       <header className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -196,7 +201,9 @@ export default function IntakeReviewStep({
       {/* ── What still needs a human ────────────────────────────────────────── */}
       <section>
         <h2 className="mb-3 font-display text-xl font-semibold text-uiInk">Needs review</h2>
-        <MissingFieldQueue
+        {/* Below lg the rail is hidden, so its outline would be the only thing lost —
+            the list itself is here either way and stays fully usable. */}
+        <MissingFieldList
           content={effective}
           setField={setField}
           paths={missing}
@@ -257,6 +264,16 @@ export default function IntakeReviewStep({
           </div>
         </div>
       )}
+        </div>
+      </div>
+
+      {/* ── Review rail ──────────────────────────────────────────────────────
+          Hidden below lg: 768 (work column) + 320 (rail) + gutters needs ~1150px, and
+          crushing both is worse than dropping the outline. Nothing is lost when it goes —
+          the rail only jumps to fields the main column already lists. */}
+      <aside className="hidden w-[320px] shrink-0 overflow-hidden border-l border-rule lg:block">
+        <IntakeReviewRail content={effective} paths={missing} onDone={onDone} />
+      </aside>
     </div>
   );
 }

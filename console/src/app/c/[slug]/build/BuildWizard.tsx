@@ -702,8 +702,11 @@ export default function BuildWizard({
             transition={{ duration: reduce ? 0 : 0.42, ease: EASE }}
             className="absolute inset-0"
           >
+            {/* overflow-HIDDEN, not auto: the Intake step is two panes that each own their
+                own scroll now, and a scroll container here would stack a second scrollbar
+                on top of theirs. */}
             {step === 'intake' && (
-              <div className="h-full overflow-y-auto">
+              <div className="h-full overflow-hidden">
                 <IntakeReviewStep
                   slug={slug}
                   vertical={vertical}
