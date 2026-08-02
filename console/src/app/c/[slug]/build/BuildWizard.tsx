@@ -276,9 +276,20 @@ export default function BuildWizard({
     intakeCheckpoint();
     setImported(site);
   }, [intakeCheckpoint]);
+  /**
+   * Fold a generation result into the generated layer.
+   *
+   * MERGE, not replace. This was `setGenerated(partial)` back when generation was always
+   * all-or-nothing, so replacing was equivalent. Once you can regenerate a subset, replacing
+   * would silently drop every section that wasn't in the request.
+   *
+   * The spread is section-level — `generated` is keyed by section name — which is exactly the
+   * granularity per-section regeneration needs. `onClearGenerated` remains the way to remove
+   * sections; this path only ever adds or overwrites the ones that came back.
+   */
   const applyGenerated = useCallback((partial: Partial<SiteContent>) => {
     intakeCheckpoint();
-    setGenerated(partial);
+    setGenerated((prev) => ({ ...(prev ?? {}), ...partial }));
   }, [intakeCheckpoint]);
   const clearGenerated = useCallback(() => {
     intakeCheckpoint();
