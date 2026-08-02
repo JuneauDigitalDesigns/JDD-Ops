@@ -24,6 +24,13 @@ export interface SiteInfo {
   repoBuilt: boolean;
   env: SiteEnv;
   missingFields: string[];
+  /**
+   * The brand's accent colour from site.ts (brand.palette.accent). Surfaced so the client
+   * index can wear each client's own colour — at 15–50 clients that is the cheapest way to
+   * make a card recognisable before you've read a word of it. Null when there's no readable
+   * site.ts or no palette.
+   */
+  accent: string | null;
 }
 
 export type ClientStatus =
@@ -78,6 +85,7 @@ export interface OpsConfig {
   vercelTeamId?: string; // jdd-ops/.env VERCEL_TEAM_ID
   makePostCallMasterScenarioId?: string; // jdd-ops/.env MAKE_POST_CALL_MASTER_SCENARIO_ID
   portalSignInUrl?: string; // agency NEXT_PUBLIC_CLERK_SIGN_IN_URL → absolute
+  siteUrl?: string; // agency NEXT_PUBLIC_SITE_URL, no trailing slash
   serviceAccountEmail?: string; // GOOGLE_SERVICE_ACCOUNT_KEY → client_email
 }
 

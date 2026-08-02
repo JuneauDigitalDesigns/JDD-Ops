@@ -1,54 +1,76 @@
 'use client';
+
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Compass, Stack, ClipboardText, Wrench, ArrowRight } from '@phosphor-icons/react';
+import { Gear } from '@phosphor-icons/react';
+import JddMark from './shell/JddMark';
 
-// Persistent console top nav. Lives in the ROOT layout — outside the `.studio-chrome`
-// (/build) and `.onboard-chrome` (/onboard) scopes — so it always resolves the global
-// JDD console palette (--bg / --fg / --accent / --rule / .btn*). The route toggle links
-// to the *other* tools based on the current path; on the home landing it shows none,
-// since the page's own cards already offer all three.
-//
-// The middle SLOT (#console-nav-slot) is a portal target: route-level chrome that used to
-// sit in a second bar (the wizard's step rail, /onboard's title + Refresh) renders into it
-// via <NavSlot>, so those routes save a full horizontal band of vertical space. The slot is
-// empty on routes that don't fill it.
+/**
+ * The persistent console bar. Lives in the ROOT layout — outside the `.studio-chrome`
+ * (build) and `.onboard-chrome` (onboard) scopes — so it always resolves the global JDD
+ * palette (--bg / --fg / --accent / --rule / .btn*).
+ *
+ * ── THREE ZONES, one job each ───────────────────────────────────────────────────────────
+ *
+ *   [JDD] [ Build │ Onboard │ Manage ]   arthur-plumbing · growth · ● Live │ ⌘K ↻ ⚙
+ *   └──────── NAVIGATE ──────────────┘   └──── CONTEXT (inert) ───────────┘└ UTILITIES ┘
+ *
+ * This replaced a bar that mixed all three. On /c/{slug}/build it used to carry the logo,
+ * a back link, the brand name, a plan chip, a status badge, three tool tabs, two wizard
+ * step pills, undo/redo, Back and Next — twelve-plus targets spanning six unrelated
+ * concepts, separated by nothing but `gap-4`. The problem was never density; it was that
+ * nothing told you which controls belonged to which scope.
+ *
+ * So: everything you can navigate with is on the LEFT. The client you're working on is a
+ * muted, non-interactive readout in the MIDDLE-RIGHT — visible, never competing. App-level
+ * utilities sit past a hairline on the FAR RIGHT.
+ *
+ * Page actions do not live here at all. They moved to <ToolBar>, the strip directly below,
+ * where they sit next to the work they act on.
+ *
+ * The bar is otherwise empty on its own: the middle three regions are portal targets filled
+ * from below (see shell/slots.tsx for why there are four separate ones rather than one).
+ */
 export default function ConsoleNav() {
-  const pathname = usePathname() ?? '/';
-  const onHome = pathname === '/';
-  const onBuild = pathname.startsWith('/build');
-  const onOnboard = pathname.startsWith('/onboard') || pathname.startsWith('/setup');
-  const onManage = pathname.startsWith('/manage');
-
   return (
-    <header className="relative z-50 flex h-16 shrink-0 items-center gap-4 border-b border-rule bg-[var(--bg)] px-6">
-      <Link href="/" className="flex shrink-0 items-center gap-2.5 transition-opacity hover:opacity-80">
-        <Compass size={21} weight="fill" style={{ color: 'var(--accent)' }} />
-        <span className="font-display text-lg font-semibold tracking-tightish text-fg">JDD Console</span>
-      </Link>
+    <header className="relative z-50 flex h-[52px] shrink-0 items-center gap-3 border-b border-rule bg-[var(--bg)] px-4">
+      {/* ── NAVIGATE ──────────────────────────────────────────────────────── */}
+      <JddMark />
 
-      {/* Portal target for route-level chrome (see <NavSlot>). min-w-0 so its children can
-          truncate rather than shove the route links off the bar. */}
-      <div id="console-nav-slot" className="flex min-w-0 flex-1 items-center gap-3" />
+      {/* The tool switcher (see <ToolSwitcher>). Empty on / and /leads, which have
+          no client selected — there the mark stands alone. */}
+      <div id="console-tools-slot" className="flex shrink-0 items-center" />
 
-      {/* Link to the tools you're not currently on — but never on home, where the cards do it. */}
-      <div className="flex shrink-0 items-center gap-2">
-        {!onHome && (
-          <>
-            {!onBuild && <ToggleButton href="/build" label="Build" icon={<Stack size={15} />} />}
-            {!onOnboard && <ToggleButton href="/onboard" label="Onboard" icon={<ClipboardText size={15} />} />}
-            {!onManage && <ToggleButton href="/manage" label="Manage" icon={<Wrench size={15} />} />}
-          </>
-        )}
+      {/* ── CONTEXT ───────────────────────────────────────────────────────────
+          ml-auto pushes this and everything after it right. min-w-0 so a long brand
+          name truncates rather than shoving the utilities off the bar. */}
+      <div id="console-readout-slot" className="ml-auto flex min-w-0 items-center justify-end" />
+
+      {/* ── UTILITIES ─────────────────────────────────────────────────────────
+          Divided by a real rule, because this is the one place on the right that IS
+          clickable — an unmarked mix of inert text and buttons is worse than either
+          rule on its own. */}
+      <div className="flex shrink-0 items-center gap-1 border-l border-rule pl-3">
+        <span
+          className="meta hidden select-none px-1 sm:inline"
+          title="Press ⌘K (or Ctrl+K) to jump to any client"
+        >
+          ⌘K
+        </span>
+
+        {/* Route-scoped utilities — Refresh on / and /leads. */}
+        <div id="console-utility-slot" className="flex items-center gap-1" />
+
+        {/* /setup is the one-time master setup checklist. It had no link path into it
+            from anywhere in the app until this gear existed. */}
+        <Link
+          href="/setup"
+          title="One-time master setup"
+          aria-label="One-time master setup"
+          className="flex h-7 w-7 items-center justify-center rounded-[6px] text-fg3 transition-colors hover:bg-[var(--surface-2)] hover:text-fg"
+        >
+          <Gear size={15} />
+        </Link>
       </div>
     </header>
-  );
-}
-
-function ToggleButton({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
-  return (
-    <Link href={href} className="btn btn-xs btn-primary">
-      {icon} {label} <ArrowRight size={13} weight="bold" />
-    </Link>
   );
 }

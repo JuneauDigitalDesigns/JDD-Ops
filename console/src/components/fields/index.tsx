@@ -20,7 +20,7 @@ import { FONT_OPTIONS } from '@/lib/fonts';
 export type SetField = (path: string, value: unknown) => void;
 
 // Sizing comes from the scale in tailwind.config.ts / globals.css — do not hardcode
-// px here. `text-sm` is 15px, `text-label` is 14px (see the fontSize scale).
+// px here. `text-sm` is 14px (the base body size), `text-label` is 13.5px.
 export const INPUT_CLS =
   'block w-full min-h-[var(--control-h)] rounded-[var(--radius-control)] border border-ruleStrong bg-panel px-3 text-sm text-fg placeholder-fg3 outline-none transition-colors focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]';
 

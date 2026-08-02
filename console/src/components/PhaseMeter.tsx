@@ -2,8 +2,10 @@
 // One segment per runbook phase, filled by that phase's completion.
 //
 // A single percentage tells you how much is left; this tells you WHERE a client is stuck, which
-// is the only question the roster exists to answer. Shared by the list row and the Kanban card so
-// the two can't drift into showing progress differently.
+// is the only question the roster exists to answer.
+//
+// It was shared by the client list row and the onboarding Kanban card; that board is gone, so
+// ClientCard is now its sole consumer.
 
 import { phaseProgress } from '@/lib/runbook-nav';
 import type { Phase } from '@/lib/runbook-content';

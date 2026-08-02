@@ -161,7 +161,7 @@ export default function NextSteps({
       {(showBuild || showSetup) && (
         <div className="flex flex-wrap gap-2">
           {showBuild && (
-            <Link href="/build" className="btn btn-sm btn-primary">
+            <Link href={`/c/${slug}/build`} className="btn btn-sm btn-primary">
               <Stack size={13} /> Open Build <ArrowRight size={12} weight="bold" />
             </Link>
           )}

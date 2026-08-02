@@ -47,13 +47,24 @@ export function readOpsConfig(): OpsConfig {
   const agencyDir = resolve(root, '..', 'juneau-digital-designs');
   const agency = { ...parseEnvFile(resolve(agencyDir, '.env')), ...parseEnvFile(resolve(agencyDir, '.env.local')) };
 
+  // The agency site's PUBLIC origin, for building links back into it — the leads board
+  // deep-links a prospect straight to /agreement.
+  //
+  // Deliberately NOT just `agency.NEXT_PUBLIC_SITE_URL`: that file is the agency's local
+  // .env.local, where it's http://localhost:3000, and a localhost link is worthless the
+  // moment you send it to someone. These links always leave this machine, so a dev-only
+  // origin is never the right answer. Override with JDD_SITE_URL in jdd-ops/.env if the
+  // domain ever changes.
+  const configured = ops.JDD_SITE_URL || agency.NEXT_PUBLIC_SITE_URL || '';
+  const isLocal = /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(configured);
+  const siteUrl = (isLocal || !configured ? 'https://juneaudigitaldesigns.com' : configured).replace(/\/$/, '');
+
   const signInPath = agency.NEXT_PUBLIC_CLERK_SIGN_IN_URL || '/portal/sign-in';
-  const portalSignInUrl = signInPath.startsWith('http')
-    ? signInPath
-    : `https://juneaudigitaldesigns.com${signInPath}`;
+  const portalSignInUrl = signInPath.startsWith('http') ? signInPath : `${siteUrl}${signInPath}`;
 
   // Explicit, by-name reads only. No spreading of the env maps into the result.
   return {
+    siteUrl,
     retellPostCallWebhookUrl: ops.RETELL_POST_CALL_WEBHOOK_URL || undefined,
     githubOrg: ops.GITHUB_ORG || undefined,
     vercelTeamId: ops.VERCEL_TEAM_ID || undefined,

@@ -44,7 +44,7 @@ export default function StatusControl({
         <button
           type="button"
           onClick={() => onChange(detected)}
-          className="ml-1.5 kicker"
+          className="ml-1.5 meta"
           style={{ color: 'var(--warn)', cursor: 'pointer' }}
           title={`Disk detected "${LABEL[detected]}" — click to sync`}
         >
@@ -75,7 +75,7 @@ export default function StatusControl({
                 <span className="flex-1" style={{ color: s === value ? 'var(--fg)' : 'var(--fg-2)' }}>
                   {LABEL[s]}
                 </span>
-                {s === detected && <span className="kicker" style={{ fontSize: 9 }}>detected</span>}
+                {s === detected && <span className="meta">detected</span>}
                 {s === value && <Check size={13} weight="bold" style={{ color: 'var(--accent)' }} />}
               </button>
             ))}

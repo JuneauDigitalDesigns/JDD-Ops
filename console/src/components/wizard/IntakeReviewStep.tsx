@@ -6,10 +6,10 @@ import { Warning, BracketsCurly, Copy, X, Check, Sparkle, Globe } from '@phospho
 import type { SiteContent } from '@/data/site';
 import type { VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
-import GenerateCopyPanel from '@/app/build/GenerateCopyPanel';
-import ScrapePanel from '@/app/build/ScrapePanel';
-import SectionCopyModal from '@/app/build/SectionCopyModal';
-import VerticalPicker from '@/app/build/VerticalPicker';
+import GenerateCopyPanel from '@/app/c/[slug]/build/GenerateCopyPanel';
+import ScrapePanel from '@/app/c/[slug]/build/ScrapePanel';
+import SectionCopyModal from '@/app/c/[slug]/build/SectionCopyModal';
+import VerticalPicker from '@/app/c/[slug]/build/VerticalPicker';
 import MissingFieldQueue from './MissingFieldQueue';
 
 /**
@@ -109,8 +109,9 @@ export default function IntakeReviewStep({
       <header className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="kicker">Step 2</p>
-            <h1 className="mt-2 font-display text-3xl font-medium text-uiInk">
+            {/* No step number. It said "Step 2" from when choosing a client was step 1, and
+                counting to two isn't worth a line of chrome now that it isn't. */}
+            <h1 className="font-display text-3xl font-medium text-uiInk">
               Review the intake{slug ? <span className="text-uiInkSoft"> · {slug}</span> : null}
             </h1>
           </div>

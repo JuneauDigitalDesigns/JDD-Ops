@@ -71,17 +71,16 @@ function planned(
  *  - Airtable is created on the FIRST site only; enterprise sites 2+ reuse the shared base
  *    via a plain console.log, NOT a log(8, …) marker — so they get no Airtable phase (:1367-73)
  *
- * Note the one deliberate departure: the voice phases are still EMITTED for starter, pre-marked
- * 'skipped'. onboard.js will never report them, and every consumer treats 'skipped' as "this
- * will not happen" — but keeping them in the list means the pipeline diagram holds the same
- * shape on every plan. An operator seeing five greyed nodes learns where the tier line is; an
- * operator seeing a mysteriously shorter graph learns nothing.
+ * The list is exactly what onboard.js will emit — nothing more. An earlier version also emitted
+ * starter's five voice phases pre-marked 'skipped', to hold a constant diagram shape across
+ * tiers. That backfired: 'skipped' and 'pending' rendered almost identically, so an
+ * unprovisioned GROWTH client looked like a client that only runs Intake. The shape argument
+ * wasn't worth a diagram that misrepresents the common case.
  */
 export function expectedPhases(ctx: ClientContext): PlannedPhase[] {
   const sites = ctx.sites.length ? ctx.sites : [null];
   const multi = sites.length > 1;
   const voice = ctx.plan !== 'starter';
-  const voiceStatus = voice ? 'pending' : 'skipped';
 
   const out: PlannedPhase[] = [
     { ...planned(PHASE_LABELS.intake, ''), key: phaseKey(PHASE_LABELS.intake) },
@@ -98,14 +97,16 @@ export function expectedPhases(ctx: ClientContext): PlannedPhase[] {
       planned(PHASE_LABELS.env, tag, slug),
       planned(PHASE_LABELS.build, tag, slug),
     );
-    out.push(
-      planned(PHASE_LABELS.prompt, tag, slug, voiceStatus),
-      planned(PHASE_LABELS.agent, tag, slug, voiceStatus),
-      planned(PHASE_LABELS.number, tag, slug, voiceStatus),
-    );
-    // Only site 1 creates the base; the rest inherit it without a step marker.
-    if (i === 0) out.push(planned(PHASE_LABELS.airtable, tag, slug, voiceStatus));
-    out.push(planned(PHASE_LABELS.callLogging, tag, slug, voiceStatus));
+    if (voice) {
+      out.push(
+        planned(PHASE_LABELS.prompt, tag, slug),
+        planned(PHASE_LABELS.agent, tag, slug),
+        planned(PHASE_LABELS.number, tag, slug),
+      );
+      // Only site 1 creates the base; the rest inherit it without a step marker.
+      if (i === 0) out.push(planned(PHASE_LABELS.airtable, tag, slug));
+      out.push(planned(PHASE_LABELS.callLogging, tag, slug));
+    }
     out.push(planned(PHASE_LABELS.push, tag, slug), planned(PHASE_LABELS.vercel, tag, slug));
   });
 
@@ -175,20 +176,8 @@ export function restingPhases(ctx: ClientContext): PlannedPhase[] {
       // neither is knowable from clients/, so both stay pending until a run reports them.
       default: done = false;
     }
-    // Fall back to the planned status rather than 'pending' — that preserves the 'skipped'
-    // that expectedPhases() pre-marks on starter's voice nodes.
-    return { ...p, status: done ? 'done' : p.status };
+    // Everything expectedPhases() emits will run, so anything not already on disk is simply
+    // 'pending' — upcoming work, not an absence.
+    return { ...p, status: done ? 'done' : 'pending' };
   });
-}
-
-const VOICE_LABELS: PhaseLabel[] = [
-  PHASE_LABELS.prompt,
-  PHASE_LABELS.agent,
-  PHASE_LABELS.number,
-  PHASE_LABELS.airtable,
-  PHASE_LABELS.callLogging,
-];
-
-export function isVoicePhase(p: Pick<PlannedPhase, 'label'>): boolean {
-  return VOICE_LABELS.includes(p.label.split(' · ')[0] as PhaseLabel);
 }

@@ -41,6 +41,12 @@ export interface SiteView {
     projectName: string;
     reason?: string;
     drift: Array<{ key: string; state: DriftState }>;
+    /** Newest Vercel env var write, epoch ms. Null when drift wasn't resolved. */
+    envUpdatedAt?: number | null;
+    /** Most recent production deployment, epoch ms. Null when there is no history. */
+    lastDeployAt?: number | null;
+    /** Env on Vercel is newer than the running build — the live site is serving stale values. */
+    pendingDeploy?: boolean;
   };
 }
 

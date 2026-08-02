@@ -10,12 +10,13 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import type { SiteContent, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { findOpsRoot } from '@/lib/opsRoot';
 import { isValidSkin, supportsSkin } from '@/lib/skins';
 
@@ -97,28 +98,208 @@ export function validateEntries(entries: Entry[]): Entry[] {
 }
 
 /**
+ * Repo paths owned by onboard.js (written from jdd-ops/lib/site-routes/*), NOT by template/.
+ *
+ * template/ ships stubs of all three so it builds standalone, but the contact stub is a retired
+ * architecture — it still branches on `LEAD_DELIVERY_MODE === 'webhook'` and posts to
+ * MAKE_WEBHOOK_URL, which nothing sets any more. Copying it over a provisioned client swaps a
+ * working Retell callback for a webhook that does not exist and leads vanish silently. That had
+ * already happened to the reference client before this guard existed.
+ */
+export const ONBOARD_OWNED = [
+  { asset: 'contact.route.ts', dest: 'src/app/api/contact/route.ts' },
+  { asset: 'voice.route.ts', dest: 'src/app/api/voice/route.ts' },
+  { asset: 'no-answer.route.ts', dest: 'src/app/api/voice/no-answer/route.ts' },
+] as const;
+
+/**
+ * What the TEMPLATE owns once a repo exists — the shared libraries, styles and build config a
+ * catalog component compiles against.
+ *
+ * Refreshing exactly these is the entire purpose of `overwrite`: verifyCatalogImports' staleRepo
+ * branch tells the operator to "export again with overwrite enabled" precisely so src/lib catches
+ * up with the console. Everything outside this list belongs to the client repo once it exists.
+ */
+const TEMPLATE_OWNED_PREFIXES = ['src/lib/', 'src/styles/'];
+const TEMPLATE_OWNED_FILES = [
+  'next.config.js',
+  'postcss.config.js',
+  'tailwind.config.ts',
+  'tsconfig.json',
+  // Rewritten immediately afterwards by writeSiteContent/wirePage; listed so an existing repo
+  // still gets a clean base if either of those is ever skipped.
+  'src/data/site.ts',
+  'src/app/page.tsx',
+];
+
+/**
+ * template-relative POSIX path for a source path handed to cpSync's filter.
+ *
+ * cpSync hands the filter Windows extended-length paths (`\\?\C:\…`) whose prefix doesn't match
+ * the plain `templateDir` we computed, so a bare `relative()` gives up and returns the ABSOLUTE
+ * path — which then matches none of the ownership lists, and every existing file silently falls
+ * through to "preserve". That looks like it works (nothing gets clobbered) right up until you
+ * notice `overwrite` no longer refreshes src/lib either, which is the one thing it is for.
+ * git-state.ts hit the same class of bug in samePath(); normalise the same way.
+ *
+ * Returns '' when src is the template root or somehow outside it — callers treat that as
+ * "no opinion", i.e. copy.
+ */
+function relPath(templateDir: string, src: string): string {
+  const norm = (p: string) => resolve(p).replace(/^\\\\\?\\/, '').split(sep).join('/');
+  const base = norm(templateDir);
+  const full = norm(src);
+  if (!full.toLowerCase().startsWith(base.toLowerCase() + '/')) return '';
+  return full.slice(base.length + 1);
+}
+
+/**
  * Copy template/ -> clients/<slug>/repo (skipping node_modules/.next/.git/out).
- * Skips the copy if the repo already exists and overwrite is false.
- * Returns true if a copy happened, false if an existing repo was reused.
+ *
+ * FIRST EXPORT (no repo yet): copies everything. This is the provisioning path.
+ *
+ * EXISTING REPO with `overwrite`: copies only files the template owns, plus files the repo
+ * doesn't have yet. A blanket copy is what this used to do, and it silently reverted every file
+ * the client repo had legitimately evolved past the template — 20 of them on the reference
+ * client, including package.json (dropping the @vercel/speed-insights dependency) and
+ * layout.tsx (dropping the <SpeedInsights /> it renders). Worse, the repo-only catalog
+ * components survive that copy while package.json is reverted underneath them, so a component
+ * needing a dependency the template lacks fails to build with a module-not-found that points
+ * nowhere near the cause.
+ *
+ * Returns whether a copy happened and which owned paths were deliberately left alone.
  */
 export function copyTemplate(
   repoRoot: string,
   slug: string,
-  { overwrite }: { overwrite: boolean },
-): boolean {
+  { overwrite, preserveOnboardRoutes = true }: { overwrite: boolean; preserveOnboardRoutes?: boolean },
+): { copied: boolean; preserved: string[] } {
   const templateDir = resolve(repoRoot, 'template');
   const clientDir = resolve(repoRoot, 'clients', slug);
   const repoDir = repoDirFor(repoRoot, slug);
 
-  if (existsSync(repoDir) && !overwrite) return false;
+  const existed = existsSync(repoDir);
+  if (existed && !overwrite) return { copied: false, preserved: [] };
 
+  const preserved: string[] = [];
   mkdirSync(clientDir, { recursive: true });
   cpSync(templateDir, repoDir, {
     recursive: true,
     force: true,
-    filter: (src) => !EXCLUDE.has(basename(src)),
+    filter: (src) => {
+      if (EXCLUDE.has(basename(src))) return false;
+      if (!existed) return true; // first export: the template IS the repo
+
+      const rel = relPath(templateDir, src);
+      if (!rel) return true; // the template root itself
+
+      // Directories must be traversable, or nothing beneath them is ever considered. A throw
+      // inside this filter would abort the whole copy, so an unreadable entry just gets copied.
+      try {
+        if (statSync(src).isDirectory()) return true;
+      } catch {
+        return true;
+      }
+
+      if (preserveOnboardRoutes && ONBOARD_OWNED.some((r) => r.dest === rel)) {
+        if (existsSync(resolve(repoDir, rel))) {
+          preserved.push(rel);
+          return false;
+        }
+        return true; // repo lacks it entirely — a stub beats a 404, and step 3b replaces it
+      }
+
+      if (TEMPLATE_OWNED_FILES.includes(rel)) return true;
+      if (TEMPLATE_OWNED_PREFIXES.some((p) => rel.startsWith(p))) return true;
+
+      // Anything else: only if the repo doesn't have it. New template files still arrive;
+      // files the client evolved (package.json, layout.tsx, README) are left alone.
+      if (!existsSync(resolve(repoDir, rel))) return true;
+      preserved.push(rel);
+      return false;
+    },
   });
-  return true;
+  return { copied: true, preserved };
+}
+
+/**
+ * Write the onboard-owned API routes from jdd-ops/lib/site-routes, exactly as onboard.js does.
+ *
+ * Restoring rather than merely preserving, because preserving alone leaves an already-clobbered
+ * repo broken forever. These three files are self-contained (they import only `next/server`), so
+ * writing them into any repo is safe, and lib/site-routes is verifiably the working version: its
+ * voice routes are byte-identical to the reference client's, and its contact route is a strict
+ * superset — same Retell callback branch, a better email branch.
+ *
+ * Returns the repo-relative paths written; [] when the ops root carries no site-routes, in which
+ * case copyTemplate's preserve pass has already protected whatever the repo had.
+ */
+export function writeOnboardRoutes(repoRoot: string, slug: string): string[] {
+  const srcDir = resolve(repoRoot, 'lib', 'site-routes');
+  if (!existsSync(srcDir)) return [];
+  const repoDir = repoDirFor(repoRoot, slug);
+  const written: string[] = [];
+  for (const { asset, dest } of ONBOARD_OWNED) {
+    const from = resolve(srcDir, asset);
+    if (!existsSync(from)) continue;
+    const to = resolve(repoDir, ...dest.split('/'));
+    mkdirSync(dirname(to), { recursive: true });
+    copyFileSync(from, to);
+    written.push(dest);
+  }
+  return written;
+}
+
+/**
+ * Union the template's dependencies into the repo's package.json.
+ *
+ * Neither copying nor skipping is right on an existing repo. Copying drops what the client added
+ * (this is how @vercel/speed-insights disappeared from the reference client while layout.tsx
+ * still tried to render it). Skipping means a repo never picks up a dependency a NEW catalog
+ * component needs, and the failure lands as a module-not-found in `npm run build`.
+ *
+ * So: template entries are ADDED when missing, and a version the repo already pins is KEPT —
+ * the repo's is the one its lockfile resolved and its repo-only components were built against.
+ * Nothing is ever removed.
+ */
+export function mergePackageJson(repoRoot: string, slug: string): { added: string[] } {
+  const repoPkgPath = resolve(repoDirFor(repoRoot, slug), 'package.json');
+  const tplPkgPath = resolve(repoRoot, 'template', 'package.json');
+  if (!existsSync(repoPkgPath) || !existsSync(tplPkgPath)) return { added: [] };
+
+  type Pkg = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  const repoPkg = JSON.parse(readFileSync(repoPkgPath, 'utf8')) as Pkg;
+  const tplPkg = JSON.parse(readFileSync(tplPkgPath, 'utf8')) as Pkg;
+
+  const added: string[] = [];
+  for (const field of ['dependencies', 'devDependencies'] as const) {
+    const tpl = tplPkg[field];
+    if (!tpl) continue;
+    const repoDeps = (repoPkg[field] ??= {});
+    for (const [name, version] of Object.entries(tpl)) {
+      if (repoDeps[name] === undefined) {
+        repoDeps[name] = version;
+        added.push(name);
+      }
+    }
+  }
+  if (added.length) writeFileSync(repoPkgPath, JSON.stringify(repoPkg, null, 2) + '\n', 'utf8');
+  return { added };
+}
+
+/**
+ * True when the repo's contact route is the retired Make-webhook version.
+ *
+ * The last line of defence before a push. Deliberately keyed on MAKE_WEBHOOK_URL rather than on
+ * byte-equality with template/: the template's stubs are now kept in sync with lib/site-routes,
+ * so a correct repo is legitimately identical to the template and an equality check would refuse
+ * every deploy. What actually makes a contact route broken is that it posts leads to a Make
+ * webhook nothing sets any more — a site that accepts leads and silently drops them.
+ */
+export function hasStubbedContactRoute(repoRoot: string, slug: string): boolean {
+  const repoFile = resolve(repoDirFor(repoRoot, slug), 'src', 'app', 'api', 'contact', 'route.ts');
+  if (!existsSync(repoFile)) return false;
+  return /MAKE_WEBHOOK_URL/.test(readFileSync(repoFile, 'utf8'));
 }
 
 /**
@@ -139,6 +320,111 @@ export function placeComponents(repoRoot: string, slug: string, entries: Entry[]
     written.push(`src/components/catalog/${e.categoryId}/${e.name}.tsx`);
   }
   return written;
+}
+
+/**
+ * Verify every placed component's `@/lib/*` imports actually exist in the client repo.
+ *
+ * Catalog components are authored in the CONSOLE against the console's libs, then copied
+ * into a repo whose libs came from `template/`. When those two drift, the component lands in
+ * a repo missing a symbol it imports — and the only signal was a TypeScript error at the end
+ * of `next build`, minutes into an export, phrased as a module error rather than "the
+ * template is out of date". That is exactly how `parallaxY` (added to the console's motion.ts
+ * and never to the template's) reached a client repo and failed the build.
+ *
+ * Checked against the REPO rather than `template/`, which also catches the second way this
+ * bites: an export with `overwrite: false` leaves the existing repo's older libs in place, so
+ * a repo can be stale even when the template is current.
+ *
+ * Cheap — a regex over the handful of files just written — so it runs before npm install.
+ */
+export interface CatalogImportProblem {
+  message: string;
+  /**
+   * True when `template/` DOES provide the symbol and only this repo is missing it — a
+   * different fix (re-export with overwrite) from genuine template drift.
+   */
+  staleRepo: boolean;
+}
+
+export function verifyCatalogImports(
+  repoRoot: string,
+  slug: string,
+  written: string[],
+): CatalogImportProblem[] {
+  const repoDir = repoDirFor(repoRoot, slug);
+  const templateLibDir = resolve(repoRoot, 'template', 'src', 'lib');
+  const exportsByLib = new Map<string, Set<string> | null>();
+  const templateByLib = new Map<string, Set<string> | null>();
+
+  function readExports(dir: string, lib: string): Set<string> | null {
+    let found: Set<string> | null = null;
+    for (const ext of ['.ts', '.tsx']) {
+      const p = resolve(dir, `${lib}${ext}`);
+      if (!existsSync(p)) continue;
+      const src = readFileSync(p, 'utf8');
+      found = new Set<string>();
+      for (const m of src.matchAll(
+        /^export\s+(?:async\s+)?(?:const|function|type|interface|class|let)\s+(\w+)/gm,
+      )) {
+        found.add(m[1]);
+      }
+      for (const m of src.matchAll(/^export\s*\{([^}]+)\}/gm)) {
+        for (const part of m[1].split(',')) {
+          const name = part.trim().split(/\s+as\s+/).pop();
+          if (name) found.add(name);
+        }
+      }
+      break;
+    }
+    return found;
+  }
+
+  /** Named exports of `repo/src/lib/<lib>`, or null when the file doesn't exist. */
+  function repoExportsOf(lib: string): Set<string> | null {
+    if (!exportsByLib.has(lib)) {
+      exportsByLib.set(lib, readExports(resolve(repoDir, 'src', 'lib'), lib));
+    }
+    return exportsByLib.get(lib)!;
+  }
+
+  /** The same, from `template/` — used only to tell drift apart from a stale repo. */
+  function templateExportsOf(lib: string): Set<string> | null {
+    if (!templateByLib.has(lib)) {
+      templateByLib.set(lib, readExports(templateLibDir, lib));
+    }
+    return templateByLib.get(lib)!;
+  }
+
+  const problems: CatalogImportProblem[] = [];
+  for (const rel of written) {
+    const file = resolve(repoDir, rel);
+    if (!existsSync(file)) continue;
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(
+      /import\s*(?:type\s*)?\{([^}]+)\}\s*from\s*'@\/lib\/([\w.]+)'/g,
+    )) {
+      const lib = m[2];
+      const available = repoExportsOf(lib);
+      if (!available) {
+        problems.push({
+          message: `${rel} imports '@/lib/${lib}', which does not exist in the client repo.`,
+          staleRepo: templateExportsOf(lib) !== null,
+        });
+        continue;
+      }
+      for (const part of m[1].split(',')) {
+        const name = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim();
+        if (name && !available.has(name)) {
+          problems.push({
+            message: `${rel} imports '${name}' from '@/lib/${lib}', which the repo's copy does not export.`,
+            staleRepo: templateExportsOf(lib)?.has(name) ?? false,
+          });
+        }
+      }
+    }
+  }
+  return problems;
 }
 
 /** Stable order with nav pinned first and footer pinned last, others left as-is. */

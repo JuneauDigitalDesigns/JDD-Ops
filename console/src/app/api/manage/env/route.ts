@@ -62,6 +62,12 @@ interface SiteView {
     projectName: string;
     reason?: string;
     drift: Array<{ key: string; state: DriftState }>;
+    /** Newest Vercel env var write, epoch ms. Null when drift wasn't resolved for this site. */
+    envUpdatedAt: number | null;
+    /** Most recent production deployment, epoch ms. Null when there is no history. */
+    lastDeployAt: number | null;
+    /** Env on Vercel is newer than the running build — the live site serves stale values. */
+    pendingDeploy: boolean;
   };
 }
 
@@ -179,6 +185,26 @@ export async function GET(req: Request) {
       }
     }
 
+    // "Are the env vars on Vercel newer than the running build?" — the durable version of
+    // the post-save redeploy prompt, which lived only in React state and died on reload.
+    // One extra request, and only on the drift path for the site actually being viewed, so
+    // it rides along with a sweep that already costs one request per key.
+    let envUpdatedAt: number | null = null;
+    let lastDeployAt: number | null = null;
+    if (vercel && resolveDrift && remote.ok) {
+      for (const v of Object.values(remote.vars)) {
+        if (v.updatedAt && (envUpdatedAt === null || v.updatedAt > envUpdatedAt)) {
+          envUpdatedAt = v.updatedAt;
+        }
+      }
+      try {
+        const deploys = await vercel.listDeployments(site.slug, { limit: 1 });
+        lastDeployAt = deploys.deployments[0]?.createdAt ?? null;
+      } catch {
+        // Leave null — the UI then just doesn't claim a deploy is pending.
+      }
+    }
+
     sites.push({
       slug: site.slug,
       brandName: site.brandName,
@@ -191,6 +217,12 @@ export async function GET(req: Request) {
         projectName: remote.projectName,
         reason: remote.reason,
         drift: driftFor(env, remote),
+        envUpdatedAt,
+        lastDeployAt,
+        // Both timestamps required: with no deploy history we can't claim the live site is
+        // stale, and saying so falsely would train the operator to ignore the prompt.
+        pendingDeploy:
+          envUpdatedAt !== null && lastDeployAt !== null && envUpdatedAt > lastDeployAt,
       },
     });
   }

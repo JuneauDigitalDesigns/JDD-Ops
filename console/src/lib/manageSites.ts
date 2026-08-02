@@ -1,19 +1,14 @@
 import 'server-only';
-import { cache } from 'react';
 import { getClientContext, siteDirFor } from './clients';
 import { readEnvLocal } from './intake';
 import type { ClientContext, SiteEnv, SiteInfo } from './types';
 
 /**
- * Per-request memo of getClientContext.
- *
- * The [slug] layout and the [section] page both need the client, and App Router renders
- * them as separate server components with no way to pass props between them. Without
- * this, every section navigation re-reads and re-parses site.ts twice.
+ * The per-request memo now lives in clients.ts as getClientCached — the /c/[slug] shell
+ * needs it too, and it was never specific to /manage. Re-exported under the old name so
+ * every manage route keeps its existing import.
  */
-export const getManageClient = cache(
-  async (slug: string): Promise<ClientContext | null> => getClientContext(slug),
-);
+export { getClientCached as getManageClient } from './clients';
 
 /**
  * Shared slug/site resolution for the /manage routes.

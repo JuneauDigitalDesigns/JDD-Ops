@@ -1,53 +1,46 @@
-// Column derivation and ordering maths for the roster Kanban.
+// Status resolution and Kanban ordering maths.
 //
-// Deliberately pure — no React, no dnd-kit. The board's drag handling is fiddly enough that the
-// rules it enforces (which column a client belongs in, which drops are legal, what sort key a
-// dropped card gets) are worth keeping somewhere they can be read and reasoned about on their own.
+// Deliberately pure — no React, no dnd-kit — so the rules a board enforces can be read and
+// reasoned about on their own.
+//
+// This file used to also own the onboarding board's column rules (COLUMNS, buildColumns,
+// canDrop, floorIndex, compareInColumn). That board was replaced by the leads funnel at /leads,
+// and those five went with it — a lead has no disk-derived truth, so it has no floor and no
+// refused drops. What survived is the half that still has consumers:
+//
+//   · effectiveStatus / columnFor — read by the client index's status sort and attention.ts
+//   · the ordering maths          — reused verbatim by the leads board
+//
+// Client status is still settable, just not by dragging: StatusControl in the /c/{slug}/onboard
+// step rail owns it now, which is where you'd actually know it changed.
 
-import { STATUS_ORDER, type ClientContext, type ClientState, type ClientStatus, type RunbookState } from './types';
-
-/** The five pipeline columns, in order. `unknown` is not one of them — see columnFor. */
-export const COLUMNS: ClientStatus[] = STATUS_ORDER;
+import { STATUS_ORDER, type ClientState, type ClientStatus, type RunbookState } from './types';
 
 /**
- * Which column a client renders in.
+ * Which status a client should be shown as.
  *
- * `unknown` isn't a pipeline stage — it means the client folder is brand new or unreadable, which
- * is materially the same situation as "needs build". Folding it there gives those clients a real
- * home you can drag them out of, instead of a sixth column that is empty ~always.
+ * `unknown` isn't a pipeline stage — it means the client folder is brand new or unreadable,
+ * which is materially the same situation as "needs build".
  */
 export function columnFor(status: ClientStatus): ClientStatus {
   return status === 'unknown' ? 'needs-build' : status;
 }
 
-/**
- * The lowest column index a client may be dropped into.
- *
- * `detectedStatus` is derived from what's actually on disk, so it's a floor: a client whose repo
- * is provisioned cannot truthfully be "needs build". A detected `unknown` yields index 0 — we know
- * nothing, so nothing is blocked.
- */
-export function floorIndex(ctx: ClientContext): number {
-  const i = STATUS_ORDER.indexOf(ctx.detectedStatus);
-  return i === -1 ? 0 : i;
-}
-
-/** Whether `ctx` may be dropped into `column`. Drops behind the disk-detected floor are refused. */
-export function canDrop(ctx: ClientContext, column: ClientStatus): boolean {
-  return STATUS_ORDER.indexOf(column) >= floorIndex(ctx);
-}
-
 /** The effective status: manual override when set, else what disk detection found. */
-export function effectiveStatus(ctx: ClientContext, state: RunbookState): ClientStatus {
+export function effectiveStatus(ctx: { slug: string; detectedStatus: ClientStatus }, state: RunbookState): ClientStatus {
   return state[ctx.slug]?.status ?? ctx.detectedStatus;
+}
+
+/** Whether a manual status has fallen behind what's actually on disk. */
+export function isBehindDisk(ctx: { slug: string; detectedStatus: ClientStatus }, state: RunbookState): boolean {
+  return STATUS_ORDER.indexOf(effectiveStatus(ctx, state)) < STATUS_ORDER.indexOf(ctx.detectedStatus);
 }
 
 /**
  * A sort key strictly between two neighbours.
  *
- * Fractional so a drop writes ONE client. patchClientState takes a single slug per call; reindexing
- * a whole column on every reorder would mean N round-trips and a partially-applied order if one
- * failed.
+ * Fractional so a drop writes ONE record. Reindexing a whole column on every reorder would mean
+ * N round-trips and a partially-applied order if one failed.
  */
 export function orderBetween(prev: number | undefined, next: number | undefined): number {
   if (prev == null && next == null) return 0;
@@ -67,48 +60,17 @@ export function needsRenormalise(prev: number | undefined, next: number | undefi
   return prev != null && next != null && Math.abs(next - prev) < MIN_ORDER_GAP;
 }
 
-/** Sort key for a client within its column: dragged ones first by `order`, then untouched ones A→Z. */
-function sortKey(ctx: ClientContext, state: RunbookState): [number, string] {
-  const order = state[ctx.slug]?.order;
-  return [order ?? Number.POSITIVE_INFINITY, ctx.brandName.toLowerCase()];
-}
-
-export function compareInColumn(a: ClientContext, b: ClientContext, state: RunbookState): number {
-  const [ao, an] = sortKey(a, state);
-  const [bo, bn] = sortKey(b, state);
-  if (ao !== bo) return ao - bo;
-  return an.localeCompare(bn);
-}
-
-/** Slugs per column, each already sorted. Every column is present, even when empty. */
-export function buildColumns(
-  clients: ClientContext[],
-  state: RunbookState,
-): Record<ClientStatus, string[]> {
-  const out = {} as Record<ClientStatus, string[]>;
-  for (const col of COLUMNS) out[col] = [];
-
-  for (const ctx of clients) {
-    const col = columnFor(effectiveStatus(ctx, state));
-    // A status outside STATUS_ORDER would otherwise vanish from the board entirely.
-    (out[col] ?? out['needs-build']).push(ctx.slug);
-  }
-
-  const byslug = new Map(clients.map((c) => [c.slug, c]));
-  for (const col of COLUMNS) {
-    out[col].sort((x, y) => compareInColumn(byslug.get(x)!, byslug.get(y)!, state));
-  }
-  return out;
-}
-
 /**
- * The order value a card should take at `index` within `slugs` (the column's post-move list,
- * excluding nothing — `index` is where the card now sits).
+ * The order value a card should take at `index` within `slugs` (the column's post-move list —
+ * `index` is where the card now sits).
+ *
+ * The state parameter is widened past RunbookState so the leads board can reuse this as-is;
+ * RunbookState satisfies it structurally, so no client-side call site changed.
  */
 export function orderAt(
   slugs: string[],
   index: number,
-  state: RunbookState,
+  state: Record<string, { order?: number } | undefined>,
 ): { order: number; renormalise: boolean } {
   const orderOf = (s: string | undefined) => (s == null ? undefined : state[s]?.order);
   const prev = orderOf(slugs[index - 1]);

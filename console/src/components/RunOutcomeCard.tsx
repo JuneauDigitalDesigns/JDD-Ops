@@ -6,7 +6,7 @@ import CopyButton from './CopyButton';
 function CopyRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="kicker w-28 shrink-0">{label}</span>
+      <span className="meta w-28 shrink-0">{label}</span>
       <code className="codechip flex-1">{value}</code>
       <CopyButton value={value} />
     </div>
@@ -16,7 +16,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 function LinkRow({ label, href, Icon }: { label: string; href: string; Icon: typeof ArrowSquareOut }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="kicker w-28 shrink-0">{label}</span>
+      <span className="meta w-28 shrink-0">{label}</span>
       <a href={href} target="_blank" rel="noreferrer" className="btn btn-sm inline-flex min-w-0 flex-1">
         <Icon size={13} />
         <span className="truncate">{href}</span>
@@ -41,7 +41,7 @@ export default function RunOutcomeCard({ state }: { state: RunState }) {
 
       {state.sites.map((s, i) => (
         <div key={i} className="flex flex-col gap-2">
-          {multi && <span className="kicker" style={{ color: 'var(--accent)' }}>{s.label}</span>}
+          {multi && <span className="meta" style={{ color: 'var(--accent)' }}>{s.label}</span>}
           {s.repo && <LinkRow label="Repo" href={s.repo} Icon={GithubLogo} />}
           {s.agent && <CopyRow label="Retell agent" value={s.agent} />}
           {s.number && <CopyRow label="Phone number" value={s.number} />}

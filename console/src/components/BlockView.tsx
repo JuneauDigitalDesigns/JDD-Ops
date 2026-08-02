@@ -15,7 +15,7 @@ const CALLOUT_TONE = {
 } as const;
 
 function PendingNote() {
-  return <span className="kicker" style={{ color: 'var(--fg-3)' }}>(provision first)</span>;
+  return <span className="meta" style={{ color: 'var(--fg-3)' }}>(provision first)</span>;
 }
 
 export default function BlockView({ block }: { block: Block }) {
@@ -66,7 +66,7 @@ export default function BlockView({ block }: { block: Block }) {
         <div className="rounded-[10px] border px-3.5 py-3" style={{ borderColor: 'var(--ok)', background: 'var(--ok-glow)' }}>
           <div className="mb-2 flex items-center gap-2">
             <Eye size={15} weight="fill" style={{ color: 'var(--ok)' }} />
-            <span className="kicker" style={{ color: 'var(--ok)' }}>{block.title ?? 'You should see'}</span>
+            <span className="meta" style={{ color: 'var(--ok)' }}>{block.title ?? 'You should see'}</span>
           </div>
           <ul className="flex flex-col gap-1.5">
             {block.items.map((item, i) => (
@@ -108,7 +108,7 @@ export default function BlockView({ block }: { block: Block }) {
           {(block.cwd || block.note) && (
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-1">
               {block.cwd && (
-                <span className="kicker" style={{ color: 'var(--fg-3)' }}>
+                <span className="meta" style={{ color: 'var(--fg-3)' }}>
                   run from <span style={{ color: 'var(--accent)' }}>{block.cwd}</span>
                 </span>
               )}
@@ -121,7 +121,7 @@ export default function BlockView({ block }: { block: Block }) {
     case 'copy':
       return (
         <div className="flex items-center gap-2.5">
-          <span className="kicker w-32 shrink-0">{block.label}</span>
+          <span className="meta w-32 shrink-0">{block.label}</span>
           <code className="codechip flex-1">{block.value}</code>
           {block.pending && <PendingNote />}
           <CopyButton value={block.value} disabled={block.pending} />
@@ -146,7 +146,7 @@ export default function BlockView({ block }: { block: Block }) {
       return (
         <div className="overflow-hidden rounded-[10px] border border-rule">
           <div className="flex items-center justify-between border-b border-rule bg-[var(--bg-deep)] px-3 py-1.5">
-            <span className="kicker">{block.file}</span>
+            <span className="meta">{block.file}</span>
           </div>
           <div className="flex flex-col gap-1.5 px-3 py-2.5">
             {block.vars.map((v, i) => (
@@ -188,29 +188,29 @@ export default function BlockView({ block }: { block: Block }) {
       return (
         <div className="overflow-hidden rounded-[10px] border" style={{ borderColor: 'var(--rule-strong)', background: 'var(--surface)' }}>
           <div className="flex items-center justify-between gap-2 border-b border-rule px-3 py-1.5">
-            <span className="kicker" style={{ color: 'var(--accent)' }}>{block.label}</span>
+            <span className="meta" style={{ color: 'var(--accent)' }}>{block.label}</span>
             {block.value && <CopyButton value={block.value} />}
           </div>
           <div className="flex flex-col gap-1.5 px-3 py-2.5">
             <div className="flex gap-2">
               <Crosshair size={13} weight="bold" style={{ color: 'var(--fg-3)', flexShrink: 0, marginTop: 2 }} />
               <p className="text-xs leading-[1.5] text-fg2">
-                <span className="kicker mr-1.5" style={{ fontSize: 9.5 }}>from</span>
+                <span className="meta mr-1.5">from</span>
                 {block.from}
               </p>
             </div>
             <div className="flex gap-2">
               <ArrowBendDownRight size={13} weight="bold" style={{ color: 'var(--fg-3)', flexShrink: 0, marginTop: 2 }} />
               <p className="text-xs leading-[1.5] text-fg2">
-                <span className="kicker mr-1.5" style={{ fontSize: 9.5 }}>put in</span>
+                <span className="meta mr-1.5">put in</span>
                 {block.to}
               </p>
             </div>
             {(block.value || block.example) && (
               <div className="flex items-center gap-2 pl-[21px]">
-                <span className="kicker" style={{ fontSize: 9.5 }}>{block.value ? 'value' : 'looks like'}</span>
+                <span className="meta">{block.value ? 'value' : 'looks like'}</span>
                 <code className="codechip flex-1">{block.value ?? block.example}</code>
-                {block.pending && <span className="kicker" style={{ color: 'var(--fg-3)' }}>(provision first)</span>}
+                {block.pending && <span className="meta" style={{ color: 'var(--fg-3)' }}>(provision first)</span>}
               </div>
             )}
           </div>
@@ -221,7 +221,7 @@ export default function BlockView({ block }: { block: Block }) {
       return (
         <div className="overflow-hidden rounded-[10px] border border-rule">
           <div className="flex items-center justify-between border-b border-rule bg-[var(--bg-deep)] px-3 py-1.5">
-            <span className="kicker">{block.label}</span>
+            <span className="meta">{block.label}</span>
             <CopyButton value={block.json} />
           </div>
           <pre className="mono overflow-x-auto px-3 py-2.5 text-2xs leading-[1.6] text-fg2 no-scrollbar">

@@ -281,6 +281,7 @@ export const LOCKED_KEYS = new Set([
   'VERCEL_PROJECT_NAME', // renaming here would orphan the Vercel project
   'CLERK_USER_ID', // written by the portal link repair tool
   'RETELL_LLM_ID', // bound to the agent by onboard.js / update-prompt
+  'PORTAL_ACCOUNT_EMAIL', // which account owns this site; onboard.js --link-portal moves it
 ]);
 
 /** A .env.local line the UI shows in the advanced drawer rather than as a curated field. */

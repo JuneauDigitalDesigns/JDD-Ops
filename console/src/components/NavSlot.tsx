@@ -1,21 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+export { ToolBarSlot as default } from './shell/slots';
 
-// Renders its children into ConsoleNav's #console-nav-slot, so a route can put its own
-// chrome (the wizard step rail, /onboard's title + Refresh) into the ONE global bar instead
-// of a second bar of its own. A portal rather than context-with-state: no cross-tree state
-// to keep in sync, and the route keeps owning its handlers — children are just JSX.
-//
-// The target doesn't exist during SSR (ConsoleNav renders it, but portals run client-side),
-// so we gate on a mounted flag and look the node up after paint.
-export default function NavSlot({ children }: { children: React.ReactNode }) {
-  const [target, setTarget] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setTarget(document.getElementById('console-nav-slot'));
-  }, []);
-
-  return target ? createPortal(children, target) : null;
-}
+/**
+ * `NavSlot` is now an alias for <ToolBarSlot>.
+ *
+ * It used to portal a route's chrome into the console BAR (#console-nav-slot), which is how
+ * the bar ended up carrying wizard step pills, undo/redo, Back, Next and Deploy alongside
+ * app and client identity. Those are actions, not wayfinding, so the target moved down to
+ * the per-tool strip — see <ToolBar>.
+ *
+ * Kept as a re-export rather than deleted so the four call sites read naturally: a route
+ * still says "put my chrome in the slot" and doesn't need to care which strip that is.
+ */

@@ -47,7 +47,7 @@ export default function StepCard({
             >
               {step.title}
             </h4>
-            {step.est && <span className="kicker">{step.est}</span>}
+            {step.est && <span className="meta">{step.est}</span>}
           </div>
         </button>
 

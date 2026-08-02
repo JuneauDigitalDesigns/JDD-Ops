@@ -92,7 +92,7 @@ export default function LaunchStage({
             <CopyButton value={`npm run new-client -- --slug ${ctx.slug}`} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/build" className="btn btn-primary btn-sm">
+            <Link href={`/c/${ctx.slug}/build`} className="btn btn-primary btn-sm">
               <Stack size={13} /> Open Build <ArrowRight size={12} weight="bold" />
             </Link>
             <span className="text-2xs text-fg3">or scaffold a blank intake above, then fill it in.</span>
@@ -117,7 +117,7 @@ export default function LaunchStage({
             (drag-and-drop), export it to this client folder, then come back to provision.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/build" className="btn btn-sm">
+            <Link href={`/c/${ctx.slug}/build`} className="btn btn-sm">
               <Stack size={13} /> Open Build <ArrowRight size={12} weight="bold" />
             </Link>
             <span className="text-2xs text-fg3">or scaffold manually:</span>
@@ -165,7 +165,7 @@ export default function LaunchStage({
                 style={{ left: dryRun ? '18px' : '2px' }}
               />
             </span>
-            <span className="kicker" style={{ color: dryRun ? 'var(--ok)' : 'var(--fg-3)' }}>
+            <span className="meta" style={{ color: dryRun ? 'var(--ok)' : 'var(--fg-3)' }}>
               <Flask size={12} weight="fill" style={{ display: 'inline', marginRight: 4, verticalAlign: -1 }} />
               Dry run {dryRun ? 'on' : 'off'}
             </span>
@@ -179,7 +179,7 @@ export default function LaunchStage({
           type="button"
           disabled={running}
           onClick={() => (dryRun ? launch() : setConfirming(true))}
-          className={dryRun ? 'btn' : 'btn btn-primary cta-offset'}
+          className={dryRun ? 'btn' : 'btn btn-primary'}
         >
           <Play size={15} weight="fill" />
           {running ? 'Running…' : dryRun ? 'Run dry run' : 'Provision for real'}

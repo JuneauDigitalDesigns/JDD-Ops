@@ -18,23 +18,28 @@ const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
-      // Type scale — ~15-20% larger than stock Tailwind at the small end, which is where
-      // this app actually lives (text-sm/text-xs are the workhorses). Bumping these grows
-      // the whole console without touching every file. [size, lineHeight] pairs.
+      // Type scale — one notch down from where it was. The old scale sat ~15-20% ABOVE
+      // stock Tailwind; this app is a control panel, and that sizing is why every screen
+      // fit so little. [size, lineHeight] pairs.
+      //
+      // 14px is the FLOOR for body text and it is not negotiable. The density this
+      // redesign buys comes from radii, gutters, control heights and chrome — not from
+      // shrinking prose. Going to 13px here would trade legibility for a few rows.
       fontSize: {
-        '2xs': ['12px', { lineHeight: '1.45' }],   // smallest legal size; badges only
-        xs: ['13px', { lineHeight: '1.5' }],       // secondary / meta
-        sm: ['15px', { lineHeight: '1.55' }],      // BASE BODY — the workhorse
-        base: ['16px', { lineHeight: '1.6' }],
-        lg: ['18px', { lineHeight: '1.5' }],
-        xl: ['20px', { lineHeight: '1.4' }],       // section headers
-        '2xl': ['24px', { lineHeight: '1.25' }],
-        '3xl': ['28px', { lineHeight: '1.15' }],   // screen titles
-        '4xl': ['36px', { lineHeight: '1.1' }],
-        '5xl': ['46px', { lineHeight: '1.05' }],
+        '2xs': ['11.5px', { lineHeight: '1.45' }], // smallest legal size; badges only
+        xs: ['12.5px', { lineHeight: '1.5' }],     // secondary
+        sm: ['14px', { lineHeight: '1.5' }],       // BASE BODY — the workhorse
+        base: ['15px', { lineHeight: '1.55' }],
+        lg: ['17px', { lineHeight: '1.45' }],
+        xl: ['19px', { lineHeight: '1.35' }],      // section headers
+        '2xl': ['22px', { lineHeight: '1.25' }],
+        '3xl': ['26px', { lineHeight: '1.15' }],   // screen titles
+        '4xl': ['32px', { lineHeight: '1.1' }],
+        '5xl': ['42px', { lineHeight: '1.05' }],
         // Semantic sizes for chrome — use these instead of arbitrary values.
-        label: ['14px', { lineHeight: '1.4' }],    // form field labels
-        kicker: ['11.5px', { lineHeight: '1.4' }], // section eyebrows only
+        label: ['13.5px', { lineHeight: '1.4' }],  // form field labels
+        kicker: ['11.5px', { lineHeight: '1.4' }], // SECTION EYEBROWS ONLY
+        meta: ['11px', { lineHeight: '1.4' }],     // counts, durations, slugs, timestamps
       },
       colors: {
         // Client-brand tokens — bound to CSS vars set per previewed site. Reserved
@@ -119,6 +124,9 @@ const config: Config = {
       },
       borderRadius: {
         xl2: '22px',
+        // Matches .panel in globals.css. Use for surfaces that should read as the
+        // same container class as .panel but can't take the class itself.
+        panel: '12px',
       },
       backgroundImage: {
         'accent-grad': 'var(--accent-grad)',

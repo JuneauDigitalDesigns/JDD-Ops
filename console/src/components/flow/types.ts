@@ -106,6 +106,14 @@ export interface StateStyle {
   tag?: string;
 }
 
+/**
+ * Node-diagram styling (call routing, post-call). NOT used by PipelineFlow.
+ *
+ * Here `pending` means "this env var has no value yet", so dashed + dimmed is right — the node
+ * really is an empty slot. In the pipeline `pending` means "this step hasn't run yet", which is
+ * upcoming work, not absence; using this map there greyed out an entire healthy Growth client.
+ * PipelineFlow keeps its own ROW_STYLE for that reason.
+ */
 export function styleFor(state: FlowState, tone: FlowTone = 'default'): StateStyle {
   switch (state) {
     case 'live':

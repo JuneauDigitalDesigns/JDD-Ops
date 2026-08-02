@@ -67,7 +67,7 @@ export default function DriftDiff({
       </div>
 
       <div className="flex items-baseline gap-2 text-xs">
-        <span className="kicker shrink-0" style={{ fontSize: 9.5 }}>
+        <span className="meta shrink-0">
           disk
         </span>
         <span className="min-w-0 flex-1 truncate font-mono text-fg2" title={localValue}>

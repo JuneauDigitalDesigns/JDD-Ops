@@ -39,7 +39,12 @@ import {
   listProjectDomains,
 } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
-import { attachSiteToAccount, accountStoreConfigured } from './lib/account-store.js';
+import { buildPortalSiteEntries } from '@jdd/schema';
+import {
+  attachSiteToAccount,
+  detachSiteFromAccount,
+  accountStoreConfigured,
+} from './lib/account-store.js';
 
 const TOTAL_STEPS = 10;
 
@@ -198,7 +203,13 @@ async function loadIntake(schemaPath) {
     return mod.INTAKE;
   }
   if (mod.CONTENT) {
-    const plan = mod.CONTENT?._meta?.selectedPlan ?? 'growth';
+    // No default here on purpose. Guessing "growth" for a schema that never said so buys a
+    // Twilio number and creates a Retell agent for what may well be a starter client — a
+    // silent, billable wrong answer. Make the operator state the plan.
+    const plan = mod.CONTENT?._meta?.selectedPlan;
+    if (!plan) {
+      fail(1, `Legacy CONTENT schema has no _meta.selectedPlan — set it to "starter", "growth", or "enterprise" in ${schemaPath}. Refusing to guess: the wrong guess provisions paid Twilio/Retell resources.`);
+    }
     return { plan, siteCount: 1, sites: [mod.CONTENT] };
   }
   fail(1, 'Schema must export INTAKE or CONTENT');
@@ -233,6 +244,12 @@ function validateIntake(intake) {
   if (intake.plan === 'enterprise' && (intake.sites.length < 2 || intake.sites.length > 3)) {
     errors.push(`enterprise plan requires 2 or 3 sites (got ${intake.sites.length})`);
   }
+  // Enforce `plan === 'enterprise'` ⟺ multi-site. Without this the two are independent, and
+  // a growth intake carrying 2 sites builds site-1/ and site-2/ dirs while the portal
+  // attaches only the base slug — naming a Vercel project that was never created.
+  if (intake.plan !== 'enterprise' && Array.isArray(intake.sites) && intake.sites.length > 1) {
+    errors.push(`plan "${intake.plan}" requires exactly 1 site (got ${intake.sites.length}) — only enterprise is multi-site`);
+  }
   intake.sites.forEach((site, i) => {
     errors.push(...validateSite(site, `site[${i + 1}/${intake.sites.length}]`));
   });
@@ -261,14 +278,28 @@ function validateIntake(intake) {
 // Slug + directory helpers
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * The one definition of "multi-site". validateIntake enforces that this is equivalent to
+ * `plan === 'enterprise'`, so slug layout, directory layout, Airtable base sharing and portal
+ * attachment all key off the same fact instead of three lookalike conditions that could drift.
+ */
+function isMultiSite(intake) {
+  return intake.sites.length > 1;
+}
+
 function siteSlugFor(baseSlug, intake, i) {
-  if (intake.sites.length === 1) return baseSlug;
+  if (!isMultiSite(intake)) return baseSlug;
   return `${baseSlug}-${i + 1}`;
 }
 
 function siteDirFor(baseSlug, intake, i) {
-  if (intake.sites.length === 1) return resolve('clients', baseSlug);
+  if (!isMultiSite(intake)) return resolve('clients', baseSlug);
   return resolve('clients', baseSlug, `site-${i + 1}`);
+}
+
+/** The client dir holding the shared/primary values (Airtable base, portal email, Clerk user). */
+function primaryClientDirFor(baseSlug, intake) {
+  return siteDirFor(baseSlug, intake, 0);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -466,8 +497,19 @@ RETELL_POST_CALL_WEBHOOK_URL=${keep('RETELL_POST_CALL_WEBHOOK_URL')}
 VERCEL_PROJECT_NAME=${siteSlug}
 `;
   }
+  // Keys onboard.js writes LATER in the run (steps 8–10) and that are absent from the
+  // templates above. Without this they are silently dropped on every re-run — and
+  // PORTAL_ACCOUNT_EMAIL in particular is what a later `--link-portal --email` reads to know
+  // which account to move the sites off.
+  const CARRIED_KEYS = ['AIRTABLE_SITE_TAG', 'CLERK_USER_ID', 'PORTAL_ACCOUNT_EMAIL'];
+  const carried = CARRIED_KEYS.filter((k) => prev[k]);
+  for (const k of carried) body += `${k}=${prev[k]}\n`;
+
   writeFileSync(envPath, body, 'utf8');
-  const preserved = ['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'CLIENT_FORWARD_PHONE', 'AIRTABLE_BASE_ID'].filter((k) => prev[k]);
+  const preserved = [
+    ...['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'CLIENT_FORWARD_PHONE', 'AIRTABLE_BASE_ID'].filter((k) => prev[k]),
+    ...carried,
+  ];
   console.log(`  Wrote ${envPath}${preserved.length ? ` (preserved: ${preserved.join(', ')})` : ''}`);
 }
 
@@ -794,13 +836,82 @@ async function provisionTwilioNumber(content, siteSlug, clientDir) {
 // Step 8b: Create Airtable base (shared for Enterprise)
 // ───────────────────────────────────────────────────────────────────────────
 
-async function createAirtableBase(intake, primaryContent, clientDir) {
+/**
+ * The value written into the Call Log's `Site` column for one site.
+ *
+ * This is the **provisioning slug**, not brand.short. The portal filters call rows with
+ * `row.Site === site.slug` (CallsSection), so anything else silently filters every row out.
+ */
+function siteTagFor(baseSlug, intake, i) {
+  return isMultiSite(intake) ? siteSlugFor(baseSlug, intake, i) : null;
+}
+
+/**
+ * Widen an existing base's `Site` choices to cover every current site.
+ *
+ * Matters when an enterprise client adds a location after first provisioning: the base
+ * already exists so createAirtableBase short-circuits, and Make would then write a value
+ * that isn't a valid singleSelect option. Best-effort — the PAT may not carry
+ * `schema.bases:write`, and a missing choice is not worth aborting a run over.
+ */
+async function ensureSiteChoices(baseId, tags) {
+  const wanted = tags.filter(Boolean);
+  if (!wanted.length) return;
+  if (DRY_RUN) {
+    dryLog(`would ensure base ${baseId} Site choices cover: ${wanted.join(', ')}`);
+    return;
+  }
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  if (!apiKey) return;
+  const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+
+  try {
+    const res = await fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`, { headers });
+    if (!res.ok) {
+      console.warn(`  ⚠ Could not read base ${baseId} schema (${res.status}) — skipping Site choice check.`);
+      return;
+    }
+    const { tables } = await res.json();
+    const table = (tables ?? []).find((t) => t.name === 'Call Log');
+    const field = (table?.fields ?? []).find((f) => f.name === 'Site');
+    if (!table || !field) {
+      console.warn(`  ⚠ Base ${baseId} has no Call Log."Site" field — enterprise call rows will not be separable by site.`);
+      return;
+    }
+    const existing = (field.options?.choices ?? []).map((c) => c.name);
+    const missing = wanted.filter((t) => !existing.includes(t));
+    if (!missing.length) return;
+
+    const patch = await fetch(
+      `https://api.airtable.com/v0/meta/bases/${baseId}/tables/${table.id}/fields/${field.id}`,
+      {
+        method: 'PATCH',
+        headers,
+        // Airtable rejects a choices array that drops existing options, so send the union.
+        body: JSON.stringify({
+          options: { choices: [...(field.options?.choices ?? []), ...missing.map((name) => ({ name }))] },
+        }),
+      },
+    );
+    if (!patch.ok) {
+      console.warn(`  ⚠ Could not add Site choices ${missing.join(', ')} (${patch.status}) — add them by hand in Airtable.`);
+      return;
+    }
+    console.log(`  Added Site choices: ${missing.join(', ')}`);
+  } catch (err) {
+    console.warn(`  ⚠ Site choice check failed (${err?.message ?? err}) — continuing.`);
+  }
+}
+
+async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
+  const siteTags = intake.sites.map((_, i) => siteTagFor(baseSlug, intake, i));
   const existingBaseId = readEnvLocal(clientDir).AIRTABLE_BASE_ID;
   if (existingBaseId) {
     log(8, `Reusing existing Airtable base ${existingBaseId} (skipping create)`);
+    await ensureSiteChoices(existingBaseId, siteTags);
     return existingBaseId;
   }
-  const isEnterprise = intake.sites.length > 1;
+  const isEnterprise = isMultiSite(intake);
   const baseLabel = isEnterprise
     ? `${primaryContent.brand.name} — Calls (${intake.sites.length} sites)`
     : `${primaryContent.brand.name} — Calls`;
@@ -808,7 +919,7 @@ async function createAirtableBase(intake, primaryContent, clientDir) {
   if (DRY_RUN) {
     dryLog(`would create Airtable base "${baseLabel}" with Call Log table`);
     if (isEnterprise) {
-      dryLog(`  + Site singleSelect column with choices: ${intake.sites.map((s) => s.brand.short).join(', ')}`);
+      dryLog(`  + Site singleSelect column with choices: ${siteTags.filter(Boolean).join(', ')}`);
     }
     dryLog(`would patch AIRTABLE_BASE_ID into ${clientDir}/.env.local`);
     return '<dry-run-base-id>';
@@ -847,7 +958,8 @@ async function createAirtableBase(intake, primaryContent, clientDir) {
       name: 'Site',
       type: 'singleSelect',
       options: {
-        choices: intake.sites.map((s) => ({ name: s.brand.short })),
+        // Provisioning slugs, NOT brand.short — the portal matches these against site.slug.
+        choices: siteTags.filter(Boolean).map((name) => ({ name })),
       },
     });
   }
@@ -1061,20 +1173,35 @@ async function resolveVercelHost(slug) {
   }
 }
 
-async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug, forceRelink = false, emailOverride = null }) {
-  log(10, `Link portal account`);
+/**
+ * Same lookup, but returns null rather than a guess when Vercel can't confirm the host.
+ *
+ * Used for the portal record's canonical fallback. The lenient version above is fine for the
+ * test-login path (a wrong host there is a bad link in a log line), but a fabricated URL
+ * written into a client's portal record is worse than an empty one: the Performance tab would
+ * report a real-looking failure against a host that never existed.
+ */
+async function resolveVercelHostStrict(slug) {
+  if (!process.env.VERCEL_TOKEN) return null;
+  try {
+    const result = await listProjectDomains(slug);
+    if (!result.ok) return null;
+    const alias = result.domains.find((d) => d.name.endsWith('.vercel.app') && !d.redirect);
+    return alias ? `https://${alias.name}` : null;
+  } catch {
+    return null;
+  }
+}
 
-  // For single-site: clients/{slug}/.env.local
-  // For enterprise: clients/{slug}/site-1/.env.local (the primary site dir)
-  const primaryClientDir = intake.sites.length === 1
-    ? resolve('clients', baseSlug)
-    : resolve('clients', baseSlug, 'site-1');
-
-  // Test clients (e2e slugs, or --test-portal) additionally get a real Clerk login with
-  // a known password, so you can sign in without owning the placeholder brand.email
-  // inbox. REAL clients are deliberately never pre-created in Clerk — they self-serve
-  // sign up at /portal/sign-up, and an account that already exists for their email
-  // would block that signup. Their portal access comes from the account record below.
+/**
+ * Which portal account this client's sites attach to.
+ *
+ * Test clients (`_e2e*` slugs, or `--test-portal`) use PORTAL_TEST_EMAIL so you can sign in
+ * without owning the placeholder brand.email inbox. REAL clients are deliberately never
+ * pre-created in Clerk — they self-serve at /portal/sign-up, and a pre-existing account for
+ * their address would block that signup. Their access comes from the account record alone.
+ */
+function resolvePortalIdentity(intake, baseSlug, emailOverride = null) {
   const isTestClient = baseSlug.startsWith('_e2e') || FORCE_TEST_PORTAL;
   const testEmail = process.env.PORTAL_TEST_EMAIL || null;
   const testPassword = process.env.PORTAL_TEST_PASSWORD || null;
@@ -1083,70 +1210,39 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
     console.warn(`  ⚠ Test client but PORTAL_TEST_EMAIL / PORTAL_TEST_PASSWORD not set in .env — falling back to brand.email with no password.`);
   }
 
-  // An explicit --email selects WHICH account the site attaches to, for when the client
-  // signed up with a different address than brand.email.
-  // (`forceRelink` is retained for call-site compatibility but no longer gates anything:
-  // attaching is an idempotent upsert, so there is nothing to skip or force.)
-  void forceRelink;
+  const override = emailOverride && emailOverride.trim() ? emailOverride.trim() : null;
+  const email = override ?? (useTestLogin ? testEmail : intake.sites[0]?.brand?.email) ?? null;
 
-  const overrideEmail = emailOverride && emailOverride.trim() ? emailOverride.trim() : null;
-  const email = overrideEmail ?? (useTestLogin ? testEmail : intake.sites[0]?.brand?.email);
+  // Enterprise sites all land on the primary site's email — one paying client, one account.
+  // Say so out loud when the intake disagrees with itself, rather than silently picking one.
+  const emails = new Set(
+    intake.sites.map((s) => s?.brand?.email).filter(Boolean).map((e) => e.trim().toLowerCase()),
+  );
+  if (!override && emails.size > 1) {
+    console.warn(`  ⚠ Sites disagree on brand.email (${[...emails].join(', ')}) — all sites attach to ${email}. Use --link-portal --email to change it.`);
+  }
+
+  return { email, useTestLogin, testPassword };
+}
+
+/**
+ * Attach ONE provisioned site to the portal account.
+ *
+ * Called inside the provisioning loop rather than once at the end: a `fail()` on site 3 of an
+ * enterprise client used to exit before step 10 ran at all, leaving sites 1–2 fully
+ * provisioned — numbers bought, agents created — with no portal record and no obvious way to
+ * tell. Attaching as we go means a partial run leaves a partially-correct portal, not an empty one.
+ */
+async function attachSiteToPortal({ email, plan, status, siteSlug, content, sharedBaseId, clientDir, preferResolvedHost = false }) {
+  log(10, `Link portal account`);
   if (!email) {
-    console.warn(`  ⚠ No email available (brand.email empty and no --email given) — skipping portal link.`);
+    console.warn(`  ⚠ No email available (brand.email empty and no --email given) — skipping portal link for ${siteSlug}.`);
     return;
   }
 
-  // For test clients, point canonical at the live Vercel URL so the portal's
-  // Performance tab pings a real host instead of the placeholder domain.
-  //
-  // ASK Vercel for the host rather than deriving it. Vercel STRIPS underscores when it
-  // mints the alias, so `_e2e_test_growth` is served at e2etestgrowth.vercel.app, while
-  // the old `.replace(/_/g, '-')` guess produced e2e-test-growth.vercel.app — a 404 that
-  // then got written into the client's portal record. By this step the project exists, so
-  // the domain list is authoritative; the derived form stays only as a fallback for when
-  // the lookup fails.
-  const canonical = useTestLogin
-    ? await resolveVercelHost(baseSlug)
-    : (intake.sites[0]?.seo?.canonical ?? '');
-
-  const airtableBaseId = intake.plan !== 'starter'
-    ? (sharedBaseId || readEnvLocal(primaryClientDir).AIRTABLE_BASE_ID || null)
-    : null;
-
-  // The site entries to attach. Enterprise attaches one per site (sharing the Airtable
-  // base, separated in the portal by the Call Log's `Site` column); everything else
-  // attaches the single base slug. Vercel project ids let the portal query Web
-  // Analytics — null when VERCEL_TOKEN is unset or the project isn't created yet, and
-  // the portal degrades to "analytics not connected yet".
-  const sitesToAttach = intake.plan === 'enterprise'
-    ? await Promise.all(intake.sites.map(async (s, i) => {
-        const siteSlug = provisioned[i]?.siteSlug ?? `${baseSlug}-${i + 1}`;
-        return {
-          slug: siteSlug,
-          name: s?.brand?.name ?? '',
-          canonical: s?.seo?.canonical ?? '',
-          plan: intake.plan,
-          status: 'live',
-          airtableBaseId,
-          vercelProjectId: await getVercelProjectId(siteSlug),
-        };
-      }))
-    : [{
-        slug: baseSlug,
-        name: intake.sites[0]?.brand?.name ?? '',
-        canonical,
-        plan: intake.plan,
-        status: 'live',
-        airtableBaseId,
-        vercelProjectId: await getVercelProjectId(baseSlug),
-      }];
-
   if (DRY_RUN) {
-    for (const s of sitesToAttach) {
-      dryLog(`would upsert site "${s.slug}" (plan ${s.plan}, status live) into account ${email}`);
-    }
+    dryLog(`would upsert site "${siteSlug}" (plan ${plan}, status ${status}) into account ${email}`);
     dryLog(`any other sites already on that account would be preserved`);
-    if (useTestLogin) dryLog(`would create/update Clerk test login ${email} (+ password)`);
     return;
   }
 
@@ -1155,16 +1251,46 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
     return;
   }
 
-  // Upsert each site. Other sites on the account are preserved, so provisioning a
-  // returning client's second site never disturbs their first.
-  for (const s of sitesToAttach) {
-    const account = await attachSiteToAccount(email, s);
-    const n = account.sites.length;
-    console.log(`  Linked "${s.slug}" → ${email} (${n} site${n === 1 ? '' : 's'} on account)`);
-  }
+  // Test clients carry a placeholder domain in seo.canonical, so the live Vercel host has to
+  // WIN there — that is the whole point of the test-portal path. Real clients keep their own
+  // canonical and only fall back to the Vercel host when they have none yet (pre-domain).
+  const resolvedHost = preferResolvedHost
+    ? await resolveVercelHost(siteSlug)
+    : await resolveVercelHostStrict(siteSlug);
+  const ownCanonical = preferResolvedHost ? null : (content?.seo?.canonical ?? null);
 
-  // Test clients only: ensure a Clerk login exists with a known password.
-  if (!useTestLogin) return;
+  const [entry] = buildPortalSiteEntries({
+    plan,
+    status,
+    sharedAirtableBaseId: sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID || null,
+    sites: [{
+      slug: siteSlug,
+      name: content?.brand?.name ?? '',
+      canonical: ownCanonical,
+      fallbackCanonical: resolvedHost,
+      vercelProjectId: await getVercelProjectId(siteSlug),
+    }],
+  });
+
+  const account = await attachSiteToAccount(email, entry);
+  const n = account.sites.length;
+  console.log(`  Linked "${siteSlug}" → ${email} (status ${status}, ${n} site${n === 1 ? '' : 's'} on account)`);
+
+  // Record which account owns this site so a later --email re-link can clean up the old one.
+  patchEnvLocal(clientDir, 'PORTAL_ACCOUNT_EMAIL', email);
+}
+
+/**
+ * Test clients only: ensure a Clerk login exists with a known password.
+ * Runs once per client, after every site has been attached.
+ */
+async function provisionPortalTestLogin({ email, useTestLogin, testPassword, primaryClientDir, baseSlug }) {
+  if (!useTestLogin || !email) return;
+
+  if (DRY_RUN) {
+    dryLog(`would create/update Clerk test login ${email} (+ password)`);
+    return;
+  }
 
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
@@ -1213,14 +1339,37 @@ async function provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug,
   return user.id;
 }
 
-// Links (or repairs) an existing client's Clerk portal user without re-running full
-// provisioning. Always force-relinks (re-applies metadata even if CLERK_USER_ID is
-// already saved); an optional emailOverride targets the account the client actually
-// signed up with when it differs from brand.email.
+/**
+ * Detach this client's sites from an account they were previously linked to.
+ *
+ * Re-linking with --email used to attach to the new address and simply walk away from the old
+ * record, which kept every site on it — so whoever still controls the old address kept portal
+ * access to the client's call log. Move the sites rather than copying them.
+ */
+async function detachFromPreviousAccount(previousEmail, newEmail, siteSlugs) {
+  if (!previousEmail || previousEmail.trim().toLowerCase() === newEmail.trim().toLowerCase()) return;
+  if (DRY_RUN) {
+    dryLog(`would remove ${siteSlugs.join(', ')} from the previous account ${previousEmail}`);
+    return;
+  }
+  if (!accountStoreConfigured()) return;
+  for (const slug of siteSlugs) {
+    try {
+      await detachSiteFromAccount(previousEmail, slug);
+    } catch (err) {
+      console.warn(`  ⚠ Could not detach "${slug}" from ${previousEmail}: ${err?.message ?? err}`);
+    }
+  }
+  console.log(`  Removed ${siteSlugs.length} site${siteSlugs.length === 1 ? '' : 's'} from the previous account ${previousEmail}`);
+}
+
+// Links (or repairs) an existing client's portal account without re-running full
+// provisioning. An optional emailOverride targets the account the client actually signed up
+// with when it differs from brand.email; the sites are MOVED off the previous account.
 // Usage: node onboard.js --slug {slug} --link-portal [--email addr] [--test-portal]
 async function linkPortal(slug, opts = {}) {
   const emailOverride = opts.email ?? null;
-  console.log(`\n[link-portal] Linking client "${slug}" to the Clerk portal${emailOverride ? ` (email: ${emailOverride})` : ''}`);
+  console.log(`\n[link-portal] Linking client "${slug}" to the portal${emailOverride ? ` (email: ${emailOverride})` : ''}`);
 
   const singleSchema = resolve('clients', slug, 'site.ts');
   const schemaPath = existsSync(singleSchema)
@@ -1234,30 +1383,51 @@ async function linkPortal(slug, opts = {}) {
   validateIntake(intake);
 
   // sharedBaseId comes from the primary site's .env.local (written at provision time).
-  const primaryClientDir = intake.sites.length === 1
-    ? resolve('clients', slug)
-    : resolve('clients', slug, 'site-1');
+  const primaryClientDir = primaryClientDirFor(slug, intake);
   const sharedBaseId = readEnvLocal(primaryClientDir).AIRTABLE_BASE_ID || null;
 
-  // provisioned[] is only read for enterprise per-site slugs; reconstruct minimally.
-  const provisioned = intake.sites.map((s, i) => ({ siteSlug: siteSlugFor(slug, intake, i) }));
+  const { email, useTestLogin, testPassword } = resolvePortalIdentity(intake, slug, emailOverride);
+  if (!email) {
+    fail(0, `No email available for "${slug}" — pass --email addr.`);
+  }
 
-  await provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug: slug, forceRelink: true, emailOverride });
+  const siteSlugs = intake.sites.map((_, i) => siteSlugFor(slug, intake, i));
+
+  // A repair run can't know whether the site deployed since; leave status alone by reading
+  // back what the account already says, defaulting to 'live' for an already-provisioned client.
+  const previousEmail = readEnvLocal(primaryClientDir).PORTAL_ACCOUNT_EMAIL || null;
+  await detachFromPreviousAccount(previousEmail, email, siteSlugs);
+
+  for (let i = 0; i < intake.sites.length; i++) {
+    await attachSiteToPortal({
+      email,
+      plan: intake.plan,
+      status: 'live',
+      siteSlug: siteSlugs[i],
+      content: intake.sites[i],
+      sharedBaseId,
+      clientDir: siteDirFor(slug, intake, i),
+      preferResolvedHost: useTestLogin,
+    });
+  }
+
+  await provisionPortalTestLogin({ email, useTestLogin, testPassword, primaryClientDir, baseSlug: slug });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // Final handoff summary
 // ───────────────────────────────────────────────────────────────────────────
 
-function printHandoff({ intake, provisioned, sharedBaseId, baseSlug }) {
+function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail }) {
   const line = '─'.repeat(64);
   console.log(`\n${line}`);
-  console.log(`  ONBOARDED: ${intake.sites[0].brand.name}${intake.sites.length > 1 ? ` (Enterprise — ${intake.sites.length} sites)` : ''}`);
+  console.log(`  ONBOARDED: ${intake.sites[0].brand.name}${isMultiSite(intake) ? ` (Enterprise — ${intake.sites.length} sites)` : ''}`);
   console.log(`  Plan: ${intake.plan}`);
   console.log(line);
   provisioned.forEach((p, i) => {
     console.log(`\n  Site ${i + 1}/${intake.sites.length}: ${p.brandName}`);
     console.log(`    Repo          ${p.repoUrl}`);
+    console.log(`    Portal slug   ${p.siteSlug}${p.portalStatus ? ` (${p.portalStatus})` : ''}`);
     if (p.agentId)      console.log(`    Retell agent  ${p.agentId}`);
     if (p.twilioNumber) console.log(`    Twilio number ${p.twilioNumber}`);
     console.log(`    Accent        ${p.palette.accent}`);
@@ -1267,8 +1437,12 @@ function printHandoff({ intake, provisioned, sharedBaseId, baseSlug }) {
   });
   if (sharedBaseId) {
     console.log(`\n  Airtable base (shared): ${sharedBaseId}`);
+    if (isMultiSite(intake)) {
+      console.log(`    Call Log rows are separated by the "Site" column (values = portal slugs above).`);
+    }
   }
   console.log(`\n  Portal: https://juneaudigitaldesigns.com/portal`);
+  console.log(`  Portal account: ${portalEmail ?? '⚠ not linked'}`);
   console.log(`\n${line}`);
   console.log(`  Next:`);
   if (intake.plan === 'starter') {
@@ -1280,7 +1454,7 @@ function printHandoff({ intake, provisioned, sharedBaseId, baseSlug }) {
     console.log(`    2. Checkpoint 2 — test-call each Twilio number; tune each agent-prompt.txt.`);
     provisioned.forEach((p) => {
       if (p.agentId) {
-        const slugForCmd = intake.sites.length === 1 ? baseSlug : `${baseSlug}/site-${p.index + 1}`;
+        const slugForCmd = isMultiSite(intake) ? `${baseSlug}/site-${p.index + 1}` : baseSlug;
         console.log(`         npm run update-prompt -- ${p.agentId} --slug ${slugForCmd}`);
       }
     });
@@ -1315,12 +1489,20 @@ function preflight(intake) {
   // Repo + deploy are needed for every plan.
   need('GITHUB_TOKEN');
   need('GITHUB_ORG');
-  if (!process.env.VERCEL_TOKEN) warnings.push('VERCEL_TOKEN not set — step 9 (Vercel sync) will be skipped');
-  if (!process.env.CLERK_SECRET_KEY) warnings.push('CLERK_SECRET_KEY not set — step 10 (Clerk portal user) will be skipped. Run Clerk setup first (see RUNBOOK.md).');
+  if (!process.env.VERCEL_TOKEN) warnings.push('VERCEL_TOKEN not set — step 9 (Vercel sync) will be skipped, and sites will be linked as "building" rather than "live"');
+  if (!process.env.CLERK_SECRET_KEY) warnings.push('CLERK_SECRET_KEY not set — the portal test login will be skipped. Run Clerk setup first (see RUNBOOK.md).');
+  // Step 10 writes the account record to KV, not Clerk. Warn here rather than at the very end
+  // of a run that has already bought numbers.
+  if (!accountStoreConfigured()) {
+    warnings.push('KV not configured (KV_REST_API_URL / KV_REST_API_TOKEN) — step 10 will NOT link the portal; the client will have no portal access until you re-run --link-portal');
+  }
 
   if (intake.plan === 'starter') {
     if (!process.env.RESEND_API_KEY) warnings.push('RESEND_API_KEY not set — starter lead emails will not send until configured');
   } else {
+    if (!process.env.MAKE_API_KEY || !process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID) {
+      warnings.push('MAKE_API_KEY / MAKE_POST_CALL_MASTER_SCENARIO_ID not set — step 8c will skip the post-call clone, so calls will not reach Airtable or SMS the owner');
+    }
     // growth / enterprise voice + CRM stack
     need('ANTHROPIC_API_KEY');
     need('RETELL_API_KEY');
@@ -1376,11 +1558,15 @@ async function main() {
   const provisioned = [];
   let sharedBaseId = null;
 
+  // Resolved once, up front: every site of a client attaches to the same portal account, and
+  // knowing the address before the loop lets each site link as soon as it is done.
+  const { email: portalEmail, useTestLogin, testPassword } = resolvePortalIdentity(intake, baseSlug);
+
   for (let i = 0; i < intake.sites.length; i++) {
     const site = intake.sites[i];
     const siteSlug = siteSlugFor(baseSlug, intake, i);
     const clientDir = siteDirFor(baseSlug, intake, i);
-    CURRENT_SITE_LABEL = intake.sites.length > 1 ? `site ${i + 1}/${intake.sites.length}` : '';
+    CURRENT_SITE_LABEL = isMultiSite(intake) ? `site ${i + 1}/${intake.sites.length}` : '';
 
     const { repoDir, repoUrl } = await createRepoFromLocal(siteSlug, site, clientDir);
     writeClientSchema(repoDir, site);
@@ -1398,22 +1584,49 @@ async function main() {
       agentId = await createRetellAgent(site, agentPrompt, clientDir);
       twilioNumber = await provisionTwilioNumber(site, siteSlug, clientDir);
 
+      // The value written into the Call Log's `Site` column — the provisioning slug, and set
+      // for EVERY enterprise site including the first. Tagging only sites 2+ left site 1's
+      // rows untagged, and the portal shows untagged rows under every site.
+      const siteTag = siteTagFor(baseSlug, intake, i);
+
       if (i === 0) {
-        sharedBaseId = await createAirtableBase(intake, site, clientDir);
+        sharedBaseId = await createAirtableBase(intake, site, clientDir, baseSlug);
       } else {
         patchEnvLocal(clientDir, 'AIRTABLE_BASE_ID', sharedBaseId);
-        patchEnvLocal(clientDir, 'AIRTABLE_SITE_TAG', site.brand.short);
-        console.log(`  Reusing shared Airtable base ${sharedBaseId} (site tag: ${site.brand.short})`);
+        console.log(`  Reusing shared Airtable base ${sharedBaseId}`);
+      }
+      if (siteTag) {
+        patchEnvLocal(clientDir, 'AIRTABLE_SITE_TAG', siteTag);
+        console.log(`  Site tag: ${siteTag}`);
       }
       await cloneAndWirePostCall(
         agentId, site, clientDir,
         sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID,
-        i === 0 ? null : site.brand.short, // Site tag for enterprise sites 2+
+        siteTag,
       );
     }
 
     commitAndPush(repoDir, site.brand.name);
-    await syncVercelEnv(siteSlug, site, clientDir, intake.plan);
+    const sync = await syncVercelEnv(siteSlug, site, clientDir, intake.plan);
+
+    // "live" means the env actually reached Vercel. A skipped or failed sync leaves the site
+    // "building" so the portal says so, instead of showing a dashboard for a site that can't
+    // serve leads yet.
+    const syncOk = Boolean(sync) && !sync.skippedAll && !sync.error;
+    const portalStatus = syncOk || sync?.dryRun ? 'live' : 'building';
+
+    // Link this site now rather than after the whole loop: an enterprise run that dies on
+    // site 3 should still leave sites 1 and 2 visible in the client's portal.
+    await attachSiteToPortal({
+      email: portalEmail,
+      plan: intake.plan,
+      status: portalStatus,
+      siteSlug,
+      content: site,
+      sharedBaseId,
+      clientDir,
+      preferResolvedHost: useTestLogin,
+    });
 
     const missingFields = site?._meta?.missing_fields ?? site?._meta?.missingFields ?? [];
     provisioned.push({
@@ -1425,15 +1638,23 @@ async function main() {
       twilioNumber,
       palette: site.brand.palette,
       missingFields,
+      portalStatus,
     });
   }
 
   CURRENT_SITE_LABEL = '';
 
-  // Step 10: Provision Clerk portal user (after Airtable so sharedBaseId is known)
-  await provisionClerkUser({ intake, provisioned, sharedBaseId, baseSlug });
+  // Step 10 (tail): the Clerk test login, once per client, after every site is attached.
+  log(10, `Portal test login`);
+  await provisionPortalTestLogin({
+    email: portalEmail,
+    useTestLogin,
+    testPassword,
+    primaryClientDir: primaryClientDirFor(baseSlug, intake),
+    baseSlug,
+  });
 
-  printHandoff({ intake, provisioned, sharedBaseId, baseSlug });
+  printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail });
 
   if (DRY_RUN) {
     console.log('=== DRY RUN COMPLETE — no resources were created ===\n');

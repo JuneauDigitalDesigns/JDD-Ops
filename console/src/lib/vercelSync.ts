@@ -26,6 +26,8 @@ export interface ProjectEnvVar {
   value: string | null;
   decrypted: boolean;
   target: string[];
+  /** Epoch ms Vercel last wrote this var. Comes free with the list call. */
+  updatedAt: number | null;
 }
 
 export interface ProjectEnv {

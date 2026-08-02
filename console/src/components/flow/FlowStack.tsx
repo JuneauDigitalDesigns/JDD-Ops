@@ -39,8 +39,8 @@ export default function FlowStack({ model }: { model: FlowModel }) {
             >
               {n.kicker && (
                 <span
-                  className="kicker"
-                  style={{ fontSize: 9.5, color: n.tone === 'default' ? 'var(--fg-3)' : TONE_COLOR[n.tone ?? 'default'] }}
+                  className="meta"
+                  style={{ color: n.tone === 'default' ? 'var(--fg-3)' : TONE_COLOR[n.tone ?? 'default'] }}
                 >
                   {n.kicker}
                 </span>
@@ -58,13 +58,13 @@ export default function FlowStack({ model }: { model: FlowModel }) {
                 </div>
               )}
               {n.note && <span className="text-[11px] leading-[1.4] text-fg3">{n.note}</span>}
-              {s.tag && !n.value && <span className="kicker" style={{ fontSize: 9 }}>{s.tag}</span>}
+              {s.tag && !n.value && <span className="meta">{s.tag}</span>}
             </div>
 
             {next && (
               <div className="flex items-center gap-2 py-1 pl-4">
                 <span className="h-4 w-px" style={{ background: 'var(--rule-strong)' }} />
-                {link?.label && <span className="kicker" style={{ fontSize: 9 }}>{link.label}</span>}
+                {link?.label && <span className="meta">{link.label}</span>}
               </div>
             )}
           </li>

@@ -22,8 +22,11 @@ export const dynamic = 'force-dynamic';
 
 type HttpView = ProbeResult;
 
-export async function GET() {
-  const clients = await listClientContexts().catch(() => []);
+export async function GET(req: Request) {
+  // Mirror the client list's fixture filter, or health comes back keyed for a population the
+  // index isn't showing — and we'd spend probes on fixtures nobody asked about.
+  const includeFixtures = new URL(req.url).searchParams.get('fixtures') === '1';
+  const clients = await listClientContexts({ includeFixtures }).catch(() => []);
   const vercelConfigured = loadVercelCredentials();
   const vercel = vercelConfigured ? await loadVercelSync().catch(() => null) : null;
 

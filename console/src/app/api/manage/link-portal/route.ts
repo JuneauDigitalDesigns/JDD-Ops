@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { PortalPlan, PortalSiteInput, PortalSiteStatus } from '@jdd/schema';
+import { buildPortalSiteEntries, type PortalPlan, type PortalSiteInput, type PortalSiteStatus } from '@jdd/schema';
 import { getClientContext } from '@/lib/clients';
 import { accountStoreConfigured, attachSiteToAccount } from '@/lib/accountStore';
 import { appendAudit } from '@/lib/audit';
@@ -31,24 +31,27 @@ function statusFor(ctx: ClientContext): PortalSiteStatus {
  * Site entries for one client. Single-site clients yield one; enterprise yields one per
  * site (sharing the Airtable base, as onboard.js does).
  *
- * `vercelProjectId` is deliberately omitted: resolving it needs a Vercel API call the
- * console isn't credentialed for. Because upsert merges only *defined* fields, omitting
- * it preserves whatever is already stored — and a never-provisioned site simply shows
- * "analytics not connected yet" until a normal onboard/sync run fills it in.
+ * The starter/shared-base/canonical rules live in @jdd/schema's `buildPortalSiteEntries`, so
+ * this route and onboard.js cannot drift on them — same reasoning as `upsertSite`. All this
+ * function does is translate ClientContext into that helper's input.
+ *
+ * `vercelProjectId` and `fallbackCanonical` are deliberately omitted: both need a Vercel API
+ * call the console isn't credentialed for. Because the helper omits undefined fields and
+ * upsert merges only *defined* ones, omitting them preserves whatever onboard.js stored — a
+ * never-provisioned site simply shows "analytics not connected yet" until a sync fills it in.
  */
 function siteEntriesFor(ctx: ClientContext): PortalSiteInput[] {
-  const status = statusFor(ctx);
-  const plan = ctx.plan as PortalPlan;
-  const sharedBase = ctx.sites[0]?.env?.AIRTABLE_BASE_ID ?? null;
-
-  return ctx.sites.map((s) => ({
-    slug: s.slug,
-    name: s.brandName,
-    canonical: s.canonical ?? undefined,
-    plan,
-    status,
-    airtableBaseId: plan === 'starter' ? null : (s.env?.AIRTABLE_BASE_ID ?? sharedBase),
-  }));
+  return buildPortalSiteEntries({
+    plan: ctx.plan as PortalPlan,
+    status: statusFor(ctx),
+    sharedAirtableBaseId: ctx.sites[0]?.env?.AIRTABLE_BASE_ID ?? null,
+    sites: ctx.sites.map((s) => ({
+      slug: s.slug,
+      name: s.brandName,
+      canonical: s.canonical,
+      airtableBaseId: s.env?.AIRTABLE_BASE_ID ?? null,
+    })),
+  });
 }
 
 export async function POST(req: Request) {

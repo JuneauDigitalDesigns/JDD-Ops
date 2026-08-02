@@ -1,7 +1,9 @@
-import BuildWizard from './BuildWizard';
+import { redirect } from 'next/navigation';
 
-// The Build side is a 4-step wizard. All wizard state (content + builder, per client)
-// lives in BuildWizard; the studio component catalog is built by buildCategories().
-export default function Page() {
-  return <BuildWizard />;
+/**
+ * Legacy entry point. Build is now per-client at /c/{slug}/build — its old step 1 was a
+ * client picker, and that job belongs to the root now.
+ */
+export default function BuildIndexRedirect() {
+  redirect('/');
 }

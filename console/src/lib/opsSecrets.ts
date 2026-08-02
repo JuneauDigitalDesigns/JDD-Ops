@@ -65,3 +65,23 @@ export function loadRetellApiKey(): string | null {
   }
   return process.env.RETELL_API_KEY ?? null;
 }
+
+/**
+ * The org PAT, for pushing a client repo from the studio's Deploy button.
+ *
+ * Without it the push falls back to whatever the ambient credential helper offers, and on a
+ * machine where that helper wants to prompt, the push blocks forever — taking the deploy's
+ * NDJSON stream with it. onboard.js has always injected this token for exactly the same reason
+ * (see its git push at step 8); the console just never did.
+ *
+ * Same contract as the rest of this module: the value goes into the git invocation and nowhere
+ * else. It must never reach a response body — the export route redacts it out of command output
+ * before streaming anything back.
+ */
+export function loadGithubToken(): string | null {
+  if (!process.env.GITHUB_TOKEN) {
+    const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+    if (ops.GITHUB_TOKEN) process.env.GITHUB_TOKEN = ops.GITHUB_TOKEN;
+  }
+  return process.env.GITHUB_TOKEN ?? null;
+}

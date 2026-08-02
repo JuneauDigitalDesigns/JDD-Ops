@@ -197,7 +197,7 @@ export default function PortalSection() {
                 style={{ left: dryRun ? '16px' : '2px' }}
               />
             </span>
-            <span className="kicker" style={{ color: dryRun ? 'var(--ok)' : 'var(--fg-3)' }}>
+            <span className="meta" style={{ color: dryRun ? 'var(--ok)' : 'var(--fg-3)' }}>
               <Flask size={12} weight="fill" style={{ display: 'inline', marginRight: 4, verticalAlign: -1 }} />
               Dry run {dryRun ? 'on' : 'off'}
             </span>

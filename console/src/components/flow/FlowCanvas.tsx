@@ -356,7 +356,7 @@ function FlowNodeBox({
       transition={{ duration: 0.4, ease: EASE, delay: index * 0.05 }}
     >
       {n.kicker && (
-        <span className="kicker truncate" style={{ fontSize: 9.5, color: n.tone === 'default' ? 'var(--fg-3)' : TONE_COLOR[n.tone ?? 'default'] }}>
+        <span className="meta truncate" style={{ color: n.tone === 'default' ? 'var(--fg-3)' : TONE_COLOR[n.tone ?? 'default'] }}>
           {n.kicker}
         </span>
       )}
@@ -385,7 +385,7 @@ function FlowNodeBox({
       )}
 
       {n.note && <span className="text-[11px] leading-[1.4] text-fg3">{n.note}</span>}
-      {s.tag && !n.value && <span className="kicker" style={{ fontSize: 9 }}>{s.tag}</span>}
+      {s.tag && !n.value && <span className="meta">{s.tag}</span>}
     </motion.div>
   );
 }

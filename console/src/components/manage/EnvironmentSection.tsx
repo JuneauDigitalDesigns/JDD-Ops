@@ -9,8 +9,10 @@ import {
   XCircle,
 } from '@phosphor-icons/react';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ENV_GROUPS } from '@/lib/envFields';
 import { useEnvEditor } from '@/lib/useEnvEditor';
+import { relativeTime } from '@/lib/relativeTime';
 import { useManage } from './ManageContext';
 import SectionHeader from './SectionHeader';
 import EnvFieldRow from './EnvFieldRow';
@@ -28,10 +30,15 @@ import SaveBar from './SaveBar';
 export default function EnvironmentSection() {
   const { ctx, site: siteInfo } = useManage();
   const env = useEnvEditor(ctx.slug, siteInfo.slug);
+  const params = useSearchParams();
   const [deploying, setDeploying] = useState(false);
   const [deployed, setDeployed] = useState<{ error?: string; deployment?: { inspectorUrl: string | null } } | null>(null);
 
   const { site } = env;
+
+  // Carry ?site= so an enterprise client's site selection survives the jump, same as ManageRail.
+  const siteParam = params.get('site');
+  const deploymentsHref = `/c/${ctx.slug}/manage/deployments${siteParam ? `?site=${encodeURIComponent(siteParam)}` : ''}`;
 
   async function redeploy() {
     setDeploying(true);
@@ -42,7 +49,10 @@ export default function EnvironmentSection() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ slug: ctx.slug, siteSlug: siteInfo.slug }),
       });
-      setDeployed(await res.json());
+      const body = await res.json();
+      setDeployed(body);
+      // Re-read drift so the pending flag clears once the new build is the latest one.
+      if (!body?.error) await env.reload();
     } catch (err) {
       setDeployed({ error: err instanceof Error ? err.message : 'Redeploy failed.' });
     } finally {
@@ -148,7 +158,20 @@ export default function EnvironmentSection() {
             />
           </div>
 
-          {env.saved && <SaveResult saved={env.saved} deploying={deploying} deployed={deployed} onRedeploy={redeploy} />}
+          {env.saved && <SaveResult saved={env.saved} />}
+
+          <DeployFooter
+            // Emphasized right after a save that changed Vercel vars, and — durably, across
+            // reloads — whenever Vercel's env is newer than the running build.
+            pending={Boolean(env.saved?.needsRedeploy) || Boolean(site.vercel.pendingDeploy)}
+            vercelOk={site.vercel.ok}
+            reason={site.vercel.reason}
+            lastDeployAt={site.vercel.lastDeployAt ?? null}
+            deploying={deploying}
+            deployed={deployed}
+            onRedeploy={redeploy}
+            deploymentsHref={deploymentsHref}
+          />
 
           {env.dirty && (
             <SaveBar
@@ -164,17 +187,103 @@ export default function EnvironmentSection() {
   );
 }
 
-/** Outcome of the last save, including the redeploy prompt. */
-function SaveResult({
-  saved,
+/**
+ * The redeploy control, always on screen.
+ *
+ * It used to live inside SaveResult, so it existed only after a save in the current page
+ * session AND only when that save happened to change a Vercel var. Reload the page, push a
+ * single key from a drift row, or come back later to apply an earlier change, and the button
+ * was simply gone — you had to leave for the Deployments section, which is the navigation
+ * that section's own comment says it was trying to spare you.
+ *
+ * So: always rendered when the project exists, emphasized when there is something to apply,
+ * and disabled-with-a-reason rather than hidden when Vercel isn't reachable — a control that
+ * vanishes teaches you nothing about why.
+ */
+function DeployFooter({
+  pending,
+  vercelOk,
+  reason,
+  lastDeployAt,
   deploying,
   deployed,
   onRedeploy,
+  deploymentsHref,
 }: {
-  saved: NonNullable<ReturnType<typeof useEnvEditor>['saved']>;
+  pending: boolean;
+  vercelOk: boolean;
+  reason?: string;
+  lastDeployAt: number | null;
   deploying: boolean;
   deployed: { error?: string; deployment?: { inspectorUrl: string | null } } | null;
   onRedeploy: () => void;
+  deploymentsHref: string;
+}) {
+  const disabled = deploying || !vercelOk;
+
+  return (
+    <div
+      className="mt-4 flex flex-col gap-2 rounded-[10px] border p-3"
+      style={{
+        background: 'var(--bg-deep)',
+        borderColor: pending ? 'var(--warn)' : 'var(--rule)',
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-xs" style={{ color: pending ? 'var(--warn)' : 'var(--fg-3)' }}>
+          {!vercelOk
+            ? (reason ?? 'Vercel project not reachable.')
+            : pending
+              ? 'Live site still runs the old values until it redeploys.'
+              : lastDeployAt
+                ? `Live site is up to date with these values. Last deploy ${relativeTime(lastDeployAt)}.`
+                : 'Live site is up to date with these values.'}
+        </span>
+        <div className="flex items-center gap-2">
+          <a href={deploymentsHref} className="btn btn-sm">
+            Deployments
+          </a>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onRedeploy}
+            title={vercelOk ? 'Rebuild the production deployment with the current Vercel env' : reason}
+            className={pending ? 'btn btn-primary btn-sm' : 'btn btn-sm'}
+          >
+            {deploying ? (
+              <ArrowsClockwise size={13} className="animate-spin" />
+            ) : (
+              <RocketLaunch size={13} weight="fill" />
+            )}
+            {deploying ? 'Deploying…' : pending ? 'Redeploy to apply' : 'Redeploy'}
+          </button>
+        </div>
+      </div>
+
+      {deployed?.error && (
+        <Line tone="danger" icon={<XCircle size={14} weight="fill" />}>{deployed.error}</Line>
+      )}
+      {deployed?.deployment && (
+        <Line tone="ok" icon={<CheckCircle size={14} weight="fill" />}>
+          Deployment queued.{' '}
+          {deployed.deployment.inspectorUrl && (
+            <a href={deployed.deployment.inspectorUrl} target="_blank" rel="noreferrer" className="underline">
+              Watch the build
+            </a>
+          )}
+          {' · '}
+          <a href={deploymentsHref} className="underline">See it in Deployments</a>
+        </Line>
+      )}
+    </div>
+  );
+}
+
+/** Outcome of the last save. */
+function SaveResult({
+  saved,
+}: {
+  saved: NonNullable<ReturnType<typeof useEnvEditor>['saved']>;
 }) {
   return (
     <div className="mt-4 flex flex-col gap-2 rounded-[10px] border border-rule p-3" style={{ background: 'var(--bg-deep)' }}>
@@ -206,33 +315,6 @@ function SaveResult({
         </span>
       )}
 
-      {saved.needsRedeploy && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-2">
-          <span className="text-xs text-fg3">Live site still runs the old values until it redeploys.</span>
-          <button type="button" disabled={deploying} onClick={onRedeploy} className="btn btn-primary btn-sm">
-            {deploying ? (
-              <ArrowsClockwise size={13} className="animate-spin" />
-            ) : (
-              <RocketLaunch size={13} weight="fill" />
-            )}
-            {deploying ? 'Deploying…' : 'Redeploy to apply'}
-          </button>
-        </div>
-      )}
-
-      {deployed?.error && (
-        <Line tone="danger" icon={<XCircle size={14} weight="fill" />}>{deployed.error}</Line>
-      )}
-      {deployed?.deployment && (
-        <Line tone="ok" icon={<CheckCircle size={14} weight="fill" />}>
-          Deployment queued.{' '}
-          {deployed.deployment.inspectorUrl && (
-            <a href={deployed.deployment.inspectorUrl} target="_blank" rel="noreferrer" className="underline">
-              Watch the build
-            </a>
-          )}
-        </Line>
-      )}
     </div>
   );
 }

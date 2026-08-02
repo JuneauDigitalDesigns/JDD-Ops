@@ -64,7 +64,7 @@ export default function StepGuide({
                 <h3 className="font-display text-lg font-medium tracking-tightish">{phase.title}</h3>
                 {phase.subtitle && isOpen && <p className="mt-0.5 text-xs text-fg3">{phase.subtitle}</p>}
               </div>
-              <span className="kicker shrink-0">{completed}/{actionable} done</span>
+              <span className="meta shrink-0">{completed}/{actionable} done</span>
             </button>
             {isOpen && (
               <div className="flex flex-col pb-4">

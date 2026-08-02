@@ -66,7 +66,7 @@ export function useRunbookState() {
     (slug: string, id: string, done: boolean) => patch(slug, { step: { id, done } }),
     [patch],
   );
-  /** Kanban drop: status and/or sort position, in one write. */
+  /** Status and/or sort position, in one write. */
   const place = useCallback(
     (slug: string, next: { status?: ClientStatus; order?: number }) => patch(slug, next),
     [patch],

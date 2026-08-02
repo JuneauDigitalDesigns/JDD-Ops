@@ -52,11 +52,15 @@ export interface RawIntake {
   sites: RawSite[];
 }
 
-/** Load + normalize clients/{slug}/site.ts into { plan, sites } (or null if unreadable). */
-export async function loadIntake(schemaPath: string): Promise<RawIntake | null> {
-  if (!existsSync(schemaPath)) return null;
+/**
+ * Parse site.ts SOURCE (not a path) into { plan, sites }, or null if it can't be read.
+ *
+ * Split out from loadIntake because the deploy diff needs to parse the version of site.ts
+ * that is COMMITTED — read via `git show origin/<branch>:src/data/site.ts` — which never
+ * exists as a file on disk. The on-disk loader below is now just this plus a read.
+ */
+export async function parseIntakeSource(src: string): Promise<RawIntake | null> {
   try {
-    const src = readFileSync(schemaPath, 'utf8');
     const stripped = stripInterfaceBlocks(src)
       .replace(/:\s*SiteContent/g, '')
       .replace(/:\s*Intake/g, '')
@@ -73,6 +77,31 @@ export async function loadIntake(schemaPath: string): Promise<RawIntake | null> 
   } catch {
     return null;
   }
+}
+
+/** Load + normalize clients/{slug}/site.ts into { plan, sites } (or null if unreadable). */
+export async function loadIntake(schemaPath: string): Promise<RawIntake | null> {
+  if (!existsSync(schemaPath)) return null;
+  try {
+    return await parseIntakeSource(readFileSync(schemaPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stamp the loaded client's plan onto the seed's `_meta.selectedPlan`, so the studio's
+ * buildCategories() can auto-detect starter vs growth/enterprise and show the right
+ * lead-capture components. loadIntake reports `plan` alongside the sites rather than
+ * inside them, so a seed handed straight to the wizard would otherwise lose its tier.
+ *
+ * Returns RawSite; callers hand the result to the studio as SiteContent, which is the
+ * same cast /api/build/load-client's consumer used to do.
+ */
+export function withPlan(seed: RawSite | null, plan: unknown): RawSite | null {
+  if (!seed) return seed;
+  if (plan !== 'starter' && plan !== 'growth' && plan !== 'enterprise') return seed;
+  return { ...seed, _meta: { ...seed._meta, selectedPlan: plan } };
 }
 
 // ── .env.local parsing (mirrors onboard.js readEnvLocal) ─────────────────────

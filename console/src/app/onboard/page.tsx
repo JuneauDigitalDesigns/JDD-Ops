@@ -1,9 +1,9 @@
-import RunbookApp from '@/components/RunbookApp';
+import { redirect } from 'next/navigation';
 
-// Single entry point. RunbookApp is a client component that fetches /api/runbook/clients
-// and renders the dashboard + drawer. Force dynamic so it never gets statically cached.
-export const dynamic = 'force-dynamic';
-
-export default function Page() {
-  return <RunbookApp />;
+/**
+ * Legacy entry point. The runbook is now per-client at /c/{slug}/onboard, and the client
+ * roster it used to open on has become the root picker.
+ */
+export default function OnboardIndexRedirect() {
+  redirect('/');
 }

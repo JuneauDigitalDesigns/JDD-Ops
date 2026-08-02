@@ -242,13 +242,15 @@ export default function OverviewSection() {
 
         <section className="panel flex flex-col gap-2 p-5">
           <h2 className="font-display text-lg font-semibold tracking-tightish text-fg">Quick actions</h2>
-          <Action href={`/manage/${ctx.slug}/environment${qs}`} icon={<Sliders size={14} />}>
+          <Action href={`/c/${ctx.slug}/manage/environment${qs}`} icon={<Sliders size={14} />}>
             Edit environment
           </Action>
-          <Action href={`/manage/${ctx.slug}/deployments${qs}`} icon={<RocketLaunch size={14} />}>
+          <Action href={`/c/${ctx.slug}/manage/deployments${qs}`} icon={<RocketLaunch size={14} />}>
             Deployments &amp; redeploy
           </Action>
-          <Action href={`/build`} icon={<ArrowSquareOut size={14} />}>
+          {/* Now lands on THIS client's Build rather than a picker — the whole point of the
+              client shell. */}
+          <Action href={`/c/${ctx.slug}/build`} icon={<ArrowSquareOut size={14} />}>
             Edit site content in Build
           </Action>
         </section>

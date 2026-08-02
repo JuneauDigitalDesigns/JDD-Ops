@@ -45,11 +45,15 @@
 
   --tracking-widest: 0.14em;
 
-  /* Control sizing — referenced by .btn/.input so hit targets change in one place. */
-  --control-h: 38px;
-  --control-h-sm: 32px;
-  --control-px: 16px;
-  --radius-control: 10px;
+  /* Control sizing — referenced by .btn/.input so hit targets change in one place.
+     These are the tighter metrics /manage ran on for months before they were
+     promoted to the root: this is a control panel, and 38px controls made every
+     screen a form. Density comes from here, from radii, and from gutters — NOT
+     from shrinking body text, which bottoms out at 14px (see tailwind.config). */
+  --control-h: 34px;
+  --control-h-sm: 28px;
+  --control-px: 14px;
+  --radius-control: 8px;
 
   /* ── /build chrome ALIASES → canonical tokens above. Do not give these
      independent values; that is what caused the two-system drift. ────────── */
@@ -80,12 +84,21 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+  /* Headings inherit the BODY face by default. Big Shoulders is opt-in via
+     `font-display`, and is reserved for page titles and large numeric readouts.
+     It used to be the family for every h1–h6, which meant a display face was
+     setting panel titles, card names and field group headers — the single
+     biggest reason the console read as editorial rather than as a tool. */
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-big-shoulders), 'Big Shoulders', sans-serif;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.01em;
-    line-height: 1.05;
+    line-height: 1.2;
     color: var(--fg);
+  }
+  /* Restore display-face metrics wherever font-display is applied to a heading. */
+  :where(h1, h2, h3, h4, h5, h6).font-display {
+    font-weight: 700;
+    line-height: 1.05;
   }
   /* Console feels calmer with a thin custom scrollbar */
   *::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -145,43 +158,25 @@
   }
 
   /* ── /manage scope ───────────────────────────────────────────────────────
-     A control panel, not an editorial page. /manage is the console's only
-     production-write surface — it edits .env.local, pushes to Vercel, and
-     redeploys live client sites — so it gets its own accent as a mode signal.
+     A LAYOUT HOOK ONLY — it no longer carries any tokens.
 
-     Indigo (~250°) is clear of the teal accent (~185°) and of the coral/amber/
-     green already spoken for by --danger/--warn/--ok, which stay put so status
-     keeps meaning the same thing everywhere.
+     This scope used to override --accent and --accent-2 to indigo (#4a3f8f) as a
+     "you are on the write surface" mode signal. That was removed deliberately:
+     indigo exists nowhere in the JDD palette (cream / teal / coral), so it made
+     /manage read as a different application rather than a different section, and
+     it meant .btn-primary was indigo here and coral everywhere else. Mode is now
+     signalled STRUCTURALLY — the segmented tool switcher, the rail, the page
+     title — which is what a control panel should do anyway.
 
-     --accent-2 must be overridden TOO: .btn-primary and .btn:hover key off
-     --accent-2, not --accent. Overriding only --accent leaves every primary
-     button coral while the focus rings turn indigo, which reads as a bug.
+     Its tighter control metrics were promoted to :root (they were right; they
+     were just scoped too narrowly), and its tighter .panel shadow became the
+     global .panel. Both overrides are gone because they'd now be duplicates.
 
-     Unlike .studio-chrome this does NOT re-scope the whole palette — the warm
-     cream ground is shared console furniture. Only the accent pair and the
-     control metrics change. */
+     Keep the class: the form-control rules below and several layout selectors
+     still key off it. */
   .manage-chrome {
-    --accent: #4a3f8f;
-    --accent-ink: #f6f2e6;
-    --accent-2: #4a3f8f;
-    --on-accent-2: #f6f2e6;
-    --accent-glow: rgba(74, 63, 143, 0.2);
-
-    /* Denser than the rest of the console — this screen is tables and key/value
-       rows, not a form you fill in once. */
-    --control-h: 34px;
-    --control-h-sm: 28px;
-    --radius-control: 8px;
+    /* intentionally empty — see above */
   }
-}
-
-/* /manage stacks many panels down one stage; the root 80px drop shadow reads as
-   noise at that density. Unlayered so it outranks the @layer components .panel. */
-.manage-chrome .panel {
-  border-radius: 14px;
-  box-shadow:
-    0 1px 2px rgba(20, 18, 12, 0.04),
-    0 8px 24px -16px rgba(20, 18, 12, 0.28);
 }
 
 /* ── Build-catalog card preview: tighten large section padding ───────────────
@@ -196,16 +191,14 @@
 .studio-preview-card .py-20 { padding-top: 2.75rem; padding-bottom: 2.75rem; }
 
 @layer components {
-  /* ── Atmosphere: fixed grain + parchment dot field (mounted only on /onboard) ── */
-  .grain {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    pointer-events: none;
-    opacity: 0.03;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 200px 200px;
-  }
+  /* ── Atmosphere: parchment dot field ─────────────────────────────────────
+     `.grain` (fixed SVG turbulence at 3% over the whole viewport) used to live
+     here and was removed: it was print texture with no functional read, and it
+     sat at z-60 — above the navbar and every modal.
+
+     The dot field STAYS. It reads as graph paper, which is structure rather than
+     decoration, and it's what keeps the low-density surfaces (/ , /pipeline,
+     /onboard) from going flat now that the editorial layer is gone. */
   .dotfield {
     position: fixed;
     inset: 0;
@@ -221,15 +214,39 @@
   }
 
   /* ── Section eyebrow ─────────────────────────────────────────────────────
-     SECTION HEADERS ONLY. This was previously used for every form field label
-     too (as a re-typed inline string), which made the whole app read as 10px
-     all-caps mono. Field labels now use .field-label below. ───────────────── */
+     SECTION HEADERS ONLY, and this time it's enforced. The class had drifted to
+     109 call sites across 41 files — plan labels, step counts, durations, REF
+     tags, timestamps — which is what made the whole app read as all-caps mono
+     texture. Those are metadata, not eyebrows; they now use .meta below.
+
+     Form field labels use .field-label. If you are reaching for .kicker and the
+     thing you're labelling is not a section header, you want .meta. ─────────── */
   .kicker {
     font-family: var(--font-dm-mono), 'DM Mono', monospace;
     font-size: 11.5px;
     font-weight: 500;
     letter-spacing: var(--tracking-widest);
     text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  /* ── Metadata ────────────────────────────────────────────────────────────
+     The workhorse for machine-ish values that sit beside content: counts,
+     durations, slugs, plan names, timestamps, relative times, group labels.
+
+     Stays MONOSPACE deliberately — mono is the control-panel signal, and moving
+     this layer to the body face is what would make the console read bland. What
+     was dropped is the editorial part: uppercase and 0.14em tracking.
+
+     It also replaces a dozen inline `style={{ fontSize: 8.5|9|9.5 }}` overrides
+     that existed only because .kicker was the sole small-label class available —
+     so the smallest type in the app went UP, not down. ──────────────────────── */
+  .meta {
+    font-family: var(--font-dm-mono), 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
     color: var(--fg-3);
   }
 
@@ -240,7 +257,7 @@
     display: block;
     margin-bottom: 6px;
     font-family: var(--font-hanken), sans-serif;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 500;
     line-height: 1.4;
     letter-spacing: normal;
@@ -248,14 +265,20 @@
     color: var(--fg-2);
   }
 
-  /* ── Glass panel ────────────────────────────────────────────────────── */
+  /* ── Panel ──────────────────────────────────────────────────────────────
+     A UI container, not a marketing card. The old 18px radius + 80px drop shadow
+     was a content-card treatment; at the density this app actually runs at —
+     many panels stacked down one stage — it read as noise. These are the metrics
+     /manage was already using via an override, promoted here. */
   .panel {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 100%),
       var(--panel);
     border: 1px solid var(--rule);
-    border-radius: 18px;
-    box-shadow: 0 30px 80px -34px rgba(0, 0, 0, 0.35);
+    border-radius: 12px;
+    box-shadow:
+      0 1px 2px rgba(20, 18, 12, 0.04),
+      0 8px 24px -16px rgba(20, 18, 12, 0.28);
   }
 
   /* ── Status badge ───────────────────────────────────────────────────── */
@@ -263,10 +286,10 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 11px 5px;
+    padding: 3px 10px 4px;
     border-radius: 999px;
     font-family: var(--font-dm-mono), monospace;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -298,7 +321,7 @@
     border-radius: var(--radius-control);
     font-family: var(--font-hanken), sans-serif;
     font-weight: 500;
-    font-size: 15px;
+    font-size: 14px;
     cursor: pointer;
     border: 1px solid var(--rule-strong);
     background: var(--surface);
@@ -318,8 +341,8 @@
   .btn-primary:hover { background: var(--fg); color: var(--bg); border-color: var(--fg); transform: translateY(-1px); }
   .btn-danger { border-color: var(--rule-strong); color: var(--danger); }
   .btn-danger:hover { background: var(--danger); color: var(--bg); border-color: var(--danger); }
-  .btn-sm { min-height: var(--control-h-sm); padding: 0 12px; font-size: 14px; border-radius: 9px; }
-  .btn-xs { min-height: 28px; padding: 0 10px; font-size: 13px; border-radius: 8px; gap: 6px; }
+  .btn-sm { min-height: var(--control-h-sm); padding: 0 11px; font-size: 13px; border-radius: 7px; }
+  .btn-xs { min-height: 26px; padding: 0 9px; font-size: 12.5px; border-radius: 6px; gap: 6px; }
 
   /* ── Text input ──────────────────────────────────────────────────────────
      The class form of INPUT_CLS in components/fields. Both must stay in sync;
@@ -333,7 +356,7 @@
     border: 1px solid var(--rule-strong);
     background: var(--panel);
     font-family: var(--font-hanken), sans-serif;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--fg);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
@@ -350,26 +373,29 @@
      client select) needs the SAME bottom gutter, or the last row butts against
      the viewport edge and reads as cut off. This was fixed on the canvas alone
      once and drifted; centralize it so it can't drift again. Callers add their
-     own max-width. pb-24 = 96px. */
+     own max-width.
+
+     The gutter was 6rem/96px — roughly a panel's worth of dead scroll at the
+     bottom of every screen. 2.5rem/40px still clears the viewport edge. */
   .step-body {
     margin-left: auto;
     margin-right: auto;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
     padding-top: 1.5rem;
-    padding-bottom: 6rem;
+    padding-bottom: 2.5rem;
   }
 
   /* ── Mono code chip ─────────────────────────────────────────────────── */
   .mono {
     font-family: var(--font-dm-mono), monospace;
-    font-size: 14px;
+    font-size: 13px;
   }
   .codechip {
     font-family: var(--font-dm-mono), monospace;
-    font-size: 13.5px;
-    padding: 3px 8px;
-    border-radius: 6px;
+    font-size: 12.5px;
+    padding: 2px 7px;
+    border-radius: 5px;
     background: var(--surface-2);
     border: 1px solid var(--rule);
     color: var(--fg-2);
@@ -394,29 +420,16 @@
     margin: 0;
     background: var(--panel);
     border: 1px solid var(--rule);
-    border-radius: 16px;
+    border-radius: 12px;
     box-shadow: 0 2px 6px rgba(20, 18, 12, 0.05), 0 24px 60px -28px rgba(20, 18, 12, 0.32);
     overflow: hidden;
   }
 
-  /* ── Offset-shadow CTA ──────────────────────────────────────────────────
-     The editorial-print primary-button signature from DESIGN-LANGUAGE.md, brought
-     into console chrome. RESERVE IT for the single primary action on a screen —
-     the stage's Complete button, or Provision for real. If two of these are visible
-     at once, one of them is wrong. Compose with .btn/.btn-primary. */
-  .cta-offset {
-    border-radius: 3px;
-    box-shadow: 4px 4px 0 rgba(20, 18, 12, 0.85);
-    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.18s ease;
-  }
-  .cta-offset:hover:not(:disabled) {
-    transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0 rgba(20, 18, 12, 0.85);
-  }
-  .cta-offset:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 rgba(20, 18, 12, 0.85);
-  }
+  /* `.cta-offset` (the 4px hard offset-shadow primary button) lived here and was
+     removed. It is the primary-CTA signature from DESIGN-LANGUAGE.md — which is
+     the spec for `catalog/**`, i.e. CLIENT SITES. Borrowing it into the console
+     chrome is the clearest single instance of the client-site design language
+     leaking into the tool. Primary actions are plain `.btn .btn-primary`. */
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -448,7 +461,7 @@
   border-radius: var(--radius-control);
   min-height: var(--control-h);
   padding: 0 12px;
-  font-size: 15px;
+  font-size: 14px;
 }
 .onboard-chrome textarea,
 .manage-chrome textarea { min-height: 88px; padding: 10px 12px; line-height: 1.55; }

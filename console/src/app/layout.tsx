@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Big_Shoulders_Display, Hanken_Grotesk, DM_Mono } from 'next/font/google';
 import './globals.css';
 import ConsoleNav from '@/components/ConsoleNav';
+import ToolBar from '@/components/shell/ToolBar';
+import CommandPalette from '@/components/CommandPalette';
 import { industryFontVars } from '@/lib/fonts.loader';
 
 // JDD site fonts (mirrors juneaudigitaldesigns.com): Big Shoulders (display),
@@ -47,8 +49,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <div className="flex h-[100dvh] flex-col overflow-hidden">
           <ConsoleNav />
+          {/* Per-tool action strip. Self-collapses on routes with no actions, so it costs
+              nothing on / and /leads. */}
+          <ToolBar />
           <div className="min-h-0 flex-1">{children}</div>
         </div>
+        {/* Outside the flex column and above it — an overlay, reachable from every route. */}
+        <CommandPalette />
       </body>
     </html>
   );

@@ -6,3 +6,6 @@ out/
 *.log
 .DS_Store
 next-env.d.ts
+# Build artifact. Tracked, it changes on every `next build`, so every deploy diff carries noise
+# that hides the content and layout changes actually being shipped.
+tsconfig.tsbuildinfo

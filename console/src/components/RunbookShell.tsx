@@ -23,7 +23,7 @@ import StepStage from './StepStage';
 import LaunchStage from './LaunchStage';
 
 export default function RunbookShell({
-  ctx, config, clientState, onSetStatus, onToggleStep, onRunComplete, onBack,
+  ctx, config, clientState, onSetStatus, onToggleStep, onRunComplete,
 }: {
   ctx: ClientContext;
   config: OpsConfig;
@@ -31,7 +31,6 @@ export default function RunbookShell({
   onSetStatus: (status: ClientStatus) => void;
   onToggleStep: (id: string, done: boolean) => void;
   onRunComplete: (result: { ok: boolean; dryRun: boolean }) => void;
-  onBack: () => void;
 }) {
   const phases = useMemo(() => buildRunbook(ctx, config), [ctx, config]);
   const nodes = useMemo(() => flatten(phases), [phases]);
@@ -90,8 +89,6 @@ export default function RunbookShell({
           done={done}
           activeId={mode === 'launch' ? '' : active.step.id}
           onSelect={select}
-          onBack={onBack}
-          backDisabled={run.running}
           pct={pct}
           completed={completed}
           total={total}

@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clientsDir, clientDir } from './paths';
@@ -31,6 +32,7 @@ function buildSiteInfo(baseSlug: string, count: number, i: number, site: RawSite
     repoBuilt: existsSync(resolve(dir, 'repo')),
     env,
     missingFields: missingFor(site),
+    accent: site?.brand?.palette?.accent ?? null,
   };
 }
 
@@ -51,8 +53,15 @@ function deriveStatus(plan: Plan, sites: SiteInfo[]): ClientStatus {
   return 'portal-pending';
 }
 
-/** Build the full client context for one base slug (or null if no readable intake). */
+/** Build the full client context for one base slug (or null if there's no such client). */
 export async function getClientContext(baseSlug: string): Promise<ClientContext | null> {
+  // No folder, no client. The stub below is for a client folder that exists but has no
+  // readable site.ts yet; without this check it also answered for slugs that were simply
+  // made up, which let /c/{anything} render a plausible-looking shell for a client that
+  // does not exist. listClientContexts only ever passes real directory names, so this
+  // guard is for the by-slug callers (the client shell and the manage routes).
+  if (!existsSync(clientDir(baseSlug))) return null;
+
   const schemaAbs = resolve(clientDir(baseSlug), 'site.ts');
   const intake = await loadIntake(schemaAbs);
   const hasIntake = Boolean(intake);
@@ -91,12 +100,44 @@ export async function getClientContext(baseSlug: string): Promise<ClientContext 
   };
 }
 
-/** List every client folder under clients/ (skipping dotfiles and _e2e fixtures hidden by default). */
-export async function listClientContexts(): Promise<ClientContext[]> {
+/**
+ * Per-request memo of getClientContext.
+ *
+ * The /c/[slug] shell layout and the tool page beneath it are separate server components
+ * with no way to pass props between them. Without this, every navigation inside a client
+ * re-reads and re-parses site.ts once per component.
+ */
+export const getClientCached = cache(
+  async (slug: string): Promise<ClientContext | null> => getClientContext(slug),
+);
+
+/**
+ * Folders whose name starts with `_` are test fixtures, not clients — the `_e2e*` set the
+ * provisioning tests run against.
+ */
+export function isFixtureSlug(slug: string): boolean {
+  return slug.startsWith('_');
+}
+
+/**
+ * List every client folder under clients/.
+ *
+ * Dotfiles are always skipped; `_`-prefixed fixtures are skipped unless asked for, so the
+ * client index isn't mostly test data. (This docstring used to claim fixtures were hidden
+ * while the filter only excluded dotfiles — they have been showing up in every roster.)
+ *
+ * getClientContext() deliberately does NOT apply this: a fixture stays openable by URL, so
+ * /c/_e2e-starter works whether or not the index is showing it.
+ */
+export async function listClientContexts(
+  { includeFixtures = false }: { includeFixtures?: boolean } = {},
+): Promise<ClientContext[]> {
   const dir = clientsDir();
   if (!existsSync(dir)) return [];
   const slugs = readdirSync(dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .filter(
+      (d) => d.isDirectory() && !d.name.startsWith('.') && (includeFixtures || !isFixtureSlug(d.name)),
+    )
     .map((d) => d.name)
     .sort();
 

@@ -16,19 +16,34 @@ import { EASE } from '@/lib/motion';
 import type { PhaseStatus } from '@/lib/onboard-parse';
 import type { PlannedPhase } from '@/lib/run-plan';
 import type { ClientContext } from '@/lib/types';
-import { styleFor, type FlowState } from './types';
 
 const COL_W = 212;
 const COL_GAP = 28;
 const ROW_H = 46;
 const ROW_GAP = 8;
 
-const STATE_OF: Record<PhaseStatus, FlowState> = {
-  pending: 'pending',
-  running: 'running',
-  done: 'done',
+/**
+ * The pipeline has its OWN state styling rather than borrowing `styleFor` from the node diagrams.
+ *
+ * There, `pending` means "this env var has no value yet" and dashed + dimmed is right. Here it
+ * means "this step hasn't run yet" — and since nothing has run before the first provision, using
+ * the same treatment greyed out the entire diagram and made a perfectly healthy Growth client
+ * look like it only performs one step. Dimming now means exactly one thing: this will never run.
+ */
+const ROW_STYLE: Record<PhaseStatus, { border: string; opacity: number; dashed: boolean; strike?: boolean }> = {
+  done: { border: 'var(--ok)', opacity: 1, dashed: false },
+  pending: { border: 'var(--rule)', opacity: 1, dashed: false },
+  running: { border: 'var(--accent)', opacity: 1, dashed: false },
+  failed: { border: 'var(--danger)', opacity: 1, dashed: false },
+  skipped: { border: 'var(--rule)', opacity: 0.4, dashed: true, strike: true },
+};
+
+const STATE_LEGEND: Record<PhaseStatus, string> = {
+  done: 'already provisioned',
+  pending: 'will run',
+  running: 'running now',
   failed: 'failed',
-  skipped: 'skipped',
+  skipped: 'did not run',
 };
 
 const GLYPH: Record<PhaseStatus, { Icon: typeof Circle; color: string; spin?: boolean }> = {
@@ -67,7 +82,7 @@ function partition(phases: PlannedPhase[]) {
 }
 
 function PhaseRow({ p, delay, reduce }: { p: PlannedPhase; delay: number; reduce: boolean }) {
-  const s = styleFor(STATE_OF[p.status]);
+  const s = ROW_STYLE[p.status];
   const g = GLYPH[p.status];
   const ms = fmtMs(p.ms);
 
@@ -77,7 +92,9 @@ function PhaseRow({ p, delay, reduce }: { p: PlannedPhase; delay: number; reduce
       style={{
         height: ROW_H,
         opacity: s.opacity,
-        background: p.unplanned ? 'var(--danger-glow)' : s.background,
+        background: p.unplanned
+          ? 'var(--danger-glow)'
+          : p.status === 'done' ? 'var(--ok-glow)' : 'transparent',
         border: `1px ${s.dashed ? 'dashed' : 'solid'} ${p.unplanned ? 'var(--danger)' : s.border}`,
         boxShadow: p.status === 'running' ? '0 0 0 3px var(--accent-glow)' : undefined,
       }}
@@ -92,11 +109,14 @@ function PhaseRow({ p, delay, reduce }: { p: PlannedPhase; delay: number; reduce
         className={g.spin ? 'animate-spin' : undefined}
         style={{ color: g.color, flexShrink: 0 }}
       />
-      <span className="min-w-0 flex-1 truncate text-xs font-medium" style={{ color: 'var(--fg-2)' }}>
+      <span
+        className="min-w-0 flex-1 truncate text-xs font-medium"
+        style={{ color: 'var(--fg-2)', textDecoration: s.strike ? 'line-through' : undefined }}
+      >
         {p.label.split(' · ')[0]}
       </span>
       {p.unplanned && <WarningCircle size={13} weight="fill" style={{ color: 'var(--danger)', flexShrink: 0 }} />}
-      {ms && <span className="kicker shrink-0" style={{ fontSize: 9 }}>{ms}</span>}
+      {ms && <span className="meta shrink-0">{ms}</span>}
     </motion.div>
   );
 }
@@ -115,6 +135,15 @@ export default function PipelineFlow({ phases, ctx }: { phases: PlannedPhase[]; 
   // width. Multi-site keeps one column per site — that layout IS the fan-out.
   const single = columns.length <= 1;
 
+  const doneCount = phases.filter((p) => p.status === 'done').length;
+  const summary = doneCount === 0
+    ? `Nothing provisioned yet — all ${phases.length} steps will run.`
+    : `${doneCount} of ${phases.length} steps already provisioned.`;
+
+  // Order matters: this is the reading order of the legend.
+  const presentStates = (['done', 'running', 'pending', 'failed', 'skipped'] as PhaseStatus[])
+    .filter((st) => phases.some((p) => p.status === st));
+
   let i = 0;
   const stack = (list: PlannedPhase[]) =>
     list.map((p) => <PhaseRow key={p.key} p={p} delay={0.04 * i++} reduce={reduce} />);
@@ -131,11 +160,28 @@ export default function PipelineFlow({ phases, ctx }: { phases: PlannedPhase[]; 
           <span className="kicker">What provisioning does</span>
         </span>
         <p className="max-w-[62ch] text-xs leading-[1.55] text-fg2">
-          One command stands up the whole stack.
-          {columns.length > 1
-            ? ` Steps 2–9 run once per site — ${columns.length} columns, one per site.`
-            : ' Greyed steps don’t run on this plan.'}
+          {summary}
+          {columns.length > 1 && ` Steps 2–9 run once per site — ${columns.length} columns, one per site.`}
         </p>
+
+        {/* Legend built from the states actually on screen. A hardcoded one is how this caption
+            came to claim "greyed steps don't run on this plan" on a client where every greyed
+            step did, in fact, run. */}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+          {presentStates.map((st) => {
+            const g = GLYPH[st];
+            return (
+              <span key={st} className="flex items-center gap-1.5" style={{ opacity: ROW_STYLE[st].opacity }}>
+                <g.Icon
+                  size={12}
+                  weight={st === 'done' || st === 'failed' ? 'fill' : 'regular'}
+                  style={{ color: g.color }}
+                />
+                <span className="meta">{STATE_LEGEND[st]}</span>
+              </span>
+            );
+          })}
+        </div>
       </figcaption>
 
       {/* overflow-x-auto WITHOUT no-scrollbar: a 3-site canvas can still exceed a narrow frame,
@@ -167,7 +213,7 @@ export default function PipelineFlow({ phases, ctx }: { phases: PlannedPhase[]; 
               {columns.map(([slug, col]) => (
                 <div key={slug} className="flex flex-col gap-2" style={{ width: COL_W }}>
                   {columns.length > 1 && (
-                    <span className="kicker truncate pb-0.5" style={{ color: 'var(--accent)' }}>
+                    <span className="meta truncate pb-0.5" style={{ color: 'var(--accent)' }}>
                       {siteName(slug)}
                     </span>
                   )}
