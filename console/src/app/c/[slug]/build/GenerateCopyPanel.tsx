@@ -9,7 +9,7 @@ import { labelFor } from '@/lib/section-labels';
 type State = { kind: 'idle' } | { kind: 'running' } | { kind: 'error'; message: string };
 
 export default function GenerateCopyPanel({
-  vertical, base, sections, onSectionsChange, details, onDetailsChange, scanUrl, onScanUrlChange,
+  vertical, base, sections, onSectionsChange, details, onDetailsChange, clientDetails, scanUrl, onScanUrlChange,
   generated, onGenerated, onClearGenerated, onReviewSection,
 }: {
   vertical: VerticalId;
@@ -19,6 +19,11 @@ export default function GenerateCopyPanel({
   onSectionsChange: (v: Section[]) => void;
   details: string;
   onDetailsChange: (v: string) => void;
+  /**
+   * The client's own onboarding answers, compiled to prose. Empty when they didn't fill in
+   * the brand-direction step. Used to label the prefill and to offer a way back to it.
+   */
+  clientDetails: string;
   scanUrl: string;
   onScanUrlChange: (v: string) => void;
   generated: Partial<SiteContent> | null;
@@ -163,16 +168,36 @@ export default function GenerateCopyPanel({
 
       <label className="block space-y-1.5">
         <span className="font-chromeMono text-xs uppercase tracking-widest text-zinc-400">
-          Additional brand details (optional)
+          Brand details for the copywriter
         </span>
         <textarea
           value={details}
           onChange={(e) => onDetailsChange(e.target.value)}
-          placeholder="Business name, city, what makes them different, tone/voice, services to emphasize…"
-          rows={4}
+          placeholder="What makes them different, who they sell to, tone of voice, services to emphasize…"
+          rows={7}
           disabled={busy}
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-uiInk"
         />
+        {/* The client answered a brand-direction questionnaire at onboarding and until now
+            nothing read it. Say where the text came from, and keep a way back to it — this
+            box mixes their words with yours, so an edit shouldn't be one-way. */}
+        {clientDetails && (
+          <span className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+            {details === clientDetails
+              ? "Prefilled from the client's onboarding answers."
+              : "Edited — no longer matches the client's onboarding answers."}
+            {details !== clientDetails && (
+              <button
+                type="button"
+                onClick={() => onDetailsChange(clientDetails)}
+                disabled={busy}
+                className="inline-flex items-center gap-1 font-chromeMono hover:text-zinc-700"
+              >
+                <ArrowCounterClockwise size={11} /> Reset to their answers
+              </button>
+            )}
+          </span>
+        )}
       </label>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -48,6 +48,7 @@ export default function IntakeReviewStep({
   onEditInStudio,
   details,
   onDetailsChange,
+  clientDetails,
   scanUrl,
   onScanUrlChange,
   source,
@@ -76,6 +77,8 @@ export default function IntakeReviewStep({
    */
   details: string;
   onDetailsChange: (v: string) => void;
+  /** The client's onboarding brand answers as prose; empty when they skipped that step. */
+  clientDetails: string;
   scanUrl: string;
   onScanUrlChange: (v: string) => void;
   source: SourceId;
@@ -169,6 +172,7 @@ export default function IntakeReviewStep({
             onSectionsChange={onGenSectionsChange}
             details={details}
             onDetailsChange={onDetailsChange}
+            clientDetails={clientDetails}
             scanUrl={scanUrl}
             onScanUrlChange={onScanUrlChange}
             generated={generated}

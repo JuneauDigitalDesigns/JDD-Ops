@@ -43,9 +43,18 @@ export function buildCopyUserMessage(
   const want = new Set<Section>(['brand', ...sections]);
   const label = VERTICALS.find((v) => v.id === vertical)?.label ?? vertical;
   const b = base.brand;
+  const x = base.extensions;
+  // Everything below `license` comes straight off the client's onboarding form and was
+  // being collected, mapped, written to disk — and then never shown to the model. The
+  // copywriter was writing "serving the local area" while the intake knew the actual towns.
+  // Undefined-safe throughout: extensions is optional and older intakes predate these keys.
   const facts = {
     name: b.name, long: b.long, tagline: b.tagline, established: b.established,
     phone: b.phone, email: b.email, address: b.address, license: b.license,
+    serviceArea: x?.serviceArea?.length ? x.serviceArea : undefined,
+    hours: x?.hours?.all || undefined,
+    certifications: x?.trustBadges?.length ? x.trustBadges : undefined,
+    notableClients: base.trust?.logos?.length ? base.trust.logos : undefined,
   };
   const counts = {
     pillars: base.about.pillars.length,

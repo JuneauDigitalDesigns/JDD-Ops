@@ -10,6 +10,7 @@ import { deepMerge, applyEdits } from '@/lib/merge';
 import { EASE } from '@/lib/motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import { brandDirectionToDetails, type BrandDirection } from '@jdd/schema';
 import type { SourceId } from '@/components/wizard/IntakeReviewStep';
 import {
   reconcileOrder,
@@ -70,6 +71,44 @@ type WizardBundle = {
   genSections: Section[];
 };
 
+/**
+ * The client's own brand answers, compiled into copywriter guidance.
+ *
+ * The onboarding form asks what makes the business different, who it sells to, the vibe and
+ * tone it wants, and what to avoid. All of it lands on `_meta.brandDirection` and, until
+ * now, nothing in the console ever read it — the copywriter saw contact details only, so it
+ * wrote generic copy and the operator's only recourse was retyping the client's own words.
+ *
+ * `brandDirectionToDetails` already exists in @jdd/schema for exactly this, and even
+ * documents itself as feeding "buildCopyUserMessage's `details` argument". The contract was
+ * written; only this call was missing.
+ */
+function seedDetailsFrom(seed: SiteContent | null): string {
+  const bd = (seed?._meta as { brandDirection?: BrandDirection } | undefined)?.brandDirection;
+  return brandDirectionToDetails(bd ?? null);
+}
+
+/**
+ * The vertical implied by the client's stated industry, when we can tell.
+ *
+ * @jdd/schema's BrandIntakeSubmission declares `industry: string; // console maps this to a
+ * copywriter VerticalId` — but mapBrandIntakeToIntake never emits it, so today the value the
+ * client typed is gone before the console sees it and you pick the vertical by hand. That
+ * pick is not cosmetic: it chooses the preset baseline AND the copywriter's system prompt.
+ *
+ * Implemented now and inert until the mapper is fixed (a cross-repo change: schema bump plus
+ * an agency-site deploy). Falls back to the manual pick whenever nothing matches, so it can
+ * never make the current behaviour worse.
+ */
+function verticalFromIntake(seed: SiteContent | null): VerticalId | null {
+  const industry = (seed?._meta as { industry?: string } | undefined)?.industry?.trim().toLowerCase();
+  if (!industry) return null;
+  const hit = VERTICALS.find(
+    (v) => v.id === industry || v.label.toLowerCase() === industry,
+  );
+  return hit?.id ?? null;
+}
+
 /** Read a client's saved bundle. Partial because older ones predate the intake-input fields. */
 function readBundle(slug: string): Partial<WizardBundle> | null {
   try {
@@ -82,14 +121,14 @@ function readBundle(slug: string): Partial<WizardBundle> | null {
 
 function freshBundle(seed: SiteContent | null): WizardBundle {
   return {
-    vertical: DEFAULT_VERTICAL,
+    vertical: verticalFromIntake(seed) ?? DEFAULT_VERTICAL,
     imported: seed,
     generated: null,
     edits: {},
     selections: {},
     skins: {},
     order: [],
-    details: '',
+    details: seedDetailsFrom(seed),
     scanUrl: '',
     source: 'generate',
     // A brand-new client has nothing generated, so the first run should write everything.
@@ -149,6 +188,8 @@ export default function BuildWizard({
   const [details, setDetails] = useState('');
   const [scanUrl, setScanUrl] = useState('');
   const [source, setSource] = useState<SourceId>('generate');
+  /** The client's own answers, kept separately so the panel can offer a way back to them. */
+  const clientDetails = useMemo(() => seedDetailsFrom(seed), [seed]);
   const [genSections, setGenSections] = useState<Section[]>([...ALL_SECTIONS]);
 
   // ── Builder layer ─────────────────────────────────────────────────────────
@@ -321,19 +362,24 @@ export default function BuildWizard({
    * controlled input (React would flip the textarea to uncontrolled and warn).
    */
   const applyBundle = useCallback((b: Partial<WizardBundle>) => {
-    setVertical(b.vertical ?? DEFAULT_VERTICAL);
+    setVertical(b.vertical ?? verticalFromIntake(seed) ?? DEFAULT_VERTICAL);
     setImported(b.imported ?? null);
     setGenerated(b.generated ?? null);
     setEdits(b.edits ?? {});
     setSelections(b.selections ?? {});
     setSkins(b.skins ?? {});
     setOrder(b.order ?? []);
-    setDetails(b.details ?? '');
+    // Only seed when the bundle has no `details` KEY — deliberately not "when the text is
+    // empty". Keyed off emptiness, clearing the box would refill it on the next remount,
+    // which is more infuriating than the bug this replaces.
+    setDetails(b.details ?? seedDetailsFrom(seed));
     setScanUrl(b.scanUrl ?? '');
     setSource(b.source ?? 'generate');
     // An old bundle has no selection; a fresh run should write everything.
     setGenSections(b.genSections?.length ? b.genSections : [...ALL_SECTIONS]);
-  }, []);
+    // `seed` is read for the brandDirection prefill, so it belongs in the deps — an empty
+    // array here would pin this callback to the first client's intake.
+  }, [seed]);
   // Each of these replaces a whole content layer, so each is one undo step (Intake stack).
   const importSite = useCallback((site: SiteContent) => {
     intakeCheckpoint();
@@ -677,6 +723,7 @@ export default function BuildWizard({
                   onEditInStudio={(s) => { setFocusSection(s); go(STUDIO_STEP); }}
                   details={details}
                   onDetailsChange={setDetails}
+                  clientDetails={clientDetails}
                   scanUrl={scanUrl}
                   onScanUrlChange={setScanUrl}
                   source={source}

@@ -525,8 +525,13 @@ export type { IntakeEnvelope };
  * target clients/<slug>/repo). onboard.js's loadIntake prefers the `INTAKE` export, so a
  * signup pulled from the queue lands as the exact schema the orchestrator reads next.
  *
- * The agency site's Intake and the studio's SiteContent are the same schema family, so the
- * object is serialized verbatim — no field mapping. Per CLAUDE.md we never invent values:
+ * Serialized verbatim — but NOT because no mapping is needed. The agency form collects a
+ * BrandIntakeSubmission, whose shape is nothing like SiteContent; `mapBrandIntakeToIntake`
+ * (@jdd/schema, src/brand-intake.ts) does the renaming and nesting on the AGENCY SIDE before
+ * the submission ever enters the KV queue. By the time it reaches here it is already a
+ * SiteContent-shaped envelope, so this writer must not touch it. If a field looks like it
+ * went missing on import, that mapper is where to look — not this function.
+ * Per CLAUDE.md we never invent values:
  * `_meta.missing_fields` is preserved as-is for human review in the wizard's intake step.
  * JSON.stringify keeps this data-only (no code injection from client-supplied strings).
  */
