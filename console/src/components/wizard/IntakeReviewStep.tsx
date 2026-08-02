@@ -1,29 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { Warning, BracketsCurly, Copy, X, Check, Sparkle, Globe } from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
 import type { VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import GenerateCopyPanel from '@/app/c/[slug]/build/GenerateCopyPanel';
 import ScrapePanel from '@/app/c/[slug]/build/ScrapePanel';
-import SectionCopyModal from '@/app/c/[slug]/build/SectionCopyModal';
 import VerticalPicker from '@/app/c/[slug]/build/VerticalPicker';
 import MissingFieldList from './MissingFieldList';
 import IntakeReviewRail from './IntakeReviewRail';
+import GeneratedSections from './GeneratedSections';
 
 /**
- * Step 2 — where content comes FROM, and what's still missing.
+ * The intake — where content comes FROM, what it produced, and what's still missing.
  *
  * This used to be the whole schema as twelve collapsible sections: every field for every
  * category, whether or not it needed attention. That inverted the job. The intake's actual
  * work is (a) getting copy in — AI generation or scraping an existing site — and (b)
  * closing the gaps that leaves behind.
  *
- * So: one source pane at a time, then a guided queue over `_meta.missing_fields`. Everything
- * else is edited in the Studio, on the live page, where it has context. The raw-JSON editor
- * stays as the escape hatch for bulk work.
+ * Two panes. The work column runs source → generated copy → fields needing input; the rail
+ * is a live outline of the last of those. Flagged gaps are still the default view, so the
+ * original reasoning holds — the "All fields" group is opt-in and scoped to the curated
+ * dozen in field-labels.ts, not a return to the full-schema form. Everything else is edited
+ * in the Studio, on the live page, where it has context, and the raw-JSON editor stays as
+ * the escape hatch for bulk work.
  */
 
 export type SourceId = 'generate' | 'seed';
@@ -87,7 +89,6 @@ export default function IntakeReviewStep({
   genSections: Section[];
   onGenSectionsChange: (v: Section[]) => void;
 }) {
-  const [reviewSection, setReviewSection] = useState<Section | null>(null);
   const missing = effective._meta?.missing_fields ?? [];
 
   // ── Editable JSON view (the escape hatch) ───────────────────────────────────
@@ -183,7 +184,6 @@ export default function IntakeReviewStep({
             generated={generated}
             onGenerated={onGenerated}
             onClearGenerated={onClearGenerated}
-            onReviewSection={setReviewSection}
           />
         )}
         {source === 'seed' && (
@@ -196,6 +196,19 @@ export default function IntakeReviewStep({
             onUrlChange={onScanUrlChange}
           />
         )}
+      </section>
+
+      {/* ── What the copywriter wrote ───────────────────────────────────────── */}
+      <section className="mb-8">
+        <h2 className="mb-3 font-display text-xl font-semibold text-uiInk">Brand copy</h2>
+        <GeneratedSections
+          content={effective}
+          generated={generated}
+          selected={genSections}
+          onSelectedChange={onGenSectionsChange}
+          onEditInStudio={onEditInStudio}
+          busy={false}
+        />
       </section>
 
       {/* ── What still needs a human ────────────────────────────────────────── */}
@@ -211,18 +224,6 @@ export default function IntakeReviewStep({
         />
       </section>
 
-      {/* ── Read-only review-copy modal (opened from a checklist item) ─────── */}
-      <AnimatePresence>
-        {reviewSection && (
-          <SectionCopyModal
-            section={reviewSection}
-            content={effective}
-            isGenerated={Boolean(generated && reviewSection in generated)}
-            onClose={() => setReviewSection(null)}
-            onEditInStudio={onEditInStudio}
-          />
-        )}
-      </AnimatePresence>
 
       {/* ── Editable JSON modal ──────────────────────────────────────────── */}
       {jsonOpen && (

@@ -1,16 +1,16 @@
 'use client';
 import { useState } from 'react';
-import { Sparkle, CircleNotch, ArrowCounterClockwise, Warning, CheckCircle, Circle } from '@phosphor-icons/react';
+import { Sparkle, CircleNotch, ArrowCounterClockwise, Warning, CheckCircle } from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
 import type { VerticalId } from '@/lib/verticals';
-import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import type { Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
 
 type State = { kind: 'idle' } | { kind: 'running' } | { kind: 'error'; message: string };
 
 export default function GenerateCopyPanel({
   vertical, base, sections, onSectionsChange, details, onDetailsChange, clientDetails, scanUrl, onScanUrlChange,
-  generated, onGenerated, onClearGenerated, onReviewSection,
+  generated, onGenerated, onClearGenerated,
 }: {
   vertical: VerticalId;
   base: SiteContent;
@@ -29,8 +29,6 @@ export default function GenerateCopyPanel({
   generated: Partial<SiteContent> | null;
   onGenerated: (p: Partial<SiteContent>) => void;
   onClearGenerated: () => void;
-  /** Open the read-only review modal for a section (click on a checklist item). */
-  onReviewSection: (s: Section) => void;
 }) {
   const [state, setState] = useState<State>({ kind: 'idle' });
   /** What the last run actually produced, vs what was asked for. See the note in run(). */
@@ -73,18 +71,6 @@ export default function GenerateCopyPanel({
   }
 
   const busy = state.kind === 'running';
-  // Every section the checklist offers. `sections` is now the SELECTION for the next run,
-  // not the catalogue, so the list has to come from ALL_SECTIONS. (brand is an always-on
-  // tagline rather than a listed section.)
-  const sectionLabels = ALL_SECTIONS.filter((s) => s !== 'brand');
-  // A section is "generated" once it appears in the generated layer.
-  const isGen = (s: Section) => Boolean(generated && s in generated);
-  const genCount = sectionLabels.filter(isGen).length;
-
-  const picked = new Set(sections);
-  const togglePick = (s: Section) =>
-    onSectionsChange(picked.has(s) ? sections.filter((x) => x !== s) : [...sections, s]);
-  const allPicked = sectionLabels.every((s) => picked.has(s));
 
   return (
     <div className="space-y-3 rounded-lg border border-uiCardRule bg-white p-6">
@@ -100,60 +86,6 @@ export default function GenerateCopyPanel({
           </button>
         )}
       </div>
-      {/* Status checklist — grey = not yet written, teal accent = written. Compact 2-column. */}
-      {sectionLabels.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-chromeMono text-xs uppercase tracking-widest text-uiInkSoft">Brand copy</span>
-              <span className="badge badge-accent">{vertical}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => onSectionsChange(allPicked ? [] : [...sectionLabels])}
-                className="font-chromeMono text-xs text-zinc-400 hover:text-zinc-700"
-              >
-                {allPicked ? 'Select none' : 'Select all'}
-              </button>
-              <span className="font-chromeMono text-xs tabular-nums text-zinc-400">
-                {genCount} / {sectionLabels.length}
-              </span>
-            </div>
-          </div>
-          {/* Checkbox picks the section for the next run; the label opens the review modal. */}
-          <ul className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-            {sectionLabels.map((s) => {
-              const done = isGen(s);
-              return (
-                <li key={s} className="flex items-center gap-1.5 rounded px-1.5 py-1">
-                  <input
-                    type="checkbox"
-                    checked={picked.has(s)}
-                    onChange={() => togglePick(s)}
-                    disabled={busy}
-                    aria-label={`Regenerate ${labelFor(s)}`}
-                    className="shrink-0 cursor-pointer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onReviewSection(s)}
-                    aria-label={`Review ${labelFor(s)} copy`}
-                    className={[
-                      'flex min-w-0 flex-1 items-center gap-1.5 rounded text-left text-xs transition-colors hover:bg-black/[0.04]',
-                      done ? 'text-accent' : 'text-zinc-400',
-                    ].join(' ')}
-                  >
-                    {done ? <CheckCircle size={14} weight="fill" /> : <Circle size={14} />}
-                    {labelFor(s)}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
       <label className="block">
         <span className="field-label">Scan an existing site (optional)</span>
         <input
