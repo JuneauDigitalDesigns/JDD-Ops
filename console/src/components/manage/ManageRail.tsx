@@ -11,6 +11,7 @@ import {
   RocketLaunch,
   Sliders,
   UserCircle,
+  Warning,
 } from '@phosphor-icons/react';
 import NavRail from '@/components/shell/NavRail';
 import RailRow from '@/components/shell/RailRow';
@@ -37,6 +38,7 @@ const ICONS: Record<ManageSection['icon'], Icon> = {
   globe: Globe,
   microphone: Microphone,
   portal: UserCircle,
+  warning: Warning,
 };
 
 export default function ManageRail({
@@ -50,7 +52,9 @@ export default function ManageRail({
   const params = useSearchParams();
 
   const isPending = Boolean(ctx.pendingOnboarding);
-  const sections = sectionsForPlan(ctx.plan);
+  const allSections = sectionsForPlan(ctx.plan);
+  const sections = allSections.filter((s) => !s.danger);
+  const dangerSection = allSections.find((s) => s.danger);
   // Carry ?site= across section links so the enterprise selection survives navigation.
   const site = params.get('site');
   const qs = site ? `?site=${encodeURIComponent(site)}` : '';
@@ -99,6 +103,28 @@ export default function ManageRail({
           />
         );
       })}
+
+      {/* Danger renders last and set apart by a rule — NavRail's children wrapper isn't a
+          stretched flex container, so there's no true "pin to the bottom" available here
+          without reaching into that shared component (also used by the onboarding rail).
+          Last + a visibly different rule + a danger-toned icon is enough separation without
+          touching shared layout for one row. */}
+      {dangerSection && !isPending && (
+        <div className="mt-2 flex flex-col border-t pt-1" style={{ borderColor: 'var(--danger)' }}>
+          <RailRow
+            label={dangerSection.label}
+            leading={
+              <Warning
+                size={15}
+                weight={active === dangerSection.id ? 'fill' : 'regular'}
+                style={{ color: 'var(--danger)' }}
+              />
+            }
+            active={active === dangerSection.id}
+            href={`/c/${ctx.slug}/manage/${dangerSection.id}${qs}`}
+          />
+        </div>
+      )}
     </NavRail>
   );
 }

@@ -16,7 +16,8 @@ export type SectionId =
   | 'deployments'
   | 'domain'
   | 'voice-agent'
-  | 'portal';
+  | 'portal'
+  | 'danger';
 
 export interface ManageSection {
   id: SectionId;
@@ -24,9 +25,11 @@ export interface ManageSection {
   /** One line under the section title. */
   lede: string;
   /** Key into ManageRail's icon map. */
-  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'portal';
+  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'portal' | 'warning';
   /** Which plans get this section. */
   plans: Plan[];
+  /** Rendered visually apart, after a spacer and rule, with a danger-toned icon. */
+  danger?: boolean;
 }
 
 const ALL: Plan[] = ['starter', 'growth', 'enterprise'];
@@ -75,6 +78,14 @@ export const MANAGE_SECTIONS: ManageSection[] = [
     lede: 'Which account this client signs into the portal with.',
     icon: 'portal',
     plans: ALL,
+  },
+  {
+    id: 'danger',
+    label: 'Danger',
+    lede: 'Tear down every resource provisioned for this client.',
+    icon: 'warning',
+    plans: ALL,
+    danger: true,
   },
 ];
 
