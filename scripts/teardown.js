@@ -3,8 +3,19 @@
  * scripts/teardown.js — delete every resource provisioned for a test client.
  *
  * SAFETY: refuses to run unless the slug starts with `_e2e-`. This is only
- * intended for disposable test clients. Real client teardown should be a
- * separate, deliberate, manual process.
+ * intended for disposable test clients, and stays that way: a CLI that will
+ * destroy a real client with `--yes` is one arrow-up in shell history away from
+ * a very bad afternoon.
+ *
+ * Real-client teardown lives in the console (/manage → Danger), where it gets a
+ * preview of exactly what dies, a typed confirmation, an archive record written
+ * before anything is destroyed, and cleanup of the things this script never
+ * touched (portal record, Clerk user, Retell LLM, Make scenario).
+ *
+ * The per-resource deletes now live in lib/teardown-ops.js so both this script
+ * and the console run the same code. This file is the CLI wrapper: argument
+ * parsing, the `_e2e-` gate, the confirmation prompt, and formatting step
+ * results back into the log lines it has always printed.
  *
  * Usage:
  *   npm run teardown -- --slug _e2e-{name}
@@ -12,12 +23,21 @@
  */
 
 import 'dotenv/config';
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { resolve, basename } from 'node:path';
+import { existsSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
+import {
+  discoverSites,
+  deleteGitHubRepo,
+  releaseTwilioNumber,
+  deleteRetellAgent,
+  deleteVercelProject,
+  deleteAirtableBase,
+} from '../lib/teardown-ops.js';
 
 function fail(msg, err) {
   console.error(`teardown: ${msg}`);
@@ -41,136 +61,24 @@ function parseArgs(argv) {
   return args;
 }
 
-function parseEnvLocal(envPath) {
-  if (!existsSync(envPath)) return {};
-  const out = {};
-  for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    out[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
-  }
-  return out;
-}
-
-function discoverSites(clientDir, baseSlug) {
-  // Single-site (Starter/Growth): clientDir contains .env.local directly.
-  // Multi-site (Enterprise): clientDir contains site-1/, site-2/, ... each with .env.local.
-  if (existsSync(resolve(clientDir, '.env.local'))) {
-    return [{ slug: baseSlug, dir: clientDir, env: parseEnvLocal(resolve(clientDir, '.env.local')) }];
-  }
-  const sites = [];
-  for (const entry of readdirSync(clientDir)) {
-    const sub = resolve(clientDir, entry);
-    if (!statSync(sub).isDirectory()) continue;
-    if (!/^site-\d+$/.test(entry)) continue;
-    const env = parseEnvLocal(resolve(sub, '.env.local'));
-    const i = parseInt(entry.replace('site-', ''), 10);
-    sites.push({ slug: `${baseSlug}-${i}`, dir: sub, env });
-  }
-  return sites;
-}
-
-async function deleteGitHubRepo(octokit, owner, repo) {
-  try {
-    await octokit.repos.delete({ owner, repo });
-    console.log(`  ✓ GitHub repo ${owner}/${repo} deleted`);
-  } catch (err) {
-    if (err.status === 404) {
-      console.log(`  · GitHub repo ${owner}/${repo} not found (skipping)`);
-    } else {
-      console.error(`  ✗ GitHub delete failed for ${owner}/${repo}: ${err.status} ${err.message}`);
-    }
-  }
-}
-
-async function releaseTwilioNumber(twilioClient, phoneNumber) {
-  if (!phoneNumber) {
-    console.log('  · No TWILIO_NUMBER recorded (skipping)');
-    return;
-  }
-  try {
-    const matches = await twilioClient.incomingPhoneNumbers.list({ phoneNumber, limit: 1 });
-    if (!matches.length) {
-      console.log(`  · Twilio number ${phoneNumber} not owned (skipping)`);
-      return;
-    }
-    await twilioClient.incomingPhoneNumbers(matches[0].sid).remove();
-    console.log(`  ✓ Twilio number ${phoneNumber} released`);
-  } catch (err) {
-    console.error(`  ✗ Twilio release failed for ${phoneNumber}: ${err.message}`);
-  }
-}
-
-async function deleteRetellAgent(agentId) {
-  if (!agentId) {
-    console.log('  · No RETELL_AGENT_ID recorded (skipping)');
-    return;
-  }
-  const apiKey = process.env.RETELL_API_KEY;
-  if (!apiKey) {
-    console.log('  · RETELL_API_KEY not set (skipping Retell delete)');
-    return;
-  }
-  try {
-    const res = await fetch(`https://api.retellai.com/delete-agent/${agentId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (res.ok || res.status === 404) {
-      console.log(`  ✓ Retell agent ${agentId} deleted`);
-    } else {
-      console.error(`  ✗ Retell delete failed: ${res.status} ${await res.text()}`);
-    }
-  } catch (err) {
-    console.error(`  ✗ Retell delete threw: ${err.message}`);
-  }
-}
-
-async function deleteVercelProject(slug) {
-  const token = process.env.VERCEL_TOKEN;
-  if (!token) {
-    console.log('  · VERCEL_TOKEN not set (skipping Vercel delete)');
-    return;
-  }
-  const teamId = process.env.VERCEL_TEAM_ID;
-  const sep = '?';
-  const url = `https://api.vercel.com/v9/projects/${encodeURIComponent(slug)}${teamId ? `${sep}teamId=${encodeURIComponent(teamId)}` : ''}`;
-  try {
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok || res.status === 404) {
-      console.log(`  ✓ Vercel project "${slug}" deleted`);
-    } else {
-      console.error(`  ✗ Vercel delete failed: ${res.status} ${await res.text()}`);
-    }
-  } catch (err) {
-    console.error(`  ✗ Vercel delete threw: ${err.message}`);
-  }
-}
-
-async function deleteAirtableBase(baseId) {
-  if (!baseId) return;
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  if (!apiKey) {
-    console.log('  · AIRTABLE_API_KEY not set (skipping Airtable delete)');
-    return;
-  }
-  try {
-    const res = await fetch(`https://api.airtable.com/v0/meta/bases/${baseId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (res.ok || res.status === 404) {
-      console.log(`  ✓ Airtable base ${baseId} deleted`);
-    } else {
-      console.error(`  ✗ Airtable delete failed: ${res.status} ${await res.text()}`);
-    }
-  } catch (err) {
-    console.error(`  ✗ Airtable delete threw: ${err.message}`);
+/**
+ * Render a StepResult as the line this script has always printed.
+ * `✓` deleted · `·` skipped or already gone · `✗` failed.
+ */
+function report(result, label) {
+  const what = `${label}${result.target && result.target !== '—' ? ` ${result.target}` : ''}`;
+  switch (result.outcome) {
+    case 'deleted':
+      console.log(`  ✓ ${what} deleted`);
+      break;
+    case 'already-gone':
+      console.log(`  · ${what} not found (skipping)`);
+      break;
+    case 'skipped':
+      console.log(`  · ${result.message ?? `${what} skipped`}`);
+      break;
+    default:
+      console.error(`  ✗ ${what} failed: ${result.message ?? 'unknown error'}`);
   }
 }
 
@@ -185,7 +93,10 @@ async function main() {
   const { slug, yes } = parseArgs(process.argv);
   if (!slug) fail('Missing --slug. Usage: npm run teardown -- --slug _e2e-{name}');
   if (!slug.startsWith('_e2e-')) {
-    fail(`Refusing to tear down "${slug}" — slug must start with "_e2e-" for safety.`);
+    fail(
+      `Refusing to tear down "${slug}" — slug must start with "_e2e-" for safety.\n` +
+        `        Real clients are torn down from the console: /manage → Danger.`,
+    );
   }
   const clientDir = resolve('clients', slug);
   if (!existsSync(clientDir)) fail(`Client directory not found: ${clientDir}`);
@@ -212,28 +123,32 @@ async function main() {
     }
   }
 
-  const githubOrg = process.env.GITHUB_ORG;
+  const org = process.env.GITHUB_ORG;
   const githubToken = process.env.GITHUB_TOKEN;
   const octokit = githubToken ? new Octokit({ auth: githubToken }) : null;
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-  const twilioClient = twilioSid && twilioToken ? twilio(twilioSid, twilioToken) : null;
+  const client = twilioSid && twilioToken ? twilio(twilioSid, twilioToken) : null;
+  const retellKey = process.env.RETELL_API_KEY;
 
   for (const s of sites) {
     console.log(`\n--- Tearing down ${s.slug} ---`);
-    if (octokit && githubOrg) {
-      await deleteGitHubRepo(octokit, githubOrg, s.slug);
-    }
-    await deleteVercelProject(s.slug);
-    if (twilioClient) {
-      await releaseTwilioNumber(twilioClient, s.env.TWILIO_NUMBER);
-    }
-    await deleteRetellAgent(s.env.RETELL_AGENT_ID);
+    report(await deleteGitHubRepo({ octokit, org, repo: s.slug }), 'GitHub repo');
+    report(
+      await deleteVercelProject({
+        token: process.env.VERCEL_TOKEN,
+        teamId: process.env.VERCEL_TEAM_ID,
+        slug: s.slug,
+      }),
+      'Vercel project',
+    );
+    report(await releaseTwilioNumber({ client, phoneNumber: s.env.TWILIO_NUMBER }), 'Twilio number');
+    report(await deleteRetellAgent({ apiKey: retellKey, agentId: s.env.RETELL_AGENT_ID }), 'Retell agent');
   }
 
   if (sharedBase) {
     console.log(`\n--- Deleting shared Airtable base ---`);
-    await deleteAirtableBase(sharedBase);
+    report(await deleteAirtableBase({ apiKey: process.env.AIRTABLE_API_KEY, baseId: sharedBase }), 'Airtable base');
   }
 
   console.log(`\n--- Removing local folder ${clientDir} ---`);
@@ -241,4 +156,8 @@ async function main() {
   console.log(`✓ Teardown complete for "${slug}"`);
 }
 
-main().catch((err) => fail('unhandled error', err));
+// Only run when invoked directly. Without this, importing anything from this file
+// — a test, an editor auto-import, a mistaken bridge call — would execute a teardown.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => fail('unhandled error', err));
+}
