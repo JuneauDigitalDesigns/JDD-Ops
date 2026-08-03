@@ -299,6 +299,9 @@ export default function ClientIndex() {
           (where every route's refresh lives), "New client" is the first card in the grid,
           and only the cross-route link is left as an action. */}
       <NavSlot>
+        <Link href="/archive" className="btn btn-xs">
+          Archive
+        </Link>
         <Link href="/leads" className="btn btn-xs">
           Leads <ArrowRight size={12} weight="bold" />
         </Link>

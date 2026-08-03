@@ -270,6 +270,15 @@ export function releaseTeardownLock(slug: string): void {
   }
 }
 
+/**
+ * The most recent record for a slug, regardless of status — used by the client layout to
+ * redirect a stale bookmark (clients/{slug} is gone) to something other than a bare 404.
+ */
+export function findLatestArchiveForSlug(slug: string): ArchiveIndexEntry | null {
+  const all = readArchiveIndex({ limit: Number.MAX_SAFE_INTEGER });
+  return all.find((e) => e.slug === slug) ?? null;
+}
+
 /* ── Index — the list view reads this instead of walking every record ───────── */
 
 const INDEX_FILE = () => resolve(archiveRoot(), 'index.ndjson');

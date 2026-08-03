@@ -1,6 +1,7 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, unmanageableReason, SLUG_RE } from '@/lib/manageSites';
+import { findLatestArchiveForSlug } from '@/lib/archive';
 import { ClientProvider } from '@/components/client/ClientProvider';
 import ClientChrome from '@/components/client/ClientChrome';
 
@@ -28,7 +29,14 @@ export default async function ClientLayout({
   if (!SLUG_RE.test(params.slug)) notFound();
 
   const ctx = await getClientCached(params.slug);
-  if (!ctx) notFound();
+  if (!ctx) {
+    // clients/{slug} is gone — either it never existed, or it was torn down. A bookmark
+    // pointing at a torn-down client deserves better than a bare 404: send it to what's
+    // left of the record instead.
+    const archived = findLatestArchiveForSlug(params.slug);
+    if (archived) redirect(`/archive/${archived.id}`);
+    notFound();
+  }
 
   // Evaluated here because isManageable/unmanageableReason are server-only; ClientChrome
   // receives the answers, not the predicates.
