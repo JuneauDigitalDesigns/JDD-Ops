@@ -30,6 +30,7 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
+import { sanitizeProjectName } from '../lib/vercel-sync.js';
 import {
   discoverSites,
   deleteGitHubRepo,
@@ -107,7 +108,11 @@ async function main() {
   console.log(`\nAbout to delete the following for slug "${slug}":`);
   for (const s of sites) {
     console.log(`  - GitHub repo:   ${process.env.GITHUB_ORG ?? '<GITHUB_ORG>'}/${s.slug}`);
-    console.log(`  - Vercel project: ${s.slug}`);
+    // Vercel forbids leading underscores etc., so the real project name is the sanitized
+    // form onboard.js actually created — not the raw folder slug. Showing the raw slug
+    // here previously meant the preview (and the "not found, skipping" log line after it)
+    // both silently referred to a project that never existed.
+    console.log(`  - Vercel project: ${sanitizeProjectName(s.slug)}`);
     if (s.env.TWILIO_NUMBER) console.log(`  - Twilio number:  ${s.env.TWILIO_NUMBER}`);
     if (s.env.RETELL_AGENT_ID) console.log(`  - Retell agent:   ${s.env.RETELL_AGENT_ID}`);
   }

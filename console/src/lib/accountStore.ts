@@ -5,6 +5,7 @@ import {
   accountByUserKey,
   createAccount,
   upsertSite,
+  removeSite,
   type PortalAccount,
   type PortalSiteInput,
 } from '@jdd/schema';
@@ -68,6 +69,26 @@ export async function attachSiteToAccount(
   const existing = await getRedis().get<PortalAccount>(key);
   const account = existing ?? createAccount(email);
   const next = upsertSite(account, site);
+  await getRedis().set(key, next);
+  return next;
+}
+
+/**
+ * Remove one site from an account, leaving every other site intact.
+ *
+ * Mirrors lib/account-store.js's detachSiteFromAccount, which onboard.js already uses when
+ * re-linking a client to a different email — same reasoning applies to teardown: the site
+ * is going away, and a portal record left pointing at a deleted Vercel project is a worse
+ * artifact than removing it while the site briefly still exists.
+ *
+ * A no-op returning `null` when the account doesn't exist — that is success, not failure,
+ * for a teardown's purposes.
+ */
+export async function detachSiteFromAccount(email: string, slug: string): Promise<PortalAccount | null> {
+  const key = accountKey(email);
+  const existing = await getRedis().get<PortalAccount>(key);
+  if (!existing) return null;
+  const next = removeSite(existing, slug);
   await getRedis().set(key, next);
   return next;
 }

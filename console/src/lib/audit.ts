@@ -30,7 +30,9 @@ export type AuditAction =
   | 'agent.prompt.push'
   | 'domain.add'
   | 'domain.verify'
-  | 'canonical.set';
+  | 'canonical.set'
+  | 'client.teardown.start'
+  | 'client.teardown';
 
 export interface AuditEntry {
   /** ISO timestamp. */

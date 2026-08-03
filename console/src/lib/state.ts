@@ -52,3 +52,15 @@ export function patchClientState({ slug, status, step, order }: PatchInput): Cli
   writeState(state);
   return next;
 }
+
+/**
+ * Remove a client's entry entirely — used by teardown once its disk folder is gone.
+ * patchClientState can only merge into a client's state, never remove it, so a torn-down
+ * client would otherwise leave a stale row in progress.json forever.
+ */
+export function deleteClientState(slug: string): void {
+  const state = readState();
+  if (!(slug in state)) return;
+  delete state[slug];
+  writeState(state);
+}
