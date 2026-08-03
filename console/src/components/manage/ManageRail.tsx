@@ -6,6 +6,7 @@ import {
   ArrowSquareOut,
   Gauge,
   Globe,
+  Lock,
   Microphone,
   RocketLaunch,
   Sliders,
@@ -48,6 +49,7 @@ export default function ManageRail({
   const active = useSelectedLayoutSegment();
   const params = useSearchParams();
 
+  const isPending = Boolean(ctx.pendingOnboarding);
   const sections = sectionsForPlan(ctx.plan);
   // Carry ?site= across section links so the enterprise selection survives navigation.
   const site = params.get('site');
@@ -84,11 +86,13 @@ export default function ManageRail({
       {sections.map((section) => {
         const SectionIcon = ICONS[section.icon];
         const isActive = active === section.id;
+        const locked = isPending && section.id !== 'overview';
         return (
           <RailRow
             key={section.id}
             label={section.label}
             leading={<SectionIcon size={15} weight={isActive ? 'fill' : 'regular'} />}
+            trailing={locked ? <Lock size={11} style={{ color: 'var(--fg-3)' }} /> : undefined}
             active={isActive}
             href={`/c/${ctx.slug}/manage/${section.id}${qs}`}
             badge={badges[section.id]}

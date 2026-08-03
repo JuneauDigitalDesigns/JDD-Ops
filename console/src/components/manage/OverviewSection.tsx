@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   ArrowSquareOut,
   ArrowsClockwise,
+  Bell,
   CheckCircle,
   Globe,
   Question,
@@ -39,8 +40,23 @@ export default function OverviewSection() {
   // `domains` comes from the shared context — the rail and the Domain section read the same
   // object, so the three can't disagree about where the site lives.
   const { ctx, site, domains } = useManage();
+  const pending = ctx.pendingOnboarding ?? null;
   const params = useSearchParams();
   const qs = params.get('site') ? `?site=${encodeURIComponent(params.get('site') as string)}` : '';
+
+  const [remind, setRemind] = useState<{ loading: boolean; ok?: boolean; error?: string }>({ loading: false });
+
+  const sendReminder = useCallback(async () => {
+    setRemind({ loading: true });
+    try {
+      const res = await fetch(`/api/c/${ctx.slug}/remind`, { method: 'POST', cache: 'no-store' });
+      const body = (await res.json()) as { ok?: boolean; to?: string; error?: string };
+      if (body.ok) setRemind({ loading: false, ok: true });
+      else setRemind({ loading: false, error: body.error ?? 'Send failed.' });
+    } catch {
+      setRemind({ loading: false, error: 'Send failed — check console logs.' });
+    }
+  }, [ctx.slug]);
 
   const [deploy, setDeploy] = useState<{ loading: boolean; data: DeployInfo | null; reason?: string }>({
     loading: true,
@@ -156,15 +172,59 @@ export default function OverviewSection() {
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
       <SectionHeader
         title="Overview"
-        lede={`${ctx.plan} plan · ${ctx.sites.length} site${ctx.sites.length === 1 ? '' : 's'} · clients/${ctx.slug}`}
+        lede={`${ctx.plan} plan · ${ctx.sites.length} site${ctx.sites.length === 1 ? '' : 's'}${pending ? ' · pending onboarding' : ` · clients/${ctx.slug}`}`}
         actions={
-          liveUrl && (
+          liveUrl && !pending && (
             <a href={liveUrl} target="_blank" rel="noreferrer" className="btn btn-sm">
               Open site <ArrowSquareOut size={13} />
             </a>
           )
         }
       />
+
+      {pending && (
+        <div
+          className="mb-6 rounded-[12px] border p-5"
+          style={{ borderColor: 'var(--warn)', background: 'var(--surface)' }}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+                <Warning size={15} weight="fill" style={{ color: 'var(--warn)', flexShrink: 0 }} />
+                Onboarding incomplete
+              </span>
+              <p className="text-xs text-fg2">
+                {ctx.brandName} paid but hasn't submitted the wizard yet.
+              </p>
+              {pending.signerEmail && (
+                <p className="text-xs text-fg3">
+                  Reminder goes to{' '}
+                  <span className="font-mono text-fg2">{pending.signerEmail}</span>
+                </p>
+              )}
+              {remind.ok && (
+                <p className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ok)' }}>
+                  <CheckCircle size={13} weight="fill" /> Reminder sent.
+                </p>
+              )}
+              {remind.error && (
+                <p className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--danger)' }}>
+                  <XCircle size={13} weight="fill" /> {remind.error}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={sendReminder}
+              disabled={remind.loading || remind.ok}
+              className="btn btn-sm shrink-0"
+            >
+              <Bell size={13} weight={remind.loading ? 'regular' : 'fill'} />
+              {remind.loading ? 'Sending…' : remind.ok ? 'Sent' : 'Send reminder'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Tile

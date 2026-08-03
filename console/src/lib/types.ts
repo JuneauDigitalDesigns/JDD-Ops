@@ -50,6 +50,15 @@ export const STATUS_ORDER: ClientStatus[] = [
   'live',
 ];
 
+export interface PendingOnboardingMeta {
+  signerEmail: string;
+  signerName: string;
+  sessionId: string;
+  plan: string;
+  name: string;
+  createdAt: number;
+}
+
 export interface ClientContext {
   slug: string; // base folder under clients/
   plan: Plan;
@@ -60,6 +69,8 @@ export interface ClientContext {
   schemaPath: string; // clients/{slug}/site.ts (relative to jdd-ops root)
   hasIntake: boolean;
   sites: SiteInfo[];
+  /** Non-null when this client paid but hasn't submitted the wizard yet (KV-only, no disk). */
+  pendingOnboarding?: PendingOnboardingMeta | null;
 }
 
 // ── Durable runbook state (runbook/.state/progress.json) ─────────────────────

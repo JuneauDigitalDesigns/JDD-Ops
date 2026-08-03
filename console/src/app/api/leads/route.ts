@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import {
   LEAD_STAGES,
+  deleteLead,
+  getLead,
   leadQueueConfigured,
   listLeads,
   patchLead,
@@ -11,12 +13,9 @@ import { LEAD_LABEL } from '@/lib/lead-meta';
 import { reconcileWon } from '@/lib/leadConversion';
 import { readOpsConfig } from '@/lib/opsConfig';
 
-// The funnel behind /leads. Reads the KV the agency site writes; local-only, like the
-// rest of this console.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** KV creds absent is a setup problem with a fix, so say which one rather than throwing. */
 function notConfigured() {
   return NextResponse.json(
     {
@@ -39,20 +38,24 @@ export async function GET() {
     return NextResponse.json({ leads: [], error: 'Could not read the lead queue.' }, { status: 200 });
   }
 
-  // Anyone who has since become a real client is marked won here rather than by a
-  // separate job — this route is the only place both sources are already in hand.
   try {
     leads = await reconcileWon(leads);
   } catch (e) {
-    // A reconciliation failure must not take the board down; the leads are still valid.
     console.error('[/api/leads] conversion reconcile failed', e);
   }
 
-  // The modal deep-links a prospect into the agency site's agreement flow, so it needs
-  // that origin. Sent with the list rather than read client-side — opsConfig is a
-  // server-only disk read.
   return NextResponse.json({ leads, siteUrl: readOpsConfig().siteUrl });
 }
+
+const CONTACT_FIELD_LABEL: Record<string, string> = {
+  name: 'Name',
+  businessName: 'Business',
+  phone: 'Phone',
+  email: 'Email',
+  trade: 'Trade',
+  planInterest: 'Plan',
+};
+const CONTACT_FIELDS = Object.keys(CONTACT_FIELD_LABEL) as Array<keyof typeof CONTACT_FIELD_LABEL>;
 
 interface PatchBody {
   id?: string;
@@ -60,6 +63,12 @@ interface PatchBody {
   order?: number;
   notes?: string;
   lostReason?: string;
+  name?: string;
+  businessName?: string;
+  phone?: string;
+  email?: string | null;
+  trade?: string | null;
+  planInterest?: string | null;
 }
 
 export async function PATCH(req: Request) {
@@ -80,7 +89,6 @@ export async function PATCH(req: Request) {
   if (body.stage !== undefined && !LEAD_STAGES.includes(body.stage)) {
     return NextResponse.json({ error: `Unknown stage "${body.stage}".` }, { status: 400 });
   }
-  // Fractional by design, but NaN/Infinity would poison the column sort and persist.
   if (body.order !== undefined && !Number.isFinite(body.order)) {
     return NextResponse.json({ error: 'order must be a finite number.' }, { status: 400 });
   }
@@ -90,20 +98,49 @@ export async function PATCH(req: Request) {
   if (body.lostReason !== undefined && typeof body.lostReason !== 'string') {
     return NextResponse.json({ error: 'lostReason must be a string.' }, { status: 400 });
   }
+  for (const f of ['name', 'businessName', 'phone'] as const) {
+    if (body[f] !== undefined && (typeof body[f] !== 'string' || !(body[f] as string).trim())) {
+      return NextResponse.json({ error: `${f} must be a non-empty string.` }, { status: 400 });
+    }
+  }
+  for (const f of ['email', 'trade'] as const) {
+    if (body[f] !== undefined && body[f] !== null && typeof body[f] !== 'string') {
+      return NextResponse.json({ error: `${f} must be a string or null.` }, { status: 400 });
+    }
+  }
 
-  // One trail entry per meaningful change. A pure reorder writes nothing — dragging a
-  // card up two places is not history, and logging it would bury the entries that are.
-  let activity: { kind: string; text: string } | undefined;
+  // Read current state to generate diffs for contact-field edits.
+  const existing = await getLead(body.id);
+  if (!existing) return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
+
+  const activities: { kind: string; text: string }[] = [];
+
+  // Contact field diffs
+  const bodyIndex = body as Record<string, unknown>;
+  const existingIndex = existing as unknown as Record<string, unknown>;
+  for (const key of CONTACT_FIELDS) {
+    if (bodyIndex[key] === undefined) continue;
+    const oldVal = String(existingIndex[key] ?? '—');
+    const newVal = String(bodyIndex[key] ?? '—');
+    if (oldVal !== newVal) {
+      activities.push({
+        kind: 'field',
+        text: `${CONTACT_FIELD_LABEL[key]} corrected: "${oldVal}" → "${newVal}"`,
+      });
+    }
+  }
+
+  // Stage / notes activities (a pure reorder stays silent)
   if (body.stage !== undefined) {
-    activity = {
+    activities.push({
       kind: 'stage',
       text:
         body.stage === 'lost' && body.lostReason?.trim()
           ? `Marked Lost — ${body.lostReason.trim()}`
           : `Moved to ${LEAD_LABEL[body.stage]}`,
-    };
+    });
   } else if (body.notes !== undefined) {
-    activity = { kind: 'note', text: 'Notes updated' };
+    activities.push({ kind: 'note', text: 'Notes updated' });
   }
 
   try {
@@ -112,12 +149,44 @@ export async function PATCH(req: Request) {
       order: body.order,
       notes: body.notes,
       lostReason: body.lostReason,
-      activity,
+      name: body.name,
+      businessName: body.businessName,
+      phone: body.phone,
+      email: body.email,
+      trade: body.trade,
+      planInterest: body.planInterest as 'starter' | 'growth' | 'enterprise' | null | undefined,
+      activity: activities.length > 0 ? activities : undefined,
     });
     if (!updated) return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
     return NextResponse.json({ lead: updated });
   } catch (e) {
     console.error('[/api/leads] patch failed', e);
     return NextResponse.json({ error: 'Could not save that change.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  if (!leadQueueConfigured()) {
+    return NextResponse.json({ error: 'Lead queue not configured.' }, { status: 503 });
+  }
+
+  let body: { id?: string };
+  try {
+    body = (await req.json()) as { id?: string };
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
+  }
+
+  if (!body?.id || typeof body.id !== 'string') {
+    return NextResponse.json({ error: 'id is required.' }, { status: 400 });
+  }
+
+  try {
+    const found = await deleteLead(body.id);
+    if (!found) return NextResponse.json({ error: 'Lead not found.' }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('[/api/leads] delete failed', e);
+    return NextResponse.json({ error: 'Could not delete that lead.' }, { status: 500 });
   }
 }

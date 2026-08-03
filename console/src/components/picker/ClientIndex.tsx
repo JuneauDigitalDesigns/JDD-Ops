@@ -21,6 +21,7 @@ import IntakeCard from './IntakeCard';
 import IntakeImportDialog from './IntakeImportDialog';
 import NewClientCard from './NewClientCard';
 import NewClientDialog from './NewClientDialog';
+import PendingOnboardCard, { type PendingOnboardSummary } from './PendingOnboardCard';
 
 /**
  * The console's front door: every client, searchable, worst-first.
@@ -108,6 +109,8 @@ export default function ClientIndex() {
   /** Whether we've ever successfully loaded — decides fatal error vs. soft warning. */
   const hasData = useRef(false);
 
+  const [pendingOnboard, setPendingOnboard] = useState<PendingOnboardSummary[]>([]);
+
   const { state } = useRunbookState();
   const { intakes, error: intakeError, importIntake } = useIntakeQueue();
   /** The signup whose slug is being confirmed, and the one currently being written. */
@@ -178,11 +181,22 @@ export default function ClientIndex() {
     }
   }, [qs]);
 
+  const loadPending = useCallback(async () => {
+    try {
+      const res = await fetch('/api/runbook/pending', { cache: 'no-store' });
+      const data = (await res.json()) as { pending?: PendingOnboardSummary[] };
+      setPendingOnboard(data.pending ?? []);
+    } catch {
+      /* supplementary — failure just shows no pending cards */
+    }
+  }, []);
+
   useEffect(() => {
     if (!prefsRead) return;
     load();
     loadHealth();
-  }, [prefsRead, load, loadHealth]);
+    loadPending();
+  }, [prefsRead, load, loadHealth, loadPending]);
 
   const toggleFixtures = useCallback(() => {
     setShowFixtures((prev) => {
@@ -369,6 +383,10 @@ export default function ClientIndex() {
                   busy={importing === it.id}
                   onImport={() => setPendingIntake(it)}
                 />
+              ))}
+
+              {!attentionOnly && pendingOnboard.map((p) => (
+                <PendingOnboardCard key={p.slug} item={p} />
               ))}
 
               {cards.map((c) => (

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, SLUG_RE } from '@/lib/manageSites';
+import { getPendingOnboardRecord, buildPendingClientContext, pendingKvConfigured } from '@/lib/pendingKv';
 import { ManageProvider } from '@/components/manage/ManageContext';
 import ManageNavChrome from '@/components/manage/ManageNavChrome';
 import ManageRail from '@/components/manage/ManageRail';
@@ -40,8 +41,18 @@ export default async function ManageLayout({
 }) {
   if (!SLUG_RE.test(params.slug)) notFound();
 
-  const ctx = await getClientCached(params.slug);
-  if (!ctx || ctx.sites.length === 0 || !isManageable(ctx)) notFound();
+  let ctx = await getClientCached(params.slug);
+  if (!ctx || ctx.sites.length === 0 || !isManageable(ctx)) {
+    // Disk lookup failed — check KV for a pending-onboarding client (paid, wizard not yet done).
+    if (!pendingKvConfigured()) notFound();
+    try {
+      const pending = await getPendingOnboardRecord(params.slug);
+      if (!pending) notFound();
+      ctx = buildPendingClientContext(pending);
+    } catch {
+      notFound();
+    }
+  }
 
   return (
     <div className="manage-chrome flex h-full min-h-0 flex-col overflow-hidden">

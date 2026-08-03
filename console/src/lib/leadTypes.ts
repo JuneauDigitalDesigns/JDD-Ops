@@ -38,10 +38,10 @@ export interface QueuedLead {
   name: string;
   businessName: string;
   phone: string;
-  email?: string;
+  email?: string | null;
   planInterest: PlanInterest | null;
   note?: string;
-  trade?: string;
+  trade?: string | null;
   /** → jdd:democall:item:{callId}, for source: 'call'. */
   callId?: string;
   notes?: string;

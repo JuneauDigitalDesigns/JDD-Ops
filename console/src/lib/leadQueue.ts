@@ -17,7 +17,7 @@ export type {
 } from './leadTypes';
 export { LEAD_STAGES } from './leadTypes';
 
-import type { DemoCall, LeadStage, QueuedLead } from './leadTypes';
+import type { DemoCall, LeadStage, PlanInterest, QueuedLead } from './leadTypes';
 
 let _redis: Redis | null = null;
 
@@ -85,8 +85,14 @@ export interface LeadPatch {
   notes?: string;
   lostReason?: string;
   convertedSlug?: string;
-  /** Appended to the trail. Callers describe the change; this file timestamps it. */
-  activity?: { kind: string; text: string };
+  name?: string;
+  businessName?: string;
+  phone?: string;
+  email?: string | null;
+  trade?: string | null;
+  planInterest?: PlanInterest | null;
+  /** Appended to the trail. Callers describe the change; this file timestamps it. Accepts one or many. */
+  activity?: { kind: string; text: string } | { kind: string; text: string }[];
 }
 
 /**
@@ -112,12 +118,29 @@ export async function patchLead(id: string, patch: LeadPatch): Promise<QueuedLea
   if (patch.notes !== undefined) next.notes = patch.notes;
   if (patch.lostReason !== undefined) next.lostReason = patch.lostReason;
   if (patch.convertedSlug !== undefined) next.convertedSlug = patch.convertedSlug;
+  if (patch.name !== undefined) next.name = patch.name;
+  if (patch.businessName !== undefined) next.businessName = patch.businessName;
+  if (patch.phone !== undefined) next.phone = patch.phone;
+  if (patch.email !== undefined) next.email = patch.email === null ? undefined : patch.email;
+  if (patch.trade !== undefined) next.trade = patch.trade === null ? undefined : patch.trade;
+  if (patch.planInterest !== undefined) next.planInterest = patch.planInterest;
   if (patch.activity) {
-    next.activity.push({ at: now, kind: patch.activity.kind, text: patch.activity.text });
+    const entries = Array.isArray(patch.activity) ? patch.activity : [patch.activity];
+    for (const a of entries) {
+      next.activity.push({ at: now, kind: a.kind, text: a.text });
+    }
   }
 
   await redis.set(leadKey(id), next);
   return next;
+}
+
+/** Hard-delete one lead: removes the item key and the index entry. Returns false if not found. */
+export async function deleteLead(id: string): Promise<boolean> {
+  const redis = getRedis();
+  const count = await redis.del(leadKey(id));
+  if (count > 0) await redis.zrem(LEAD_INDEX, id).catch(() => {});
+  return count > 0;
 }
 
 /** Newest-first demo calls, for the Calls tab. Same self-healing prune as listLeads. */

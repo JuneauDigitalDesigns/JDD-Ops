@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowsClockwise } from '@phosphor-icons/react';
-import type { DemoCall, LeadStage, QueuedLead } from '@/lib/leadTypes';
+import type { DemoCall, QueuedLead } from '@/lib/leadTypes';
 import PageHeader from '@/components/shell/PageHeader';
 import RefreshButton from '@/components/shell/RefreshButton';
 import WarnBanner from '@/components/shell/WarnBanner';
@@ -75,7 +75,7 @@ export default function LeadsView() {
         setWarning(null);
       }
     } catch {
-      const msg = 'Couldn’t reach the console dev server (is it still running?).';
+      const msg = "Couldn't reach the console dev server (is it still running?).";
       if (hasData.current) setWarning(msg);
       else setError(msg);
     } finally {
@@ -96,8 +96,9 @@ export default function LeadsView() {
    * as the warn banner and the next refresh puts things back.
    */
   const patch = useCallback(
-    async (id: string, next: { stage?: LeadStage; order?: number; notes?: string; lostReason?: string }) => {
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...next } : l)));
+    // Accepts any valid lead field subset — including nullable optional fields (email, trade).
+    async (id: string, next: Partial<QueuedLead> & Record<string, unknown>) => {
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...next } as QueuedLead : l)));
       try {
         const res = await fetch('/api/leads', {
           method: 'PATCH',
@@ -105,21 +106,50 @@ export default function LeadsView() {
           body: JSON.stringify({ id, ...next }),
         });
         if (!res.ok) {
-          setWarning('That change didn’t save.');
+          setWarning("That change didn't save.");
           return;
         }
         const data = (await res.json()) as { lead?: QueuedLead };
         // Take the server's copy — it owns updatedAt and the activity trail.
         if (data.lead) setLeads((prev) => prev.map((l) => (l.id === id ? data.lead! : l)));
       } catch {
-        setWarning('That change didn’t save.');
+        setWarning("That change didn't save.");
       }
     },
     [],
   );
 
+  const removeLead = useCallback(
+    async (id: string) => {
+      setLeads((prev) => prev.filter((l) => l.id !== id));
+      setOpenId(null);
+      try {
+        const res = await fetch('/api/leads', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        if (!res.ok) {
+          setWarning("That lead couldn't be deleted.");
+          load();
+        }
+      } catch {
+        setWarning("That lead couldn't be deleted.");
+        load();
+      }
+    },
+    [load],
+  );
+
   const openLead = leads.find((l) => l.id === openId) ?? null;
   const openCall = openLead?.callId ? calls.find((c) => c.callId === openLead.callId) ?? null : null;
+
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const addedThisWeek = leads.filter((l) => Date.now() - l.receivedAt < WEEK_MS).length;
+  const lede =
+    leads.length === 0
+      ? "No leads yet — they arrive from the site's interest form and the demo agent."
+      : `${leads.length} lead${leads.length !== 1 ? 's' : ''} · ${addedThisWeek} added this week`;
 
   const tabButton = (id: Tab, label: string, count: number) => (
     <button
@@ -173,10 +203,7 @@ export default function LeadsView() {
       ) : (
         <div className="no-scrollbar flex-1 overflow-y-auto">
           <div className="w-full px-6 py-6 md:px-8">
-            <PageHeader
-              title="Leads"
-              lede="Interest from the site · drag a card to advance it."
-            />
+            <PageHeader title="Leads" lede={lede} />
 
             <div className="mb-5 flex items-center gap-2">
               {tabButton('board', 'Board', leads.length)}
@@ -223,6 +250,7 @@ export default function LeadsView() {
           siteUrl={siteUrl}
           onClose={() => setOpenId(null)}
           onPatch={(p) => patch(openLead.id, p)}
+          onDelete={removeLead}
         />
       )}
     </div>

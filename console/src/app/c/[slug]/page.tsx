@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, SLUG_RE } from '@/lib/manageSites';
+import { getPendingOnboardRecord, pendingKvConfigured } from '@/lib/pendingKv';
 
 /**
  * /c/{slug} has no screen of its own — the shell is always showing one of the three tools.
@@ -14,7 +15,19 @@ export default async function ClientIndex({ params }: { params: { slug: string }
   if (!SLUG_RE.test(params.slug)) notFound();
 
   const ctx = await getClientCached(params.slug);
-  if (!ctx) notFound();
+
+  if (!ctx) {
+    // Check KV — this may be a client who paid but hasn't had their folder created yet.
+    if (pendingKvConfigured()) {
+      try {
+        const pending = await getPendingOnboardRecord(params.slug);
+        if (pending) redirect(`/c/${params.slug}/manage/overview`);
+      } catch {
+        /* fall through to notFound */
+      }
+    }
+    notFound();
+  }
 
   if (isManageable(ctx)) redirect(`/c/${params.slug}/manage`);
   if (!ctx.hasIntake || ctx.detectedStatus === 'needs-build') redirect(`/c/${params.slug}/build`);

@@ -57,14 +57,15 @@ export function LeadFace({ lead, dragging }: { lead: QueuedLead; dragging?: bool
           </h3>
           <span className="truncate text-xs text-fg2">{lead.name}</span>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
         {lead.planInterest && (
-          <span className="meta" style={{ color: 'var(--accent)' }}>
+          <span className="meta ml-auto shrink-0" style={{ color: 'var(--accent)' }}>
             {PLAN_LABEL[lead.planInterest] ?? lead.planInterest}
           </span>
         )}
+      </div>
+
+      <div className="flex items-center">
         <span
           className="meta ml-auto"
           style={stale ? { color: 'var(--warn)' } : undefined}

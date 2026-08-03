@@ -1,12 +1,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { getManageClient, SLUG_RE } from '@/lib/manageSites';
 import { DEFAULT_SECTION, findSection, MANAGE_SECTIONS } from '@/lib/manageSections';
+import { getPendingOnboardRecord, buildPendingClientContext, pendingKvConfigured } from '@/lib/pendingKv';
 import OverviewSection from '@/components/manage/OverviewSection';
 import EnvironmentSection from '@/components/manage/EnvironmentSection';
 import DeploymentsSection from '@/components/manage/DeploymentsSection';
 import DomainSection from '@/components/manage/DomainSection';
 import VoiceAgentSection from '@/components/manage/VoiceAgentSection';
 import PortalSection from '@/components/manage/PortalSection';
+import SectionPlaceholder from '@/components/manage/SectionPlaceholder';
 
 /**
  * The stage. One dynamic [section] segment rather than five named folders, so the plan
@@ -25,14 +27,34 @@ export default async function ManageSectionPage({
 }) {
   if (!SLUG_RE.test(params.slug)) notFound();
 
-  const ctx = await getManageClient(params.slug);
-  if (!ctx || ctx.sites.length === 0) notFound();
+  let ctx = await getManageClient(params.slug);
+  if (!ctx || ctx.sites.length === 0) {
+    if (!pendingKvConfigured()) notFound();
+    try {
+      const pending = await getPendingOnboardRecord(params.slug);
+      if (!pending) notFound();
+      ctx = buildPendingClientContext(pending);
+    } catch {
+      notFound();
+    }
+  }
 
   const section = findSection(ctx.plan, params.section);
   if (!section) {
     const known = MANAGE_SECTIONS.some((s) => s.id === params.section);
     if (known) redirect(`/c/${params.slug}/manage/${DEFAULT_SECTION}`);
     notFound();
+  }
+
+  // Pending-onboarding clients (KV-only, no disk yet): Overview shows the reminder card;
+  // every other section is locked until the wizard is submitted.
+  if (ctx.pendingOnboarding && section.id !== 'overview') {
+    return (
+      <SectionPlaceholder
+        title={`${section.label} unavailable`}
+        message="This section becomes available once the client completes onboarding."
+      />
+    );
   }
 
   // Each section owns its own layout width and its own data fetching — they have very
