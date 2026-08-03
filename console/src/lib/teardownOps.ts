@@ -47,8 +47,12 @@ interface TeardownOpsModule {
   discoverSites(clientDir: string, baseSlug: string): EnvSite[];
   parseEnvLocal(envPath: string): Record<string, string>;
 
-  deleteGitHubRepo(args: { octokit: unknown; org: string | undefined; repo: string }): Promise<StepResult>;
-  releaseTwilioNumber(args: { client: unknown; phoneNumber: string | undefined }): Promise<StepResult>;
+  deleteGitHubRepo(args: { token: string | undefined; org: string | undefined; repo: string }): Promise<StepResult>;
+  releaseTwilioNumber(args: {
+    accountSid: string | undefined;
+    authToken: string | undefined;
+    phoneNumber: string | undefined;
+  }): Promise<StepResult>;
   deleteRetellAgent(args: { apiKey: string | undefined; agentId: string | undefined }): Promise<StepResult>;
   deleteRetellLlm(args: { apiKey: string | undefined; llmId: string | null | undefined }): Promise<StepResult>;
   deleteVercelProject(args: { token: string | undefined; teamId: string | undefined; slug: string }): Promise<StepResult>;
@@ -71,9 +75,13 @@ interface TeardownOpsModule {
   deleteClerkUser(args: { secretKey: string | undefined; userId: string | undefined }): Promise<StepResult>;
 
   probeVercelProject(args: { token: string | undefined; teamId: string | undefined; slug: string }): Promise<boolean | null>;
-  probeGitHubRepo(args: { octokit: unknown; org: string | undefined; repo: string }): Promise<boolean | null>;
+  probeGitHubRepo(args: { token: string | undefined; org: string | undefined; repo: string }): Promise<boolean | null>;
   probeRetellAgent(args: { apiKey: string | undefined; agentId: string | undefined }): Promise<boolean | null>;
-  probeTwilioNumber(args: { client: unknown; phoneNumber: string | undefined }): Promise<boolean | null>;
+  probeTwilioNumber(args: {
+    accountSid: string | undefined;
+    authToken: string | undefined;
+    phoneNumber: string | undefined;
+  }): Promise<boolean | null>;
   probeAirtableBase(args: { apiKey: string | undefined; baseId: string | undefined }): Promise<{ exists: boolean | null; name: string | null }>;
 }
 

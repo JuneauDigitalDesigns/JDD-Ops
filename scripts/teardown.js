@@ -28,8 +28,6 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { Octokit } from '@octokit/rest';
-import twilio from 'twilio';
 import { sanitizeProjectName } from '../lib/vercel-sync.js';
 import {
   discoverSites,
@@ -128,17 +126,9 @@ async function main() {
     }
   }
 
-  const org = process.env.GITHUB_ORG;
-  const githubToken = process.env.GITHUB_TOKEN;
-  const octokit = githubToken ? new Octokit({ auth: githubToken }) : null;
-  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-  const client = twilioSid && twilioToken ? twilio(twilioSid, twilioToken) : null;
-  const retellKey = process.env.RETELL_API_KEY;
-
   for (const s of sites) {
     console.log(`\n--- Tearing down ${s.slug} ---`);
-    report(await deleteGitHubRepo({ octokit, org, repo: s.slug }), 'GitHub repo');
+    report(await deleteGitHubRepo({ token: process.env.GITHUB_TOKEN, org: process.env.GITHUB_ORG, repo: s.slug }), 'GitHub repo');
     report(
       await deleteVercelProject({
         token: process.env.VERCEL_TOKEN,
@@ -147,8 +137,15 @@ async function main() {
       }),
       'Vercel project',
     );
-    report(await releaseTwilioNumber({ client, phoneNumber: s.env.TWILIO_NUMBER }), 'Twilio number');
-    report(await deleteRetellAgent({ apiKey: retellKey, agentId: s.env.RETELL_AGENT_ID }), 'Retell agent');
+    report(
+      await releaseTwilioNumber({
+        accountSid: process.env.TWILIO_ACCOUNT_SID,
+        authToken: process.env.TWILIO_AUTH_TOKEN,
+        phoneNumber: s.env.TWILIO_NUMBER,
+      }),
+      'Twilio number',
+    );
+    report(await deleteRetellAgent({ apiKey: process.env.RETELL_API_KEY, agentId: s.env.RETELL_AGENT_ID }), 'Retell agent');
   }
 
   if (sharedBase) {
