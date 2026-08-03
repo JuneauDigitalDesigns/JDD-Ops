@@ -85,3 +85,36 @@ export function loadGithubToken(): string | null {
   }
   return process.env.GITHUB_TOKEN ?? null;
 }
+
+/**
+ * The Make.com API key, for resolving and deleting a client's post-call scenario clone
+ * during teardown. Same contract as the rest of this module.
+ */
+export function loadMakeApiKey(): string | null {
+  if (!process.env.MAKE_API_KEY) {
+    const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+    if (ops.MAKE_API_KEY) process.env.MAKE_API_KEY = ops.MAKE_API_KEY;
+  }
+  return process.env.MAKE_API_KEY ?? null;
+}
+
+/**
+ * Every other credential teardown needs and this module doesn't already load:
+ * TWILIO_ACCOUNT_SID/AUTH_TOKEN, AIRTABLE_API_KEY, CLERK_SECRET_KEY. Grouped because
+ * teardown always wants the full set at once, unlike the single-purpose loaders above.
+ */
+export function loadTeardownCredentials(): {
+  twilioAccountSid: string | null;
+  twilioAuthToken: string | null;
+  airtableApiKey: string | null;
+  clerkSecretKey: string | null;
+} {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const pick = (key: string) => process.env[key] ?? ops[key] ?? null;
+  return {
+    twilioAccountSid: pick('TWILIO_ACCOUNT_SID'),
+    twilioAuthToken: pick('TWILIO_AUTH_TOKEN'),
+    airtableApiKey: pick('AIRTABLE_API_KEY'),
+    clerkSecretKey: pick('CLERK_SECRET_KEY'),
+  };
+}
