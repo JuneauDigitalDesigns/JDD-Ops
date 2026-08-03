@@ -7,6 +7,7 @@ import {
   renameSync,
   appendFileSync,
   readdirSync,
+  unlinkSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { clientsDir } from './paths';
@@ -70,8 +71,8 @@ export interface ArchiveIntake {
   source: string;
   /** The parsed intake envelope — plan + sites — for anything that wants structured access. */
   parsed: unknown;
-  /** Every site's .env.local, keyed by site slug. */
-  envBySite: Record<string, Record<string, string>>;
+  /** Every site's .env.local, VERBATIM (raw file text, not parsed), keyed by site slug. */
+  envBySite: Record<string, string>;
   agentPrompt: string | null;
 }
 
@@ -228,6 +229,44 @@ export function findUnfinishedArchive(slug: string): ArchiveRecord | null {
     return null;
   } catch {
     return null;
+  }
+}
+
+/* ── Lock — one teardown per client at a time ────────────────────────────────
+   A concurrent second POST would run the same eight-system destruction twice in
+   parallel and could write two contradictory records. The lock lives at the
+   client level (clients/.archive/{slug}/.lock), not per-record, since it guards
+   the CLIENT from concurrent runs regardless of which record they'd write to. */
+
+const LOCK_STALE_MS = 30 * 60 * 1000; // a dev-server restart mid-run shouldn't lock a client out forever
+
+function lockPath(slug: string): string {
+  return resolve(archiveRoot(), slug, '.lock');
+}
+
+/** Throws if already locked by a run younger than LOCK_STALE_MS. */
+export function acquireTeardownLock(slug: string): void {
+  const path = lockPath(slug);
+  if (existsSync(path)) {
+    try {
+      const { startedAt } = JSON.parse(readFileSync(path, 'utf8')) as { startedAt: number };
+      if (Date.now() - startedAt < LOCK_STALE_MS) {
+        throw new Error(`A teardown for "${slug}" is already running.`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('A teardown')) throw err;
+      // Unreadable lock file — treat as stale rather than blocking forever on a corrupt lock.
+    }
+  }
+  mkdirSync(resolve(archiveRoot(), slug), { recursive: true });
+  writeFileSync(path, JSON.stringify({ pid: process.pid, startedAt: Date.now() }), 'utf8');
+}
+
+export function releaseTeardownLock(slug: string): void {
+  try {
+    unlinkSync(lockPath(slug));
+  } catch {
+    // Already gone, or never created — either way there's nothing to release.
   }
 }
 
