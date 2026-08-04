@@ -2,6 +2,11 @@ import { notFound, redirect } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, unmanageableReason, SLUG_RE } from '@/lib/manageSites';
 import { findLatestArchiveForSlug } from '@/lib/archive';
+import {
+  buildPendingClientContext,
+  getPendingOnboardRecord,
+  pendingKvConfigured,
+} from '@/lib/pendingKv';
 import { ClientProvider } from '@/components/client/ClientProvider';
 import ClientChrome from '@/components/client/ClientChrome';
 
@@ -18,6 +23,13 @@ import ClientChrome from '@/components/client/ClientChrome';
  * The gate here is deliberately LOW: the folder exists, that's all. A client with no
  * .env.local still needs Build to open, so per-tool availability is handled by dimming
  * tabs in ClientChrome and by the manage segment's own notFound() guard — not here.
+ *
+ * One client has no folder at all and still belongs here: a PENDING-ONBOARDING client, who
+ * paid through Stripe but hasn't submitted the wizard, so they exist only as a KV record.
+ * Every layer below this one already knew that — /c/[slug]/page.tsx, the manage layout and
+ * the section page all resolve the KV record — but this layout ran first and 404'd, which
+ * made the whole feature unreachable and left the "Pending Onboarding" card on the root
+ * index pointing at a dead route.
  */
 export default async function ClientLayout({
   children,
@@ -28,26 +40,65 @@ export default async function ClientLayout({
 }) {
   if (!SLUG_RE.test(params.slug)) notFound();
 
-  const ctx = await getClientCached(params.slug);
+  let ctx = await getClientCached(params.slug);
+  let pending = false;
+
   if (!ctx) {
-    // clients/{slug} is gone — either it never existed, or it was torn down. A bookmark
-    // pointing at a torn-down client deserves better than a bare 404: send it to what's
-    // left of the record instead.
-    const archived = findLatestArchiveForSlug(params.slug);
-    if (archived) redirect(`/archive/${archived.id}`);
-    notFound();
+    // No folder on disk. Two things can still be true, checked in that order:
+    //
+    //   1. A pending-onboarding client — live, actionable business state.
+    //   2. A torn-down client — history. A bookmark pointing at one deserves better than a
+    //      bare 404, so it goes to what's left of the record.
+    //
+    // A slug realistically can't be both: pending records carry a 30-day TTL and a
+    // torn-down client's was consumed when its folder was created. The order is about
+    // intent, not conflict resolution.
+    //
+    // .catch on the KV call only — NOT a try/catch around this whole block, which would
+    // swallow the NEXT_REDIRECT that redirect() throws. A KV outage has to degrade to the
+    // 404 we'd have shown anyway; it must never become a 500 on every /c/* route.
+    const record = pendingKvConfigured()
+      ? await getPendingOnboardRecord(params.slug).catch(() => null)
+      : null;
+
+    if (record) {
+      ctx = buildPendingClientContext(record);
+      pending = true;
+    } else {
+      const archived = findLatestArchiveForSlug(params.slug);
+      if (archived) redirect(`/archive/${archived.id}`);
+      notFound();
+    }
   }
 
   // Evaluated here because isManageable/unmanageableReason are server-only; ClientChrome
-  // receives the answers, not the predicates.
-  const tools = {
-    build: { enabled: true, reason: null },
-    onboard: {
-      enabled: ctx.hasIntake,
-      reason: ctx.hasIntake ? null : 'No readable site.ts yet — build or import an intake first.',
-    },
-    manage: { enabled: isManageable(ctx), reason: unmanageableReason(ctx) },
-  };
+  // receives the answers, not the predicates. Unavailable tools stay visible and dimmed
+  // with this reason as their tooltip, so these strings are user-facing copy.
+  //
+  // Manage is force-enabled for a pending client rather than derived: isManageable() is
+  // false for the synthetic context (its one site has an empty env), and Manage → Overview
+  // is the only place the reminder card lives. Deriving it here would leave the tab dead
+  // and the client unreachable all over again.
+  const tools = pending
+    ? {
+        build: {
+          enabled: false,
+          reason: 'Waiting on the client’s onboarding wizard — there’s no site.ts to build from yet.',
+        },
+        onboard: {
+          enabled: false,
+          reason: 'Waiting on the client’s onboarding wizard.',
+        },
+        manage: { enabled: true, reason: null },
+      }
+    : {
+        build: { enabled: true, reason: null },
+        onboard: {
+          enabled: ctx.hasIntake,
+          reason: ctx.hasIntake ? null : 'No readable site.ts yet — build or import an intake first.',
+        },
+        manage: { enabled: isManageable(ctx), reason: unmanageableReason(ctx) },
+      };
 
   return (
     <ClientProvider ctx={ctx} tools={tools}>

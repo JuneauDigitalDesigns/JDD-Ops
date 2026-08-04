@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { Redis } from '@upstash/redis';
 import type { ClientContext, Plan } from './types';
 
@@ -48,9 +49,18 @@ export interface PendingOnboardRecord {
   createdAt: number;
 }
 
-export async function getPendingOnboardRecord(slug: string): Promise<PendingOnboardRecord | null> {
-  return getRedis().get<PendingOnboardRecord>(PENDING_KEY(slug));
-}
+/**
+ * Per-request memo, the same treatment getClientCached gets in clients.ts.
+ *
+ * Three layers of the /c/{slug} shell now ask this question on a single page load — the
+ * client layout, the manage layout, and the section page — and they're each resolving the
+ * SAME slug for the same request. Without the memo that's three Redis round-trips before
+ * anything renders.
+ */
+export const getPendingOnboardRecord = cache(
+  async (slug: string): Promise<PendingOnboardRecord | null> =>
+    getRedis().get<PendingOnboardRecord>(PENDING_KEY(slug)),
+);
 
 export async function listPendingOnboardRecords(): Promise<PendingOnboardRecord[]> {
   const redis = getRedis();

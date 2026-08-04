@@ -18,14 +18,15 @@ export default async function ClientIndex({ params }: { params: { slug: string }
 
   if (!ctx) {
     // Check KV — this may be a client who paid but hasn't had their folder created yet.
-    if (pendingKvConfigured()) {
-      try {
-        const pending = await getPendingOnboardRecord(params.slug);
-        if (pending) redirect(`/c/${params.slug}/manage/overview`);
-      } catch {
-        /* fall through to notFound */
-      }
-    }
+    //
+    // The redirect MUST happen outside the catch. redirect() signals by throwing
+    // NEXT_REDIRECT, so calling it inside the try meant the catch swallowed it and fell
+    // straight through to notFound() — which is why a pending client 404'd here even
+    // after the shell layout learned to resolve them.
+    const pending = pendingKvConfigured()
+      ? await getPendingOnboardRecord(params.slug).catch(() => null)
+      : null;
+    if (pending) redirect(`/c/${params.slug}/manage/overview`);
     notFound();
   }
 
