@@ -556,8 +556,8 @@ async function reconcileVoice(
             expected: tw.expected ?? undefined,
             actual: tw.voiceUrl ?? '(none)',
             fix: {
-              route: '/api/manage/twilio/repair',
-              body: { slug: a.ctx.slug, siteSlug, field: 'voiceUrl' },
+              route: '/api/manage/repair',
+              body: { slug: a.ctx.slug, siteSlug, action: 'twilio.voiceUrl' },
               label: 'Re-point voiceUrl',
             },
           }),
@@ -648,8 +648,8 @@ async function reconcileVoice(
             expected: expectedWebhook ?? undefined,
             actual: re.webhookUrl ?? '(none)',
             fix: {
-              route: '/api/manage/retell/config',
-              body: { slug: a.ctx.slug, siteSlug, field: 'webhook_url' },
+              route: '/api/manage/repair',
+              body: { slug: a.ctx.slug, siteSlug, action: 'retell.webhook' },
               label: 'Re-point the webhook',
             },
           }),
@@ -698,8 +698,11 @@ async function reconcileVoice(
             `Scenario ${mk.scenarioId} exists but is switched off. This is completely silent: calls still connect, ` +
             'the caller still gets an answer, and nothing reaches Airtable or the owner’s phone.',
           fix: {
-            route: '/api/manage/make/datastore',
-            body: { slug: a.ctx.slug, siteSlug, scenarioId: mk.scenarioId, action: 'activate' },
+            // scenarioId rides on the finding: it is resolved by matching the webhook URL
+            // during the sweep and is written down nowhere else, so the repair route cannot
+            // re-derive it on its own.
+            route: '/api/manage/repair',
+            body: { slug: a.ctx.slug, siteSlug, action: 'make.activate', scenarioId: mk.scenarioId },
             label: 'Reactivate the scenario',
           },
         }),

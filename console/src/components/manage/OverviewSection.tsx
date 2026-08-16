@@ -12,11 +12,14 @@ import {
   Question,
   RocketLaunch,
   Sliders,
+  SpinnerGap,
   Warning,
   XCircle,
 } from '@phosphor-icons/react';
 import { relativeTime, absoluteTime } from '@/lib/relativeTime';
 import type { AuditEntry } from '@/lib/audit';
+import type { ReconcileResult } from '@jdd/schema';
+import FindingsList from './FindingsList';
 import { useManage } from './ManageContext';
 import PlanControl from './PlanControl';
 import SectionHeader from './SectionHeader';
@@ -69,6 +72,60 @@ export default function OverviewSection() {
     count: null,
   });
   const [activity, setActivity] = useState<AuditEntry[] | null>(null);
+
+  /**
+   * The last sweep for this client.
+   *
+   * Read on mount, swept only on demand. A sweep is 6–10 vendor calls per site, so firing
+   * one every time you open Overview would make a screen you visit constantly expensive in
+   * a way nothing on it would explain. The cached result carries its own `checkedAt` and
+   * FindingsList always shows the age, so a stale answer is never mistaken for a fresh one.
+   */
+  const [sweep, setSweep] = useState<{
+    loading: boolean;
+    result: ReconcileResult | null;
+    error?: string;
+  }>({ loading: false, result: null });
+
+  const loadSweep = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/manage/reconcile?slug=${encodeURIComponent(ctx.slug)}`, {
+        cache: 'no-store',
+      });
+      const body = (await res.json()) as { result?: ReconcileResult | null };
+      setSweep((s) => ({ ...s, result: body.result ?? null }));
+    } catch {
+      // A failed cache read is not worth a banner — "Check now" is right there.
+    }
+  }, [ctx.slug]);
+
+  const runSweep = useCallback(async () => {
+    setSweep((s) => ({ ...s, loading: true, error: undefined }));
+    try {
+      const res = await fetch('/api/manage/reconcile', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: ctx.slug }),
+      });
+      const body = (await res.json()) as { error?: string; busy?: boolean };
+      if (!res.ok) {
+        setSweep((s) => ({ ...s, loading: false, error: body.error ?? `Failed (${res.status})` }));
+        return;
+      }
+      await loadSweep();
+      setSweep((s) => ({ ...s, loading: false }));
+    } catch (err) {
+      setSweep((s) => ({
+        ...s,
+        loading: false,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    }
+  }, [ctx.slug, loadSweep]);
+
+  useEffect(() => {
+    void loadSweep();
+  }, [loadSweep]);
 
   useEffect(() => {
     let cancelled = false;
@@ -315,6 +372,32 @@ export default function OverviewSection() {
           }
         />
       </div>
+
+      {/* Findings sit ABOVE recent activity: what is wrong now outranks what you did last.
+          Full width, because a finding carries a detail paragraph and an expected/actual
+          pair, and squeezing that into the 1fr column made every row wrap. */}
+      <section className="panel flex flex-col gap-4 p-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-lg font-semibold tracking-tightish text-fg">
+            Infrastructure
+          </h2>
+          <button type="button" onClick={runSweep} className="btn btn-xs" disabled={sweep.loading}>
+            {sweep.loading ? (
+              <SpinnerGap size={11} className="animate-spin" />
+            ) : (
+              <ArrowsClockwise size={11} />
+            )}
+            {sweep.loading ? 'Checking…' : 'Check now'}
+          </button>
+        </div>
+        {sweep.error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{sweep.error}</p>}
+        <FindingsList
+          findings={sweep.result?.findings ?? []}
+          checkedAt={sweep.result?.checkedAt ?? null}
+          unreachable={sweep.result?.unreachable ?? []}
+          onChanged={runSweep}
+        />
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="panel flex flex-col gap-3 p-5">

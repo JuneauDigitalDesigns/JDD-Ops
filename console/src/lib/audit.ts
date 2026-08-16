@@ -35,6 +35,10 @@ export type AuditAction =
   | 'plan.upgrade'
   | 'plan.downgrade'
   | 'plan.billing.sync'
+  | 'twilio.repair'
+  | 'retell.repair'
+  | 'make.repair'
+  | 'repair.undo'
   | 'client.teardown.start'
   | 'client.teardown';
 
