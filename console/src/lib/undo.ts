@@ -11,8 +11,12 @@ import { resolve } from 'node:path';
  * would defeat masking them in the UI. But an undo has to hold the previous value or it
  * cannot restore anything. Those two requirements are irreconcilable in one file, so:
  *
- *   audit.ndjson   what happened, value-free, kept long, safe to read over your shoulder
- *   undo.ndjson    how to reverse it, holds values, short-lived, gitignored
+ *   audit.ndjson   what happened. Its `detail` is key names only, and it never records a
+ *                  PREVIOUS value or a secret. The `summary` is prose and does name the
+ *                  value being set — that is what makes the activity feed readable, and a
+ *                  webhook URL we just wrote is not a credential.
+ *   undo.ndjson    how to reverse it. Holds the previous value by necessity, short-lived,
+ *                  gitignored, never rendered in a feed.
  *
  * Both are written for every repair. The audit entry is the durable record; the undo entry
  * is the escape hatch, and it expiring is fine — an undo you didn't take within the week is
