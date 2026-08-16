@@ -238,23 +238,11 @@ export async function reconcileBilling(
     }
   }
 
-  // ── 4. Cancellation in flight ───────────────────────────────────────────
-  // Read from the account record rather than Stripe's cancel_at, because the portal writes
-  // it the moment the client asks — before Stripe reflects anything.
-  if (site.cancelRequestedAt) {
-    const effective = site.cancelEffectiveAt;
-    findings.push({
-      id: 'billing.cancelRequested',
-      severity: 'red',
-      area: 'account',
-      siteSlug,
-      title: effective && effective < Date.now() ? 'Cancellation took effect' : 'Cancellation requested',
-      detail: effective
-        ? `The client asked to cancel; it takes effect ${new Date(effective).toISOString().slice(0, 10)}.`
-        : 'The client asked to cancel through the portal.',
-      actual: new Date(site.cancelRequestedAt).toISOString().slice(0, 10),
-    });
-  }
+  // Cancellation is NOT reported here. portalSignals.ts reads the dedicated
+  // `jdd:cancel-request:{slug}` record, which the portal writes the moment the client asks
+  // and which carries the resolved notice period. Reporting it from both places would put
+  // two rows on screen for one cancellation, and the account-record copy is the poorer of
+  // the two. `site.cancelRequestedAt` is still read — by the stage rules, via the route.
 
   return {
     health,

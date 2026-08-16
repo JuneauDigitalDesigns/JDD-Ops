@@ -1,3 +1,4 @@
+import { toE164 } from '@jdd/schema';
 import type { Plan } from './types';
 
 /**
@@ -217,15 +218,13 @@ export function findField(key: string): EnvField | undefined {
  * Normalize a US phone number to E.164 — the exact rule lib/site-routes/voice.route.ts
  * applies at call time. Catching it here means a bad number fails in the UI instead of
  * silently returning "This number is not configured" TwiML to a real caller.
+ *
+ * Imported and re-exported from @jdd/schema rather than reimplemented: there were five
+ * copies of this and they had already diverged on the E.164 regex. The shared one is unit
+ * tested. Imported as well as re-exported because this module calls it itself, below, when
+ * validating a submitted value — `export … from` creates no local binding.
  */
-export function toE164(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (/^\+\d{8,15}$/.test(trimmed)) return trimmed;
-  const d = trimmed.replace(/\D/g, '');
-  if (d.length === 10) return `+1${d}`;
-  if (d.length === 11 && d.startsWith('1')) return `+${d}`;
-  return null;
-}
+export { toE164 };
 
 export type Validation = { ok: true; value: string } | { ok: false; error: string };
 

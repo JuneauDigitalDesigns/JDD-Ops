@@ -4,6 +4,8 @@ import { loadRepairOps } from '@/lib/repairOps';
 import { loadRetellApiKey, loadMakeApiKey, loadTeardownCredentials } from '@/lib/opsSecrets';
 import { appendAudit } from '@/lib/audit';
 import { getUndo, listUndo, markUndone } from '@/lib/undo';
+import { applyEnvUpdates } from '@/lib/envFile';
+import { siteDirFor } from '@/lib/clients';
 
 /**
  * Reverse a repair.
@@ -115,6 +117,28 @@ export async function POST(req: Request) {
       );
     }
 
+    case 'env.value': {
+      // Restores .env.local only. Deliberately does not re-sync to Vercel or redeploy: the
+      // forward repair does both because it is fixing something live and broken, whereas an
+      // undo is the rarer, more deliberate act, and shipping a surprise deploy to reverse a
+      // phone number is more startling than helpful. The response says so explicitly so the
+      // operator knows the live site still has the newer value.
+      const before = entry.before;
+      if (typeof before !== 'string' && before !== null) {
+        return NextResponse.json({ error: 'The recorded previous value is not a string.' }, { status: 422 });
+      }
+      const dir = siteDirFor(ctx.slug, ctx.sites.length, ctx.sites.findIndex((s) => s.slug === entry.siteSlug));
+      try {
+        // A recorded null means the key was absent; writing '' clears it in .env.local
+        // rather than leaving the newer value in place.
+        applyEnvUpdates(dir, { CLIENT_FORWARD_PHONE: before ?? '' });
+        result = { ok: true, reason: null };
+      } catch (err) {
+        result = { ok: false, reason: err instanceof Error ? err.message : String(err) };
+      }
+      break;
+    }
+
     default:
       return NextResponse.json({ error: `Cannot undo "${entry.kind}".` }, { status: 422 });
   }
@@ -141,5 +165,14 @@ export async function POST(req: Request) {
     detail: { undoId: entry.id },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    ...(entry.kind === 'env.value'
+      ? {
+          note:
+            '.env.local restored. The deployed site still has the newer value until you push ' +
+            'and redeploy from Environment.',
+        }
+      : {}),
+  });
 }

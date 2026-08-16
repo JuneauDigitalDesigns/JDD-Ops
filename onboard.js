@@ -41,7 +41,11 @@ import {
   listProjectDomains,
 } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
-import { buildPortalSiteEntries } from '@jdd/schema';
+// toE164 comes from the package for the same reason vercelAppHost does: five copies had
+// already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
+// their own inline copy deliberately — those files are written verbatim into client repos,
+// which have no @jdd/schema dependency.
+import { buildPortalSiteEntries, toE164 } from '@jdd/schema';
 import {
   attachSiteToAccount,
   detachSiteFromAccount,
@@ -94,18 +98,6 @@ function run(cmd, opts = {}) {
   }
   console.log(`  $ ${cmd}`);
   execSync(cmd, { stdio: 'inherit', ...opts });
-}
-
-// Normalize a US phone number to E.164 (+1XXXXXXXXXX). Returns null if it can't
-// be parsed. Mirrors toE164() in the site template's /api/voice route so the
-// number we hand to Make/Twilio for SMS matches the format used at call time.
-function toE164(raw) {
-  const trimmed = String(raw ?? '').trim();
-  if (/^\+\d{8,15}$/.test(trimmed)) return trimmed; // already E.164
-  const d = trimmed.replace(/\D/g, '');
-  if (d.length === 10) return `+1${d}`;
-  if (d.length === 11 && d.startsWith('1')) return `+${d}`;
-  return null;
 }
 
 function parseArgs(argv) {

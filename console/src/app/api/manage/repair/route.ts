@@ -11,7 +11,25 @@ import {
 import { resolveLiveUrl } from '@/lib/manageSites';
 import { appendAudit } from '@/lib/audit';
 import { recordUndo, type UndoKind } from '@/lib/undo';
-import type { SiteInfo } from '@/lib/types';
+import { applyEnvUpdates } from '@/lib/envFile';
+import { siteDirFor } from '@/lib/clients';
+import { accountStoreConfigured, getAccount } from '@/lib/accountStore';
+import { clientRecordsConfigured, getClientRecordBySlug } from '@/lib/clientRecord';
+import { toE164 } from '@jdd/schema';
+import type { ClientContext, SiteInfo } from '@/lib/types';
+
+/** Same disk-then-record resolution reconcile uses; see resolvePortalAccount there. */
+async function resolveAccountFor(ctx: ClientContext) {
+  if (!accountStoreConfigured()) return null;
+  const fromDisk = ctx.sites[0]?.env.PORTAL_ACCOUNT_EMAIL ?? null;
+  if (fromDisk) {
+    const account = await getAccount(fromDisk).catch(() => null);
+    if (account) return account;
+  }
+  if (!clientRecordsConfigured()) return null;
+  const record = await getClientRecordBySlug(ctx.slug).catch(() => null);
+  return record?.email ? getAccount(record.email).catch(() => null) : null;
+}
 
 /**
  * Apply one repair named by a finding.
@@ -47,7 +65,8 @@ function isLoopback(req: Request): boolean {
 export type RepairAction =
   | 'twilio.voiceUrl'
   | 'retell.webhook'
-  | 'make.activate';
+  | 'make.activate'
+  | 'profile.forwardPhone';
 
 interface Body {
   slug?: string;
@@ -89,6 +108,8 @@ export async function POST(req: Request) {
         return await repairRetellWebhook(ops, ctx.slug, site);
       case 'make.activate':
         return await activateMakeScenario(ops, ctx.slug, site, body.scenarioId);
+      case 'profile.forwardPhone':
+        return await adoptPortalForwardPhone(ctx, site);
       default:
         return NextResponse.json({ error: `Unknown action "${action}"` }, { status: 400 });
     }
@@ -216,6 +237,97 @@ async function repairRetellWebhook(ops: Awaited<ReturnType<typeof loadRepairOps>
     summary: `Re-pointed the Retell post-call webhook to ${webhookUrl}`,
     result,
   });
+}
+
+/**
+ * Adopt the contact number the client set in the portal as the number Twilio rings.
+ *
+ * This is the one repair that writes to disk rather than to a vendor, and it is the whole
+ * reason Stage 4 exists: the portal saved their new number and told them it was done, while
+ * `CLIENT_FORWARD_PHONE` — the value `/api/voice` actually dials — kept pointing at the old
+ * one, with no error anywhere.
+ *
+ * Three writes, in order, and the order matters: `.env.local` is the source of truth
+ * onboard.js re-reads, Vercel is what the running route sees, and a redeploy is what makes
+ * Vercel's copy take effect. Stopping after the first two would leave the console claiming
+ * a fix that the live site has not picked up.
+ *
+ * The undo restores the previous `.env.local` value. It deliberately does NOT re-sync and
+ * re-deploy: undoing is the rarer, more deliberate act, and silently shipping another
+ * deploy to reverse a phone number is more surprise than help. The audit line says so.
+ */
+async function adoptPortalForwardPhone(ctx: ClientContext, site: SiteInfo) {
+  const account = await resolveAccountFor(ctx);
+  const phone = account?.profile?.contactPhone?.trim();
+  if (!phone) {
+    return NextResponse.json(
+      { error: 'The portal account has no contact number on file, so there is nothing to adopt.' },
+      { status: 400 },
+    );
+  }
+
+  const e164 = toE164(phone);
+  if (!e164) {
+    return NextResponse.json(
+      {
+        error:
+          `"${phone}" is not a phone number we can dial. Twilio needs E.164, and writing an ` +
+          'unusable value here would break inbound calls rather than fix them.',
+      },
+      { status: 422 },
+    );
+  }
+
+  const dir = siteDirFor(ctx.slug, ctx.sites.length, ctx.sites.findIndex((s) => s.slug === site.slug));
+  const before = site.env.CLIENT_FORWARD_PHONE ?? null;
+  if (before && toE164(before) === e164) {
+    appendAudit({
+      slug: ctx.slug,
+      siteSlug: site.slug,
+      action: 'env.save',
+      ok: true,
+      summary: 'Forwarding number already matches the portal',
+    });
+    return NextResponse.json({ ok: true, changed: false, message: 'Already correct.' });
+  }
+
+  applyEnvUpdates(dir, { CLIENT_FORWARD_PHONE: e164 });
+
+  const undoId = recordUndo({
+    slug: ctx.slug,
+    siteSlug: site.slug,
+    kind: 'env.value',
+    summary: `Set CLIENT_FORWARD_PHONE to the portal contact number`,
+    before,
+    after: e164,
+  });
+
+  // Push and redeploy so the change is live, not merely recorded. Failures here are
+  // reported but do not roll back the disk write: .env.local is the source of truth, and
+  // leaving it correct with a failed sync is recoverable from the Environment section.
+  const warnings: string[] = [];
+  try {
+    const { syncEnvToVercel, triggerRedeploy } = await loadVercelSync();
+    await syncEnvToVercel({ slug: site.slug, clientDir: dir, log: () => {} });
+    await triggerRedeploy({ slug: site.slug, log: () => {} });
+  } catch (err) {
+    warnings.push(
+      `Wrote .env.local, but the Vercel sync or redeploy failed: ${
+        err instanceof Error ? err.message : String(err)
+      }. The live site is still ringing the old number — push it from Environment.`,
+    );
+  }
+
+  appendAudit({
+    slug: ctx.slug,
+    siteSlug: site.slug,
+    action: 'env.save',
+    ok: warnings.length === 0,
+    summary: `Adopted the portal contact number as CLIENT_FORWARD_PHONE`,
+    detail: { undoId, keys: ['CLIENT_FORWARD_PHONE'], warnings: warnings.length },
+  });
+
+  return NextResponse.json({ ok: true, changed: true, undoId, warnings });
 }
 
 /** Switch a deactivated post-call scenario back on. */

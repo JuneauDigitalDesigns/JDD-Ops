@@ -18,6 +18,7 @@ import { loadReconcileProbes } from './reconcileProbes';
 import { accountStoreConfigured, getAccount } from './accountStore';
 import { clientRecordsConfigured, getClientRecordBySlug } from './clientRecord';
 import { reconcileBilling, type SubscriptionHealth } from './reconcileBilling';
+import { portalSignalFindings } from './portalSignals';
 
 /**
  * The reconcile engine: ask every vendor what is true, and report where that differs from
@@ -166,6 +167,12 @@ export async function reconcileClient(
     const portalSite = account?.sites.find((s) => s.slug === site.slug) ?? null;
     const billing = await reconcileBilling(account, portalSite, site.slug, owner.resolved);
     findings.push(...billing.findings);
+
+    // What the client themselves changed. Cheap — KV reads only, no vendor APIs — so it
+    // runs on every sweep rather than sitting behind a button.
+    findings.push(
+      ...(await portalSignalFindings({ slug: ctx.slug, site, account, portalSite }).catch(() => [])),
+    );
     if (portalSite) {
       money.push({
         siteSlug: site.slug,
