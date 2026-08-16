@@ -14,6 +14,7 @@ import {
 import { loadTeardownOps, type Outcome } from '@/lib/teardownOps';
 import { detachSiteFromAccount, getAccount } from '@/lib/accountStore';
 import { deleteClientRecord, getClientRecordBySlug } from '@/lib/clientRecord';
+import { clearReconcileState } from '@/lib/reconcileStore';
 import { deleteClientState } from '@/lib/state';
 import { appendAudit } from '@/lib/audit';
 import { buildTeardownPlan, readAllEnvLocalVerbatim } from '@/lib/teardownPlan';
@@ -266,6 +267,9 @@ export async function POST(req: Request) {
           await runStep(record, `Remove the client record`, async () => {
             const started = Date.now();
             try {
+              // Sweep state goes regardless of whether a record exists — the snapshot and
+              // history are keyed on the slug, not the record id, so they would outlive it.
+              await clearReconcileState(slug);
               const existing = await getClientRecordBySlug(slug);
               if (!existing) {
                 return { resource: 'client.record', target: slug, outcome: 'already-gone' as const, durationMs: Date.now() - started };
