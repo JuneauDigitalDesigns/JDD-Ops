@@ -54,6 +54,15 @@ export interface QueuedLead {
   lostReason?: string;
   updatedAt?: number;
   convertedSlug?: string;
+  /**
+   * → `jdd:client:{id}`, set by the Convert action. The other half of the link lives on
+   * the record as `leadId`.
+   *
+   * `convertedSlug` is kept alongside it rather than replaced: it is what the board reads
+   * to label a won card, it predates this field on existing leads, and a slug can change
+   * while this id cannot. Prefer this one when resolving; fall back to the slug.
+   */
+  clientRecordId?: string;
 }
 
 /**

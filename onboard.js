@@ -46,6 +46,10 @@ import {
   detachSiteFromAccount,
   accountStoreConfigured,
 } from './lib/account-store.js';
+import {
+  ensureClientRecord,
+  clientRecordsConfigured,
+} from './lib/client-record-store.js';
 
 const TOTAL_STEPS = 10;
 
@@ -1383,6 +1387,11 @@ async function attachSiteToPortal({ email, plan, status, siteSlug, content, shar
   if (DRY_RUN) {
     dryLog(`would upsert site "${siteSlug}" (plan ${plan}, status ${status}) into account ${email}`);
     dryLog(`any other sites already on that account would be preserved`);
+    // Disclosed here rather than from ensureClientRecordForSite, which this early return
+    // never reaches. A side effect a dry run doesn't mention is one that surprises you on
+    // the real run — which is the entire job of this branch.
+    const baseSlug = /-\d+$/.test(siteSlug) ? siteSlug.replace(/-\d+$/, '') : siteSlug;
+    dryLog(`would ensure the console client record for "${baseSlug}" → ${email}`);
     return;
   }
 
@@ -1428,6 +1437,44 @@ async function attachSiteToPortal({ email, plan, status, siteSlug, content, shar
 
   // Record which account owns this site so a later --email re-link can clean up the old one.
   patchEnvLocal(clientDir, 'PORTAL_ACCOUNT_EMAIL', email);
+
+  await ensureClientRecordForSite({ email, siteSlug, account });
+}
+
+/**
+ * Create or extend the console's client record for the site just attached.
+ *
+ * Runs inside the per-site loop for the same reason the portal attach does: a failure on
+ * site 3 of an enterprise client must not leave sites 1–2 provisioned with no record.
+ * `ensureClientRecord` is idempotent, so re-running an onboard extends the existing record
+ * rather than making a second one.
+ *
+ * The site list is derived from the account record we just wrote, filtered to THIS client's
+ * base slug — an account can legitimately own several unrelated businesses, and folding all
+ * of its sites into one record would merge them into a single relationship.
+ *
+ * Deliberately non-fatal: the record is a console convenience, and failing a provisioning
+ * run that has already bought a phone number over it would be the wrong trade.
+ */
+async function ensureClientRecordForSite({ email, siteSlug, account }) {
+  if (!clientRecordsConfigured()) return;
+
+  const base = /-\d+$/.test(siteSlug) ? siteSlug.replace(/-\d+$/, '') : siteSlug;
+  const siteSlugs = (account.sites ?? [])
+    .map((s) => s.slug)
+    .filter((s) => s === base || (s.startsWith(`${base}-`) && /^\d+$/.test(s.slice(base.length + 1))));
+
+  if (DRY_RUN) {
+    dryLog(`would ensure client record for ${base} (${siteSlugs.length} site(s)) → ${email}`);
+    return;
+  }
+
+  try {
+    const rec = await ensureClientRecord({ email, slug: base, siteSlugs });
+    console.log(`  Client record ${rec.id} (${siteSlugs.length} site${siteSlugs.length === 1 ? '' : 's'})`);
+  } catch (err) {
+    console.warn(`  ⚠ Could not write the client record for ${base}: ${err.message}`);
+  }
 }
 
 /**

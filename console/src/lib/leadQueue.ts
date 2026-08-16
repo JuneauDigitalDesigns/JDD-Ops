@@ -99,6 +99,7 @@ export interface LeadPatch {
   notes?: string;
   lostReason?: string;
   convertedSlug?: string;
+  clientRecordId?: string;
   name?: string;
   businessName?: string;
   phone?: string;
@@ -132,6 +133,7 @@ export async function patchLead(id: string, patch: LeadPatch): Promise<QueuedLea
   if (patch.notes !== undefined) next.notes = patch.notes;
   if (patch.lostReason !== undefined) next.lostReason = patch.lostReason;
   if (patch.convertedSlug !== undefined) next.convertedSlug = patch.convertedSlug;
+  if (patch.clientRecordId !== undefined) next.clientRecordId = patch.clientRecordId;
   if (patch.name !== undefined) next.name = patch.name;
   if (patch.businessName !== undefined) next.businessName = patch.businessName;
   if (patch.phone !== undefined) next.phone = patch.phone;

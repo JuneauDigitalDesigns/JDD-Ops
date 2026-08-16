@@ -13,6 +13,7 @@ import {
 } from '@/lib/opsSecrets';
 import { loadTeardownOps, type Outcome } from '@/lib/teardownOps';
 import { detachSiteFromAccount, getAccount } from '@/lib/accountStore';
+import { deleteClientRecord, getClientRecordBySlug } from '@/lib/clientRecord';
 import { deleteClientState } from '@/lib/state';
 import { appendAudit } from '@/lib/audit';
 import { buildTeardownPlan, readAllEnvLocalVerbatim } from '@/lib/teardownPlan';
@@ -258,6 +259,29 @@ export async function POST(req: Request) {
               }
             });
           }
+
+          // The console's own record goes with them. Leaving it would put a live-looking
+          // client on the roster pointing at infrastructure that no longer exists — worse
+          // than no record, because the archive is then contradicted by the roster.
+          await runStep(record, `Remove the client record`, async () => {
+            const started = Date.now();
+            try {
+              const existing = await getClientRecordBySlug(slug);
+              if (!existing) {
+                return { resource: 'client.record', target: slug, outcome: 'already-gone' as const, durationMs: Date.now() - started };
+              }
+              await deleteClientRecord(existing.id);
+              return { resource: 'client.record', target: existing.id, outcome: 'deleted' as const, durationMs: Date.now() - started };
+            } catch (err) {
+              return {
+                resource: 'client.record',
+                target: slug,
+                outcome: 'failed' as const,
+                durationMs: Date.now() - started,
+                message: err instanceof Error ? err.message : String(err),
+              };
+            }
+          });
 
           // Re-read the account AFTER detaching — never compute "remaining" as
           // "before minus what we tried to detach". A failed read means UNKNOWN, not
