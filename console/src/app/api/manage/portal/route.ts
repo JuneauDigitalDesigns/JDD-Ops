@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { siteFeatures } from '@jdd/schema';
 import { loadManageTarget } from '@/lib/manageSites';
 import { accountStoreConfigured, getAccount, getAccountEmailByUserId } from '@/lib/accountStore';
 
@@ -65,12 +66,23 @@ export async function GET(req: Request) {
       configured: true,
       clerkUserId,
       email,
+      // The full record, not a summary: the repair panel edits these fields, and showing
+      // a trimmed view would mean editing values you can't see. `features` is the portal's
+      // OWN verdict (same siteFeatures the client's dashboard renders), so the console can
+      // never disagree with what the client is actually looking at.
       sites: (account?.sites ?? []).map((s) => ({
         slug: s.slug,
-        name: s.name,
+        name: s.name ?? null,
         plan: s.plan,
         status: s.status,
+        canonical: s.canonical ?? null,
         airtableBaseId: s.airtableBaseId ?? null,
+        vercelProjectId: s.vercelProjectId ?? null,
+        stripeSubscriptionId: s.stripeSubscriptionId ?? null,
+        stripeCustomerId: s.stripeCustomerId ?? null,
+        /** Present only so the UI can explain a `connecting` billing state. */
+        hasCheckoutSession: Boolean(s.sessionId),
+        features: siteFeatures(s),
         /** Whether this account entry belongs to the client we're looking at. */
         mine: target.ctx.sites.some((cs) => cs.slug === s.slug),
       })),

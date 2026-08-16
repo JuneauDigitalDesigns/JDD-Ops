@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   LEAD_STAGES,
+  createLead,
   deleteLead,
   getLead,
   leadQueueConfigured,
@@ -45,6 +46,47 @@ export async function GET() {
   }
 
   return NextResponse.json({ leads, siteUrl: readOpsConfig().siteUrl });
+}
+
+/**
+ * Create a lead by hand.
+ *
+ * The two producers in the agency site cover everyone who reaches you through the funnel; this
+ * covers everyone who doesn't — a referral, a text, someone who called your own phone. It takes
+ * no body on purpose: the card is born as a placeholder and gets filled in through the modal's
+ * click-to-edit fields, which already diff every change into the activity trail. One click to
+ * exist, then type.
+ *
+ * The shape matches enqueueLead's output on the site side exactly, including the convention that
+ * absent optional fields are omitted rather than written as null. `name` and `phone` start empty
+ * because the type requires them; the call-ingest path already writes phone: '' when Retell has
+ * no caller ID, so an empty required string is precedent, not a new idea.
+ */
+export async function POST() {
+  if (!leadQueueConfigured()) {
+    return NextResponse.json({ error: 'Lead queue not configured.' }, { status: 503 });
+  }
+
+  const now = Date.now();
+  const lead: QueuedLead = {
+    id: crypto.randomUUID(),
+    receivedAt: now,
+    source: 'manual',
+    stage: 'new',
+    name: '',
+    businessName: 'New lead',
+    phone: '',
+    planInterest: null,
+    activity: [{ at: now, kind: 'created', text: 'Added by hand' }],
+  };
+
+  try {
+    await createLead(lead);
+    return NextResponse.json({ lead });
+  } catch (e) {
+    console.error('[/api/leads] create failed', e);
+    return NextResponse.json({ error: 'Could not create that lead.' }, { status: 500 });
+  }
 }
 
 const CONTACT_FIELD_LABEL: Record<string, string> = {

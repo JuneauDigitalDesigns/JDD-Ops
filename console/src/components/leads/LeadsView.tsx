@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowsClockwise } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowsClockwise, CircleNotch, Plus } from '@phosphor-icons/react';
 import type { DemoCall, QueuedLead } from '@/lib/leadTypes';
 import PageHeader from '@/components/shell/PageHeader';
 import RefreshButton from '@/components/shell/RefreshButton';
@@ -28,6 +28,9 @@ export default function LeadsView() {
   const [siteUrl, setSiteUrl] = useState('https://juneaudigitaldesigns.com');
   const [tab, setTab] = useState<Tab>('board');
   const [openId, setOpenId] = useState<string | null>(null);
+  /** The lead this session just created by hand — opens with its name field already live. */
+  const [freshId, setFreshId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +122,48 @@ export default function LeadsView() {
     [],
   );
 
+  /**
+   * Create a lead by hand and open it.
+   *
+   * Not optimistic, unlike patch: the server owns the id, and inventing one locally would mean
+   * every subsequent edit in the modal patched a record that doesn't exist. A round-trip is the
+   * right cost here anyway — this is one deliberate click, not a drag.
+   */
+  const createLead = useCallback(async () => {
+    setCreating(true);
+    try {
+      const res = await fetch('/api/leads', { method: 'POST' });
+      const data = (await res.json().catch(() => ({}))) as { lead?: QueuedLead; error?: string };
+      if (!res.ok || !data.lead) {
+        setWarning(data.error ?? "That lead couldn't be created.");
+        return;
+      }
+      setLeads((prev) => [data.lead!, ...prev]);
+      setFreshId(data.lead.id);
+      setOpenId(data.lead.id);
+    } catch {
+      setWarning("That lead couldn't be created.");
+    } finally {
+      setCreating(false);
+    }
+  }, []);
+
+  const newLeadButton = (
+    <button
+      type="button"
+      onClick={createLead}
+      disabled={creating}
+      className="btn btn-sm btn-primary"
+    >
+      {creating ? (
+        <CircleNotch size={13} className="animate-spin" />
+      ) : (
+        <Plus size={13} weight="bold" />
+      )}{' '}
+      New lead
+    </button>
+  );
+
   const removeLead = useCallback(
     async (id: string) => {
       setLeads((prev) => prev.filter((l) => l.id !== id));
@@ -148,7 +193,7 @@ export default function LeadsView() {
   const addedThisWeek = leads.filter((l) => Date.now() - l.receivedAt < WEEK_MS).length;
   const lede =
     leads.length === 0
-      ? "No leads yet — they arrive from the site's interest form and the demo agent."
+      ? "No leads yet — they arrive from the site's interest form and the demo agent, or you can add one by hand."
       : `${leads.length} lead${leads.length !== 1 ? 's' : ''} · ${addedThisWeek} added this week`;
 
   const tabButton = (id: Tab, label: string, count: number) => (
@@ -203,7 +248,7 @@ export default function LeadsView() {
       ) : (
         <div className="no-scrollbar flex-1 overflow-y-auto">
           <div className="w-full px-6 py-6 md:px-8">
-            <PageHeader title="Leads" lede={lede} />
+            <PageHeader title="Leads" lede={lede} actions={newLeadButton} />
 
             <div className="mb-5 flex items-center gap-2">
               {tabButton('board', 'Board', leads.length)}
@@ -229,10 +274,14 @@ export default function LeadsView() {
                   </div>
                 </div>
               ) : leads.length === 0 ? (
-                <p className="py-16 text-center text-xs text-fg3">
-                  No leads yet. They arrive from the site&apos;s interest form and from calls to
-                  the demo agent.
-                </p>
+                <div className="flex flex-col items-center gap-3 py-16">
+                  <p className="max-w-sm text-center text-xs text-fg3">
+                    No leads yet. They arrive from the site&apos;s interest form and from calls to
+                    the demo agent — or add one yourself, for a referral or someone who called you
+                    directly.
+                  </p>
+                  {newLeadButton}
+                </div>
               ) : (
                 <LeadBoard leads={leads} onOpen={setOpenId} onPlace={patch} />
               )
@@ -248,7 +297,11 @@ export default function LeadsView() {
           lead={openLead}
           call={openCall}
           siteUrl={siteUrl}
-          onClose={() => setOpenId(null)}
+          startEditing={freshId === openLead.id ? 'businessName' : undefined}
+          onClose={() => {
+            setOpenId(null);
+            setFreshId(null);
+          }}
           onPatch={(p) => patch(openLead.id, p)}
           onDelete={removeLead}
         />

@@ -20,7 +20,7 @@ import {
   type StudioReverts,
 } from './page-order';
 import { buildCategories } from './categories';
-import { injectImagePlaceholders } from '@/data/preview-placeholders';
+import { fillImagePlaceholders } from '@/data/image-placeholders';
 import StudioStep from './StudioStep';
 import IntakeReviewStep from '@/components/wizard/IntakeReviewStep';
 import NavSlot from '@/components/NavSlot';
@@ -219,7 +219,7 @@ export default function BuildWizard({
       // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
       // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
       // content. Left hidden while empty, so an untouched Work section stays off (and the
-      // preview still injects sample projects via injectImagePlaceholders).
+      // preview still injects sample projects via fillImagePlaceholders's includeWork).
       if (merged.work?.projects?.length && merged.work.hidden) {
         return { ...merged, work: { ...merged.work, hidden: false } };
       }
@@ -227,10 +227,12 @@ export default function BuildWizard({
     },
     [vertical, imported, generated, edits],
   );
-  // Preview-only: fill empty/preset image slots with per-vertical topical stock so
-  // the build catalog renders (esp. Work). Export still uses the untouched `effective`.
+  // Fill empty/preset image slots with per-vertical topical stock so the build catalog
+  // renders. The export route runs the same transform on the server, so what's previewed
+  // here is what ships — except `includeWork`, whose fabricated sample projects are
+  // preview-only and are never serialized into a client repo.
   const previewContent = useMemo(
-    () => injectImagePlaceholders(effective, vertical),
+    () => fillImagePlaceholders(effective, vertical, { includeWork: true }).content,
     [effective, vertical],
   );
   const categories = useMemo(() => buildCategories(previewContent), [previewContent]);

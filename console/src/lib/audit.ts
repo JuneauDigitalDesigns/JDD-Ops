@@ -26,11 +26,15 @@ export type AuditAction =
   | 'env.pull'
   | 'deploy.trigger'
   | 'portal.attach'
+  | 'portal.repair'
   | 'agent.prompt.save'
   | 'agent.prompt.push'
   | 'domain.add'
   | 'domain.verify'
   | 'canonical.set'
+  | 'plan.upgrade'
+  | 'plan.downgrade'
+  | 'plan.billing.sync'
   | 'client.teardown.start'
   | 'client.teardown';
 

@@ -99,6 +99,45 @@ export function loadMakeApiKey(): string | null {
 }
 
 /**
+ * The Stripe key, for looking up a client's subscription from /manage → Portal when the
+ * portal record lost its `stripeSubscriptionId`.
+ *
+ * Prefers `STRIPE_READONLY_KEY` and only falls back to `STRIPE_SECRET_KEY`. The console has
+ * **no auth of any kind**, so a restricted read-only key is strongly preferred here: the one
+ * route that uses this can only list customers and subscriptions, but a full secret key
+ * sitting in this process is a much larger blast radius than the feature needs.
+ *
+ * Same contract as the rest of this module — the value goes to Stripe and nowhere else, and
+ * must never reach a response body.
+ */
+export function loadStripeKey(): { key: string | null; restricted: boolean } {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const readonly = process.env.STRIPE_READONLY_KEY ?? ops.STRIPE_READONLY_KEY ?? null;
+  if (readonly) return { key: readonly, restricted: true };
+  const secret = process.env.STRIPE_SECRET_KEY ?? ops.STRIPE_SECRET_KEY ?? null;
+  return { key: secret, restricted: secret ? secret.startsWith('rk_') : false };
+}
+
+/**
+ * The portal app's base URL and the shared secret for calling its `/api/ops/*` routes.
+ *
+ * The console never calls Stripe to *write*. `stripe-lookup` is read-only permanently and
+ * says so; a write path behind a console with no authentication is a different category of
+ * risk. So when billing has to change, the console asks the portal app — which is deployed,
+ * gates the route on this secret, and already holds the write-capable Stripe key.
+ *
+ * `PORTAL_BASE_URL` should normally point at production: an ops action that moves money
+ * should act on the real subscription, not on whatever happens to be running on localhost.
+ */
+export function loadPortalOpsConfig(): { baseUrl: string | null; secret: string | null } {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const baseUrl =
+    process.env.PORTAL_BASE_URL ?? ops.PORTAL_BASE_URL ?? 'https://juneaudigitaldesigns.com';
+  const secret = process.env.OPS_SHARED_SECRET ?? ops.OPS_SHARED_SECRET ?? null;
+  return { baseUrl: baseUrl.replace(/\/+$/, '') || null, secret };
+}
+
+/**
  * Every other credential teardown needs and this module doesn't already load:
  * TWILIO_ACCOUNT_SID/AUTH_TOKEN, AIRTABLE_API_KEY, CLERK_SECRET_KEY. Grouped because
  * teardown always wants the full set at once, unlike the single-purpose loaders above.

@@ -161,12 +161,21 @@ by **that** repo's `.env`, not this one. Do this once:
 1. **Clerk** — create a Clerk application; set `CLERK_SECRET_KEY` +
    `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (and the sign-in URL vars) in the agency `.env` and on
    Vercel. The portal protects `/portal` and `/api/portal/*` via Clerk middleware.
-2. **Vercel Web Analytics access** — the portal's Traffic tab reads each client's traffic via
-   the Vercel Web Analytics API. Set `VERCEL_TOKEN` (a read-scoped access token) and, if the
-   projects live under a team, `VERCEL_TEAM_ID` in the **agency** `.env` and on the portal's
-   Vercel project. No per-client Google service account is needed.
+2. **Vercel API access** — `VERCEL_TOKEN` + `VERCEL_TEAM_ID` in the **agency** `.env.local`
+   *and* on the portal's Vercel project (all environments). These power both the Traffic tab
+   (Web Analytics API) and the Overview health strip (deployments + domains).
+
+   Not optional, and not only Traffic: with them missing the Traffic tab returns
+   "We couldn't load this" on a perfectly healthy live client, and the health strip's Deploy
+   and Domain segments sit on "Not checked". That exact outage happened, which is why
+   `/ops-check` now greps for both keys.
+
+   Note there is no such thing as a read-scoped Vercel token — project-scoped tokens deny
+   team-level resources and cover one project each, so a portal serving every client needs a
+   team-scoped token. Keep it server-side only and separate from this repo's token so it can
+   be rotated independently.
 3. **PageSpeed Insights API key** → `PAGESPEED_API_KEY` (still Google; one global key, powers the
-   Performance tab).
+   Performance tab). See E2 for why this is still Google and not Vercel Speed Insights.
 4. **Upstash Redis** (cache + rate-limit) — provision via Vercel → Storage; confirm the env
    var names match what `portal-kv.ts` reads (`Redis.fromEnv()`).
 5. **Airtable** — `AIRTABLE_API_KEY` (the same JDD key) so the portal can read each client's
@@ -292,13 +301,64 @@ Push any commit to the client repo (Vercel auto-deploys), or Vercel → project 
 ## Part E — Set up the client portal (per client)
 
 Gives the client a `/portal` login showing Traffic (Vercel Web Analytics), Calls (Airtable), and
-Performance (PageSpeed). The portal reads everything from the client's **Clerk user metadata**.
+Performance (PageSpeed). The portal reads everything from the **KV account record**
+(`jdd:account:{email}`) — not Clerk user metadata, which it migrated off.
 
 ### E1. Enable Web Analytics on the client's Vercel project
 Vercel → the client's project → **Analytics → Enable Web Analytics**. The exported site already
 renders `<Analytics />` from `@vercel/analytics` (in the template root layout), so once enabled
 the project starts collecting page views + visitors automatically — no per-client Google setup,
 no service-account grant. The Traffic tab stays empty until the site receives real visitors.
+
+This is a dashboard-only action: the Vercel API has no setter for it. `onboard.js` checks the
+state at the end of a run and prints either a confirmation or the exact project to fix, and
+you can audit every client at any time:
+
+```bash
+npm run audit-analytics
+```
+
+Exit 0 = every live site collecting, 1 = at least one is off (it prints which), 2 = couldn't
+check. Sites still building are excluded — they have no visitors to measure.
+
+Do **not** try to detect this by reading `analytics` on `GET /v9/projects/{id}`. That field
+reports the legacy Audiences product and is absent even on projects actively collecting Web
+Analytics; the audit probes the Web Analytics API itself instead.
+
+### E1b. Testing plan upgrades locally — you need `stripe listen`
+
+The portal's upgrade route writes `plan` itself the moment Stripe confirms the change, so the
+happy path works locally without any webhook. But the webhook is still what **reconciles**
+plan changes made outside the portal (the Stripe dashboard, a manual subscription edit), and
+without a listener those never reach KV at all:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+Take the `whsec_…` it prints and set `STRIPE_WEBHOOK_SECRET` in the **agency** repo's
+`.env.local` — the CLI's signing secret is different from the dashboard endpoint's.
+
+Without this, Stripe and KV diverge silently: the subscription moves tier and the portal keeps
+showing the old plan with an "Upgrade" button. That exact split-brain is what
+`npm run audit-billing` now detects — it compares each subscription's live price against the
+tier on the record and prints the `repair-portal` command to correct it.
+
+### E2. Why Performance is still Google PageSpeed, not Vercel Speed Insights
+
+Evaluated August 2026 and deliberately rejected:
+
+- **$10 per project, per month** on Pro, plus $0.65/10K events — billed per *client site*,
+  where PageSpeed is free.
+- **No public read API.** The only programmatic access is the `vercel metrics` CLI (June
+  2026); there is no REST endpoint, and shelling the CLI out of a serverless portal route is
+  not a supportable read path.
+- **Real Experience Score is dashboard-only**, so the portal's 0–100 health-strip score has
+  no Speed Insights equivalent.
+- PageSpeed already returns **CrUX field data** — real-user 28-day p75 for LCP/CLS/INP/TTFB —
+  in the same response as the lab score, at no cost. The portal parses and prefers it.
+
+Revisit only if Vercel ships a documented read API for Speed Insights.
 
 ### E2. Create the client's Clerk user + metadata
 `onboard.js` normally writes this automatically (including `vercelProjectId`). To do it by hand:

@@ -12,10 +12,15 @@
  * from @jdd/schema. That package currently has uncommitted v1.6.0 work while its last released
  * tag — and all three consumers' pins — are v1.4.0, so promoting these would mean untangling
  * that first.
+ *
+ * The copies have deliberately diverged in one place: 'manual' is a console-only LeadSource with
+ * no producer counterpart, because only this app can create a lead by hand. Nothing needs to
+ * change on the site side — the only lead it ever reads back is via jdd:lead:by-call:{callId},
+ * and a manual lead has no callId.
  */
 
 export type LeadStage = 'new' | 'qualified' | 'quoted' | 'won' | 'lost';
-export type LeadSource = 'form' | 'call';
+export type LeadSource = 'form' | 'call' | 'manual';
 export type PlanInterest = 'starter' | 'growth' | 'enterprise';
 
 export const LEAD_STAGES: LeadStage[] = ['new', 'qualified', 'quoted', 'won', 'lost'];

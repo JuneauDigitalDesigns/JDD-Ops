@@ -36,6 +36,7 @@ import {
   syncEnvToVercel,
   sanitizeProjectName,
   getVercelProjectId,
+  getProjectAnalytics,
   listProjectDomains,
 } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
@@ -47,6 +48,17 @@ import {
 } from './lib/account-store.js';
 
 const TOTAL_STEPS = 10;
+
+// Hard ceiling on a single AI call, in milliseconds.
+//
+// Retell's own default is 3,600,000 (60 minutes). A receptionist call that runs
+// even close to that is a malfunction — a loop, a held line, a caller who walked
+// away — not a conversation, and at the measured ~$0.0985/min blended rate a
+// single 60-minute call costs about $5.91. Measured median call length on this
+// account is 91 seconds, so 10 minutes is roughly 6x the p50 and still well clear
+// of any real call. This bounds the blast radius of one stuck call; it is NOT the
+// monthly plan allowance, which is enforced separately against usage.
+const MAX_CALL_DURATION_MS = 600_000;
 
 // Anchor to onboard.js's own directory so lib/ assets resolve regardless of cwd.
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -210,30 +222,93 @@ async function loadIntake(schemaPath) {
     if (!plan) {
       fail(1, `Legacy CONTENT schema has no _meta.selectedPlan — set it to "starter", "growth", or "enterprise" in ${schemaPath}. Refusing to guess: the wrong guess provisions paid Twilio/Retell resources.`);
     }
+    // No smsAlerts on this path, and that is correct: a legacy CONTENT file predates
+    // consent capture, so there is no record of the owner agreeing to anything. Absent
+    // reads as "not consented" downstream and the Twilio module is left out of the clone.
     return { plan, siteCount: 1, sites: [mod.CONTENT] };
   }
   fail(1, 'Schema must export INTAKE or CONTENT');
 }
 
+/**
+ * Two tiers, because "missing" means two different things here.
+ *
+ * ERRORS are structural. Step 3 splices this object into a repo that type-checks under
+ * `strict`, so an absent field is a `npm run build` failure at step 5 — one step AFTER
+ * step 2 created the GitHub repo and step 4 wrote secrets. Far cheaper to catch at step 1.
+ * The old list checked 7 fields while the build needs ~25, which is how the _e2e-starter
+ * fixture drifted to a 3-field brand without anything noticing.
+ *
+ * WARNINGS are fields whose key must exist but whose value is legitimately null: hgco ships
+ * `brand.tagline: null` and an all-null `seo`, and its onboard is designed to be re-runnable.
+ * Hard-erroring on those would break re-provisioning a live client, so they only ever warn.
+ */
 function validateSite(content, label) {
   const errors = [];
+  const warnings = [];
+  const brand = content?.brand;
+  const palette = brand?.palette;
+  const typography = brand?.typography;
+
+  // Present AND non-empty: every one of these is rendered or dereferenced unguarded.
   const required = [
-    ['brand.name', content?.brand?.name],
-    ['brand.short', content?.brand?.short],
-    ['brand.phone', content?.brand?.phone],
-    ['brand.email', content?.brand?.email],
-    ['brand.palette.accent', content?.brand?.palette?.accent],
-    ['brand.palette.bg', content?.brand?.palette?.bg],
-    ['brand.palette.ink', content?.brand?.palette?.ink],
+    ['brand.name', brand?.name],
+    ['brand.short', brand?.short],
+    ['brand.long', brand?.long],
+    ['brand.phone', brand?.phone],
+    ['brand.phoneHref', brand?.phoneHref],
+    ['brand.email', brand?.email],
+    ['brand.address', brand?.address],
+    ['brand.palette.accent', palette?.accent],
+    ['brand.palette.bg', palette?.bg],
+    ['brand.palette.bgSoft', palette?.bgSoft],
+    ['brand.palette.ink', palette?.ink],
+    ['brand.palette.inkSoft', palette?.inkSoft],
+    ['brand.palette.rule', palette?.rule],
+    // typographyVars() reads brand.typography with no guard — an absent block is a
+    // TypeError at render, not a blank CSS variable.
+    ['brand.typography.fontSans', typography?.fontSans],
+    ['brand.typography.fontHeading', typography?.fontHeading],
+    ['brand.typography.headingWeight', typography?.headingWeight],
+    ['brand.typography.bodyWeight', typography?.bodyWeight],
+    ['_meta.selectedPlan', content?._meta?.selectedPlan],
   ];
   for (const [path, val] of required) {
     if (!val) errors.push(`${label}: missing required field ${path}`);
   }
-  return errors;
+
+  // page.tsx calls .map() on both of these without a guard. Empty is fine; absent is not.
+  for (const key of ['services', 'faq']) {
+    if (!Array.isArray(content?.[key]?.items)) {
+      errors.push(`${label}: missing required field ${key}.items (must be an array)`);
+    }
+  }
+
+  // Nullable-but-required: SiteContent declares the key, so it has to be there, but null
+  // is a legal value that only costs you a blank spot on the page.
+  const nullable = [
+    ['brand.established', brand],
+    ['brand.license', brand],
+    ['brand.tagline', brand],
+    ['seo.title', content?.seo],
+    ['seo.description', content?.seo],
+    ['seo.canonical', content?.seo],
+  ];
+  for (const [path, parent] of nullable) {
+    const key = path.split('.').pop();
+    if (!parent || typeof parent !== 'object' || !(key in parent)) {
+      errors.push(`${label}: missing required field ${path}`);
+    } else if (!parent[key]) {
+      warnings.push(`${label}: ${path} is empty — renders blank`);
+    }
+  }
+
+  return { errors, warnings };
 }
 
 function validateIntake(intake) {
   const errors = [];
+  const warnings = [];
   const validPlans = new Set(['starter', 'growth', 'enterprise']);
   if (!validPlans.has(intake.plan)) {
     errors.push(`unknown plan "${intake.plan}" (expected starter|growth|enterprise)`);
@@ -251,7 +326,9 @@ function validateIntake(intake) {
     errors.push(`plan "${intake.plan}" requires exactly 1 site (got ${intake.sites.length}) — only enterprise is multi-site`);
   }
   intake.sites.forEach((site, i) => {
-    errors.push(...validateSite(site, `site[${i + 1}/${intake.sites.length}]`));
+    const res = validateSite(site, `site[${i + 1}/${intake.sites.length}]`);
+    errors.push(...res.errors);
+    warnings.push(...res.warnings);
   });
   if (intake.plan === 'enterprise') {
     const shorts = intake.sites.map((s) => s?.brand?.short);
@@ -260,6 +337,8 @@ function validateIntake(intake) {
       errors.push(`enterprise sites must have unique brand.short values; duplicates: ${[...new Set(dupes)].join(', ')}`);
     }
   }
+  // Warnings first, so they are visible even on a run that goes on to fail.
+  for (const w of warnings) console.warn(`  ! ${w}`);
   if (errors.length) {
     for (const e of errors) console.error(`  - ${e}`);
     fail(1, `Intake validation failed (${errors.length} error${errors.length === 1 ? '' : 's'})`);
@@ -749,6 +828,7 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
       agent_name: content.brand.name,
       response_engine: { type: 'retell-llm', llm_id: clientLlmId },
       voice_id: voiceId,
+      max_call_duration_ms: MAX_CALL_DURATION_MS,
       post_call_analysis_data: postCallAnalysisData,
     }),
   });
@@ -825,10 +905,43 @@ async function provisionTwilioNumber(content, siteSlug, clientDir) {
       voiceMethod: 'POST',
     });
     console.log(`  Purchased toll-free number ${numberRecord.phoneNumber}`);
+    // A toll-free number cannot join the A2P 10DLC Messaging Service — that pool is
+    // local-only. Voice works fine, but every outbound text from this number fails with
+    // 30034 until it clears its own Toll-Free Verification, which is a separate
+    // submission and takes 1–3 weeks. Silence here is how a client ends up "provisioned"
+    // and permanently textless.
+    console.warn(`  ⚠ TOLL-FREE FALLBACK — SMS alerts will NOT deliver from this number.`);
+    console.warn(`    Toll-free numbers are ineligible for the A2P 10DLC Messaging Service.`);
+    console.warn(`    Submit Toll-Free Verification for ${numberRecord.phoneNumber} (1–3 weeks),`);
+    console.warn(`    or release it and buy a local number in a nearby area code instead.`);
   }
 
   const number = numberRecord.phoneNumber;
   patchEnvLocal(clientDir, 'TWILIO_NUMBER', number);
+
+  // Local numbers join the registered A2P campaign's sender pool. Sending outside the
+  // Messaging Service is exactly the unregistered-sender case carriers reject.
+  const isTollFree = /^\+1(800|833|844|855|866|877|888)/.test(number);
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  if (!isTollFree) {
+    if (!messagingServiceSid) {
+      console.warn(`  ⚠ TWILIO_MESSAGING_SERVICE_SID not set — ${number} is not in the A2P sender pool.`);
+      console.warn(`    Add it by hand in the Twilio console, or SMS alerts will fail with 30034.`);
+    } else {
+      try {
+        await client.messaging.v1
+          .services(messagingServiceSid)
+          .phoneNumbers.create({ phoneNumberSid: numberRecord.sid });
+        console.log(`  Added ${number} to A2P Messaging Service ${messagingServiceSid}`);
+      } catch (err) {
+        // Non-fatal: the number works for voice regardless, and this is recoverable with
+        // two clicks. Failing the whole onboarding over it would be the wrong trade.
+        console.warn(`  ⚠ Could not add ${number} to Messaging Service: ${err.message}`);
+        console.warn(`    Add it by hand, or SMS alerts from this number will fail with 30034.`);
+      }
+    }
+  }
+
   return number;
 }
 
@@ -992,7 +1105,7 @@ async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
 
-async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag) {
+async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag, smsAlerts) {
   log(8, `Clone post-call Make scenario + wire Retell webhook`);
 
   const existing = readEnvLocal(clientDir).RETELL_POST_CALL_WEBHOOK_URL;
@@ -1004,16 +1117,32 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   const apiKey   = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
   const fromNum  = readEnvLocal(clientDir).TWILIO_NUMBER;      // this client's provisioned number
-  const toNum    = toE164(content.brand.phone) ?? '';         // owner's cell (== CLIENT_FORWARD_PHONE)
+
+  // The SMS destination now comes from the owner's recorded consent, not from
+  // content.brand.phone. brand.phone is the number printed on the client's website — a
+  // front desk, a shared line, sometimes a landline — and nobody ever agreed to receive
+  // texts there. smsAlerts.phone is the number the owner typed beside a checkbox they
+  // ticked, which is the only number we have permission to text.
+  const smsEnabled = smsAlerts?.consented === true && Boolean(smsAlerts?.phone);
+  const toNum      = smsEnabled ? (toE164(smsAlerts.phone) ?? '') : '';
+
+  if (smsEnabled) {
+    console.log(`  SMS alerts: ON → ${toNum} (consented ${smsAlerts.consentedAt ?? 'unknown'})`);
+  } else {
+    console.log(`  SMS alerts: OFF (no consent on file) — Twilio module will be removed from the clone`);
+  }
 
   if (!apiKey || !masterId) {
     console.warn(`  ⚠ MAKE_API_KEY or MAKE_POST_CALL_MASTER_SCENARIO_ID not set — skipping post-call clone.`);
-    console.warn(`    Clone by hand: base=${baseId}, from=${fromNum}, to=${toNum}, agent=${agentId}`);
+    console.warn(`    Clone by hand: base=${baseId}, from=${fromNum}, to=${toNum || '(no SMS — remove the Twilio module)'}, agent=${agentId}`);
     return null;
   }
   if (DRY_RUN) {
     dryLog(`would clone scenario ${masterId} → "Post-call: ${content.brand.name}"`);
-    dryLog(`would patch Airtable base=${baseId}${siteTag ? `, Site=${siteTag}` : ''}, Twilio from=${fromNum}, to=${toNum}`);
+    dryLog(`would patch Airtable base=${baseId}${siteTag ? `, Site=${siteTag}` : ''}`);
+    dryLog(smsEnabled
+      ? `would patch Twilio from=${fromNum}, to=${toNum}`
+      : `would REMOVE the Twilio module (no SMS consent on file)`);
     dryLog(`would activate clone, read webhook URL, set Retell agent ${agentId} webhook_url`);
     return null;
   }
@@ -1034,7 +1163,7 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}/blueprint`, { headers });
   if (!res.ok) fail(8, `Make get-blueprint returned ${res.status}: ${await res.text()}`);
   const blueprint = (await res.json())?.response?.blueprint;
-  patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum }); // mutates in place
+  patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum, smsEnabled }); // mutates in place
 
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}`, {
     method: 'PATCH', headers,
@@ -1070,7 +1199,7 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
 // NOTE: mapper field keys ('base' / 'from' / 'to' / 'Site') depend on how the
 // master's modules are configured — confirm against a GET of the master
 // blueprint before the first live run (see report §8).
-function patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum }) {
+function patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum, smsEnabled }) {
   const flows = blueprint?.flow ?? [];
   for (const mod of flows) {
     const app = mod.module ?? '';
@@ -1079,11 +1208,22 @@ function patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum }) 
       mod.mapper.base = baseId;
       if (siteTag) mod.mapper.Site = siteTag; // enterprise per-site tag
     }
-    if (app.startsWith('twilio')) {
+    if (app.startsWith('twilio') && smsEnabled) {
       mod.mapper = mod.mapper ?? {};
       mod.mapper.from = fromNum;
       mod.mapper.to = toNum;
     }
+  }
+
+  // No consent means the module comes out of the flow entirely, rather than being left
+  // with an empty `to`. An unconfigured module errors on every run, and enough errors get
+  // a Make scenario auto-disabled — which would take the Airtable call log down with it.
+  // Removing it leaves a scenario that logs calls correctly and simply never texts.
+  if (!smsEnabled && Array.isArray(blueprint?.flow)) {
+    const before = blueprint.flow.length;
+    blueprint.flow = blueprint.flow.filter((m) => !(m.module ?? '').startsWith('twilio'));
+    const removed = before - blueprint.flow.length;
+    if (removed > 0) console.log(`  Removed ${removed} Twilio module(s) from the clone (no SMS consent)`);
   }
 }
 
@@ -1269,8 +1409,18 @@ async function attachSiteToPortal({ email, plan, status, siteSlug, content, shar
       canonical: ownCanonical,
       fallbackCanonical: resolvedHost,
       vercelProjectId: await getVercelProjectId(siteSlug),
+      retellAgentId: readEnvLocal(clientDir).RETELL_AGENT_ID || null,
     }],
   });
+
+  // Set on the entry directly as well as via buildPortalSiteEntries, because jdd-ops
+  // pins @jdd/schema to a published tag: until that tag carries the retellAgentId rule
+  // the installed build silently drops it. `upsertSite` merges defined fields rather
+  // than picking known ones, so this survives either version — and the schema-side rule
+  // (starter ⇒ null, unresolved ⇒ omitted) still governs once the tag lands.
+  const agentId = readEnvLocal(clientDir).RETELL_AGENT_ID || null;
+  if (plan === 'starter') entry.retellAgentId = null;
+  else if (agentId) entry.retellAgentId = agentId;
 
   const account = await attachSiteToAccount(email, entry);
   const n = account.sites.length;
@@ -1418,7 +1568,52 @@ async function linkPortal(slug, opts = {}) {
 // Final handoff summary
 // ───────────────────────────────────────────────────────────────────────────
 
-function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail }) {
+/**
+ * Check Web Analytics per provisioned site so the handoff can state what is actually true.
+ *
+ * This used to be an unconditional "remember to enable Web Analytics" line, which is the
+ * kind of instruction that gets skimmed. When it is skipped the only symptom is an empty
+ * portal Traffic tab, months later, with nothing pointing at the cause.
+ *
+ * Enabling it is dashboard-only — the Vercel API exposes the state but no setter — so
+ * verifying is the most automation available here.
+ */
+async function checkAnalytics(provisioned) {
+  return Promise.all(
+    provisioned.map(async (p) => ({
+      siteSlug: p.siteSlug,
+      ...(await getProjectAnalytics(p.siteSlug)),
+    })),
+  );
+}
+
+/** Render the analytics result as either a confirmation or a specific action item. */
+function analyticsLines(results, startNumber) {
+  const off = results.filter((r) => r.analyticsEnabled === false);
+  const unknown = results.filter((r) => r.analyticsEnabled === null);
+  const on = results.filter((r) => r.analyticsEnabled === true);
+  const out = [];
+
+  if (off.length) {
+    out.push(`    ${startNumber}. ⚠ Enable Web Analytics — the portal Traffic tab is empty without it:`);
+    off.forEach((r) => out.push(`         Vercel → ${sanitizeProjectName(r.siteSlug)} → Analytics → Enable`));
+  }
+  if (unknown.length) {
+    // Never claim it's fine when we couldn't look.
+    out.push(`    ${off.length ? startNumber + 1 : startNumber}. ? Couldn't check Web Analytics — verify manually:`);
+    unknown.forEach((r) =>
+      out.push(`         ${sanitizeProjectName(r.siteSlug)} (${r.reason ?? 'unknown reason'})`),
+    );
+  }
+  if (on.length && !off.length && !unknown.length) {
+    out.push(`    ✓ Web Analytics on for ${on.length === 1 ? 'the project' : `all ${on.length} projects`} — portal Traffic will populate.`);
+  } else if (on.length) {
+    out.push(`    ✓ Web Analytics already on: ${on.map((r) => sanitizeProjectName(r.siteSlug)).join(', ')}`);
+  }
+  return out;
+}
+
+async function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail }) {
   const line = '─'.repeat(64);
   console.log(`\n${line}`);
   console.log(`  ONBOARDED: ${intake.sites[0].brand.name}${isMultiSite(intake) ? ` (Enterprise — ${intake.sites.length} sites)` : ''}`);
@@ -1443,12 +1638,14 @@ function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail
   }
   console.log(`\n  Portal: https://juneaudigitaldesigns.com/portal`);
   console.log(`  Portal account: ${portalEmail ?? '⚠ not linked'}`);
+  const analytics = await checkAnalytics(provisioned);
+
   console.log(`\n${line}`);
   console.log(`  Next:`);
   if (intake.plan === 'starter') {
     console.log(`    1. Verify lead email at ${intake.sites[0].brand.email} after a test form submission.`);
     console.log(`    2. Verify the deployed Vercel URL renders correctly.`);
-    console.log(`    3. Enable Web Analytics on the Vercel project so the portal Traffic tab populates.`);
+    analyticsLines(analytics, 3).forEach((l) => console.log(l));
   } else {
     console.log(`    1. Checkpoint 1 — review Vercel preview URL(s).`);
     console.log(`    2. Checkpoint 2 — test-call each Twilio number; tune each agent-prompt.txt.`);
@@ -1460,7 +1657,7 @@ function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail
     });
     console.log(`    3. Checkpoint 3 — submit a test lead per site; confirm the Retell callback fires`);
     console.log(`       (/api/contact → create-phone-call) + Airtable row if post-call logging is set up.`);
-    console.log(`    4. Portal Traffic: enable Web Analytics on each site's Vercel project.`);
+    analyticsLines(analytics, 4).forEach((l) => console.log(l));
   }
   console.log('');
 }
@@ -1603,6 +1800,8 @@ async function main() {
         agentId, site, clientDir,
         sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID,
         siteTag,
+        // Envelope-level: one owner, one consented cell, however many sites they run.
+        intake.smsAlerts,
       );
     }
 
@@ -1654,7 +1853,7 @@ async function main() {
     baseSlug,
   });
 
-  printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail });
+  await printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail });
 
   if (DRY_RUN) {
     console.log('=== DRY RUN COMPLETE — no resources were created ===\n');

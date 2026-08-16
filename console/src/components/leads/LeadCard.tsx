@@ -8,9 +8,9 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Phone, EnvelopeSimple } from '@phosphor-icons/react';
-import { isStale } from '@/lib/lead-meta';
-import type { QueuedLead } from '@/lib/leadTypes';
+import { PencilSimple, Phone, EnvelopeSimple } from '@phosphor-icons/react';
+import { LEAD_SOURCE_LABEL, isStale } from '@/lib/lead-meta';
+import type { LeadSource, QueuedLead } from '@/lib/leadTypes';
 import { absoluteTime, relativeTime } from '@/lib/relativeTime';
 
 const PLAN_LABEL: Record<string, string> = {
@@ -19,9 +19,18 @@ const PLAN_LABEL: Record<string, string> = {
   enterprise: 'Enterprise',
 };
 
+export const SOURCE_ICON: Record<LeadSource, typeof Phone> = {
+  form: EnvelopeSimple,
+  call: Phone,
+  manual: PencilSimple,
+};
+
 /** The visual card. Rendered in a column and (undecorated) inside the DragOverlay. */
 export function LeadFace({ lead, dragging }: { lead: QueuedLead; dragging?: boolean }) {
   const stale = isStale(lead);
+  // A record written by an older build could carry a source this one doesn't know about, and a
+  // card that throws is worse than a card with the wrong glyph.
+  const SourceIcon = SOURCE_ICON[lead.source] ?? EnvelopeSimple;
   const fromCall = lead.source === 'call';
 
   return (
@@ -39,16 +48,17 @@ export function LeadFace({ lead, dragging }: { lead: QueuedLead; dragging?: bool
     >
       <div className="flex items-start gap-2">
         {/* Source badge. A call means a real conversation already happened, which is the
-            single most useful thing to know before opening anything. */}
+            single most useful thing to know before opening anything — so it keeps the accent
+            treatment to itself, and the two silent origins share the quiet one. */}
         <span
-          title={fromCall ? 'Called the demo agent' : 'Filled the interest form'}
+          title={LEAD_SOURCE_LABEL[lead.source] ?? 'Unknown source'}
           className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
           style={{
             background: fromCall ? 'var(--accent-glow)' : 'var(--surface-2)',
             color: fromCall ? 'var(--accent)' : 'var(--fg-3)',
           }}
         >
-          {fromCall ? <Phone size={11} weight="fill" /> : <EnvelopeSimple size={11} />}
+          <SourceIcon size={11} weight={fromCall ? 'fill' : 'regular'} />
         </span>
 
         <div className="flex min-w-0 flex-col gap-0.5">

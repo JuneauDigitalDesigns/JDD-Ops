@@ -7,8 +7,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
+import { LEAD_SOURCE_SHORT } from '@/lib/lead-meta';
 import type { DemoCall, PlanInterest, QueuedLead } from '@/lib/leadTypes';
 import { absoluteTime, relativeTime } from '@/lib/relativeTime';
+import { SOURCE_ICON } from './LeadCard';
 
 const PLAN_LABEL: Record<string, string> = {
   starter: 'Starter',
@@ -38,18 +40,28 @@ function signupUrl(siteUrl: string, plan: string | null): string {
   return plan ? `${base}/agreement?plan=${plan}` : `${base}/pricing`;
 }
 
-/** Click-to-edit inline field. Blurs auto-save; Escape cancels. */
+/**
+ * Click-to-edit inline field. Blurs auto-save; Escape cancels.
+ *
+ * `autoEdit` mounts the field already open with its text selected, for a lead that was just
+ * created by hand and whose placeholder name is the first thing you want to overwrite. The
+ * select-on-focus is scoped to that path deliberately: applied to every field, it would mean
+ * clicking into a phone number to fix one digit and destroying the whole value on the next
+ * keystroke.
+ */
 function EditField({
-  label, value, type = 'text', onSave, missingLabel,
+  label, value, type = 'text', onSave, missingLabel, autoEdit,
 }: {
   label: string;
   value: string | undefined | null;
   type?: string;
   onSave: (v: string | null) => void;
   missingLabel?: string;
+  autoEdit?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(Boolean(autoEdit));
   const [draft, setDraft] = useState(value ?? '');
+  const selectOnFocus = useRef(Boolean(autoEdit));
 
   useEffect(() => {
     if (!editing) setDraft(value ?? '');
@@ -74,6 +86,11 @@ function EditField({
           type={type}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onFocus={(e) => {
+            if (!selectOnFocus.current) return;
+            selectOnFocus.current = false;
+            e.currentTarget.select();
+          }}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); commit(); }
@@ -138,7 +155,7 @@ function PlanPills({
 }
 
 export default function LeadModal({
-  lead, call, siteUrl, onClose, onPatch, onDelete,
+  lead, call, siteUrl, onClose, onPatch, onDelete, startEditing,
 }: {
   lead: QueuedLead;
   call: DemoCall | null;
@@ -146,6 +163,8 @@ export default function LeadModal({
   onClose: () => void;
   onPatch: (patch: ModalPatch) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  /** Set by the board when this lead was just created by hand, so typing can start immediately. */
+  startEditing?: 'businessName';
 }) {
   const [notes, setNotes] = useState(lead.notes ?? '');
   const [phoneCopied, setPhoneCopied] = useState(false);
@@ -216,6 +235,11 @@ export default function LeadModal({
 
   const fromCall = lead.source === 'call';
   const isLost = lead.stage === 'lost';
+  const SourceIcon = SOURCE_ICON[lead.source] ?? EnvelopeSimple;
+  // A hand-created lead starts with these blank. Everything that would render an empty control
+  // hides until there is something to render.
+  const hasName = Boolean(lead.name?.trim());
+  const hasPhone = Boolean(lead.phone?.trim());
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
@@ -238,11 +262,15 @@ export default function LeadModal({
               {lead.businessName}
             </h2>
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-fg2">
-              <span>{lead.name}</span>
-              <span className="text-fg3">·</span>
+              {hasName && (
+                <>
+                  <span>{lead.name}</span>
+                  <span className="text-fg3">·</span>
+                </>
+              )}
               <span className="flex items-center gap-1 text-fg3">
-                {fromCall ? <Phone size={11} weight="fill" /> : <EnvelopeSimple size={11} />}
-                {fromCall ? 'Called the demo' : 'Interest form'}
+                <SourceIcon size={11} weight={fromCall ? 'fill' : 'regular'} />
+                {LEAD_SOURCE_SHORT[lead.source] ?? 'Unknown source'}
               </span>
               <span className="text-fg3">·</span>
               <span className="text-fg3" title={absoluteTime(lead.receivedAt)}>
@@ -314,17 +342,22 @@ export default function LeadModal({
             {/* ── LEFT: act ── */}
             <div className="flex flex-col gap-5">
 
-              {/* Actions */}
+              {/* Actions. The two phone controls stay out of the way until there is a number
+                  to dial — an empty primary button is a worse answer than no button. */}
               <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`}
-                  className="btn btn-sm btn-primary"
-                >
-                  <Phone size={13} weight="fill" /> {lead.phone}
-                </a>
-                <button type="button" onClick={copyPhone} className="btn btn-sm">
-                  <Copy size={13} /> {phoneCopied ? 'Copied' : 'Copy'}
-                </button>
+                {hasPhone && (
+                  <>
+                    <a
+                      href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`}
+                      className="btn btn-sm btn-primary"
+                    >
+                      <Phone size={13} weight="fill" /> {lead.phone}
+                    </a>
+                    <button type="button" onClick={copyPhone} className="btn btn-sm">
+                      <Copy size={13} /> {phoneCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={copySignup}
@@ -344,8 +377,10 @@ export default function LeadModal({
                 <h3 className="meta mb-3">Contact Info</h3>
                 <div className="flex flex-col gap-3">
                   <EditField
+                    key={`business-${lead.id}`}
                     label="Business"
                     value={lead.businessName}
+                    autoEdit={startEditing === 'businessName'}
                     onSave={(v) => { if (v) run({ businessName: v }); }}
                   />
                   <EditField

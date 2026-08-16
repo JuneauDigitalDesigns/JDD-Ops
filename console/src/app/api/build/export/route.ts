@@ -6,7 +6,6 @@ import {
   mergePackageJson,
   writeOnboardRoutes,
   writeSiteContent,
-  writeVerticalSiteTs,
   isValidSlug,
   placeComponents,
   repoDirFor,
@@ -19,6 +18,7 @@ import {
   type Entry,
 } from '@/lib/export';
 import type { SiteContent } from '@/data/site';
+import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
 import { loadGithubToken } from '@/lib/opsSecrets';
@@ -33,6 +33,27 @@ const GIT_TIMEOUT_MS = 30_000;
 const PUSH_TIMEOUT_MS = 120_000;
 /** Cadence for keeping the stream (and the client's idle watchdog) alive during npm steps. */
 const HEARTBEAT_MS = 10_000;
+
+/**
+ * Fill empty/preset-picsum image slots with the vertical's curated stock and record what was
+ * filled at `_meta.placeholder_images`, so a placeholder stays distinguishable from a real
+ * client photo and a later re-export re-evaluates it rather than trusting it.
+ *
+ * `includeWork` is deliberately NOT passed: that block injects fabricated case studies with
+ * invented locations and years, which must not reach a client site.
+ */
+function withPlaceholders(
+  content: SiteContent,
+  vertical: VerticalId | null | undefined,
+  step: (message: string) => void,
+): SiteContent {
+  const { content: filledContent, filled } = fillImagePlaceholders(content, vertical ?? 'hvac');
+  if (filled.length === 0) return filledContent;
+  step(
+    `Filled ${filled.length} empty image slot(s) with ${vertical ?? 'stock'} placeholder photography.`,
+  );
+  return { ...filledContent, _meta: { ...filledContent._meta, placeholder_images: filled } };
+}
 
 /** git splits its output across both pipes; error detail needs whichever one carries it. */
 function gitTail(r: GitResult): string {
@@ -152,12 +173,26 @@ export async function POST(req: Request) {
               ? `Installing the ${vertical} content preset…`
               : 'Installing the content schema…',
         );
+        // Placeholder imagery is filled HERE rather than in the dialogs: this is the one
+        // point both export and deploy pass through, a stale client can't bypass it, and
+        // the vertical branch below gets the same treatment for free. The fill runs AFTER
+        // resolveUploads so a staged upload that has since vanished — which collapses to
+        // "" — lands on a placeholder instead of shipping an empty <img> to a live site.
         if (content) {
           step('Copying uploaded images into the site…');
-          const resolved = resolveUploads(repoRoot, slug, content);
-          writeSiteContent(repoRoot, slug, resolved);
+          const { content: resolved, missing } = resolveUploads(repoRoot, slug, content);
+          if (missing.length > 0) {
+            step(
+              `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
+            );
+          }
+          writeSiteContent(repoRoot, slug, withPlaceholders(resolved, vertical, step));
         } else if (vertical) {
-          writeVerticalSiteTs(repoRoot, slug, VERTICAL_PRESETS[vertical]);
+          writeSiteContent(
+            repoRoot,
+            slug,
+            withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step),
+          );
         } else {
           copySiteData(repoRoot, slug);
         }

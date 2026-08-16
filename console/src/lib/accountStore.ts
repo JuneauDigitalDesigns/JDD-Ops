@@ -6,7 +6,9 @@ import {
   createAccount,
   upsertSite,
   removeSite,
+  zPortalAccount,
   type PortalAccount,
+  type PortalSite,
   type PortalSiteInput,
 } from '@jdd/schema';
 
@@ -71,6 +73,59 @@ export async function attachSiteToAccount(
   const next = upsertSite(account, site);
   await getRedis().set(key, next);
   return next;
+}
+
+export type PatchResult =
+  | { ok: true; before: PortalSite; after: PortalSite; written: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Set specific fields on one site of an account.
+ *
+ * Distinct from `attachSiteToAccount`, which rebuilds an entry from a client's disk state.
+ * This is the repair path: an operator naming exactly which fields to change and what to
+ * change them to, for the cases disk can't answer — a `vercelProjectId` the console isn't
+ * credentialed to look up, or a Stripe id that only exists in Stripe.
+ *
+ * **`undefined` and `null` mean different things and the caller must mean them.** Omitting
+ * a key preserves whatever is stored; passing `null` asserts "I looked, there is nothing".
+ * `upsertSite`'s merge honours that distinction, and conflating the two is precisely the
+ * bug that silently disconnected a client's Call Log — so this function never invents a
+ * value for a field the caller didn't mention.
+ *
+ * Validates the whole resulting record before writing. `link-portal` has no such guard;
+ * a free-form field editor needs one, because a bad `status` here is a record the portal
+ * can't read at all.
+ */
+export async function patchSite(
+  email: string,
+  slug: string,
+  fields: Partial<PortalSite>,
+  { dryRun = false }: { dryRun?: boolean } = {},
+): Promise<PatchResult> {
+  const key = accountKey(email);
+  const account = await getRedis().get<PortalAccount>(key);
+  if (!account) return { ok: false, error: `No portal account for ${email}.` };
+
+  const before = account.sites.find((s) => s.slug === slug);
+  if (!before) {
+    return {
+      ok: false,
+      error: `Account ${email} has no site "${slug}" (has: ${account.sites.map((s) => s.slug).join(', ') || 'none'}).`,
+    };
+  }
+
+  const next = upsertSite(account, { ...fields, slug });
+  const after = next.sites.find((s) => s.slug === slug)!;
+
+  const parsed = zPortalAccount.safeParse(next);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    return { ok: false, error: `Refusing to write — invalid record (${issues}).` };
+  }
+
+  if (!dryRun) await getRedis().set(key, next);
+  return { ok: true, before, after, written: !dryRun };
 }
 
 /**

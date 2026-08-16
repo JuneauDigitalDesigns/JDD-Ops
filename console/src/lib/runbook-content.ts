@@ -320,7 +320,7 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
           items: isTollFree
             ? [
                 { text: 'Twilio Console → Messaging → Regulatory Compliance → Toll-Free Verification → Create.' },
-                { text: `Select ${twilio.value}; business info; use-case “Customer Care / Notifications”; sample = the owner call-brief SMS; opt-in = business agreement.` },
+                { text: `Select ${twilio.value}; business info; use-case “Customer Care / Notifications”; sample = the owner call-brief SMS. Opt-in = a separate unchecked checkbox beside a mobile-number field on the public agreement page (juneaudigitaldesigns.com/agreement); it is not a condition of purchase, and consent records carry timestamp, IP, and a hash of the wording shown.` },
                 { text: 'Submit; status must reach Verified before SMS delivers.' },
               ]
             : [
@@ -388,13 +388,14 @@ function portalPhase(ctx: ClientContext, config: OpsConfig): Phase {
       {
         t: 'callout',
         tone: 'info',
-        body: 'The Clerk portal user already exists with vercelProjectId set (onboard.js step 10 wrote it from the client’s Vercel project). You only need to switch Web Analytics on — no command, no Clerk edit.',
+        body: 'The portal account record already has vercelProjectId set (onboard.js step 10 wrote it from the client’s Vercel project). You only need to switch Web Analytics on — no command, no account edit.',
       },
       {
         t: 'substeps',
         items: [
           { text: 'Vercel → the client’s project → Analytics → Enable Web Analytics.', detail: '@vercel/analytics is already in the template root layout, so no code change or redeploy is needed — the project starts collecting once enabled.' },
           { text: 'The Traffic tab stays empty until the live site receives real visitors — visit the site once and confirm data appears within ~30s.' },
+          { text: 'Verify it rather than trusting the toggle: npm run audit-analytics', detail: 'Exit 0 = every live site collecting, 1 = at least one is off (it names the project), 2 = could not check. onboard.js also reports this at the end of a run.' },
         ],
       },
       { t: 'nav', app: 'Vercel', path: ['Project', 'Analytics', 'Enable Web Analytics'] },
@@ -404,7 +405,7 @@ function portalPhase(ctx: ClientContext, config: OpsConfig): Phase {
             {
               t: 'callout',
               tone: 'warn',
-              body: 'Enterprise: enable Web Analytics on each site’s Vercel project. Every entry in publicMetadata.sites[] carries its own vercelProjectId, and each project needs Analytics switched on to light up that site’s Traffic tab.',
+              body: 'Enterprise: enable Web Analytics on each site’s Vercel project. Every entry in the account record’s sites[] carries its own vercelProjectId, and each project needs Analytics switched on to light up that site’s Traffic tab.',
             } as Block,
           ])
         : []),
@@ -525,8 +526,9 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
               { text: 'Open your post-call scenario. Module 1: Custom webhook (Retell posts call_ended/call_analyzed here).' },
               { text: 'Add a Filter immediately after the webhook that only passes AI-handled leads (e.g. event = call_analyzed AND custom_analysis_data.caller_name exists) — so client-answered calls never log or text.' },
               { text: 'Module: Airtable → Create a Record, table Call Log; map Date / Caller name / Caller number / Summary / Duration / Call type / Outcome. Leave the Base as a PLACEHOLDER — onboard.js overwrites it per clone.' },
-              { text: 'Module: Twilio → Send a Message (JDD SID/auth connection). Leave From and To as PLACEHOLDERS — onboard.js sets From = client TWILIO_NUMBER and To = the owner (brand.phone) per clone.' },
-              { text: 'SMS body draws from the Retell analysis fields, e.g. “{{urgency}} — new lead: {{caller_name}}, {{callback_number}}”.' },
+              { text: 'Module: Twilio → Send a Message (JDD SID/auth connection). Leave From and To as PLACEHOLDERS — onboard.js sets From = client TWILIO_NUMBER and To = the owner’s CONSENTED alert number per clone. If the owner never opted in, onboard.js removes this module from the clone entirely.' },
+              { text: 'Send via the A2P Messaging Service, not a bare From number — the Messaging Service carries the approved campaign and the Advanced Opt-Out (STOP/HELP) behaviour.' },
+              { text: 'SMS body MUST identify the sender and carry opt-out language. Use exactly: “Juneau Digital Designs call alert: {{urgency}}. New lead {{caller_name}}, callback {{callback_number}}. Reply STOP to opt out.” This string must match the sample message submitted with the A2P campaign and the sample shown on juneaudigitaldesigns.com/sms-terms.' },
               { text: 'Save, then Deactivate the master (only per-client clones run).' },
             ],
           },
@@ -551,12 +553,17 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             t: 'substeps',
             items: [
               { text: 'Twilio Console → Messaging → Regulatory Compliance → A2P 10DLC. Register the JDD Brand (business/EIN) once.' },
-              { text: 'Create a Campaign (use-case: Customer Care / account notifications; sample message = the owner call brief).' },
-              { text: 'Create/attach a Messaging Service whose Sender Pool holds the client numbers; local numbers get added here during onboarding.' },
-              { text: 'Toll-free numbers instead use per-number Toll-Free Verification (handled in each client’s onboarding step).' },
+              { text: 'Create/attach a Messaging Service FIRST, and enable Advanced Opt-Out on it (STOP / HELP / START). That is what handles opt-out keywords; the site has no inbound SMS webhook wired.' },
+              { text: 'Create a Campaign against that Messaging Service. Use-case: Customer Care / account notifications.' },
+              { text: 'Sample message: “Juneau Digital Designs call alert: Callback requested. New lead Maria Alvarez, callback (930) 555-0117. Reply STOP to opt out.” Must match the Make master body and /sms-terms.' },
+              { text: 'Opt-in description: consent is a separate unchecked checkbox beside a mobile-number field on the PUBLIC agreement page, juneaudigitaldesigns.com/agreement?plan=growth (no login). Tell the reviewer to open that URL and scroll to “Your details”. Consent is not a condition of purchase, and alerts only activate after Stripe payment completes.' },
+              { text: 'Point the reviewer at juneaudigitaldesigns.com/sms-terms (linked in the site footer) for program name, message types, frequency, rates, and STOP/HELP.' },
+              { text: 'Sender Pool holds the client LOCAL numbers; onboard.js adds each one automatically when TWILIO_MESSAGING_SERVICE_SID is set.' },
+              { text: 'Toll-free numbers cannot join the pool — they need per-number Toll-Free Verification instead (onboard.js warns loudly when it falls back to one).' },
             ],
           },
-          { t: 'callout', tone: 'warn', body: 'Carrier approval takes days — do this early. Until a number’s registration is approved, owner SMS silently fails (call logging still works).' },
+          { t: 'callout', tone: 'warn', body: 'Carrier approval takes days — do this early. Until a number’s registration is approved, owner SMS silently fails with error 30034 (call logging still works).' },
+          { t: 'callout', tone: 'info', body: 'Consent proof: every opt-in and opt-out is stored with timestamp, IP, user agent, and a hash of the exact wording shown. Look it up with GET /api/ops/sms-consent?phone=+1… (x-ops-secret header) on the agency site.' },
           { t: 'link', label: 'Twilio A2P 10DLC', href: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/a2p-10dlc' },
         ],
       },
@@ -576,7 +583,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             t: 'substeps',
             items: [
               { text: 'Clerk: create an application; set CLERK_SECRET_KEY + NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (and sign-in URL vars). The same CLERK_SECRET_KEY also goes in jdd-ops/.env for step 10.' },
-              { text: 'Vercel Web Analytics: set VERCEL_TOKEN (a read-scoped access token) and, if client projects live under a team, VERCEL_TEAM_ID. The portal’s Traffic tab reads every client’s traffic through the Vercel Web Analytics API — no per-client Google service account.' },
+              { text: 'Vercel API: set VERCEL_TOKEN and VERCEL_TEAM_ID in the agency repo’s .env.local AND on its Vercel project. These power the Traffic tab (Web Analytics API) and the Overview health strip (deployments + domains). Without them the Traffic tab returns “We couldn’t load this” on a perfectly healthy client — this outage already happened. Note Vercel has no read-only tokens: project-scoped ones deny team-level resources, so a team-scoped token is required.' },
               { text: 'PAGESPEED_API_KEY — PageSpeed Insights API key (still Google; one global key powers the Performance tab).' },
               { text: 'Upstash Redis: provision (Vercel → Storage) and confirm the env names match Redis.fromEnv() (UPSTASH_REDIS_REST_URL/_TOKEN).' },
               { text: 'AIRTABLE_API_KEY — the same JDD key; the portal reads each client’s Call Log.' },
@@ -584,8 +591,8 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
           },
           { t: 'env', file: 'juneau-digital-designs/.env', vars: [
             { key: 'CLERK_SECRET_KEY + NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', value: 'Clerk app (auth for /portal)' },
-            { key: 'VERCEL_TOKEN + VERCEL_TEAM_ID', value: 'read-scoped token (+ team) — reads client traffic via Vercel Web Analytics API' },
-            { key: 'PAGESPEED_API_KEY', value: 'PageSpeed Insights' },
+            { key: 'VERCEL_TOKEN + VERCEL_TEAM_ID', value: 'team-scoped token — Traffic tab + Overview health strip. Required, not optional.' },
+            { key: 'PAGESPEED_API_KEY', value: 'PageSpeed Insights — score + CrUX real-user field data' },
             { key: 'AIRTABLE_API_KEY', value: 'same JDD key — reads each client Call Log' },
             { key: 'UPSTASH_REDIS_REST_URL + _TOKEN', value: 'cache + rate-limit (Redis.fromEnv())' },
           ] },

@@ -14,12 +14,10 @@ import NavSlot from '@/components/NavSlot';
 import PageHeader from '@/components/shell/PageHeader';
 import RefreshButton from '@/components/shell/RefreshButton';
 import WarnBanner from '@/components/shell/WarnBanner';
-import AttentionStrip from './AttentionStrip';
 import ClientCard from './ClientCard';
 import IndexControls, { type SortKey } from './IndexControls';
 import IntakeCard from './IntakeCard';
 import IntakeImportDialog from './IntakeImportDialog';
-import NewClientCard from './NewClientCard';
 import NewClientDialog from './NewClientDialog';
 import PendingOnboardCard, { type PendingOnboardSummary } from './PendingOnboardCard';
 
@@ -37,8 +35,12 @@ import PendingOnboardCard, { type PendingOnboardSummary } from './PendingOnboard
  * them at the one thing this index structurally cannot show — the people who aren't clients
  * yet.
  *
- * So: attention first (only when something is wrong), then search, then one flat list sorted
- * by what you'd most likely want — problems, then whatever you last touched.
+ * So: search, then one flat list sorted by what you'd most likely want — problems, then
+ * whatever you last touched. There used to also be a permanent banner for "something's
+ * wrong"; it was removed because the same signal already lives in two other places (the
+ * Needs attention chip below, and each card's own top band + reason line), and a banner
+ * repeating them became wallpaper. The chip is the whole feature now — it counts, colors
+ * itself, and filters to exactly those clients on click.
  */
 
 /**
@@ -82,6 +84,29 @@ function compareCards(
 
   return a.brandName.localeCompare(b.brandName);
 }
+
+/** Case-insensitive substring match on display name or slug. An empty query matches everything. */
+function matchesQuery(name: string, slug: string, q: string): boolean {
+  if (!q) return true;
+  return name.toLowerCase().includes(q) || slug.toLowerCase().includes(q);
+}
+
+/** 0 = name or slug starts with the query, 1 = it only contains it. Lower ranks higher. */
+function matchRank(name: string, slug: string, q: string): number {
+  const n = name.toLowerCase();
+  const s = slug.toLowerCase();
+  return n.startsWith(q) || s.startsWith(q) ? 0 : 1;
+}
+
+/**
+ * One entry in the grid, whichever of the three kinds it is. Searching mixes all three into
+ * a single ranked list (see `entries` below) — this is what makes that possible without three
+ * parallel arrays and a render order that has to be kept in sync by hand.
+ */
+type GridEntry =
+  | { kind: 'intake'; key: string; name: string; slug: string; intake: IntakeSummary }
+  | { kind: 'pending'; key: string; name: string; slug: string; item: PendingOnboardSummary }
+  | { kind: 'client'; key: string; name: string; slug: string; ctx: ClientContext };
 
 export default function ClientIndex() {
   const router = useRouter();
@@ -255,52 +280,104 @@ export default function ClientIndex() {
     });
   }, []);
 
-  const cards = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = clients.filter((c) => {
-      if (q && !c.brandName.toLowerCase().includes(q) && !c.slug.toLowerCase().includes(q)) {
-        return false;
-      }
-      if (plans.size > 0 && !plans.has(c.plan)) return false;
-      if (attentionOnly && !attentionBySlug.has(c.slug)) return false;
-      return true;
-    });
-    return filtered.sort((a, b) =>
-      compareCards(a, b, sort, attentionBySlug, activity, health, state),
-    );
-  }, [clients, query, plans, attentionOnly, sort, attentionBySlug, activity, health, state]);
-
-  /** Any filter narrowing the grid. Decides whether the add-card and "No matches" show. */
+  /** Any filter narrowing the grid. Decides whether "No matches" vs. the empty state shows. */
   const filtering = query.trim() !== '' || plans.size > 0 || attentionOnly;
 
   /**
-   * Pending signups, filtered by the two controls that actually apply to them.
+   * Every card in the grid, one list.
    *
-   * Query and plan match on real properties an intake has. `attentionOnly` hides them all:
-   * attention is computed from disk state, and an unclaimed signup has none — showing it
-   * under a filter that means "things that are wrong" would misreport it as a problem.
+   * `attentionOnly` excludes intakes and pending-onboarding entirely: attention is computed
+   * from disk state, and neither has any — showing them under a filter that means "things
+   * that are wrong" would misreport them as a problem.
+   *
+   * Plan and query apply to all three kinds. This is also the fix for a real bug: pending-
+   * onboarding cards used to render unconditionally, so they (and, structurally, intakes)
+   * survived every search and sat pinned ahead of whatever you were actually looking for.
+   *
+   * With no query, the old grouping holds — intakes, then pending, then clients ordered by
+   * the chosen sort (attention rank always wins first). With a query, that grouping is
+   * dropped: a search means "find this client", so all three kinds merge into one list
+   * ranked by match quality (starts-with beats contains), then name. The Sort select resumes
+   * control the moment the box is cleared.
    */
-  const visibleIntakes = useMemo(() => {
-    if (attentionOnly) return [];
+  const entries = useMemo((): GridEntry[] => {
     const q = query.trim().toLowerCase();
-    return intakes.filter((it) => {
-      if (q && !it.brandName.toLowerCase().includes(q) && !it.slugGuess.toLowerCase().includes(q)) {
-        return false;
-      }
-      if (plans.size > 0 && !plans.has(it.plan)) return false;
-      return true;
-    });
-  }, [intakes, query, plans, attentionOnly]);
+
+    const visibleIntakes = attentionOnly
+      ? []
+      : intakes.filter(
+          (it) =>
+            matchesQuery(it.brandName, it.slugGuess, q) &&
+            (plans.size === 0 || plans.has(it.plan)),
+        );
+
+    const visiblePending = attentionOnly
+      ? []
+      : pendingOnboard.filter(
+          (p) =>
+            matchesQuery(p.name, p.slug, q) &&
+            (plans.size === 0 || plans.has(p.plan as Plan)),
+        );
+
+    const visibleClients = clients.filter(
+      (c) =>
+        matchesQuery(c.brandName, c.slug, q) &&
+        (plans.size === 0 || plans.has(c.plan)) &&
+        (!attentionOnly || attentionBySlug.has(c.slug)),
+    );
+
+    const intakeEntries: GridEntry[] = visibleIntakes.map((intake) => ({
+      kind: 'intake',
+      key: `intake:${intake.id}`,
+      name: intake.brandName,
+      slug: intake.slugGuess,
+      intake,
+    }));
+    const pendingEntries: GridEntry[] = visiblePending.map((item) => ({
+      kind: 'pending',
+      key: `pending:${item.slug}`,
+      name: item.name,
+      slug: item.slug,
+      item,
+    }));
+    const clientEntries: GridEntry[] = visibleClients
+      .sort((a, b) => compareCards(a, b, sort, attentionBySlug, activity, health, state))
+      .map((ctx) => ({ kind: 'client', key: `client:${ctx.slug}`, name: ctx.brandName, slug: ctx.slug, ctx }));
+
+    if (!q) {
+      return [...intakeEntries, ...pendingEntries, ...clientEntries];
+    }
+
+    return [...intakeEntries, ...pendingEntries, ...clientEntries].sort(
+      (a, b) => matchRank(a.name, a.slug, q) - matchRank(b.name, b.slug, q) || a.name.localeCompare(b.name),
+    );
+  }, [
+    query,
+    plans,
+    attentionOnly,
+    intakes,
+    pendingOnboard,
+    clients,
+    attentionBySlug,
+    sort,
+    activity,
+    health,
+    state,
+  ]);
 
   return (
     <div className="relative z-10 flex h-full flex-col">
       {/* The bar used to carry all four of these plus a "Clients" title. Now: the title is a
           real h1 in the page below, Refresh is an icon in the navbar's utility cluster
-          (where every route's refresh lives), "New client" is the first card in the grid,
-          and only the cross-route link is left as an action. */}
+          (where every route's refresh lives), "New client" is a fixed button in the controls
+          row below (not a grid cell — its position shouldn't move with the filters), and
+          only the cross-route link is left as an action. */}
       <NavSlot>
         <Link href="/archive" className="btn btn-xs">
           Archive
+        </Link>
+        <Link href="/sms-consent" className="btn btn-xs">
+          SMS consent
         </Link>
         <Link href="/leads" className="btn btn-xs">
           Leads <ArrowRight size={12} weight="bold" />
@@ -342,8 +419,6 @@ export default function ClientIndex() {
         </div>
       ) : (
         <div className="no-scrollbar flex-1 overflow-y-auto">
-          <AttentionStrip items={attentionItems} />
-
           <div className="mx-auto w-full max-w-[1180px] px-6 py-8 md:px-8">
             <PageHeader title="Clients" lede="Everything under clients/, worst first." />
 
@@ -359,8 +434,9 @@ export default function ClientIndex() {
               attentionCount={attentionItems.length}
               showFixtures={showFixtures}
               onToggleFixtures={toggleFixtures}
-              shown={cards.length}
-              total={clients.length}
+              shown={entries.length}
+              total={clients.length + intakes.length + pendingOnboard.length}
+              onNew={() => setCreating(true)}
             />
 
             {intakeError && (
@@ -369,45 +445,52 @@ export default function ClientIndex() {
               </p>
             )}
 
-            {/* Front of the grid, in order: add-card, then unclaimed signups, then clients.
-                New work first, in the one place your eye already goes.
-
-                The add-card is suppressed only while a filter is narrowing the list, where
-                "add" would be answering a question nobody asked. With no clients and no
-                signups the grid still renders exactly one card, and it's the right one — so
-                the empty state needs no special copy. */}
+            {/* One list, three card kinds. With no query: unclaimed signups, then pending
+                onboarding, then clients — new work first, in the one place your eye already
+                goes. A search query drops that grouping (see the `entries` memo) so a match
+                is never buried behind cards that don't match at all. */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {!filtering && <NewClientCard onClick={() => setCreating(true)} />}
-
-              {visibleIntakes.map((it) => (
-                <IntakeCard
-                  key={it.id}
-                  intake={it}
-                  busy={importing === it.id}
-                  onImport={() => setPendingIntake(it)}
-                />
-              ))}
-
-              {!attentionOnly && pendingOnboard.map((p) => (
-                <PendingOnboardCard key={p.slug} item={p} />
-              ))}
-
-              {cards.map((c) => (
-                <ClientCard
-                  key={c.slug}
-                  ctx={c}
-                  clientState={state[c.slug]}
-                  config={config}
-                  health={health[c.slug]}
-                  lastTouched={activity[c.slug]}
-                  attention={attentionBySlug.get(c.slug)}
-                  onSelect={() => router.push(`/c/${c.slug}`)}
-                />
-              ))}
+              {entries.map((entry) => {
+                if (entry.kind === 'intake') {
+                  return (
+                    <IntakeCard
+                      key={entry.key}
+                      intake={entry.intake}
+                      busy={importing === entry.intake.id}
+                      onImport={() => setPendingIntake(entry.intake)}
+                    />
+                  );
+                }
+                if (entry.kind === 'pending') {
+                  return <PendingOnboardCard key={entry.key} item={entry.item} />;
+                }
+                const c = entry.ctx;
+                return (
+                  <ClientCard
+                    key={entry.key}
+                    ctx={c}
+                    clientState={state[c.slug]}
+                    config={config}
+                    health={health[c.slug]}
+                    lastTouched={activity[c.slug]}
+                    attention={attentionBySlug.get(c.slug)}
+                    onSelect={() => router.push(`/c/${c.slug}`)}
+                  />
+                );
+              })}
             </div>
 
-            {filtering && cards.length === 0 && (
-              <p className="py-16 text-center text-xs text-fg3">No matches.</p>
+            {entries.length === 0 && (
+              <p className="py-16 text-center text-xs text-fg3">
+                {filtering ? (
+                  'No matches.'
+                ) : (
+                  <>
+                    No clients yet. Use <span className="font-medium text-fg2">New client</span> to add
+                    one.
+                  </>
+                )}
+              </p>
             )}
           </div>
         </div>

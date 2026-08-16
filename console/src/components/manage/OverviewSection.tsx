@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowSquareOut,
   ArrowsClockwise,
@@ -18,6 +18,7 @@ import {
 import { relativeTime, absoluteTime } from '@/lib/relativeTime';
 import type { AuditEntry } from '@/lib/audit';
 import { useManage } from './ManageContext';
+import PlanControl from './PlanControl';
 import SectionHeader from './SectionHeader';
 
 /**
@@ -41,6 +42,7 @@ export default function OverviewSection() {
   // object, so the three can't disagree about where the site lives.
   const { ctx, site, domains } = useManage();
   const pending = ctx.pendingOnboarding ?? null;
+  const router = useRouter();
   const params = useSearchParams();
   const qs = params.get('site') ? `?site=${encodeURIComponent(params.get('site') as string)}` : '';
 
@@ -138,6 +140,13 @@ export default function OverviewSection() {
 
   const liveUrl = domains.liveUrl;
 
+  // The three ids a growth client can only get from a real onboard.js run. A plan upgrade
+  // made here writes everything else, so this list is exactly what's still missing.
+  const unprovisionedVoice =
+    ctx.plan === 'growth' && !pending
+      ? ['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'AIRTABLE_BASE_ID'].filter((k) => !site.env[k])
+      : [];
+
   // Three genuinely different situations the old tile blurred together:
   //   - serving on the Vercel alias with no custom domain — normal, not a problem
   //   - a custom domain attached and verified — the goal
@@ -172,7 +181,7 @@ export default function OverviewSection() {
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
       <SectionHeader
         title="Overview"
-        lede={`${ctx.plan} plan · ${ctx.sites.length} site${ctx.sites.length === 1 ? '' : 's'}${pending ? ' · pending onboarding' : ` · clients/${ctx.slug}`}`}
+        lede={`${ctx.sites.length} site${ctx.sites.length === 1 ? '' : 's'}${pending ? ' · pending onboarding' : ` · clients/${ctx.slug}`}`}
         actions={
           liveUrl && !pending && (
             <a href={liveUrl} target="_blank" rel="noreferrer" className="btn btn-sm">
@@ -181,6 +190,38 @@ export default function OverviewSection() {
           )
         }
       />
+
+      <div className="mb-6 -mt-2">
+        <PlanControl ctx={ctx} onChanged={() => router.refresh()} />
+      </div>
+
+      {/* Growth tier, but the resources growth pays for don't exist. Checked against the env
+          directly rather than via detectedStatus, which reports needs-build first when the
+          repo folder is missing — hiding this in exactly the case it matters most. */}
+      {unprovisionedVoice.length > 0 && (
+        <div
+          className="mb-6 rounded-[12px] border p-5"
+          style={{ borderColor: 'var(--warn)', background: 'var(--surface)' }}
+        >
+          <div className="flex flex-col gap-1">
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+              <Warning size={15} weight="fill" style={{ color: 'var(--warn)', flexShrink: 0 }} />
+              Growth plan, voice not provisioned
+            </span>
+            <p className="text-xs text-fg2">
+              {unprovisionedVoice.join(', ')} {unprovisionedVoice.length === 1 ? 'is' : 'are'} unset,
+              but lead delivery is set to <span className="mono">callback</span> — the live site's
+              contact form has nothing to dial, so every lead fails.
+            </p>
+            <p className="text-xs text-fg3">
+              Re-run onboarding to provision them:{' '}
+              <span className="mono text-fg2">
+                npm run onboard -- --schema clients/{ctx.slug}/site.ts
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {pending && (
         <div

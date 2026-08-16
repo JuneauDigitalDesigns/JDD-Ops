@@ -2,6 +2,9 @@ node_modules/
 .next/
 .env
 .env.local
+# Backups made before editing an env file hold the same secrets as the original.
+.env.bak-*
+.env.*.bak-*
 # Client folders live only on local machines — each client gets its own GitHub repo.
 # Keep the directory present on fresh clones via .gitkeep, but track nothing else.
 /clients/*

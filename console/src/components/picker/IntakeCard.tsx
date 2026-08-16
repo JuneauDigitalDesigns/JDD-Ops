@@ -6,13 +6,14 @@ import { relativeTime } from '@/lib/relativeTime';
 import type { IntakeSummary } from '@/lib/useIntakeQueue';
 
 /**
- * A pending signup, sitting in the client grid right after "Add a new client".
+ * A pending signup, sitting in the client grid ahead of real clients.
  *
  * ── Why it's in the grid ────────────────────────────────────────────────────────────────
  * This used to be a separate strip above the roster, which framed a new signup as a
  * notification ABOUT the list. It isn't — it's a member of the list that hasn't been claimed
- * yet. Putting it in the grid at the front means new work is the first thing on the screen,
- * in the same place your eye already goes for the add-card.
+ * yet. Putting it in the grid at the front means new work is the first thing on the screen.
+ * A search query drops this ordering — see `entries` in ClientIndex — so a match is never
+ * buried behind an unrelated signup.
  *
  * ── Why it looks different ──────────────────────────────────────────────────────────────
  * It must not read as a client, because you cannot do anything to it yet: there is no
@@ -26,8 +27,8 @@ import type { IntakeSummary } from '@/lib/useIntakeQueue';
  *   • It says what it is ("New signup") and what to do ("Import"), because the whole card is
  *     one action rather than a link into three tools.
  *
- * It is deliberately NOT the dashed treatment <NewClientCard> uses. Dashed means "nothing is
- * here yet"; a signup is real data waiting on a decision.
+ * It is deliberately NOT a dashed treatment. Dashed means "nothing is here yet"; a signup is
+ * real data waiting on a decision.
  */
 export default function IntakeCard({
   intake,

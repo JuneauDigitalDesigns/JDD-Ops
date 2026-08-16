@@ -79,6 +79,20 @@ export async function getLead(id: string): Promise<QueuedLead | null> {
   return getRedis().get<QueuedLead>(leadKey(id));
 }
 
+/**
+ * Write a new lead and index it — the manual counterpart to the agency site's enqueueLead.
+ *
+ * Same two keys, same score, same absence of a TTL, because a lead the console created must be
+ * indistinguishable from one the site produced everywhere downstream. The one omission is the
+ * jdd:lead:by-call reverse key: that exists so the demo-call reconcile cron can tell a call it
+ * has already ingested from a new one, and a hand-typed lead has no call to point back at.
+ */
+export async function createLead(rec: QueuedLead): Promise<void> {
+  const redis = getRedis();
+  await redis.set(leadKey(rec.id), rec);
+  await redis.zadd(LEAD_INDEX, { score: rec.receivedAt, member: rec.id });
+}
+
 export interface LeadPatch {
   stage?: LeadStage;
   order?: number;

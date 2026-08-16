@@ -582,19 +582,32 @@ export function rewriteClientSchema(repoRoot: string, slug: string, data: unknow
 /**
  * Walk the content tree; for every string value shaped "upload://<file>", copy the staged
  * file from console/.uploads into clients/<slug>/repo/public/images and rewrite the value to
- * "/images/<file>". Returns a deep clone with refs resolved; unknown refs collapse to "".
+ * "/images/<file>".
+ *
+ * Returns a deep clone with refs resolved, plus the filenames of any refs that could not be
+ * resolved. Those still collapse to "" — but the caller reports them and backfills the slot
+ * with placeholder imagery, because a staged upload vanishing between upload and export used
+ * to ship an empty <img> to a live client site with nothing in the stream to say so.
  */
-export function resolveUploads(repoRoot: string, slug: string, content: SiteContent): SiteContent {
+export function resolveUploads(
+  repoRoot: string,
+  slug: string,
+  content: SiteContent,
+): { content: SiteContent; missing: string[] } {
   const stageDir = resolve(process.cwd(), '.uploads');
   const publicImg = resolve(repoDirFor(repoRoot, slug), 'public', 'images');
   let created = false;
+  const missing = new Set<string>();
 
   const walk = (v: unknown): unknown => {
     if (typeof v === 'string') {
       if (!v.startsWith('upload://')) return v;
       const file = v.slice('upload://'.length);
       const src = resolve(stageDir, file);
-      if (!existsSync(src)) return '';
+      if (!existsSync(src)) {
+        missing.add(file);
+        return '';
+      }
       if (!created) {
         mkdirSync(publicImg, { recursive: true });
         created = true;
@@ -610,5 +623,5 @@ export function resolveUploads(repoRoot: string, slug: string, content: SiteCont
     }
     return v;
   };
-  return walk(content) as SiteContent;
+  return { content: walk(content) as SiteContent, missing: [...missing] };
 }

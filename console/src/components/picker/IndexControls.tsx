@@ -1,6 +1,6 @@
 'use client';
 
-import { Flask, MagnifyingGlass, Warning } from '@phosphor-icons/react';
+import { Flask, MagnifyingGlass, Plus, Warning } from '@phosphor-icons/react';
 import type { Plan } from '@/lib/types';
 
 export type SortKey = 'touched' | 'name' | 'status' | 'health';
@@ -34,6 +34,7 @@ export default function IndexControls({
   attentionCount,
   showFixtures, onToggleFixtures,
   shown, total,
+  onNew,
 }: {
   query: string;
   onQuery: (v: string) => void;
@@ -48,10 +49,15 @@ export default function IndexControls({
   onToggleFixtures: () => void;
   shown: number;
   total: number;
+  onNew: () => void;
 }) {
   return (
     <div className="mb-6 flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={onNew} className="btn shrink-0">
+          <Plus size={14} weight="bold" /> New client
+        </button>
+
         <div className="relative min-w-[220px] flex-1">
           <MagnifyingGlass
             size={14}
@@ -130,7 +136,10 @@ export default function IndexControls({
               ? { background: 'var(--warn-glow)', color: 'var(--warn)', borderColor: 'var(--warn)' }
               : attentionCount === 0
                 ? { color: 'var(--fg-3)', opacity: 0.5 }
-                : { color: 'var(--fg-3)' }
+                // This chip is now the ONLY always-visible surface for "something's wrong" —
+                // AttentionStrip is gone. Give it the warn color at rest, not just when
+                // pressed, so a live problem still catches the eye without a banner.
+                : { color: 'var(--warn)', borderColor: 'var(--warn)' }
           }
         >
           <Warning size={12} weight="fill" /> Needs attention

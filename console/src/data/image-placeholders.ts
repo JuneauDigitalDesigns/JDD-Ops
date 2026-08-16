@@ -1,16 +1,27 @@
-// Preview-only image placeholders for the studio build catalog.
+// Image placeholders for the studio build catalog — and for export.
 //
 // Several catalog components render nothing (Work) or fall back to gray numeral
 // tiles (services/testimonials) when the effective content carries no imagery —
 // and the vertical presets intentionally ship empty work/service/avatar images.
-// To make the *builder preview* look real, `injectImagePlaceholders` fills those
-// empty (or preset-picsum) image slots with per-vertical curated topical stock.
+// `fillImagePlaceholders` fills those empty (or preset-picsum) image slots with
+// per-vertical curated topical stock.
 //
-// IMPORTANT: this is preview-only. The transform is applied to a copy that is fed
-// solely to `buildCategories` (see BuildWizard). Export continues to serialize the
-// untouched `effective`, so none of these placeholder URLs ever reach a client
-// site. A slot becomes "real" only when the user sets an image in the BrandDrawer
-// (a present, non-picsum value), which this transform then leaves untouched.
+// THESE URLS SHIP. The build preview and the exported repo both run through this
+// transform, so a client who supplied no photography gets the placeholder rather
+// than a gray tile or a dead picsum hotlink. That is deliberate: the preview and
+// the deployed site must agree. Every slot filled here is reported back in
+// `filled` and recorded at `_meta.placeholder_images` by the export route, so a
+// placeholder stays distinguishable from a real client photo — and so a later
+// re-export re-evaluates it instead of mistaking it for one.
+//
+// The one exception is `opts.includeWork`, which injects five fully fabricated
+// case studies (invented locations, years and scope). Those are copy, not
+// imagery, and must never reach a client site — jdd-ops CLAUDE.md forbids
+// inventing values. Only the preview passes it.
+//
+// A slot becomes "real" when the user sets an image in the BrandDrawer (a
+// present, non-picsum value not carried over from a previous placeholder run),
+// which this transform then leaves untouched.
 //
 // All URLs below were fetched from Unsplash's public search API and verified to
 // return HTTP 200. They are free `images.unsplash.com` photos (no Unsplash+),
@@ -178,18 +189,71 @@ function needsPlaceholder(v: unknown): boolean {
   return !isPresent(v);
 }
 
+/** Every URL this table can emit, across all verticals — what a prior run could have written. */
+const KNOWN_PLACEHOLDER_URLS: ReadonlySet<string> = new Set<string>([
+  ...PLACEHOLDER_AVATARS,
+  ...Object.values(PREVIEW_PLACEHOLDERS).flatMap((s) => [
+    ...s.heroSlides.map((i) => i.url),
+    s.aboutFeature.url,
+    ...s.serviceImages.map((i) => i.url),
+  ]),
+]);
+
+/**
+ * True when the value is stock this module wrote, rather than a real client image.
+ * Guards the `_meta.placeholder_images` refill: a slot listed there has since been
+ * replaced by the operator if its value is no longer one of ours, and overwriting
+ * that would silently destroy a genuine photo.
+ */
+function isOwnPlaceholder(v: unknown): boolean {
+  if (typeof v === 'string') return KNOWN_PLACEHOLDER_URLS.has(v);
+  if (Array.isArray(v)) {
+    return v.length > 0 && v.every((x) => typeof x === 'string' && KNOWN_PLACEHOLDER_URLS.has(x));
+  }
+  return false;
+}
+
+/** What `fillImagePlaceholders` returns: the filled content, plus the slots it touched. */
+export type PlaceholderFill = {
+  content: SiteContent;
+  /** Dotted paths of the image slots filled, e.g. "images.hero.slides.0". */
+  filled: string[];
+};
+
 /**
  * Return a deep copy of `effective` with empty/preset-picsum image slots filled
- * from the vertical's curated set. Preview-only: never merge this into the
- * content that gets exported. Genuine client images (present, non-picsum) are
- * always preserved.
+ * from the vertical's curated set, alongside the dotted paths of what was filled.
+ *
+ * Genuine client images (present, non-picsum, not a carried-over placeholder) are
+ * always preserved. Pass `includeWork: true` for the builder preview only — it
+ * injects fabricated sample projects that must not reach a client site.
  */
-export function injectImagePlaceholders(effective: SiteContent, vertical: VerticalId): SiteContent {
+export function fillImagePlaceholders(
+  effective: SiteContent,
+  vertical: VerticalId,
+  opts: { includeWork?: boolean } = {},
+): PlaceholderFill {
   const set = PREVIEW_PLACEHOLDERS[vertical] ?? PREVIEW_PLACEHOLDERS.hvac;
   const c: SiteContent =
     typeof structuredClone === 'function'
       ? structuredClone(effective)
       : (JSON.parse(JSON.stringify(effective)) as SiteContent);
+
+  // Slots a previous export filled with stock. Without this, the Unsplash URL we
+  // wrote last time reads as a genuine client photo forever — a vertical change
+  // could never refresh it, and `_meta` would drift out of sync with reality.
+  const prior = new Set(effective._meta?.placeholder_images ?? []);
+  const filled: string[] = [];
+  /**
+   * True when the slot is empty, preset picsum, or stock we wrote on a prior run AND
+   * still holds that stock. The second clause is what lets a vertical change refresh
+   * old photography while a real image the operator has since set always wins.
+   */
+  const needsFill = (path: string, v: unknown): boolean =>
+    needsPlaceholder(v) || (prior.has(path) && isOwnPlaceholder(v));
+  const mark = (path: string): void => {
+    filled.push(path);
+  };
 
   // Ensure the images container exists (schema guarantees it, but be defensive).
   c.images = c.images ?? { hero: {}, about: {}, testimonials: {}, footer: {} };
@@ -198,41 +262,53 @@ export function injectImagePlaceholders(effective: SiteContent, vertical: Vertic
   c.images.testimonials = c.images.testimonials ?? {};
   c.images.footer = c.images.footer ?? {};
 
+  // Hero portrait — the single-image hero variants read this, not `slides`.
+  if (needsFill('images.hero.portrait', c.images.hero.portrait)) {
+    c.images.hero.portrait = set.heroSlides[0].url;
+    mark('images.hero.portrait');
+  }
+
   // Hero slides — fill each slot that's empty or picsum, keeping any real alt.
   const slides = [...(c.images.hero.slides ?? [])];
   set.heroSlides.forEach((ph, i) => {
-    if (needsPlaceholder(slides[i]?.url)) {
+    if (needsFill(`images.hero.slides.${i}`, slides[i]?.url)) {
       slides[i] = { url: ph.url, alt: slides[i]?.alt || ph.alt };
+      mark(`images.hero.slides.${i}`);
     }
   });
   c.images.hero.slides = slides;
 
   // About feature image.
-  if (needsPlaceholder(c.images.about.feature)) {
+  if (needsFill('images.about.feature', c.images.about.feature)) {
     c.images.about.feature = set.aboutFeature.url;
+    mark('images.about.feature');
   }
 
   // Service item images — cycle the curated set across items lacking an image.
   if (Array.isArray(c.services?.items)) {
     c.services.items = c.services.items.map((it, i) => {
-      if (needsPlaceholder(it.image?.url)) {
+      const path = `services.items.${i}.image`;
+      if (needsFill(path, it.image?.url)) {
         const ph = set.serviceImages[i % set.serviceImages.length];
+        mark(path);
         return { ...it, image: { url: ph.url, alt: it.image?.alt || ph.alt } };
       }
       return it;
     });
   }
 
-  // Work projects — only when there are none. Reveal the section for preview and
-  // inject the vertical's full sample projects so all four Work variants render.
-  if (!c.work?.projects?.length) {
+  // Work projects — PREVIEW ONLY (see the header note). These carry invented
+  // locations, years and scope, so they must never be serialized into a client
+  // repo. Not recorded in `filled`: this injects copy, not imagery.
+  if (opts.includeWork && !c.work?.projects?.length) {
     c.work = { ...c.work, hidden: false, projects: set.workProjects.map((p) => ({ ...p })) };
   }
 
-  // Testimonial avatars — only when none are set.
-  if (!isPresent(c.images.testimonials.avatars)) {
+  // Testimonial avatars — only when none are set (or ours are still in place).
+  if (needsFill('images.testimonials.avatars', c.images.testimonials.avatars)) {
     c.images.testimonials.avatars = [...PLACEHOLDER_AVATARS];
+    mark('images.testimonials.avatars');
   }
 
-  return c;
+  return { content: c, filled };
 }

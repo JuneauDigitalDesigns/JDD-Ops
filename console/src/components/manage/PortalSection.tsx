@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, Flask, LinkSimple, Play, Warning, XCircle } from '@phosphor-icons/react';
+import { CheckCircle, Flask, LinkSimple, Play, Warning, Wrench, XCircle } from '@phosphor-icons/react';
 import { useManage } from './ManageContext';
 import SectionHeader from './SectionHeader';
+import PortalRepairPanel, { type RepairSite } from './PortalRepairPanel';
+import BillingSyncPanel from './BillingSyncPanel';
 
 /**
  * Which portal account this client signs in with, and repair for when that link is wrong.
@@ -14,14 +16,8 @@ import SectionHeader from './SectionHeader';
  * genuinely useful.
  */
 
-interface PortalSite {
-  slug: string;
-  name: string;
-  plan: string;
-  status: string;
-  airtableBaseId: string | null;
-  mine: boolean;
-}
+/** The account record as /api/manage/portal returns it — the full site, not a summary. */
+type PortalSite = RepairSite;
 
 interface PortalState {
   configured: boolean;
@@ -141,7 +137,7 @@ export default function PortalSection() {
                       className="h-[6px] w-[6px] shrink-0 rounded-full"
                       style={{ background: s.status === 'live' ? 'var(--ok)' : 'var(--warn)' }}
                     />
-                    <span className={s.mine ? 'text-fg' : 'text-fg3'}>{s.name}</span>
+                    <span className={s.mine ? 'text-fg' : 'text-fg3'}>{s.name ?? s.slug}</span>
                     <span className="font-mono text-fg3">{s.slug}</span>
                     {!s.mine && <span className="text-fg3">· another client</span>}
                     {s.airtableBaseId && (
@@ -256,6 +252,69 @@ export default function PortalSection() {
           </div>
         )}
       </section>
+
+      {/* ── Per-field repair ──────────────────────────────────────────────────
+          Attach above rebuilds an entry from the client's disk state, which cannot express
+          a vercelProjectId and never touches Stripe. This is for the fields only an
+          operator can supply — the ones that leave a live client staring at "we're
+          finishing your setup" with nothing in the product able to fix it. */}
+      {state?.email && state.sites.some((s) => s.mine) && (
+        <section className="panel mt-4 flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="flex items-center gap-2 font-display text-lg font-semibold tracking-tightish text-fg">
+              <Wrench size={16} weight="fill" style={{ color: 'var(--accent)' }} />
+              Repair site record
+            </h2>
+            <p className="text-xs text-fg3">
+              Sets individual fields on the account record. Leaving a box untouched keeps
+              what&apos;s stored; <strong>Clear</strong> writes an explicit &ldquo;none&rdquo; — they are
+              not the same, and the difference is why a client&apos;s Call Log once went dark.
+            </p>
+          </div>
+
+          {state.sites
+            .filter((s) => s.mine)
+            .map((s) => (
+              <PortalRepairPanel
+                key={s.slug}
+                clientSlug={ctx.slug}
+                email={state.email!}
+                site={s}
+                onWritten={load}
+              />
+            ))}
+        </section>
+      )}
+
+      {/* ── Billing ───────────────────────────────────────────────────────────
+          The plan controls elsewhere in this console write `plan` to KV and never touch
+          Stripe, so the two can silently disagree — and the expensive direction is a client
+          using Growth while paying Starter. This is where that shows up. */}
+      {state?.email && state.sites.some((s) => s.mine) && (
+        <section className="panel mt-4 flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-display text-lg font-semibold tracking-tightish text-fg">
+              Billing vs plan
+            </h2>
+            <p className="text-xs text-fg3">
+              Changing a plan here does not change what Stripe charges. This compares the two
+              and can bring Stripe into line. The console holds no Stripe write access — the
+              change is made by the portal app.
+            </p>
+          </div>
+
+          {state.sites
+            .filter((s) => s.mine)
+            .map((s) => (
+              <BillingSyncPanel
+                key={s.slug}
+                clientSlug={ctx.slug}
+                siteSlug={s.slug}
+                email={state.email!}
+              />
+            ))}
+        </section>
+      )}
     </div>
   );
 }
