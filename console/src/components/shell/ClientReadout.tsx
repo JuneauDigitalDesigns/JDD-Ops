@@ -1,8 +1,8 @@
 'use client';
 
-import type { ClientStatus } from '@/lib/types';
 import { useClient } from '@/components/client/ClientProvider';
 import { ReadoutSlot } from './slots';
+import LifecycleSpine from '@/components/client/LifecycleSpine';
 
 /**
  * The CONTEXT zone: which client you're working on, stated once and never again.
@@ -24,18 +24,12 @@ import { ReadoutSlot } from './slots';
  * is scannable at a glance in a way a word never is.
  */
 
-const STATUS: Record<ClientStatus, { label: string; tone: string }> = {
-  'needs-build': { label: 'Needs build', tone: 'var(--warn)' },
-  ready: { label: 'Ready to provision', tone: 'var(--accent)' },
-  provisioned: { label: 'Wire callback', tone: 'var(--accent)' },
-  'portal-pending': { label: 'Portal + checkpoints', tone: 'var(--ok)' },
-  live: { label: 'Live', tone: 'var(--ok)' },
-  unknown: { label: 'Unknown', tone: 'var(--fg-3)' },
-};
+// The disk-status label map moved into LifecycleSpine, which owns this cluster now and
+// uses it only as the fallback for a client with no record. Keeping a second copy here
+// would be one more place for the two lifecycle vocabularies to drift apart.
 
 export default function ClientReadout() {
   const { ctx } = useClient();
-  const status = STATUS[ctx.detectedStatus] ?? STATUS.unknown;
 
   return (
     <ReadoutSlot>
@@ -51,13 +45,13 @@ export default function ClientReadout() {
         <span className="meta shrink-0">{ctx.plan}</span>
 
         <Dot />
-        <span className="flex shrink-0 items-center gap-1.5">
-          <span
-            className="h-[6px] w-[6px] shrink-0 rounded-full"
-            style={{ background: status.tone, boxShadow: `0 0 6px ${status.tone}` }}
-          />
-          <span className="meta whitespace-nowrap">{status.label}</span>
-        </span>
+        {/* The lifecycle stage, which SUPERSEDES the disk status this used to render.
+            detectedStatus only knows what's on disk; the stage is derived from disk, the
+            portal record, Stripe and breakage history. Showing both would put two competing
+            answers a few pixels apart — the exact disagreement the client record exists to
+            resolve. LifecycleSpine falls back to the disk status when a client has no
+            record yet, which is honest: for those, disk really is all we know. */}
+        <LifecycleSpine />
       </div>
     </ReadoutSlot>
   );

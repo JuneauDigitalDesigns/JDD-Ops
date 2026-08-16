@@ -1,31 +1,33 @@
-import ClientIndex from '@/components/picker/ClientIndex';
+import BriefingView from '@/components/BriefingView';
 
 /**
- * The console's front door is a searchable client index.
+ * The console's front door is a briefing.
  *
- * Two changes got it here. First, the root stopped being a tool picker — it used to be three
- * cards (Build, Onboard, Manage) and each of those then made you pick a client again, so the
- * first thing you did every session was choose the same client up to three times. The client
- * is now chosen once, and the tools are things you do to it inside its shell at /c/{slug}.
+ * Three changes got it here, each removing a reason to click before you could think.
  *
- * Then the root stopped being a Kanban board. The board organised around onboarding status —
- * a phase every client passes through once and then leaves — which made it a weekly-review
- * view, not a front door: it couldn't be searched, and it couldn't tell you a live site was
- * down. It moved to /pipeline, and was eventually deleted outright: given a route of its own
- * it turned out to answer nothing this screen didn't already answer better. The Kanban shape
- * now lives at /leads, pointed at prospects — the one population that has no rows here.
+ * First the root stopped being a tool picker — three cards (Build, Onboard, Manage) that
+ * each then asked which client you meant, so the first thing you did every session was
+ * choose the same client up to three times. The client became the thing you pick once, and
+ * the tools became things you do to it inside its shell at /c/{slug}.
  *
- * The `.onboard-chrome` scope (dotfield) is the surface these roster views were designed on,
- * and came up with them from /onboard. The `.grain` overlay it also used to carry was removed
- * console-wide; see globals.css.
+ * Then it stopped being a Kanban board. That organised around onboarding status — a phase
+ * every client passes through once and then leaves — which made it a weekly-review view,
+ * not a front door. The Kanban shape moved to /leads, pointed at prospects, which is the
+ * one population it actually fits.
+ *
+ * Now it stops being the client roster. The roster was genuinely good at "find a client and
+ * open them", and it moved to /clients unchanged. What it could never do is answer the
+ * question you actually arrive with — what needs doing — because it is sorted for lookup,
+ * and a roster of healthy clients looks exactly like a roster nobody has checked. The
+ * reconcile engine finally made that question answerable, so the front door asks it.
  */
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
   return (
-    <div className="onboard-chrome h-full">
+    <div className="onboard-chrome h-full overflow-y-auto">
       <div className="dotfield" aria-hidden />
-      <ClientIndex />
+      <BriefingView />
     </div>
   );
 }

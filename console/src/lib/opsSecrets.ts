@@ -110,12 +110,39 @@ export function loadMakeApiKey(): string | null {
  * Same contract as the rest of this module — the value goes to Stripe and nowhere else, and
  * must never reach a response body.
  */
-export function loadStripeKey(): { key: string | null; restricted: boolean } {
+/**
+ * `mode` is derived from the key prefix and must be surfaced anywhere money is shown.
+ *
+ * The console is currently configured with a TEST key, which means every figure it can
+ * report — MRR on the briefing, the subscription on the Account phase, plan drift in
+ * audit-billing — is test data. A dashboard that prints "$297/mo active" without saying
+ * which Stripe it came from is worse than one that prints nothing: it looks exactly like
+ * revenue. The orphan scan surfaced 22 active subscriptions for one address before this
+ * distinction existed, which reads as alarming until you know the mode.
+ *
+ * Never returns or logs the key itself; only which of the two it came from and its prefix.
+ */
+export function loadStripeKey(): {
+  key: string | null;
+  restricted: boolean;
+  mode: 'test' | 'live' | 'unknown' | null;
+} {
   const ops = parseEnvFile(resolve(opsRoot(), '.env'));
   const readonly = process.env.STRIPE_READONLY_KEY ?? ops.STRIPE_READONLY_KEY ?? null;
-  if (readonly) return { key: readonly, restricted: true };
+  if (readonly) return { key: readonly, restricted: true, mode: stripeMode(readonly) };
   const secret = process.env.STRIPE_SECRET_KEY ?? ops.STRIPE_SECRET_KEY ?? null;
-  return { key: secret, restricted: secret ? secret.startsWith('rk_') : false };
+  return {
+    key: secret,
+    restricted: secret ? secret.startsWith('rk_') : false,
+    mode: stripeMode(secret),
+  };
+}
+
+function stripeMode(key: string | null): 'test' | 'live' | 'unknown' | null {
+  if (!key) return null;
+  if (/^(sk|rk)_test_/.test(key)) return 'test';
+  if (/^(sk|rk)_live_/.test(key)) return 'live';
+  return 'unknown';
 }
 
 /**
