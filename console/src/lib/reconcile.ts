@@ -2,6 +2,7 @@ import 'server-only';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sortFindings, type Finding, type ReconcileResult } from '@jdd/schema';
+import type { PortalAccount } from '@jdd/schema';
 import type { ClientContext, SiteInfo } from './types';
 import { siteDirFor } from './clients';
 import { loadVercelSync } from './vercelSync';
@@ -14,6 +15,9 @@ import {
 import { probeUrl } from './probe';
 import { resolveLiveUrl } from './manageSites';
 import { loadReconcileProbes } from './reconcileProbes';
+import { accountStoreConfigured, getAccount } from './accountStore';
+import { clientRecordsConfigured, getClientRecordBySlug } from './clientRecord';
+import { reconcileBilling, type SubscriptionHealth } from './reconcileBilling';
 
 /**
  * The reconcile engine: ask every vendor what is true, and report where that differs from
@@ -41,6 +45,28 @@ export interface ReconcileOptions {
   quiet?: boolean;
 }
 
+/** One site's derived money facts. */
+export interface SiteMoney {
+  siteSlug: string;
+  plan: string;
+  status: string | null;
+  amountCents: number | null;
+  currentPeriodEnd: number | null;
+}
+
+/**
+ * A sweep, plus the derived money facts the Account phase and the stage rules read.
+ *
+ * These live in the CACHE, not on the client record: Stripe owns them and a copy on the
+ * record would be a second source of truth that silently goes stale. Cached beside the
+ * findings they were gathered with, they inherit the same `checkedAt`, so the UI can always
+ * say how old the number it is showing actually is.
+ */
+export interface ClientReconcileResult extends ReconcileResult {
+  subscriptionHealth: SubscriptionHealth;
+  money: SiteMoney[];
+}
+
 /** Read `agent-prompt.txt` for a site, or null when there isn't one. */
 function promptOnDisk(baseSlug: string, siteCount: number, index: number): string | null {
   const dir = siteDirFor(baseSlug, siteCount, index);
@@ -58,6 +84,28 @@ function f(finding: Finding): Finding {
 }
 
 /**
+ * Disk first, then the client record. See the call site for why the fallback matters.
+ *
+ * `resolved` reports whether an owning email was found at all, separately from whether the
+ * account exists. Without that distinction the caller cannot tell "this client has no
+ * portal record" from "I don't know where to look", and would state the first while meaning
+ * the second.
+ */
+async function resolvePortalAccount(
+  ctx: ClientContext,
+): Promise<{ account: PortalAccount | null; resolved: boolean }> {
+  const fromDisk = ctx.sites[0]?.env.PORTAL_ACCOUNT_EMAIL ?? null;
+  if (fromDisk) {
+    return { account: await getAccount(fromDisk).catch(() => null), resolved: true };
+  }
+  if (!clientRecordsConfigured()) return { account: null, resolved: false };
+
+  const record = await getClientRecordBySlug(ctx.slug).catch(() => null);
+  if (!record?.email) return { account: null, resolved: false };
+  return { account: await getAccount(record.email).catch(() => null), resolved: true };
+}
+
+/**
  * Sweep one client across every vendor.
  *
  * Vendor sections are independent and each swallows its own failures, so one dead API
@@ -68,7 +116,7 @@ function f(finding: Finding): Finding {
 export async function reconcileClient(
   ctx: ClientContext,
   opts: ReconcileOptions = {},
-): Promise<ReconcileResult> {
+): Promise<ClientReconcileResult> {
   const checkedAt = Date.now();
   const findings: Finding[] = [];
   const unreachable = new Set<string>();
@@ -83,8 +131,57 @@ export async function reconcileClient(
   const siteCount = ctx.sites.length;
   const sharedBase = ctx.isEnterprise;
 
+  /**
+   * The portal account, fetched ONCE per client rather than per site.
+   *
+   * An enterprise client's sites all live on one account record, so fetching inside the
+   * loop would make three KV round-trips to read the same object — and, worse, could see
+   * three different versions of it mid-sweep.
+   *
+   * Two ways to find the owning email, in order:
+   *
+   * 1. `PORTAL_ACCOUNT_EMAIL` in `.env.local`, written by onboard.js at link time.
+   * 2. The client record's `email`.
+   *
+   * The fallback is not optional. Reading only (1) reported "no portal record" for every
+   * client here: the two real ones have no `.env.local` at all (they aren't provisioned
+   * yet) and the one provisioned fixture predates that variable. All three have perfectly
+   * good account records. This is the client record earning its keep — it is keyed on the
+   * email precisely so a question like this doesn't depend on a file that may not exist.
+   */
+  const owner = accountStoreConfigured()
+    ? await resolvePortalAccount(ctx).catch(() => ({ account: null, resolved: false }))
+    : { account: null, resolved: false };
+  const account = owner.account;
+
+  /** Worst subscription health across the client's sites — what the stage rules read. */
+  let health: SubscriptionHealth = null;
+  const money: SiteMoney[] = [];
+
   for (let i = 0; i < siteCount; i++) {
     const site = ctx.sites[i];
+
+    // Billing is per SITE, because an enterprise client can have one site cancelling while
+    // the others are fine — collapsing them would hide the one you need to act on.
+    const portalSite = account?.sites.find((s) => s.slug === site.slug) ?? null;
+    const billing = await reconcileBilling(account, portalSite, site.slug, owner.resolved);
+    findings.push(...billing.findings);
+    if (portalSite) {
+      money.push({
+        siteSlug: site.slug,
+        plan: portalSite.plan,
+        status: billing.status,
+        amountCents: billing.amountCents,
+        currentPeriodEnd: billing.currentPeriodEnd,
+      });
+    }
+
+    // 'trouble' outranks 'active'; 'ended' only wins if nothing is live. One failing
+    // subscription on a multi-site client should make the whole relationship at-risk.
+    if (billing.health === 'trouble') health = 'trouble';
+    else if (billing.health === 'active' && health !== 'trouble') health = 'active';
+    else if (billing.health === 'ended' && health === null) health = 'ended';
+
     await reconcileSite({
       ctx,
       site,
@@ -110,6 +207,8 @@ export async function reconcileClient(
     checkedAt,
     findings: sortFindings(findings),
     unreachable: [...unreachable],
+    subscriptionHealth: health,
+    money,
   };
 }
 
@@ -262,6 +361,37 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
           }),
         );
       }
+    }
+
+    // Web Analytics collection state, from scripts/audit-analytics.js. Enabling it is a
+    // dashboard-only action — the API exposes the state but offers no setter — so this can
+    // only ever tell you which project to go and fix. Amber, not red: nothing is broken for
+    // the client, but their Traffic tab will be empty and the cause is invisible from it.
+    const analytics = await a.vercel.getProjectAnalytics(siteSlug).catch(() => null);
+    if (analytics?.analyticsEnabled === false) {
+      findings.push(
+        f({
+          id: 'vercel.analyticsOff',
+          severity: 'amber',
+          area: 'site',
+          siteSlug,
+          title: 'Web Analytics is not collecting',
+          detail:
+            'The portal’s Traffic tab reads Vercel Web Analytics, so it will stay empty until this is ' +
+            'switched on — and nothing in the portal explains why. Vercel → this project → Analytics → ' +
+            'Enable. There is no API for it.',
+        }),
+      );
+    } else if (analytics && analytics.analyticsEnabled === null && !quiet) {
+      findings.push(
+        unknownFinding(
+          'vercel.analyticsUnchecked',
+          'site',
+          siteSlug,
+          'Web Analytics state unknown',
+          `Could not determine whether analytics is collecting: ${analytics.reason ?? 'no reason given'}.`,
+        ),
+      );
     }
 
     // Registrar expiry — only knowable for domains bought through Vercel. Anything else is

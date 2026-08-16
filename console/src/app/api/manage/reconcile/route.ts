@@ -8,7 +8,57 @@ import {
   getReconcileResults,
   acquireSweepLock,
   releaseSweepLock,
+  getBreakageCount,
 } from '@/lib/reconcileStore';
+import { clientRecordsConfigured, getClientRecordBySlug, refreshStage } from '@/lib/clientRecord';
+import { getAccount, accountStoreConfigured } from '@/lib/accountStore';
+import type { ClientContext } from '@/lib/types';
+import type { SubscriptionHealth } from '@/lib/reconcileBilling';
+import type { Stage } from '@jdd/schema';
+
+/**
+ * Re-derive and persist one client's stage from the evidence a sweep just gathered.
+ *
+ * Non-fatal throughout: a sweep that found real problems must still report them even if
+ * the record is missing or KV is unreachable. The stage is a convenience layered on the
+ * findings, not a precondition for them.
+ */
+async function refreshStageFor(
+  ctx: ClientContext,
+  health: SubscriptionHealth,
+): Promise<{ stage: Stage; reason: string } | null> {
+  if (!clientRecordsConfigured()) return null;
+  try {
+    const record = await getClientRecordBySlug(ctx.slug);
+    if (!record) return null;
+
+    const portalEmail = ctx.sites[0]?.env.PORTAL_ACCOUNT_EMAIL ?? null;
+    const account =
+      portalEmail && accountStoreConfigured() ? await getAccount(portalEmail).catch(() => null) : null;
+    const portalSite = account?.sites.find((s) => s.slug === ctx.sites[0]?.slug) ?? null;
+
+    const { result } = await refreshStage(record, {
+      subscription: health,
+      disk: ctx.detectedStatus,
+      portal: portalSite?.status ?? null,
+      hasClientFolder: true,
+      hasPaid: Boolean(portalSite?.stripeSubscriptionId || portalSite?.sessionId),
+      cancel: portalSite?.cancelRequestedAt
+        ? {
+            requestedAt: portalSite.cancelRequestedAt,
+            effectiveAt: portalSite.cancelEffectiveAt ?? Number.MAX_SAFE_INTEGER,
+          }
+        : null,
+      // Counted from the history this same sweep just appended to, so a breakage that
+      // opened moments ago is already reflected.
+      breakages30d: await getBreakageCount(ctx.slug),
+    });
+    return { stage: result.stage, reason: result.reason };
+  } catch (err) {
+    console.error('[reconcile] stage refresh failed', ctx.slug, err);
+    return null;
+  }
+}
 
 /**
  * Run or read a reconcile sweep.
@@ -102,6 +152,12 @@ export async function POST(req: Request) {
       // of `unknown`.
       const result = await reconcileClient(ctx);
       const transitions = await saveReconcileResult(result);
+
+      // Close the loop: a sweep is the only moment we hold live evidence from every
+      // vendor at once, so it is the right moment to re-derive the stage. Doing it
+      // anywhere else would mean re-querying Stripe to answer a question we just asked.
+      const stage = await refreshStageFor(ctx, result.subscriptionHealth);
+
       swept.push({
         slug: ctx.slug,
         checkedAt: result.checkedAt,
@@ -109,6 +165,8 @@ export async function POST(req: Request) {
         unreachable: result.unreachable,
         opened: transitions.filter((t) => t.event === 'opened').length,
         closed: transitions.filter((t) => t.event === 'closed').length,
+        stage: stage?.stage ?? null,
+        stageReason: stage?.reason ?? null,
       });
     }
 

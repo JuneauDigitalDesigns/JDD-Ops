@@ -126,6 +126,15 @@ interface VercelSyncModule {
   sanitizeProjectName(slug: string): string;
   /** Exported by the module but previously undeclared here. */
   getVercelProjectId(slug: string): Promise<string | null>;
+  /**
+   * Web Analytics collection state. Tri-state on purpose: `null` means the probe could not
+   * determine it (401/429 are about our credential and our rate, not the project's
+   * configuration), and audit-analytics treats that as exit 2 rather than a pass.
+   */
+  getProjectAnalytics(
+    slug: string,
+    projectId?: string | null,
+  ): Promise<{ projectId: string | null; analyticsEnabled: boolean | null; reason: string | null }>;
   syncEnvToVercel(opts: {
     slug: string;
     extraEnv?: Record<string, string>;
