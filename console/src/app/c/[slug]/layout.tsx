@@ -71,6 +71,13 @@ export default async function ClientLayout({
     }
   }
 
+  // Same "past provisioning" floor the reconcile engine's site checks use, and for the
+  // same reason: before it, an empty Account tab is the correct state, not a problem.
+  const accountReady =
+    ctx.detectedStatus === 'provisioned' ||
+    ctx.detectedStatus === 'portal-pending' ||
+    ctx.detectedStatus === 'live';
+
   // Evaluated here because isManageable/unmanageableReason are server-only; ClientChrome
   // receives the answers, not the predicates. Unavailable tools stay visible and dimmed
   // with this reason as their tooltip, so these strings are user-facing copy.
@@ -90,6 +97,10 @@ export default async function ClientLayout({
           reason: 'Waiting on the client’s onboarding wizard.',
         },
         manage: { enabled: true, reason: null },
+        account: {
+          enabled: false,
+          reason: 'Nothing to account for until they’ve onboarded and gone live.',
+        },
       }
     : {
         build: { enabled: true, reason: null },
@@ -98,6 +109,15 @@ export default async function ClientLayout({
           reason: ctx.hasIntake ? null : 'No readable site.ts yet — build or import an intake first.',
         },
         manage: { enabled: isManageable(ctx), reason: unmanageableReason(ctx) },
+        // Gated on provisioning rather than on a subscription, deliberately. An UNBILLED
+        // live client is exactly who this tab exists to surface, so requiring a
+        // subscription to open it would hide the most expensive case in the roster.
+        account: {
+          enabled: accountReady,
+          reason: accountReady
+            ? null
+            : 'Opens once this client is provisioned — there’s no billing or usage history before then.',
+        },
       };
 
   return (

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardText, Stack, Wrench } from '@phosphor-icons/react';
+import { ClipboardText, CurrencyDollar, Stack, Wrench } from '@phosphor-icons/react';
 import { useClient, type ToolState } from '@/components/client/ClientProvider';
 import { ToolsSlot } from './slots';
 
@@ -18,10 +18,16 @@ import { ToolsSlot } from './slots';
  * is chosen once at the root picker and never asked for again.
  */
 
+/**
+ * Four phases, in the order a client passes through them. Account is last because it is
+ * the only one that means anything after the work is finished — everything before it is
+ * getting them live, and it is what the relationship becomes afterwards.
+ */
 const TOOLS = [
   { id: 'build', label: 'Build', Icon: Stack },
   { id: 'onboard', label: 'Onboard', Icon: ClipboardText },
   { id: 'manage', label: 'Manage', Icon: Wrench },
+  { id: 'account', label: 'Account', Icon: CurrencyDollar },
 ] as const;
 
 export default function ToolSwitcher() {

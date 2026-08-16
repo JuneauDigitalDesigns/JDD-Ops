@@ -4,12 +4,16 @@ import { isManageable, SLUG_RE } from '@/lib/manageSites';
 import { getPendingOnboardRecord, pendingKvConfigured } from '@/lib/pendingKv';
 
 /**
- * /c/{slug} has no screen of its own — the shell is always showing one of the three tools.
+ * /c/{slug} has no screen of its own — the shell is always showing one of the four tools.
  * Which one depends on where the client actually is, so opening a card from the picker
  * lands on the useful thing rather than a fixed default you'd have to click past.
  *
  * The order matches the pipeline: a provisioned client is one you maintain, an unbuilt one
  * is one you build, and everything between is mid-onboarding.
+ *
+ * Account is deliberately NOT a landing target, even for a live client. Opening a client
+ * usually means something needs doing to it, and Manage is where the findings are. Account
+ * answers a question you go looking for, not one you arrive with.
  */
 export default async function ClientIndex({ params }: { params: { slug: string } }) {
   if (!SLUG_RE.test(params.slug)) notFound();

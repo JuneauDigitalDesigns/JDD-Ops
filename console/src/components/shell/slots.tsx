@@ -15,8 +15,8 @@ import { createPortal } from 'react-dom';
  * band and the tool band would race for first position and the bar would reorder itself
  * depending on which subtree hydrated first.
  *
- *   #console-tools-slot    NAVIGATE zone — the Build/Onboard/Manage segmented control.
- *                          Owned by /c/[slug]/layout. Empty on / and /leads.
+ *   #console-tools-slot    NAVIGATE zone — the Build/Onboard/Manage/Account segmented
+ *                          control. Owned by /c/[slug]/layout. Empty on / and /leads.
  *   #console-readout-slot  CONTEXT zone — the muted, inert client readout. Same owner.
  *   #console-utility-slot  UTILITIES zone — route-scoped utilities that sit beside ⌘K and
  *                          the settings gear. Currently just Refresh, on / and /leads.

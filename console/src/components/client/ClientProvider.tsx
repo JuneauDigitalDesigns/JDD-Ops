@@ -26,6 +26,8 @@ export interface ToolAvailability {
   build: ToolState;
   onboard: ToolState;
   manage: ToolState;
+  /** The retention surface. Only meaningful once a client is actually being billed. */
+  account: ToolState;
 }
 
 interface ClientShellValue {
