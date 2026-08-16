@@ -48,6 +48,17 @@ export interface UndoEntry {
   slug: string;
   siteSlug: string;
   kind: UndoKind;
+  /**
+   * Which specific thing `kind` refers to, when the kind alone isn't enough to reverse it.
+   * For `env.value` this is the env var name.
+   *
+   * Without it the undo route had to hardcode `CLIENT_FORWARD_PHONE`, which worked only
+   * because that was the sole env repair. The second one — ring seconds, lead email — would
+   * have restored its old value into the phone number field, silently, with the audit log
+   * cheerfully recording a success. The kind says what shape the value is; this says where
+   * it goes.
+   */
+  target?: string;
   /** Human-readable, rendered on the undo button. */
   summary: string;
   /**

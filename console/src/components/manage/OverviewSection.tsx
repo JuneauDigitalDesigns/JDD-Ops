@@ -20,6 +20,7 @@ import { relativeTime, absoluteTime } from '@/lib/relativeTime';
 import type { AuditEntry } from '@/lib/audit';
 import type { ReconcileResult } from '@jdd/schema';
 import FindingsList from './FindingsList';
+import RecentRepairs from './RecentRepairs';
 import { useManage } from './ManageContext';
 import PlanControl from './PlanControl';
 import SectionHeader from './SectionHeader';
@@ -398,6 +399,11 @@ export default function OverviewSection() {
           onChanged={runSweep}
         />
       </section>
+
+      {/* Separate from the findings, because a repair outlives the problem it fixed: the
+          sweep that follows a fix clears the finding, so an Undo attached to the row would
+          disappear the instant it appeared. Renders nothing when there's nothing to undo. */}
+      <RecentRepairs slug={ctx.slug} />
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="panel flex flex-col gap-3 p-5">

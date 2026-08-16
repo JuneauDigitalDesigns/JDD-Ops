@@ -66,7 +66,9 @@ export type RepairAction =
   | 'twilio.voiceUrl'
   | 'retell.webhook'
   | 'make.activate'
-  | 'profile.forwardPhone';
+  | 'profile.forwardPhone'
+  | 'airtable.callLog'
+  | 'airtable.siteColumn';
 
 interface Body {
   slug?: string;
@@ -110,6 +112,9 @@ export async function POST(req: Request) {
         return await activateMakeScenario(ops, ctx.slug, site, body.scenarioId);
       case 'profile.forwardPhone':
         return await adoptPortalForwardPhone(ctx, site);
+      case 'airtable.callLog':
+      case 'airtable.siteColumn':
+        return await repairAirtable(ops, ctx, site, action);
       default:
         return NextResponse.json({ error: `Unknown action "${action}"` }, { status: 400 });
     }
@@ -297,6 +302,8 @@ async function adoptPortalForwardPhone(ctx: ClientContext, site: SiteInfo) {
     slug: ctx.slug,
     siteSlug: site.slug,
     kind: 'env.value',
+    // Names the key, so the undo route restores THIS var rather than a hardcoded one.
+    target: 'CLIENT_FORWARD_PHONE',
     summary: `Set CLIENT_FORWARD_PHONE to the portal contact number`,
     before,
     after: e164,
@@ -328,6 +335,60 @@ async function adoptPortalForwardPhone(ctx: ClientContext, site: SiteInfo) {
   });
 
   return NextResponse.json({ ok: true, changed: true, undoId, warnings });
+}
+
+/**
+ * Recreate a missing Call Log table, or add the Site column a shared enterprise base needs.
+ *
+ * No undo is recorded, and that is deliberate rather than an omission. The operation is
+ * additive — it only ever creates something absent — so the reversal would be "delete a
+ * table from a client's base", which is destructive in a way none of the other repairs are.
+ * The audit line records that it happened; putting it back is a decision for Airtable, not
+ * a button here.
+ */
+async function repairAirtable(
+  ops: Awaited<ReturnType<typeof loadRepairOps>>,
+  ctx: ClientContext,
+  site: SiteInfo,
+  action: 'airtable.callLog' | 'airtable.siteColumn',
+) {
+  const { airtableApiKey } = loadTeardownCredentials();
+  const want = action === 'airtable.callLog' ? 'call-log' : 'site-column';
+
+  const result = await ops.repairAirtableBase({
+    apiKey: airtableApiKey,
+    baseId: site.env.AIRTABLE_BASE_ID,
+    want,
+    siteTag: ctx.isEnterprise ? (site.env.AIRTABLE_SITE_TAG ?? null) : null,
+  });
+
+  const summary =
+    want === 'call-log'
+      ? `Created the Call Log table in ${site.env.AIRTABLE_BASE_ID}`
+      : `Added the Site column to Call Log in ${site.env.AIRTABLE_BASE_ID}`;
+
+  if (!result.ok) {
+    appendAudit({
+      slug: ctx.slug, siteSlug: site.slug, action: 'airtable.repair',
+      ok: false, summary: `${summary} — failed`, detail: { reason: result.reason },
+    });
+    return NextResponse.json({ error: result.reason ?? 'Repair failed.' }, { status: 502 });
+  }
+
+  if (result.noop) {
+    appendAudit({
+      slug: ctx.slug, siteSlug: site.slug, action: 'airtable.repair',
+      ok: true, summary: `${summary} — already present`,
+    });
+    return NextResponse.json({ ok: true, changed: false, message: 'Already present.' });
+  }
+
+  appendAudit({
+    slug: ctx.slug, siteSlug: site.slug, action: 'airtable.repair', ok: true, summary,
+  });
+  // `reason` carries the caveat about existing rows having no Site value; surface it rather
+  // than reporting a clean success the operator would have to discover was partial.
+  return NextResponse.json({ ok: true, changed: true, message: result.reason ?? undefined });
 }
 
 /** Switch a deactivated post-call scenario back on. */

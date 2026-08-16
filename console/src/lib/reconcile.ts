@@ -474,7 +474,15 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
             area: 'leads',
             siteSlug,
             title: 'Call Log table missing',
-            detail: 'The base exists but has no "Call Log" table, so the post-call scenario has nowhere to write.',
+            detail:
+              'The base exists but has no "Call Log" table, so the post-call scenario has nowhere to ' +
+              'write and every completed call is being dropped. Recreating it is additive — no existing ' +
+              'data is touched — but calls that failed to log while it was missing are gone.',
+            fix: {
+              route: '/api/manage/repair',
+              body: { slug: a.ctx.slug, siteSlug, action: 'airtable.callLog' },
+              label: 'Create the Call Log table',
+            },
           }),
         );
       }
@@ -488,7 +496,13 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
             title: 'Shared base has no Site column',
             detail:
               'Enterprise sites share one base and are kept apart by the Site column. Without it every site’s ' +
-              'calls land in one undifferentiated table and the portal shows each client all of them.',
+              'calls land in one undifferentiated table and the portal shows each client all of them. ' +
+              'Adding it fixes calls from here on; rows already logged have no Site value and need a backfill.',
+            fix: {
+              route: '/api/manage/repair',
+              body: { slug: a.ctx.slug, siteSlug, action: 'airtable.siteColumn' },
+              label: 'Add the Site column',
+            },
           }),
         );
       }

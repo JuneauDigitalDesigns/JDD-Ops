@@ -38,6 +38,7 @@ export type AuditAction =
   | 'twilio.repair'
   | 'retell.repair'
   | 'make.repair'
+  | 'airtable.repair'
   | 'repair.undo'
   | 'client.teardown.start'
   | 'client.teardown';

@@ -1,5 +1,5 @@
 import 'server-only';
-import { samePhone } from '@jdd/schema';
+import { samePhone, toE164 } from '@jdd/schema';
 import type { Finding, PortalAccount, PortalSite } from '@jdd/schema';
 import type { SiteInfo } from './types';
 import {
@@ -68,7 +68,24 @@ export async function portalSignalFindings({
   const profilePhone = account?.profile?.contactPhone ?? null;
   const forwardPhone = site.env.CLIENT_FORWARD_PHONE ?? null;
 
-  if (profilePhone && forwardPhone && !samePhone(profilePhone, forwardPhone)) {
+  // A CLIENT_FORWARD_PHONE that can't be parsed is a DIFFERENT problem from one that
+  // disagrees with the portal, and reporting it as "the client changed their number" tells
+  // the wrong story about the wrong party. It is also worse: an unparseable value means
+  // /api/voice has nothing valid to dial, so the human-first ring is already broken.
+  if (forwardPhone && toE164(forwardPhone) === null) {
+    findings.push({
+      id: 'voice.forwardPhoneMalformed',
+      severity: 'red',
+      area: 'voice',
+      siteSlug,
+      title: 'Forwarding number is not a dialable number',
+      detail:
+        'CLIENT_FORWARD_PHONE cannot be normalized to E.164, so /api/voice has nothing valid to ' +
+        'ring and the human-first hop is already failing — every call goes straight to the agent, ' +
+        'or nowhere. Fix it in Environment.',
+      actual: forwardPhone,
+    });
+  } else if (profilePhone && forwardPhone && !samePhone(profilePhone, forwardPhone)) {
     findings.push({
       id: 'portal.contactPhoneDrift',
       severity: 'amber',

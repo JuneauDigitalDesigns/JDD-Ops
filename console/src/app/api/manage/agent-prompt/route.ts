@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadReconcileProbes } from '@/lib/reconcileProbes';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadManageTarget } from '@/lib/manageSites';
@@ -15,9 +16,10 @@ import { appendAudit } from '@/lib/audit';
  *    llm_id first. We prefer RETELL_LLM_ID from .env.local when onboard.js wrote one, and
  *    fall back to GET /get-agent — which is the path older clients actually take.
  *
- * 2. Disk is the source of truth for the editor. There is no read-back wired from Retell,
- *    so agent-prompt.txt can lag if someone edited in the Retell dashboard. The UI says so
- *    rather than implying the textarea shows what the agent is currently running.
+ * 2. Disk is the source of truth for the editor, but GET now READS BACK from Retell as
+ *    well and returns both. It used to write disk → Retell and never look the other way,
+ *    so an edit made in the Retell dashboard was invisible here and would be silently
+ *    overwritten by the next save. The editor shows the two side by side when they differ.
  *
  * Ports scripts/update-agent-prompt.js rather than shelling out to it: that script
  * resolves clients/{slug} against process.cwd() and pulls the key from `dotenv/config`,
@@ -41,12 +43,56 @@ export async function GET(req: Request) {
 
   const path = resolve(resolved.dir, PROMPT_FILE);
   const exists = existsSync(path);
+  const prompt = exists ? readFileSync(path, 'utf8') : '';
+
+  /**
+   * The prompt the agent is ACTUALLY answering with.
+   *
+   * Read-back was the documented gap in this editor: it wrote disk → Retell and never
+   * looked the other way, so an edit made in the Retell dashboard was invisible here and
+   * would be silently overwritten by the next save. The reconcile engine detects the drift,
+   * but a finding that says "compare the two before you push" is useless without somewhere
+   * to compare them — this is that somewhere.
+   *
+   * `?live=0` skips it. The editor asks for it on open; the save path does not need it and
+   * should not pay two Retell round-trips for it.
+   */
+  let livePrompt: string | null = null;
+  let liveError: string | null = null;
+
+  if (url.searchParams.get('live') !== '0') {
+    const agentId = resolved.env.RETELL_AGENT_ID;
+    const apiKey = loadRetellApiKey();
+    if (!agentId) liveError = 'No RETELL_AGENT_ID for this site.';
+    else if (!apiKey) liveError = 'No RETELL_API_KEY in jdd-ops/.env.';
+    else {
+      try {
+        const probes = await loadReconcileProbes();
+        const probe = await probes.probeRetellAgent({
+          apiKey,
+          agentId,
+          promptOnDisk: prompt,
+          expectedWebhookUrl: null,
+        });
+        if (!probe.checked) liveError = 'Retell did not answer.';
+        else if (probe.exists === false) liveError = `Retell does not recognise agent ${agentId}.`;
+        else livePrompt = probe.livePrompt;
+      } catch (err) {
+        liveError = err instanceof Error ? err.message : String(err);
+      }
+    }
+  }
 
   return NextResponse.json({
     exists,
-    prompt: exists ? readFileSync(path, 'utf8') : '',
+    prompt,
     agentId: resolved.env.RETELL_AGENT_ID ?? null,
     llmId: resolved.env.RETELL_LLM_ID ?? null,
+    livePrompt,
+    liveError,
+    // Trimmed comparison, matching the probe: a trailing-newline difference between what
+    // the editor wrote and what Retell stored is not drift anyone needs to see.
+    inSync: livePrompt === null ? null : livePrompt.trim() === prompt.trim(),
   });
 }
 

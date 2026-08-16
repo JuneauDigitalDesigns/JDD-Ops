@@ -127,11 +127,27 @@ export async function POST(req: Request) {
       if (typeof before !== 'string' && before !== null) {
         return NextResponse.json({ error: 'The recorded previous value is not a string.' }, { status: 422 });
       }
-      const dir = siteDirFor(ctx.slug, ctx.sites.length, ctx.sites.findIndex((s) => s.slug === entry.siteSlug));
+      // Refuse rather than assume. This used to hardcode CLIENT_FORWARD_PHONE, which was
+      // right only while that was the only env repair — the next one would have restored
+      // its value into the phone field. An entry written before `target` existed cannot say
+      // where its value belongs, so it is not undoable, and saying so beats guessing.
+      const key = entry.target;
+      if (!key) {
+        return NextResponse.json(
+          {
+            error:
+              'This undo record does not name which env var it changed, so restoring it ' +
+              'could write the value into the wrong field. Edit .env.local directly.',
+          },
+          { status: 422 },
+        );
+      }
+      const idx = ctx.sites.findIndex((s) => s.slug === entry.siteSlug);
+      const dir = siteDirFor(ctx.slug, ctx.sites.length, idx);
       try {
         // A recorded null means the key was absent; writing '' clears it in .env.local
         // rather than leaving the newer value in place.
-        applyEnvUpdates(dir, { CLIENT_FORWARD_PHONE: before ?? '' });
+        applyEnvUpdates(dir, { [key]: before ?? '' });
         result = { ok: true, reason: null };
       } catch (err) {
         result = { ok: false, reason: err instanceof Error ? err.message : String(err) };

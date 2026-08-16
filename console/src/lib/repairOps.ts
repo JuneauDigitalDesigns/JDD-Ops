@@ -41,6 +41,14 @@ export interface RepairOpsModule {
     scenarioId: number | string;
     active: boolean;
   }): Promise<RepairResult<boolean, boolean>>;
+
+  /** Additive only — creates an absent table or field, never modifies an existing one. */
+  repairAirtableBase(args: {
+    apiKey: string | null;
+    baseId: string | null | undefined;
+    want: 'call-log' | 'site-column';
+    siteTag?: string | null;
+  }): Promise<RepairResult<string, string>>;
 }
 
 const cache = new Map<string, Promise<RepairOpsModule>>();

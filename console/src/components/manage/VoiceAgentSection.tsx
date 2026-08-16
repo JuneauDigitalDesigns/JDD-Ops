@@ -1,17 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, CloudArrowUp, FloppyDisk, Info, SpinnerGap, Warning, XCircle } from '@phosphor-icons/react';
+import { CheckCircle, CloudArrowUp, FloppyDisk, Info, Question, SpinnerGap, Warning, XCircle } from '@phosphor-icons/react';
 import { useManage } from './ManageContext';
 import SectionHeader from './SectionHeader';
 
 /**
  * The Retell agent prompt.
  *
- * Disk is the source of truth here, and the banner says so. There is no read-back from
- * Retell — the API has no exported "get current prompt" helper — so if someone edited in
- * the Retell dashboard, this textarea shows the last thing WE wrote, not what the agent
- * is currently answering with. Implying otherwise would be worse than saying it plainly.
+ * Disk is the source of truth for editing, but the route now READS BACK what the agent is
+ * actually answering with, and this shows both when they differ.
+ *
+ * That gap used to be papered over with a banner admitting the textarea might be stale.
+ * Saying it plainly was better than implying otherwise, but it still left you unable to act:
+ * the reconcile engine would report "live prompt differs from agent-prompt.txt" and tell you
+ * to compare the two, with nowhere to do it. Worse, saving from here would silently
+ * overwrite whatever had been changed in the Retell dashboard.
  *
  * Save and push are separate buttons for the same reason redeploy is separate from an env
  * save: writing a file is cheap and reversible, changing what a live phone agent says is
@@ -26,6 +30,19 @@ export default function VoiceAgentSection() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'save' | 'push' | null>(null);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  /**
+   * What Retell says the agent is answering with right now.
+   *
+   * `inSync: null` means we could not read it — rendered as "couldn't check", never as
+   * agreement. A prompt editor that implies the live agent matches when it has no idea is
+   * the failure this read-back exists to remove.
+   */
+  const [live, setLive] = useState<{
+    prompt: string | null;
+    error: string | null;
+    inSync: boolean | null;
+  }>({ prompt: null, error: null, inSync: null });
+  const [showLive, setShowLive] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,6 +55,9 @@ export default function VoiceAgentSection() {
         prompt?: string;
         agentId?: string | null;
         llmId?: string | null;
+        livePrompt?: string | null;
+        liveError?: string | null;
+        inSync?: boolean | null;
         error?: string;
       };
       if (body.error) {
@@ -47,6 +67,11 @@ export default function VoiceAgentSection() {
       setPrompt(body.prompt ?? '');
       setOriginal(body.prompt ?? '');
       setMeta({ exists: Boolean(body.exists), agentId: body.agentId ?? null, llmId: body.llmId ?? null });
+      setLive({
+        prompt: body.livePrompt ?? null,
+        error: body.liveError ?? null,
+        inSync: body.inSync ?? null,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to read agent-prompt.txt');
     } finally {
@@ -123,8 +148,9 @@ export default function VoiceAgentSection() {
       >
         <Info size={14} className="mt-0.5 shrink-0" />
         <span>
-          This is the file on disk, not a read-back from Retell — there is no API to fetch the
-          live prompt. If someone edited it in the Retell dashboard, that change isn&apos;t shown here.
+          You are editing the file on disk. It is compared against the live agent on open —
+          the strip below says whether they match, and shows the live prompt when they
+          don&apos;t. Pushing overwrites the agent with what is in this box.
           {meta?.agentId && (
             <>
               {' '}Agent <code className="codechip">{meta.agentId}</code>
@@ -160,6 +186,58 @@ export default function VoiceAgentSection() {
         </div>
       ) : (
         <>
+          {/* Live-agent comparison. Only speaks up when it has something to say: agreement
+              is the expected case and needs one quiet line, a mismatch needs the actual
+              text, and "couldn't check" must never be rendered as agreement. */}
+          <div className="mb-3 flex flex-col gap-2">
+            {live.error ? (
+              <p className="flex items-start gap-1.5 text-xs" style={{ color: 'var(--fg-3)' }}>
+                <Question size={13} style={{ flexShrink: 0, marginTop: 2 }} />
+                Couldn’t read the live agent ({live.error}). This textarea is the last thing
+                <em> we </em> wrote, which may not be what the agent is answering with.
+              </p>
+            ) : live.inSync === true ? (
+              <p className="flex items-center gap-1.5 text-xs text-fg2">
+                <CheckCircle size={13} weight="fill" style={{ color: 'var(--ok)' }} />
+                Matches what the agent is answering with.
+              </p>
+            ) : live.inSync === false ? (
+              <div className="panel flex flex-col gap-2 p-3" style={{ borderColor: 'var(--warn)' }}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--warn)' }}>
+                    <Warning size={13} weight="fill" />
+                    The agent is answering with something different — most likely edited in the
+                    Retell dashboard. Saving from here will overwrite it.
+                  </span>
+                  <button type="button" className="btn btn-xs shrink-0" onClick={() => setShowLive((v) => !v)}>
+                    {showLive ? 'Hide' : 'Show live prompt'}
+                  </button>
+                </div>
+                {showLive && (
+                  <>
+                    <textarea
+                      className="mono-field w-full"
+                      style={{ minHeight: 220 }}
+                      value={live.prompt ?? ''}
+                      readOnly
+                      aria-label="Live prompt on the Retell agent (read-only)"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-xs w-fit"
+                      onClick={() => setPrompt(live.prompt ?? '')}
+                      // Loads it into the editor rather than writing disk directly, so the
+                      // existing Save/Push buttons stay the only things that commit — one
+                      // path to disk, one path to Retell.
+                    >
+                      Copy live prompt into the editor
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : null}
+          </div>
+
           <textarea
             className="mono-field w-full"
             style={{ minHeight: 460 }}

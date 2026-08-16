@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import {
-  ArrowCounterClockwise,
   CheckCircle,
   Question,
   SpinnerGap,
@@ -150,7 +149,6 @@ function Band({
 function FindingRow({ finding, onChanged }: { finding: Finding; onChanged?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [undoId, setUndoId] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   async function applyFix() {
@@ -169,34 +167,10 @@ function FindingRow({ finding, onChanged }: { finding: Finding; onChanged?: () =
         return;
       }
       setDone(body.changed === false ? 'Already correct.' : 'Fixed.');
-      // Only offer an undo the server actually recorded. A no-op returns none, and showing
-      // one anyway would promise a reversal of something that never happened.
-      if (body.undoId) setUndoId(body.undoId);
-      onChanged?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function undo() {
-    if (!undoId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/manage/repair/undo', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: undoId }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(body?.error ?? `Undo failed (${res.status})`);
-        return;
-      }
-      setUndoId(null);
-      setDone('Put back.');
+      // Undo is NOT offered here. onChanged re-sweeps, the re-sweep clears the finding
+      // that was just fixed, and this row unmounts — so an Undo button rendered here would
+      // vanish in the same tick it appeared. It lives in <RecentRepairs>, which reads the
+      // undo log and therefore outlives both the finding and the sweep.
       onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -222,12 +196,7 @@ function FindingRow({ finding, onChanged }: { finding: Finding; onChanged?: () =
               {finding.fix.label}
             </button>
           )}
-          {undoId && (
-            <button className="btn btn-xs" onClick={undo} disabled={busy} title="Restore the previous value">
-              <ArrowCounterClockwise size={12} /> Undo
-            </button>
-          )}
-          {done && !undoId && <span className="meta">{done}</span>}
+          {done && <span className="meta">{done}</span>}
         </div>
       </div>
 
