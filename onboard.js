@@ -35,6 +35,7 @@ import twilio from 'twilio';
 import {
   syncEnvToVercel,
   sanitizeProjectName,
+  vercelAppHost,
   getVercelProjectId,
   getProjectAnalytics,
   listProjectDomains,
@@ -863,7 +864,7 @@ async function provisionTwilioNumber(content, siteSlug, clientDir) {
     return existingNumber;
   }
   if (DRY_RUN) {
-    const dryHost = sanitizeProjectName(siteSlug).replace(/_/g, '-');
+    const dryHost = vercelAppHost(siteSlug);
     dryLog(`would search Twilio for local number (area code from brand.phone) then toll-free`);
     dryLog(`would purchase number and set voiceUrl → https://${dryHost}.vercel.app/api/voice`);
     dryLog(`would patch TWILIO_NUMBER into ${clientDir}/.env.local`);
@@ -873,9 +874,11 @@ async function provisionTwilioNumber(content, siteSlug, clientDir) {
   const accountSid = requireEnv('TWILIO_ACCOUNT_SID');
   const authToken  = requireEnv('TWILIO_AUTH_TOKEN');
   const client     = twilio(accountSid, authToken);
-  // Use the Vercel-safe hostname: strip leading punctuation and replace underscores
-  // (underscores are not valid in DNS hostnames; Vercel renders them as hyphens).
-  const vercelHost = sanitizeProjectName(siteSlug).replace(/_/g, '-');
+  // The Vercel alias for this project. Vercel REMOVES characters that aren't valid in a
+  // DNS label rather than substituting hyphens for them — see vercelAppHost. The number is
+  // bought before the project exists, so this is derived; step 9 re-checks it against the
+  // real host once Vercel can answer.
+  const vercelHost = vercelAppHost(siteSlug);
   const voiceUrl   = `https://${vercelHost}.vercel.app/api/voice`;
 
   const digits   = (content.brand.phone || '').replace(/\D/g, '');
@@ -1307,7 +1310,7 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
  * missing VERCEL_TOKEN degrades to the old behaviour rather than an empty canonical.
  */
 async function resolveVercelHost(slug) {
-  const derived = `https://${sanitizeProjectName(slug).replace(/_/g, '-')}.vercel.app`;
+  const derived = `https://${vercelAppHost(slug)}.vercel.app`;
   try {
     const result = await listProjectDomains(slug);
     const alias = result.domains.find((d) => d.name.endsWith('.vercel.app') && !d.redirect);

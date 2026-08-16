@@ -83,7 +83,22 @@ bundled into the client fee.
    connects the call to the Retell AI agent over SIP (no bridge server needed;
    the SIP leg must be dialed within 5 min of register-phone-call).
 
-The `voiceUrl` is set at number-purchase time to `https://{vercelHost}.vercel.app/api/voice`, where `vercelHost` is `sanitizeProjectName(siteSlug).replace(/_/g, '-')` — underscores are not valid in DNS hostnames and Vercel renders them as hyphens anyway.
+The `voiceUrl` is set at number-purchase time to `https://{vercelHost}.vercel.app/api/voice`,
+where `vercelHost` is `vercelAppHost(siteSlug)` from `@jdd/schema`.
+
+**Vercel REMOVES characters that aren't valid in a DNS label; it does not substitute
+hyphens.** `e2e_test_growth` serves at `e2etestgrowth.vercel.app`, not
+`e2e-test-growth.vercel.app`. This file previously documented the rule as
+`.replace(/_/g, '-')`, and three call sites implemented it that way — which pointed the
+voiceUrl of any underscore-containing slug at a hostname that does not resolve. Inbound
+calls then fail with nothing surfacing on our side: the number looks configured and the
+agent looks healthy. Never re-derive this transform inline; import it.
+
+The derivation is best-effort — Vercel appends a hash on collision or overlong labels — so
+anything that can ask the API should prefer `listProjectDomains`. `vercelAppHost` exists for
+the window before the project is created, which is exactly when the number is bought. The
+reconcile engine re-checks the number against the host Vercel actually reports.
+
 Vercel keeps `.vercel.app` URLs live permanently, so no update is needed after a custom domain is assigned.
 
 ## Retell agent

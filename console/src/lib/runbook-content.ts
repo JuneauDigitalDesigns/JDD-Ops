@@ -2,6 +2,7 @@
 // interpolates each client's real values (slug, plan, env IDs, canonical). Pure function
 // of ClientContext so it is safe to run on the client. One source of truth for the guide.
 
+import { vercelVoiceUrl } from '@jdd/schema';
 import type { ClientContext, OpsConfig, Plan, SiteInfo } from './types';
 
 export type Block =
@@ -275,7 +276,11 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
   const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? '25';
   const slugForCmd = ctx.isEnterprise ? `${ctx.slug}/site-${i + 1}` : ctx.slug;
   const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
-  const voiceUrl = `https://${s.slug.replace(/_/g, '-')}.vercel.app/api/voice`;
+  // Must match what onboard.js actually sets on the number, or this tells you to verify
+  // against a hostname that was never configured. Two bugs lived on this line: it used the
+  // RAW slug (skipping sanitizeProjectName's leading-punctuation and illegal-char rules)
+  // and it hyphenated underscores where Vercel drops them. Now one shared implementation.
+  const voiceUrl = vercelVoiceUrl(s.slug);
   const isTollFree = /^\+1(800|833|844|855|866|877|888)/.test(twilio.value);
   return [
     {

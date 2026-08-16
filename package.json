@@ -29,7 +29,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@clerk/backend": "^3.5.0",
-    "@jdd/schema": "github:JuneauDigitalDesigns/jdd-schema#v1.13.0",
+    "@jdd/schema": "github:JuneauDigitalDesigns/jdd-schema#v1.14.0",
     "@octokit/rest": "^21.0.2",
     "@upstash/redis": "^1.38.0",
     "airtable": "^0.12.2",
