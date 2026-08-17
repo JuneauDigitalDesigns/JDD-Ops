@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClientContext, listClientContexts } from '@/lib/clients';
+import { fixturesParam, resolveIncludeFixtures } from '@/lib/fixtures';
 import { reconcileClient } from '@/lib/reconcile';
 import {
   reconcileStoreConfigured,
@@ -99,7 +100,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ configured: true, result: await getReconcileResult(slug) });
   }
 
-  const clients = await listClientContexts({ includeFixtures: false }).catch(() => []);
+  const url = new URL(req.url);
+  const clients = await listClientContexts({
+    includeFixtures: resolveIncludeFixtures(fixturesParam(url)),
+  }).catch(() => []);
   const results = await getReconcileResults(clients.map((c) => c.slug));
   return NextResponse.json({ configured: true, results });
 }
@@ -118,7 +122,12 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const slug: string | undefined = body?.slug;
   const all = body?.all === true;
-  const includeFixtures = body?.fixtures === true;
+  // An absent `fixtures` defers to CONSOLE_INCLUDE_FIXTURES rather than meaning "exclude".
+  // It used to mean exclude, which is why "Sweep all" silently skipped the one client that
+  // had anything to report — the briefing then rendered that skip as a clean bill of health.
+  const includeFixtures = resolveIncludeFixtures(
+    typeof body?.fixtures === 'boolean' ? body.fixtures : null,
+  );
 
   if (!slug && !all) {
     return NextResponse.json({ error: 'Pass a slug, or all: true.' }, { status: 400 });

@@ -27,6 +27,7 @@
  *   node scripts/backfill-client-records.js --apply    # create the missing records
  *   node scripts/backfill-client-records.js --email a@b.com   # limit to one account
  *   node scripts/backfill-client-records.js --fixtures # include _e2e-* fixtures
+ *   node scripts/backfill-client-records.js --purge-fixtures --apply   # go-live cleanup
  */
 
 import 'dotenv/config';
@@ -37,7 +38,8 @@ import {
   clientRecordsConfigured,
   ensureClientRecord,
   getClientRecordBySlug,
-  getClientRecordByEmail,
+  listClientRecords,
+  deleteClientRecord,
 } from '../lib/client-record-store.js';
 
 function fail(msg, err) {
@@ -47,15 +49,46 @@ function fail(msg, err) {
 }
 
 function parseArgs(argv) {
-  const args = { apply: false, email: null, fixtures: false };
+  const args = { apply: false, email: null, fixtures: false, purgeFixtures: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--apply') args.apply = true;
     else if (a === '--fixtures') args.fixtures = true;
+    else if (a === '--purge-fixtures') args.purgeFixtures = true;
     else if (a === '--email' && argv[i + 1]) args.email = argv[++i];
     else if (a.startsWith('--')) fail(`unknown flag ${a}`);
   }
   return args;
+}
+
+/**
+ * Delete every client record whose slug is a fixture.
+ *
+ * The go-live counterpart to `--fixtures`: during the test phase the console treats
+ * `_`-prefixed clients as real (CONSOLE_INCLUDE_FIXTURES=1) and they get records like
+ * anything else. This removes them in one command so KV is left holding only real clients.
+ *
+ * No flag or marker field is needed, and that is deliberate — the slug prefix already IS
+ * the marker, so this cannot miss a record whose flag was never set, and there is nothing
+ * extra to keep in sync. deleteClientRecord removes the record plus all three indexes.
+ */
+async function purgeFixtures(apply) {
+  const records = await listClientRecords();
+  const fixtures = records.filter((r) => r.slug && isFixtureSlug(r.slug));
+
+  console.log(
+    `${apply ? '' : '[audit — no writes] '}${records.length} record(s), ${fixtures.length} fixture(s)\n`,
+  );
+
+  for (const rec of fixtures) {
+    console.log(`  ${apply ? '✓' : '~'} ${rec.slug.padEnd(28)} ${rec.id} — ${apply ? 'deleted' : 'would delete'}`);
+    if (apply) await deleteClientRecord(rec.id);
+  }
+
+  const kept = records.length - fixtures.length;
+  console.log(`\n${apply ? 'Deleted' : 'Would delete'}: ${fixtures.length} · left intact: ${kept}`);
+  if (!apply && fixtures.length) console.log('\nRe-run with --apply to delete these.');
+  if (apply) console.log('\nAlso unset CONSOLE_INCLUDE_FIXTURES in console/.env.local.');
 }
 
 /** Matches isFixtureSlug() in the console — `_`-prefixed folders are e2e test data. */
@@ -96,9 +129,17 @@ function clientFoldersOnDisk(includeFixtures) {
 }
 
 async function main() {
-  const { apply, email, fixtures } = parseArgs(process.argv);
+  const { apply, email, fixtures, purgeFixtures: purge } = parseArgs(process.argv);
   if (!accountStoreConfigured() || !clientRecordsConfigured()) {
     fail('KV not configured — set KV_REST_API_URL / KV_REST_API_TOKEN in .env');
+  }
+
+  // Purge is its own mode, not a modifier: it reads the record index rather than accounts,
+  // and mixing "create some, delete others" in one run is how a cleanup deletes the thing
+  // it just made.
+  if (purge) {
+    await purgeFixtures(apply);
+    return;
   }
 
   const accounts = email
@@ -133,8 +174,10 @@ async function main() {
 
       claimed.add(base);
 
-      const existing =
-        (await getClientRecordBySlug(base)) ?? (await getClientRecordByEmail(account.email));
+      // By slug only. The email index holds one id per address, and an account can own
+      // several clients — falling back to it made three different slugs all report the
+      // same record as "already present", so nothing was ever created for the other two.
+      const existing = await getClientRecordBySlug(base);
       if (existing) {
         already++;
         console.log(`  = ${label} — already ${existing.id}`);

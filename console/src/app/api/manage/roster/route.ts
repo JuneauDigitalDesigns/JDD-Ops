@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listClientContexts } from '@/lib/clients';
+import { fixturesParam, resolveIncludeFixtures } from '@/lib/fixtures';
 import { loadVercelCredentials } from '@/lib/opsSecrets';
 import { loadVercelSync } from '@/lib/vercelSync';
 import { isManageable, resolveLiveUrl } from '@/lib/manageSites';
@@ -24,8 +25,9 @@ type HttpView = ProbeResult;
 
 export async function GET(req: Request) {
   // Mirror the client list's fixture filter, or health comes back keyed for a population the
-  // index isn't showing — and we'd spend probes on fixtures nobody asked about.
-  const includeFixtures = new URL(req.url).searchParams.get('fixtures') === '1';
+  // index isn't showing — and we'd spend probes on fixtures nobody asked about. Same
+  // resolution order as everywhere else: explicit param, then CONSOLE_INCLUDE_FIXTURES.
+  const includeFixtures = resolveIncludeFixtures(fixturesParam(new URL(req.url)));
   const clients = await listClientContexts({ includeFixtures }).catch(() => []);
   const vercelConfigured = loadVercelCredentials();
   const vercel = vercelConfigured ? await loadVercelSync().catch(() => null) : null;

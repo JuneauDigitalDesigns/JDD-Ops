@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listClientContexts } from '@/lib/clients';
+import { fixturesParam, resolveIncludeFixtures } from '@/lib/fixtures';
 import { readOpsConfig } from '@/lib/opsConfig';
 import { lastTouchedBySlug } from '@/lib/activity';
 
@@ -17,7 +18,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  const includeFixtures = new URL(req.url).searchParams.get('fixtures') === '1';
+  // The roster's toggle sends ?fixtures=1 and wins outright; absent, CONSOLE_INCLUDE_FIXTURES
+  // decides. Reading the param as a plain `=== '1'` made "no opinion" indistinguishable from
+  // "exclude", which is what kept the test-phase clients off every surface but this one.
+  const includeFixtures = resolveIncludeFixtures(fixturesParam(new URL(req.url)));
   try {
     const clients = await listClientContexts({ includeFixtures });
     const config = readOpsConfig();

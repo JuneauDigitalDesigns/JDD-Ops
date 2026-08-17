@@ -6,6 +6,9 @@ import { clientRecordsConfigured, listClientRecords } from '@/lib/clientRecord';
 import { leadQueueConfigured, listLeads, listDemoCalls } from '@/lib/leadQueue';
 import type { SiteMoney } from '@/lib/reconcile';
 import { loadStripeKey } from '@/lib/opsSecrets';
+import { accountStoreConfigured, getAccount } from '@/lib/accountStore';
+import { fixturesIncludedByDefault } from '@/lib/fixtures';
+import Stripe from 'stripe';
 
 /**
  * The briefing: everything worth knowing across the whole roster, in one read.
@@ -33,12 +36,19 @@ export interface BriefingPayload {
   issues: BriefingFinding[];
   counts: Record<Severity, number>;
   money: {
-    mrrCents: number;
+    /**
+     * Sum of subscriptions the console could tie to a client. Kept under its honest name —
+     * it used to be called `mrrCents`, which is what made a $594 attribution read as
+     * $594 of total revenue when Stripe held $17,478.
+     */
+    attributedMrrCents: number;
     /** Subscriptions renewing in the next 14 days. */
     renewingSoon: { slug: string; brandName: string; at: number; amountCents: number | null }[];
     failing: { slug: string; brandName: string; status: string }[];
     overageBilledCents: number;
   };
+  /** Straight from Stripe: the real total, and how much of it is unaccounted for. */
+  stripe: StripeFacts;
   funnel: {
     leadsTotal: number;
     leadsNew: number;
@@ -51,20 +61,131 @@ export interface BriefingPayload {
   clientCount: number;
   /** Clients with no cached sweep — their state is unknown, not healthy. */
   staleSlugs: string[];
-  checkedAt: number | null;
   /**
-   * Which Stripe every money figure above came from. Surfaced because a test-mode MRR is
-   * indistinguishable from revenue once it's rendered as a dollar amount.
+   * Client records in KV whose folder isn't on this machine — provisioned elsewhere, or
+   * torn down and left behind. They used to be silently folded into `stages`, which is why
+   * the stage totals didn't match `clientCount`.
    */
-  stripeMode: 'test' | 'live' | 'unknown' | null;
+  recordsWithoutFolder: string[];
+  /**
+   * Clients on disk with no record, so no derived stage. With the field above this closes
+   * the accounting: clientCount === sum(stages) + foldersWithoutRecord.length.
+   */
+  foldersWithoutRecord: string[];
+  checkedAt: number | null;
+  /** Whether this payload's population includes `_`-prefixed fixtures. */
+  includingFixtures: boolean;
 }
 
 const RENEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 const DEMO_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Stop paginating eventually; 500 active subscriptions is far past this roster's scale. */
+const MAX_SUB_PAGES = 5;
+
+export interface StripeFacts {
+  /** Every active subscription. This is the number that matches the Stripe dashboard. */
+  totalMrrCents: number;
+  /** The subset tied to a client the console knows about. */
+  attributedMrrCents: number;
+  unattributedCents: number;
+  unattributedCount: number;
+  activeCount: number;
+  /** True when there were more pages than we were willing to fetch. */
+  truncated: boolean;
+  mode: 'test' | 'live' | 'unknown' | null;
+  error: string | null;
+}
+
+/**
+ * Total MRR, and how much of it the console can actually account for.
+ *
+ * ONE Stripe call regardless of how many clients exist — O(1), not O(n) — which is what
+ * keeps this affordable on the front door. Everything else the briefing reads is cached.
+ *
+ * The split is the point. Summing only subscriptions attached to a client site record
+ * reported $0 while Stripe held $17,478 across 54 active subscriptions, because almost no
+ * site record carries a `stripeSubscriptionId`. A figure labelled "MRR" that silently omits
+ * most of the revenue is worse than no figure — and the omitted part is the interesting
+ * part: in production, revenue attributable to nobody means people paying with nothing
+ * provisioned.
+ */
+async function loadStripeFacts(subscribed: Map<string, string>): Promise<StripeFacts> {
+  const empty: StripeFacts = {
+    totalMrrCents: 0,
+    attributedMrrCents: 0,
+    unattributedCents: 0,
+    unattributedCount: 0,
+    activeCount: 0,
+    truncated: false,
+    mode: null,
+    error: null,
+  };
+
+  const { key, mode } = loadStripeKey();
+  if (!key) return { ...empty, mode, error: 'No Stripe key in jdd-ops/.env.' };
+
+  const stripe = new Stripe(key, { apiVersion: '2025-10-29.clover' as Stripe.LatestApiVersion });
+
+  let totalMrrCents = 0;
+  let attributedMrrCents = 0;
+  let unattributedCents = 0;
+  let unattributedCount = 0;
+  let activeCount = 0;
+  let startingAfter: string | undefined;
+  let truncated = false;
+
+  try {
+    for (let page = 0; page < MAX_SUB_PAGES; page++) {
+      const res = await stripe.subscriptions.list({
+        status: 'active',
+        limit: 100,
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+
+      for (const sub of res.data) {
+        const amount = sub.items?.data?.[0]?.price?.unit_amount ?? 0;
+        activeCount++;
+        totalMrrCents += amount;
+        if (subscribed.has(sub.id)) {
+          attributedMrrCents += amount;
+        } else {
+          unattributedCents += amount;
+          unattributedCount++;
+        }
+      }
+
+      if (!res.has_more) return {
+        totalMrrCents, attributedMrrCents, unattributedCents, unattributedCount,
+        activeCount, truncated: false, mode, error: null,
+      };
+      startingAfter = res.data[res.data.length - 1]?.id;
+      if (!startingAfter) break;
+      truncated = true; // provisional: cleared on the loop that sees has_more === false
+    }
+  } catch (err) {
+    // A partial total is worse than an admitted failure — it would read as a real number.
+    return { ...empty, mode, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  return {
+    totalMrrCents, attributedMrrCents, unattributedCents, unattributedCount,
+    activeCount, truncated, mode, error: null,
+  };
+}
+
 export async function GET() {
-  const clients = await listClientContexts({ includeFixtures: false }).catch(() => []);
-  const byslug = new Map(clients.map((c) => [c.slug, c.brandName]));
+  /**
+   * ONE client list, resolved once, and everything below derives from it.
+   *
+   * The payload used to mix three populations: `clientCount` counted non-fixture disk
+   * folders, `stages` counted every record in KV (including ones with no folder), and
+   * `issues`/`money` covered the disk clients. One screen, three denominators, and no way
+   * to tell which question any number was answering.
+   */
+  const includingFixtures = fixturesIncludedByDefault();
+  const clients = await listClientContexts({ includeFixtures: includingFixtures }).catch(() => []);
+  const knownSlugs = new Set(clients.map((c) => c.slug));
 
   const results: Record<string, ReconcileResult> = reconcileStoreConfigured()
     ? await getReconcileResults(clients.map((c) => c.slug)).catch(() => ({}))
@@ -73,7 +194,7 @@ export async function GET() {
   const issues: BriefingFinding[] = [];
   const counts: Record<Severity, number> = { red: 0, amber: 0, grey: 0, unknown: 0 };
   const money: BriefingPayload['money'] = {
-    mrrCents: 0,
+    attributedMrrCents: 0,
     renewingSoon: [],
     failing: [],
     overageBilledCents: 0,
@@ -100,7 +221,7 @@ export async function GET() {
     }
 
     for (const m of ((result as { money?: SiteMoney[] }).money ?? []) as SiteMoney[]) {
-      if (m.amountCents) money.mrrCents += m.amountCents;
+      if (m.amountCents) money.attributedMrrCents += m.amountCents;
       if (m.status && m.status !== 'active') {
         money.failing.push({ slug: ctx.slug, brandName: ctx.brandName, status: m.status });
       }
@@ -121,13 +242,58 @@ export async function GET() {
   money.renewingSoon.sort((a, b) => a.at - b.at);
 
   // ── Stages + overage history, from the client records ────────────────────
+  //
+  // Scoped to the SAME client list as everything else. Counting every record in KV made the
+  // stage totals disagree with clientCount, and the extra ones weren't noise — they are
+  // records whose folder isn't on this machine, which is its own situation and now gets
+  // named instead of quietly inflating a total.
   const stages: Record<string, number> = {};
+  const recordsWithoutFolder: string[] = [];
+  const withRecord = new Set<string>();
+  const subscribedSlugs = new Map<string, string>(); // subscriptionId → slug
   if (clientRecordsConfigured()) {
     for (const rec of await listClientRecords().catch(() => [])) {
+      if (!rec.slug || !knownSlugs.has(rec.slug)) {
+        if (rec.slug) recordsWithoutFolder.push(rec.slug);
+        continue;
+      }
+      withRecord.add(rec.slug);
       stages[rec.stage] = (stages[rec.stage] ?? 0) + 1;
       for (const o of rec.ledger?.overages ?? []) money.overageBilledCents += o.billedCents;
     }
   }
+
+  /**
+   * Clients on disk with no record, so no derived stage.
+   *
+   * The counterpart to `recordsWithoutFolder`, and together they close the accounting:
+   *
+   *   clientCount === (sum of stages) + foldersWithoutRecord.length
+   *
+   * Without this the totals silently didn't add up — 6 clients, 4 stages, nothing stale —
+   * and the two missing ones were invisible rather than merely uncounted. In practice they
+   * are clients with no portal account, which `npm run link-portal` fixes.
+   */
+  const foldersWithoutRecord = clients
+    .map((c) => c.slug)
+    .filter((slug) => !withRecord.has(slug));
+
+  // Every subscription id the console can tie to a client, for the attribution split below.
+  // Sourced from the portal account records rather than the sweep cache, so a client that
+  // has never been swept still counts as attributed.
+  if (accountStoreConfigured()) {
+    for (const ctx of clients) {
+      const email = ctx.sites[0]?.env.PORTAL_ACCOUNT_EMAIL ?? null;
+      const account = email ? await getAccount(email).catch(() => null) : null;
+      for (const s of account?.sites ?? []) {
+        if (s.stripeSubscriptionId && knownSlugs.has(ctx.slug)) {
+          subscribedSlugs.set(s.stripeSubscriptionId, ctx.slug);
+        }
+      }
+    }
+  }
+
+  const stripeFacts = await loadStripeFacts(subscribedSlugs);
 
   // ── Funnel ───────────────────────────────────────────────────────────────
   const funnel: BriefingPayload['funnel'] = {
@@ -166,8 +332,11 @@ export async function GET() {
     stages,
     clientCount: clients.length,
     staleSlugs,
+    recordsWithoutFolder,
+    foldersWithoutRecord,
     checkedAt: newestCheck,
-    stripeMode: loadStripeKey().mode,
+    includingFixtures,
+    stripe: stripeFacts,
   };
 
   return NextResponse.json(payload);

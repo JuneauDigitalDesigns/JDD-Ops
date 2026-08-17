@@ -424,3 +424,38 @@ scripted** — do it by hand so you can't accidentally delete a paying customer'
 
 Make scenarios and Clerk users are **not** deleted by teardown — remove an inactive clone, the
 `retell-agent-lookup` row, and the Clerk user manually in their dashboards if needed.
+
+### G1. Going live — turning the test phase off
+
+While the six-vendor stack is being stood up, the fixtures **are** the working clients:
+`_e2e_test_growth` ("Your HVAC Co.") has a live site, a Twilio number, a Retell agent, an
+Airtable base and a subscription. So the console is told to treat `_`-prefixed clients as real:
+
+```
+# console/.env.local
+CONSOLE_INCLUDE_FIXTURES=1
+```
+
+That one flag drives the briefing, the roster default, the reconcile sweep and the manage
+health probe — see `console/src/lib/fixtures.ts`. The roster's own Fixtures toggle still
+overrides it per-request, in both directions.
+
+**At launch, two steps:**
+
+```
+# 1. stop treating fixtures as clients
+#    console/.env.local → CONSOLE_INCLUDE_FIXTURES=0  (or delete the line)
+
+# 2. remove the client records they accumulated
+npm run backfill-client-records -- --purge-fixtures          # audit
+npm run backfill-client-records -- --purge-fixtures --apply  # delete
+```
+
+The purge matches on the `_` slug prefix — the same rule everything else uses — so there is
+no marker field to have forgotten to set, and it cannot miss a record. It removes the record
+and all three of its indexes, and leaves every non-fixture record untouched. Verified by
+purging and re-creating against live KV.
+
+Note this only clears the **console's** client records. The `_e2e-*` portal account records,
+Vercel projects, Twilio numbers and Stripe subscriptions are separate; use `npm run teardown`
+above for the infrastructure, and `/orphans` in the console to find what's left over.

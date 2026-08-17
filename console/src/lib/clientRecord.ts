@@ -155,9 +155,16 @@ export interface EnsureClientRecordInput {
 export async function ensureClientRecord(
   input: EnsureClientRecordInput,
 ): Promise<ClientRecord> {
-  const existing =
-    (input.slug ? await getClientRecordBySlug(input.slug) : null) ??
-    (await getClientRecordByEmail(input.email));
+  /**
+   * A SLUG identifies a client. An EMAIL does not — one account can own several, and
+   * `jdd:client:by-email:` holds a single id, so it resolves to whichever was written last.
+   * Using it as a fallback when the slug missed returned another client's record and
+   * reported it as this one's. It applies only when there is no slug: a converted lead with
+   * no folder yet, where the email is genuinely all we have.
+   */
+  const existing = input.slug
+    ? await getClientRecordBySlug(input.slug)
+    : await getClientRecordByEmail(input.email);
 
   if (existing) {
     // Fill in anything the caller knows that the record doesn't, without clobbering.

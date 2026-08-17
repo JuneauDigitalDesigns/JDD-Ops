@@ -65,6 +65,10 @@ export default function BriefingView() {
       const res = await fetch('/api/manage/reconcile', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        // No `fixtures` key on purpose. Omitting it means "no opinion", and the route
+        // resolves the same CONSOLE_INCLUDE_FIXTURES this payload was built from — so the
+        // sweep covers exactly what the screen shows. Passing a copy of the policy from the
+        // client would be a second source of the same truth, free to drift.
         body: JSON.stringify({ all: true }),
       });
       const body = await res.json();
@@ -95,6 +99,10 @@ export default function BriefingView() {
           <h1 className="font-display text-2xl font-semibold tracking-tightish text-fg">Briefing</h1>
           <p className="meta">
             {data.clientCount} client{data.clientCount === 1 ? '' : 's'}
+            {/* A screen whose population is unusual has to say so, or the counts below are
+                unreadable — this is the difference between "nothing wrong" and "nothing
+                wrong among the clients I was willing to look at". */}
+            {data.includingFixtures && ' · including fixtures'}
             {data.checkedAt && ` · swept ${relativeTime(new Date(data.checkedAt).toISOString())}`}
           </p>
         </div>
@@ -121,6 +129,28 @@ export default function BriefingView() {
           </p>
           <p className="meta">{data.staleSlugs.join(', ')}</p>
         </section>
+      )}
+
+      {/* Records with no folder here. Distinct from stale: these aren't unswept, they are
+          clients this machine has no copy of. Previously they inflated the stage counts
+          silently, which is how the totals stopped matching clientCount. */}
+      {data.recordsWithoutFolder.length > 0 && (
+        <p className="meta">
+          {data.recordsWithoutFolder.length} client record
+          {data.recordsWithoutFolder.length === 1 ? '' : 's'} with no folder on this machine:{' '}
+          {data.recordsWithoutFolder.join(', ')} — provisioned elsewhere, or torn down.
+        </p>
+      )}
+
+      {/* The other half of the accounting. These have no record, so they contribute nothing
+          to the stage counts — without naming them the totals just quietly fail to add up. */}
+      {data.foldersWithoutRecord.length > 0 && (
+        <p className="meta">
+          {data.foldersWithoutRecord.length} client
+          {data.foldersWithoutRecord.length === 1 ? '' : 's'} with no record, so no lifecycle
+          stage: {data.foldersWithoutRecord.join(', ')} — usually no portal account yet
+          (<code className="codechip">npm run link-portal</code>).
+        </p>
       )}
 
       {/* ── Issues ────────────────────────────────────────────────────────── */}
@@ -184,20 +214,49 @@ export default function BriefingView() {
                 as revenue the instant it's on screen: "$6,534 MRR" and "$6,534 MRR (test)"
                 are the same pixels and completely different facts. Turns itself off in
                 live mode, when the number means what it looks like. */}
-            {data.stripeMode !== 'live' && (
+            {data.stripe.mode !== 'live' && (
               <span
                 className="rounded-sm border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
                 style={{ borderColor: 'var(--rule)', color: 'var(--fg-3)' }}
                 title="Figures below come from Stripe test mode, not live revenue."
               >
-                {data.stripeMode ?? 'no key'}
+                {data.stripe.mode ?? 'no key'}
               </span>
             )}
           </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Stat label="MRR" value={money(data.money.mrrCents)} />
-            <Stat label="Overage billed" value={money(data.money.overageBilledCents)} />
-          </div>
+
+          {data.stripe.error ? (
+            <p className="meta" style={{ color: 'var(--warn)' }}>
+              Couldn’t read Stripe ({data.stripe.error}). Revenue is unknown, not zero.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {/* The total leads, because it's the number that matches the dashboard and
+                    the one you'd otherwise go and check. */}
+                <Stat label="MRR" value={money(data.stripe.totalMrrCents)} />
+                <Stat label="Overage billed" value={money(data.money.overageBilledCents)} />
+              </div>
+
+              {/* The attribution split. When it's clean this is one quiet line; when it
+                  isn't, the unattributed figure is the actionable one — revenue tied to no
+                  client means someone is paying for something that may not exist. */}
+              <p className="meta">
+                {money(data.stripe.attributedMrrCents)} tied to a client
+                {data.stripe.unattributedCount > 0 && (
+                  <>
+                    {' · '}
+                    <span style={{ color: 'var(--warn)' }}>
+                      {money(data.stripe.unattributedCents)} across{' '}
+                      {data.stripe.unattributedCount} subscription
+                      {data.stripe.unattributedCount === 1 ? '' : 's'} matched to no client
+                    </span>
+                  </>
+                )}
+                {data.stripe.truncated && ' · more than 500 active subscriptions — total is partial'}
+              </p>
+            </>
+          )}
 
           {data.money.failing.length > 0 && (
             <div className="flex flex-col gap-1 border-t pt-2" style={{ borderColor: 'var(--rule)' }}>

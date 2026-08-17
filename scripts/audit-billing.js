@@ -36,7 +36,11 @@ const includeFixtures = process.argv.includes('--include-fixtures');
 const ORPHAN_GRACE_MS = 15 * 60 * 1000;
 
 const out = (msg) => { if (!json) console.log(msg); };
-const isFixture = (slug) => slug.startsWith('_e2e');
+// Matches isFixtureSlug() in console/src/lib/clients.ts, which is the canonical definition.
+// This used to test `_e2e` only, so a `_`-prefixed slug that wasn't an e2e fixture counted
+// as a real client here and as a fixture in the console — the same concept answering two
+// ways depending on which tool you asked.
+const isFixture = (slug) => slug.startsWith('_');
 
 async function main() {
     if (!accountStoreConfigured()) {
