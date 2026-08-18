@@ -14,3 +14,6 @@ console/export/
 *.tsbuildinfo
 **/.state/
 .DS_Store
+
+# Local Lighthouse runs (raw reports are large; see PERF.md for the record)
+.perf/

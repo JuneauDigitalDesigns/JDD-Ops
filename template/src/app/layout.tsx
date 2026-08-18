@@ -4,7 +4,7 @@ import { Analytics } from '@vercel/analytics/next';
 import '../styles/globals.css';
 import { CONTENT } from '@/data/site';
 import { paletteVars, typographyVars } from '@/lib/palette';
-import { industryFontVars } from '@/lib/fonts.loader';
+import { fontVarsFor } from '@/lib/fonts.loader';
 import { buildJsonLd } from '@/lib/structuredData';
 
 // SEO is driven by CONTENT.seo. A catalog SEO variant may extend this by exporting its own
@@ -37,7 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // from the layout means every client gets it with no export wiring at all.
   const jsonLd = buildJsonLd(CONTENT);
   return (
-    <html lang="en" className={industryFontVars}>
+    /* Only the families this brand's stacks actually name — see fonts.loader.ts. A system
+       stack yields "" and the site ships no font files at all. */
+    <html lang="en" className={fontVarsFor(CONTENT.brand.typography.fontSans, CONTENT.brand.typography.fontHeading)}>
       <body style={brandVars}>
         {jsonLd && (
           <script

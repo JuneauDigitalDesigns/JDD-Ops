@@ -56,7 +56,8 @@ export default function WorkGrid({
             >
               <div className="relative overflow-hidden" style={{ aspectRatio: i === 0 ? '3/4' : '4/3' }}>
                 {p.image?.url ? (
-                  <img src={p.image.url} alt={p.image.alt} loading="lazy"
+                  /* Ratio follows the wrapper's i===0 split. width/height only supply the intrinsic ratio so the box is reserved before the bytes land; CSS still sets the rendered size. */
+                  <img src={p.image.url} alt={p.image.alt} loading="lazy" width={i === 0 ? 1200 : 1600} height={i === 0 ? 1600 : 1200}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                   <div className="relative flex h-full w-full items-center justify-center bg-accent-grad">

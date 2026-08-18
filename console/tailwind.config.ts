@@ -41,6 +41,21 @@ const config: Config = {
         kicker: ['11.5px', { lineHeight: '1.4' }], // SECTION EYEBROWS ONLY
         meta: ['11px', { lineHeight: '1.4' }],     // counts, durations, slugs, timestamps
       },
+      // `text-accent` resolves to the ACCESSIBLE accent; every other utility keeps the raw
+      // brand color. Tailwind consults `theme.textColor` before `theme.colors`, so this
+      // remaps only the text utility — `bg-accent` / `border-accent` still paint the authored
+      // hex, which is what the client picked it for.
+      //
+      // The `var(--accent)` fallback is LOAD-BEARING here in a way it is not in the template:
+      // `--accent-text` is only set where paletteVars() is applied (the /build preview
+      // subtree), but console chrome uses `text-accent` too (e.g. the icon picker). Without
+      // the fallback those chrome elements would resolve an undefined var.
+      //
+      // Measured 2026-08-18: accent-as-text was one of three color-contrast failures holding
+      // Lighthouse Accessibility at 96 on the exported site (#e08b29 on #ffffff = 2.66:1).
+      textColor: {
+        accent: 'var(--accent-text, var(--accent))',
+      },
       colors: {
         // Client-brand tokens — bound to CSS vars set per previewed site. Reserved
         // for catalog components; never used by studio chrome.

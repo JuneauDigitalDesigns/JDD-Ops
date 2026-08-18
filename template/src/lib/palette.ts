@@ -26,7 +26,23 @@ export function paletteVars(brand: Brand): CSSProperties {
   return {
     // ── authored tokens (unchanged) ──
     '--accent': accent,
-    '--accent-fg': p.accentFg ?? readableOn(accent, ink),
+    /* The schema's accentFg is a REQUEST, not an instruction — it is only honoured when it
+       actually passes AA against the accent it sits on.
+
+       Measured 2026-08-18: the e2e HVAC client sets accentFg "#FFFFFF" over accent "#e08b29",
+       which is 2.66:1 — failing AA for both normal (4.5) and large (3.0) text. Because the
+       old line was `p.accentFg ?? readableOn(...)`, an explicit value skipped the fallback
+       entirely, so the computed-and-correct answer (brand ink, ~7:1) was overridden by a
+       hand-entered one that failed. That was one of the three color-contrast failures
+       holding Lighthouse Accessibility at 96. A client may not choose an illegible site. */
+    '--accent-fg': passesAA(p.accentFg, accent) ? (p.accentFg as string) : readableOn(accent, ink),
+    /* Accent, darkened until it clears AA as TEXT on the page background.
+
+       `--accent` stays the authored brand color and remains correct for fills, borders and
+       icons. But eyebrows and phone links render accent-colored TEXT, and a brand color
+       picked to look vivid as a fill is very often illegible as type — #e08b29 on #ffffff is
+       2.66:1. Anything rendering accent text must use this token, never `--accent`. */
+    '--accent-text': accentText(accent, bg),
     '--bg': bg,
     '--bg-soft': p.bgSoft,
     '--ink': ink,
@@ -84,6 +100,47 @@ function isDarkHex(hex: string): boolean {
     return relLuminance(hex) < 0.18;
   } catch {
     return false;
+  }
+}
+
+/** WCAG AA for normal text. Large text (18.66px bold / 24px) only needs 3.0, but these
+ *  tokens are used at all sizes, so the stricter bar is the only safe one to hold. */
+const AA_NORMAL = 4.5;
+
+/** True when `fg` is set AND legible on `bg`. An unset or failing value returns false so the
+ *  caller falls back to a computed foreground. */
+function passesAA(fg: string | null | undefined, bg: string): boolean {
+  if (!fg) return false;
+  try {
+    return contrastRatio(relLuminance(fg), relLuminance(bg)) >= AA_NORMAL;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The brand accent pushed toward legibility as text on `bg`, stopping as soon as it clears
+ * AA so the result stays as close to the authored color as possible.
+ *
+ * Steps toward black on a light background and toward white on a dark one. Bounded at 24
+ * iterations: a pathological accent (a mid-grey on a mid-grey page) can never reach 4.5, and
+ * in that case the readable ink/white fallback is correct and the loop must not hang.
+ */
+function accentText(accent: string, bg: string): string {
+  try {
+    const bgLum = relLuminance(bg);
+    const toward = isDarkHex(bg) ? '#ffffff' : '#000000';
+    let candidate = accent;
+    for (let i = 0; i < 24; i++) {
+      if (contrastRatio(relLuminance(candidate), bgLum) >= AA_NORMAL) return candidate;
+      // 8% per step, not a big jump: `mix(a,b,t)` is `a + (b-a)*t`, so a coarse t would
+      // blacken the brand color in one pass. Small steps stop at the first passing shade,
+      // which keeps the result recognisably the client's accent.
+      candidate = mix(candidate, toward, 0.08);
+    }
+    return readableOn(bg);
+  } catch {
+    return readableOn(bg);
   }
 }
 

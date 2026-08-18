@@ -83,7 +83,7 @@ export default function TestimonialsGrid({
                 </div>
                 <div className="mt-6 flex items-center gap-3">
                   {avatar ? (
-                    <img src={avatar} alt={t.a} loading="lazy"
+                    <img src={avatar} alt={t.a} loading="lazy" width={96} height={96}
                       className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-accent/20" />
                   ) : (
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent ring-1 ring-accent/20">

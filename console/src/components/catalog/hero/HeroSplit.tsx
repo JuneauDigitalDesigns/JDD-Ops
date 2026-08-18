@@ -120,14 +120,10 @@ export default function HeroSplit({
       {/* Content container */}
       <div className="relative z-10 order-1 mx-auto w-full max-w-7xl px-6 lg:px-14">
 
-        {/* Badge + eyebrow — constrained to left half on desktop */}
-        <motion.div
-          className="pt-20 lg:pt-28 lg:max-w-[52%]"
-          initial={still ? false : { opacity: 0, y: 16 }}
-          whileInView={still ? undefined : { opacity: 1, y: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.5, ease: EASE }}
-        >
+        {/* Badge + eyebrow — constrained to left half on desktop.
+            STATIC BY DESIGN: see the note on the sub block below. Nothing above the fold
+            animates on load. */}
+        <div className="pt-20 lg:pt-28 lg:max-w-[52%]">
           {hero.badge && (
             <div className={`mb-5 inline-flex w-fit items-center gap-1.5 rounded-full border ${s.rule} px-3 py-1 text-xs font-medium ${s.body}`}>
               <Star size={13} weight="fill" className="text-accent" />
@@ -138,25 +134,30 @@ export default function HeroSplit({
             <span className={`hidden h-px w-8 sm:inline-block ${dark ? 'bg-accent200' : 'bg-accent'}`} />
             <E p="hero.eyebrow">{hero.eyebrow}</E>
           </p>
-        </motion.div>
+        </div>
 
         {/* Headline — unconstrained, breaks into image territory at desktop sizes */}
         <h1 className={`mt-5 font-heading text-[3.5rem] font-bold leading-[0.88] tracking-[-0.04em] sm:text-[5.5rem] lg:text-[min(9.5vw,8.5rem)] ${s.heading}`}>
-          {editing ? (
-            <E p="hero.headline" fit>{hero.headline}</E>
-          ) : (
-            <KineticHeadline text={hero.headline} emphasis={hero.headlineEmphasis} still={still} />
-          )}
+          {/* Always the static headline. `KineticHeadline`'s word-by-word rise cannot run
+              until hydration, and this <h1> is above the fold — see the note below. */}
+          <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
         </h1>
 
-        {/* Sub + CTAs + friction — left column only */}
-        <motion.div
-          className="mt-8 pb-28 lg:mt-10 lg:max-w-[50%] lg:pr-8"
-          initial={still ? false : { opacity: 0, y: 16 }}
-          whileInView={still ? undefined : { opacity: 1, y: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.6, ease: EASE, delay: 0.35 }}
-        >
+        {/* Sub + CTAs + friction — left column only.
+            STATIC BY DESIGN — DO NOT reintroduce an entrance animation here.
+
+            Measured 2026-08-18: the <p> below is this page's LCP element, and it used to sit
+            in a motion.div with `initial={{opacity:0}}` plus `delay: 0.35`. It therefore
+            could not paint until the JS bundle downloaded, hydrated, the viewport observer
+            fired, 350ms of delay elapsed and a 600ms tween ran. Result: LCP 4.2s, of which
+            3519ms (84%) was Render Delay, on a plain text node.
+
+            Note this is NOT a CPU problem — Total Blocking Time measured 10ms. Hydration here
+            is cheap; it is the *waiting* for it that cost the paint. So it cannot be fixed by
+            trimming bundle size, only by not gating above-the-fold content behind JS.
+
+            Below the fold, entrance reveals are fine and still used throughout. */}
+        <div className="mt-8 pb-28 lg:mt-10 lg:max-w-[50%] lg:pr-8">
           <p className={`max-w-md text-lg leading-relaxed ${s.body}`}>
             <E p="hero.sub">{hero.sub}</E>
           </p>
@@ -187,7 +188,7 @@ export default function HeroSplit({
               ))}
             </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Review card — floats over the copy/image seam */}
         {review && (
@@ -212,22 +213,30 @@ export default function HeroSplit({
       {/* Image — bleeds to the viewport's right edge, wider panel for visual dominance */}
       <motion.div
         className="relative order-2 h-72 w-full sm:h-96 lg:absolute lg:inset-y-0 lg:right-0 lg:h-auto lg:w-[52vw]"
+        /* Parallax (scroll-driven) is kept — it does not gate the first paint. The ENTRANCE
+           was removed: this wrapper used to start at `clipPath: inset(0 0 100% 0)`, i.e. the
+           hero image was fully clipped away until hydration ran, and the <img> additionally
+           scaled from 1.12. Both are above the fold. See the note on the sub block above. */
         style={still ? undefined : { y: imgY }}
-        initial={still ? false : { clipPath: 'inset(0 0 100% 0)' }}
-        whileInView={still ? undefined : { clipPath: 'inset(0 0 0% 0)' }}
-        viewport={viewportOnce}
-        transition={{ duration: 0.9, ease: EASE, delay: 0.1 }}
       >
         {slide?.url ? (
-          <motion.img
+          /* fetchPriority high + eager: this is the largest image in the initial viewport, so
+             it should compete for bandwidth immediately rather than be discovered late. */
+          <img
             src={slide.url}
             alt={slide.alt}
             loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            /* LOAD-BEARING, not decorative. `object-cover` + h-full/w-full means CSS decides
+               the RENDERED size, but without width/height the element has no intrinsic ratio
+               before the bytes arrive, so the browser reserves nothing and the section jumps
+               when it loads. Measured: removing the hero's entrance animation took CLS from 0
+               to 0.193 — the animation had been masking this by keeping images clipped until
+               after load. These numbers only supply the ratio; they are not a rendered size. */
+            width={1600}
+            height={900}
             className="h-full w-full object-cover"
-            initial={still ? false : { scale: 1.12 }}
-            whileInView={still ? undefined : { scale: 1 }}
-            viewport={viewportOnce}
-            transition={{ duration: 1.2, ease: EASE, delay: 0.1 }}
           />
         ) : (
           <div className="absolute inset-0 bg-accent-grad">

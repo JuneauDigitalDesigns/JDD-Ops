@@ -79,7 +79,8 @@ export default function ServicesShowcase({
                   {/* Image reveals on hover — the index's standout moment (desktop only) */}
                   <div className="hidden overflow-hidden rounded-xl lg:block lg:w-48" style={{ aspectRatio: '3/2' }}>
                     {item.image?.url ? (
-                      <img src={item.image.url} alt={item.image.alt} loading="lazy"
+                      /* 3/2 box. width/height only supply the intrinsic ratio so the box is reserved before the bytes land; CSS still sets the rendered size. */
+                      <img src={item.image.url} alt={item.image.alt} loading="lazy" width={1500} height={1000}
                         className="h-full w-full scale-105 object-cover opacity-0 transition-all duration-500 group-hover:scale-100 group-hover:opacity-100" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-accent-grad opacity-0 transition-opacity duration-500 group-hover:opacity-100">

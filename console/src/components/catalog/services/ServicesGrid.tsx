@@ -81,7 +81,12 @@ export default function ServicesGrid({
               >
                 <div className="relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
                   {current.image?.url ? (
+                    /* width/height mirror the wrapper's 16/10 and exist purely to give the
+                       browser an intrinsic ratio before the bytes land. Without them this
+                       image measured 1200x892 on a 396px viewport and shifted #services by
+                       1400px (CLS 0.193). CSS still decides the rendered size. */
                     <img src={current.image.url} alt={current.image.alt} loading="lazy"
+                      width={1600} height={1000}
                       className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-accent-grad">

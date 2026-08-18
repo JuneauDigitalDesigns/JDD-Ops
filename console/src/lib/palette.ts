@@ -18,7 +18,17 @@ export function paletteVars(brand: Brand): CSSProperties {
   return {
     // ── authored tokens (unchanged) ──
     '--accent': accent,
-    '--accent-fg': p.accentFg ?? readableOn(accent, ink),
+    /* The schema's accentFg is a REQUEST, not an instruction — honoured only when it actually
+       passes AA against the accent it sits on. Measured 2026-08-18: the e2e HVAC client sets
+       accentFg "#FFFFFF" over accent "#e08b29" = 2.66:1, failing AA for normal AND large
+       text. The old `p.accentFg ?? readableOn(...)` let an explicit value skip the fallback,
+       so a hand-entered failing color overrode the correct computed one (brand ink, ~7:1).
+       Keep this in step with template/src/lib/palette.ts. */
+    '--accent-fg': passesAA(p.accentFg, accent) ? (p.accentFg as string) : readableOn(accent, ink),
+    /* Accent darkened until it clears AA as TEXT on the page background. `--accent` stays the
+       authored brand color for fills, borders and icons; anything rendering accent-colored
+       TYPE must use this token. Tailwind's `textColor.accent` maps here. */
+    '--accent-text': accentText(accent, bg),
     '--bg': bg,
     '--bg-soft': p.bgSoft,
     '--ink': ink,
@@ -94,6 +104,46 @@ export function contrast(a: string, b: string): number {
     return contrastRatio(relLuminance(a), relLuminance(b));
   } catch {
     return 1;
+  }
+}
+
+/** WCAG AA for normal text. Large text only needs 3.0, but these tokens are used at every
+ *  size, so the stricter bar is the only safe one to hold. */
+const AA_NORMAL = 4.5;
+
+/** True when `fg` is set AND legible on `bg`. Unset or failing returns false, so the caller
+ *  falls back to a computed foreground. */
+function passesAA(fg: string | null | undefined, bg: string): boolean {
+  if (!fg) return false;
+  try {
+    return contrastRatio(relLuminance(fg), relLuminance(bg)) >= AA_NORMAL;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The brand accent pushed toward legibility as text on `bg`, stopping at the first passing
+ * shade so the result stays recognisably the client's color.
+ *
+ * `mix(a,b,t)` is `a + (b-a)*t`, so the step is deliberately small — a coarse t would blacken
+ * the accent in one pass. Bounded at 24 iterations: a pathological accent (mid-grey on a
+ * mid-grey page) can never reach 4.5, and the loop must not hang.
+ *
+ * Keep in step with template/src/lib/palette.ts.
+ */
+function accentText(accent: string, bg: string): string {
+  try {
+    const bgLum = relLuminance(bg);
+    const toward = bgLum < 0.18 ? '#ffffff' : '#000000';
+    let candidate = accent;
+    for (let i = 0; i < 24; i++) {
+      if (contrastRatio(relLuminance(candidate), bgLum) >= AA_NORMAL) return candidate;
+      candidate = mix(candidate, toward, 0.08);
+    }
+    return readableOn(bg);
+  } catch {
+    return readableOn(bg);
   }
 }
 

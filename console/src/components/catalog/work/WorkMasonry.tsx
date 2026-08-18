@@ -20,7 +20,7 @@ function ProjectCard({ p, idx }: { p: Project; idx: number }) {
     <article className="w-[280px] shrink-0 overflow-hidden rounded-2xl border border-rule bg-bg sm:w-[360px]">
       <div className="relative overflow-hidden" style={{ aspectRatio: '4/3' }}>
         {p.image?.url ? (
-          <img src={p.image.url} alt={p.image.alt} loading="lazy" className="h-full w-full object-cover" />
+          <img src={p.image.url} alt={p.image.alt} loading="lazy" width={1600} height={1200} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
             <span className="font-sans text-xs uppercase tracking-widest text-inkSoft"><E p={`work.projects.${idx}.caption`}>{p.caption}</E></span>

@@ -27,6 +27,21 @@ const config: Config = {
         onInkSoft: 'var(--on-ink-soft)',
         ruleInk: 'var(--rule-ink)',
       },
+      // `text-accent` resolves to the ACCESSIBLE accent; every other utility keeps the raw
+      // brand color. Tailwind consults `theme.textColor` before falling back to
+      // `theme.colors`, so this remaps the text utility only — `bg-accent` and
+      // `border-accent` still paint the authored hex, which is what the client picked it for.
+      //
+      // Measured 2026-08-18: accent-as-text was one of three color-contrast failures holding
+      // Lighthouse Accessibility at 96 (#e08b29 on #ffffff = 2.66:1; AA needs 4.5). There are
+      // ~159 `text-accent` call sites across the catalog — fixing it here fixes all of them,
+      // hover states included, without editing a single component.
+      // The `var(--accent)` fallback keeps this safe if a component ever renders outside the
+      // <body> that carries paletteVars() — it degrades to the authored brand color rather
+      // than to an undefined var. Mirrors the console's twin, which needs it load-bearingly.
+      textColor: {
+        accent: 'var(--accent-text, var(--accent))',
+      },
       fontFamily: {
         sans: 'var(--font-sans)',
         heading: 'var(--font-heading)',

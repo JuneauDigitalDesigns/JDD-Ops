@@ -74,7 +74,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                       <div className="pb-5 pl-[2.75rem] text-inkSoft">
                         {/* Mobile-only image (desktop uses the sticky panel) */}
                         {item.image?.url && (
-                          <img src={item.image.url} alt={item.image.alt} loading="lazy"
+                          <img src={item.image.url} alt={item.image.alt} loading="lazy" width={1600} height={900}
                             className="mb-3 aspect-[16/9] w-full rounded-lg object-cover lg:hidden" />
                         )}
                         <p><E p={`services.items.${i}.d`}>{item.d}</E></p>
@@ -103,7 +103,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                   transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 >
                   {cur.image?.url ? (
-                    <img src={cur.image.url} alt={cur.image.alt} className="h-full w-full object-cover" />
+                    <img src={cur.image.url} alt={cur.image.alt} width={1600} height={1000} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-accent-grad">
                       <span className="font-heading text-8xl font-black leading-none text-white/25">{curNum}</span>
