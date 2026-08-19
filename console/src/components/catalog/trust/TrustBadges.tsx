@@ -1,8 +1,17 @@
 'use client';
-import { motion, useReducedMotion } from 'framer-motion';
+// ─────────────────────────────────────────────────────────────────────────────
+// TrustBadges — recomposed 2026-08-19 against design/catalog-v2/SPEC.md.
+//
+// Credentials as solid chips rather than pill outlines, on the inverted surface
+// so the band reads as a deliberate break in the page rhythm instead of another
+// faint strip. Separation by mass, not by hairlines (SPEC §1).
+//
+// The per-chip stagger is gone. It was a framer-motion reveal on a row of four
+// short strings — motion that cost a client bundle and a hydration boundary to
+// animate something the reader takes in at a glance.
+// ─────────────────────────────────────────────────────────────────────────────
 import { SealCheck, Star } from '@phosphor-icons/react';
-import { CONTENT } from '@/data/site';
-import type { SiteContent } from '@/data/site';
+import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 
 export const meta = {
@@ -10,52 +19,43 @@ export const meta = {
   category: 'trust',
   label: 'Trust / Badges',
   consumes: ['extensions.trustBadges', 'extensions.reviewBadge'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['@phosphor-icons/react'],
 } as const;
 
 export default function TrustBadges({ content = CONTENT }: { content?: SiteContent }) {
-  const reduce = useReducedMotion() ?? false;
   const { extensions } = content;
   const badges = extensions.trustBadges;
   const review = extensions.reviewBadge;
 
+  // Degrade away entirely rather than render an empty shell — a client with no
+  // credentials on file should not get a band announcing that (SPEC §7).
   if (!badges?.length && !review) return null;
 
   return (
-    <section className="bg-bgSoft py-10">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          {badges?.map((badge, i) => (
-            <motion.div
-              key={badge}
-              className="flex items-center gap-2 rounded-full border border-rule bg-bg px-4 py-2 text-sm font-medium text-ink"
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.5 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: i * 0.05 }}
-            >
-              <SealCheck size={16} className="text-accent" weight="fill" />
-              <E p={`extensions.trustBadges.${i}`}>{badge}</E>
-            </motion.div>
-          ))}
+    <section className="bg-inkPanel text-onInk">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2.5 px-5 py-7 sm:px-6">
+        {badges?.map((badge, i) => (
+          <span
+            key={badge}
+            className="flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2.5 text-[15px] font-bold"
+          >
+            <SealCheck size={18} weight="fill" className="text-accent" aria-hidden="true" />
+            <E p={`extensions.trustBadges.${i}`}>{badge}</E>
+          </span>
+        ))}
 
-          {review && (
-            <motion.a
-              href={review.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-full border border-rule bg-bg px-5 py-2 text-sm font-semibold text-ink transition-colors hover:border-accent"
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.5 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: (badges?.length ?? 0) * 0.05 }}
-            >
-              <Star size={16} className="text-accent" weight="fill" />
-              {review.rating} / 5
-              <span className="text-inkSoft font-normal">({review.count} reviews)</span>
-            </motion.a>
-          )}
-        </div>
+        {review && (
+          <a
+            href={review.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[15px] font-extrabold text-accentFg transition-[filter] hover:brightness-105"
+          >
+            <Star size={18} weight="fill" aria-hidden="true" />
+            {review.rating} / 5
+            <span className="font-semibold opacity-80">({review.count} reviews)</span>
+          </a>
+        )}
       </div>
     </section>
   );

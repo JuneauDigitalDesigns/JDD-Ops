@@ -1,155 +1,99 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// ServicesGrid — recomposed as a Feature + Rail (see DESIGN-LANGUAGE.md).
-// Asymmetric split: a large feature panel showing the active service, and a rail
-// listing every service. Hover / click a rail row to swap the feature.
-// Adapts the swap pattern from catalog/faq/FaqStickyAside and the split from
-// catalog/work/BeforeAfter (renamed from WorkSpotlight in the 2026-08-19 prune).
-// Structure over decoration.
+// ServicesGrid — recomposed 2026-08-19 against design/catalog-v2/SPEC.md.
+//
+// Was a Feature + Rail: one large photo panel showing the active service, plus a
+// hover-to-swap rail. Two problems. It made the section about browsing rather
+// than about what the company fixes, and the feature photo was a single 153KB
+// 1200px JPEG that competed with the hero for bandwidth on the critical path —
+// the largest remaining request on the page after the hero was fixed.
+//
+// Now the approved card grid: an icon tile, the service, what it covers, and the
+// tag as a plain cue. NO PER-CARD PHOTOGRAPH, which is what removes those bytes
+// outright rather than shrinking them. `services.items[].image` is untouched in
+// the schema and still used by ServicesAccordion and ServicesPanel, so nothing
+// is orphaned — this variant simply does not lead with imagery.
+//
+// Cards carry real elevation. The old card was a 1px hairline plus a 6% shadow,
+// which put it on the same plane as the page and read flat (SPEC §5, and the
+// depth note in the mockup).
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { skinClasses, type SkinId } from '@/lib/skins';
-import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
 export const meta = {
   id: 'services-grid',
   category: 'services',
-  label: 'Services / Grid',
-  consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/icons'],
-  skins: ['editorial', 'contrast'],
+  label: 'Services / Card grid',
+  consumes: ['services.title', 'services.sub', 'services.items'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/icons'],
+  skins: ['soft', 'default'],
 } as const;
 
 export default function ServicesGrid({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'soft',
 }: {
   content?: SiteContent;
   skin?: SkinId;
 }) {
-  const reduce = useReducedMotion() ?? false;
-  const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
-  const dark = skin === 'contrast';
+  const dark = skin === 'inverted' || skin === 'contrast';
   const { services } = content;
-  const [active, setActive] = useState(0);
   if (!services.items.length) return null;
 
-  const idx = Math.min(active, services.items.length - 1);
-  const current = services.items[idx];
-  const num = (n: string | number, i: number) => String(n ?? i + 1).padStart(2, '0');
-
   return (
-    <section id="services" className={`px-6 py-24 ${s.section}`}>
-      <div className="mx-auto max-w-6xl">
-        {/* Section header — hairline eyebrow + scaled heading */}
-        <motion.div
-          className="max-w-xl"
-          initial={still ? false : { opacity: 0, y: 14 }}
-          whileInView={still ? undefined : { opacity: 1, y: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.5, ease: EASE }}
-        >
-          <p className={`flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] ${s.eyebrow}`}>
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="services.eyebrow">{services.eyebrow}</E>
+    <section id="services" className={`${s.section} py-14 lg:py-20`}>
+      <div className="mx-auto max-w-6xl px-5 sm:px-6">
+        {/* No eyebrow. The heading names the section and the line under it carries real
+            information, which is the job the wide-tracked kicker was pretending to do. */}
+        <div className="max-w-[46ch]">
+          <h2 className={`font-heading text-[28px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[34px] lg:text-[40px] ${s.heading}`}>
+            <E p="services.title">{services.title}</E>
+          </h2>
+          <p className={`mt-3.5 text-[17px] leading-relaxed ${s.body}`}>
+            <E p="services.sub">{services.sub}</E>
           </p>
-          <h2 className={`mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] ${s.heading} md:text-5xl`}><E p="services.title">{services.title}</E></h2>
-          <p className={`mt-4 ${s.body}`}><E p="services.sub">{services.sub}</E></p>
-        </motion.div>
-
-        <div className="mt-12 grid gap-8 lg:grid-cols-[1.35fr_minmax(300px,1fr)] lg:items-start">
-          {/* Feature panel — swaps with the active rail selection */}
-          <motion.div
-            className={`overflow-hidden rounded-3xl border ${s.cardRule} ${s.card}`}
-            initial={still ? false : { opacity: 0, x: -16 }}
-            whileInView={still ? undefined : { opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.55, ease: EASE }}
-          >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={idx}
-                initial={still ? false : { opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={still ? undefined : { opacity: 0, y: -10 }}
-                transition={{ duration: 0.3, ease: EASE }}
-              >
-                <div className="relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-                  {current.image?.url ? (
-                    /* width/height mirror the wrapper's 16/10 and exist purely to give the
-                       browser an intrinsic ratio before the bytes land. Without them this
-                       image measured 1200x892 on a 396px viewport and shifted #services by
-                       1400px (CLS 0.193). CSS still decides the rendered size. */
-                    <img src={current.image.url} alt={current.image.alt} loading="lazy"
-                      width={1600} height={1000}
-                      className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-accent-grad">
-                      <span className="font-heading text-8xl font-black leading-none text-white/25">{num(current.n, idx)}</span>
-                    </div>
-                  )}
-                  {/* Geometric cut — hard diagonal seam where the image meets the panel body */}
-                  <div aria-hidden className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 ${s.card}`}
-                    style={{ clipPath: 'polygon(0 100%, 100% 0, 100% 100%)' }} />
-                </div>
-                <div className="p-7 lg:p-9">
-                  {/* tag + title are plain mirrors of the rail selection (editable in the rail) */}
-                  <span className="text-xs font-semibold uppercase tracking-widest text-accent">{current.tag}</span>
-                  <h3 className={`mt-2 font-heading text-3xl font-bold tracking-[-0.02em] ${s.heading}`}>{current.t}</h3>
-                  <p className={`mt-3 max-w-prose leading-relaxed ${s.body}`}><E p={`services.items.${idx}.d`}>{current.d}</E></p>
-                  <a href="#contact" className="group mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
-                    Contact for pricing
-                    <ArrowRight size={15} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
-                  </a>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
-
-          {/* Rail — every service; the picker that drives the feature */}
-          <motion.ul
-            className={`border-t ${s.rule} ${dark ? 'divide-y divide-ruleInk' : 'divide-y divide-rule'}`}
-            initial={still ? false : { opacity: 0, x: 16 }}
-            whileInView={still ? undefined : { opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.55, ease: EASE }}
-          >
-            {services.items.map((item, i) => {
-              const IconComp = serviceIcon(item.icon, item.tag);
-              const on = i === idx;
-              return (
-                <li key={item.n ?? i}>
-                  <button
-                    type="button"
-                    onClick={() => setActive(i)}
-                    onMouseEnter={() => setActive(i)}
-                    aria-pressed={on}
-                    className={`group flex w-full items-center gap-4 border-l-2 py-4 pl-4 pr-3 text-left transition-colors ${
-                      on
-                        ? `border-accent ${s.card}`
-                        : `border-transparent ${dark ? 'hover:bg-inkPanel2' : 'hover:bg-bgSoft'}`
-                    }`}
-                  >
-                    <span className={`font-heading text-2xl font-black leading-none tabular-nums ${on ? 'text-accent' : `${s.heading} opacity-30`}`}>
-                      {num(item.n, i)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className={`block font-heading text-base font-bold leading-snug ${s.heading}`}><E p={`services.items.${i}.t`}>{item.t}</E></span>
-                      <span className="mt-0.5 block text-[11px] font-semibold uppercase tracking-wider text-accent"><E p={`services.items.${i}.tag`}>{item.tag}</E></span>
-                    </span>
-                    <Ico p={`services.items.${i}.icon`} icon={IconComp} size={20} className={`shrink-0 transition-colors ${on ? 'text-accent' : `${s.body} opacity-50`}`} />
-                  </button>
-                </li>
-              );
-            })}
-          </motion.ul>
         </div>
+
+        <ul className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {services.items.map((item, i) => (
+            <li
+              key={item.n ?? i}
+              className={`flex flex-col rounded-xl border p-6 transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 ${
+                dark
+                  ? 'border-ruleInk bg-inkPanel2 shadow-[0_14px_30px_-12px_rgba(0,0,0,.5)] hover:shadow-[0_22px_42px_-14px_rgba(0,0,0,.6)]'
+                  : 'border-rule/70 bg-bg shadow-[0_1px_2px_rgba(28,16,9,.05),0_14px_30px_-12px_rgba(28,16,9,.22)] hover:shadow-[0_2px_4px_rgba(28,16,9,.06),0_22px_42px_-14px_rgba(28,16,9,.28)]'
+              }`}
+            >
+              <span
+                className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl ${
+                  dark ? 'bg-white/10 text-onInk' : 'bg-accent100 text-ink'
+                }`}
+              >
+                <Ico p={`services.items.${i}.icon`} icon={serviceIcon(item.icon, item.tag)} size={26} />
+              </span>
+
+              <h3 className={`font-heading text-[20px] font-extrabold leading-snug tracking-[-0.01em] ${s.heading}`}>
+                <E p={`services.items.${i}.t`}>{item.t}</E>
+              </h3>
+              <p className={`mt-2.5 text-[16px] leading-relaxed ${s.body}`}>
+                <E p={`services.items.${i}.d`}>{item.d}</E>
+              </p>
+
+              {/* `tag` is real schema data, so it is shown as-is. There is no per-service
+                  availability field, and inventing "same-day" copy here would put a promise
+                  on the page that the client never made. */}
+              {item.tag && (
+                <p className={`mt-5 border-t pt-4 text-[14px] font-bold ${dark ? 'border-ruleInk text-accent200' : 'border-rule text-accent'}`}>
+                  <E p={`services.items.${i}.tag`}>{item.tag}</E>
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

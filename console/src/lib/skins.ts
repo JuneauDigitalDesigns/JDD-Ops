@@ -32,21 +32,21 @@ export const SKINS: Record<string, SkinDef[]> = {
   // trust
   TrustReviewsAggregate: [ED, CT],
   // about
-  AboutFeature: [ED, CT, QT], AboutStory: [ED, QT],
+  AboutFeature: [ED, CT, QT], AboutStory: [DEF, SOFT],
   // services
-  ServicesGrid: [ED, CT],
+  ServicesGrid: [SOFT, DEF],
   // work (reframed as recent jobs)
   BeforeAfter: [ED, CT, QT], RecentJobsGrid: [ED, CT],
   // testimonials
   TestimonialsGrid: [ED, CT],
   // faq
-  FaqAccordion: [ED, CT, QT], FaqStickyAside: [ED, QT],
+  FaqAccordion: [ED, CT, QT], FaqStickyAside: [SOFT, DEF],
   // finalCta
   FinalCtaSplit: [ED, CT],
   // contact
-  ContactSplit: [ED, CT, QT], ContactCardOverlap: [ED, CT], ContactInlineStrip: [SOFT, INV],
+  ContactSplit: [ED, CT, QT], ContactCardOverlap: [ED, CT], ContactInlineStrip: [DEF, INV],
   // footer
-  FooterColumns: [ED, CT], FooterMinimal: [ED, CT, QT],
+  FooterColumns: [INV, DEF], FooterMinimal: [ED, CT, QT],
   // seo has no skins
 };
 

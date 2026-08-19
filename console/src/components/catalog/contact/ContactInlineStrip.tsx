@@ -26,12 +26,12 @@ export const meta = {
   label: 'Contact / Inline strip',
   consumes: ['finalCta.cta', 'finalCta.sub', 'brand.phone', 'brand.phoneHref'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/LeadForm'],
-  skins: ['soft', 'inverted'],
+  skins: ['default', 'inverted'],
 } as const;
 
 export default function ContactInlineStrip({
   content = CONTENT,
-  skin = 'soft',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;

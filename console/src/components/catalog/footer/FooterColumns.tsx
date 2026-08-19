@@ -11,7 +11,7 @@ export const meta = {
   label: 'Footer / Columns',
   consumes: ['brand.name', 'brand.long', 'brand.license', 'brand.established', 'brand.address', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.cols', 'footer.social', 'footer.legalLinks', 'footer.legal'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
-  skins: ['editorial', 'contrast'],
+  skins: ['inverted', 'default'],
 } as const;
 
 const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
@@ -21,7 +21,7 @@ const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number | string;
 
 export default function FooterColumns({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'inverted',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -29,7 +29,10 @@ export default function FooterColumns({
   const s = skinClasses(skin);
   const { brand, footer } = content;
   return (
-    <footer className={`border-t ${s.rule} ${s.section} px-6 pb-6 pt-14`}>
+    // No `border-t`. The surface change is what separates the footer from the section above
+    // it now; a hairline on top of a surface change is the belt-and-braces the recomposition
+    // removed everywhere else (SPEC §1).
+    <footer className={`${s.section} px-5 pb-6 pt-12 sm:px-6 lg:pt-14`}>
       <div className="mx-auto max-w-6xl">
         <div
           className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[var(--footer-cols)]"
@@ -65,19 +68,25 @@ export default function FooterColumns({
 
           {/* Contact */}
           <div>
-            <p className={`font-semibold ${s.heading}`}>Contact</p>
-            <div className="mt-3 space-y-2.5 text-sm">
-              <a href={brand.phoneHref} className={`flex items-center gap-2 ${s.body} hover:text-accent`}>
-                <PhoneCall size={15} className="shrink-0 text-accent" />
+            <p className={`font-bold ${s.heading}`}>Contact</p>
+            <div className="mt-2.5 space-y-1 text-[15px]">
+              {/* The number is the one link in the footer worth finding at a glance, so it
+                  is set larger and heavier than its neighbours rather than being one more
+                  row in a list. min-h-11 keeps every row above the tap-target floor. */}
+              <a
+                href={brand.phoneHref}
+                className={`flex min-h-11 items-center gap-2 text-[19px] font-extrabold tracking-[-0.01em] ${s.heading} hover:text-accent`}
+              >
+                <PhoneCall size={19} weight="fill" className="shrink-0 text-accent" aria-hidden="true" />
                 <E p="brand.phone">{brand.phone}</E>
               </a>
-              <a href={`mailto:${brand.email}`} className={`flex items-center gap-2 ${s.body} hover:text-accent`}>
-                <Envelope size={15} className="shrink-0 text-accent" />
+              <a href={`mailto:${brand.email}`} className={`flex min-h-11 items-center gap-2 ${s.body} hover:text-accent`}>
+                <Envelope size={17} className="shrink-0 text-accent" aria-hidden="true" />
                 <E p="brand.email">{brand.email}</E>
               </a>
               {brand.address && (
-                <div className={`flex items-start gap-2 ${s.body}`}>
-                  <MapPin size={15} className="mt-0.5 shrink-0 text-accent" />
+                <div className={`flex items-start gap-2 py-2 ${s.body}`}>
+                  <MapPin size={17} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
                   <E p="brand.address">{brand.address}</E>
                 </div>
               )}

@@ -1,82 +1,77 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// AboutStory — recomposed as an editorial 2-column split (see DESIGN-LANGUAGE.md).
-// Sticky narrative on the left, pillars as a hairline-divided list on the right.
-// Narrative-led; distinct from the image feature / stat stack / pillar index.
+// AboutStory — recomposed 2026-08-19 against design/catalog-v2/SPEC.md.
+//
+// Removed: the wide-tracked uppercase eyebrow and its hairline dash, the
+// hairline-divided pillar list, and the faded 25%-opacity ordinal numerals —
+// the same magazine-index device cut from the hero. Pillars are cards now, so
+// they read as things the company does rather than as a table of contents.
+//
+// Also removed the per-pillar staggered reveal. Four short items do not need to
+// arrive one at a time, and the stagger was the only reason this file needed
+// framer-motion.
 // ─────────────────────────────────────────────────────────────────────────────
-import { motion, useReducedMotion } from 'framer-motion';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { pillarIcon } from '@/lib/icons';
 import { skinClasses, type SkinId } from '@/lib/skins';
-import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
 export const meta = {
   id: 'about-story',
   category: 'about',
   label: 'About / Story',
-  consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/icons'],
-  skins: ['editorial', 'quiet'],
+  consumes: ['about.title', 'about.body', 'about.pillars'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/icons'],
+  skins: ['default', 'soft'],
 } as const;
 
 export default function AboutStory({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
 }) {
-  const reduce = useReducedMotion() ?? false;
-  const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
+  const dark = skin === 'inverted' || skin === 'contrast';
   const { about } = content;
 
   return (
-    <section id="about" className={`px-6 py-24 ${s.section}`}>
-      <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-        {/* Narrative — sticky on desktop */}
-        <motion.div
-          className="lg:sticky lg:top-24 lg:self-start"
-          initial={still ? false : { opacity: 0, y: 16 }}
-          whileInView={still ? undefined : { opacity: 1, y: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.5, ease: EASE }}
-        >
-          <p className={`flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] ${s.eyebrow}`}>
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="about.eyebrow">{about.eyebrow}</E>
+    <section id="about" className={`${s.section} py-14 lg:py-20`}>
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <h2 className={`font-heading text-[28px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[34px] lg:text-[40px] ${s.heading}`}>
+            <E p="about.title">{about.title}</E>
+          </h2>
+          <p className={`mt-4 text-[17px] leading-relaxed sm:text-[18px] ${s.body}`}>
+            <E p="about.body">{about.body}</E>
           </p>
-          <h2 className={`mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] ${s.heading} md:text-5xl`}><E p="about.title">{about.title}</E></h2>
-          <p className={`mt-6 text-lg leading-relaxed ${s.body}`}><E p="about.body">{about.body}</E></p>
-        </motion.div>
+        </div>
 
-        {/* Pillars — hairline-divided list */}
         {about.pillars.length > 0 && (
-          <div className={`border-t divide-y divide-rule ${s.rule}`}>
+          <ul className="grid gap-3.5">
             {about.pillars.map((p, i) => {
               const Icon = pillarIcon(p.icon, p.k);
               return (
-                <motion.div
+                <li
                   key={p.k}
-                  className="flex gap-5 py-7"
-                  initial={still ? false : { opacity: 0, y: 12 }}
-                  whileInView={still ? undefined : { opacity: 1, y: 0 }}
-                  viewport={viewportOnce}
-                  transition={{ duration: 0.45, ease: EASE, delay: still ? 0 : i * 0.06 }}
+                  className={`rounded-xl border p-5 ${
+                    dark
+                      ? 'border-ruleInk bg-inkPanel2'
+                      : 'border-rule/70 bg-bgSoft shadow-[0_1px_2px_rgba(28,16,9,.04)]'
+                  }`}
                 >
-                  <span className={`font-heading text-2xl font-black leading-none tabular-nums ${s.heading} opacity-25`}>{String(i + 1).padStart(2, '0')}</span>
-                  <div className="flex-1">
-                    <h3 className={`flex items-center gap-2 font-heading text-lg font-bold ${s.heading}`}>
-                      {Icon && <Ico p={`about.pillars.${i}.icon`} icon={Icon} size={19} className="text-accent" />}
-                      <E p={`about.pillars.${i}.t`}>{p.t}</E>
-                    </h3>
-                    <p className={`mt-2 leading-relaxed ${s.body}`}><E p={`about.pillars.${i}.d`}>{p.d}</E></p>
-                  </div>
-                </motion.div>
+                  <h3 className={`flex items-center gap-2.5 font-heading text-[18px] font-extrabold ${s.heading}`}>
+                    {Icon && <Ico p={`about.pillars.${i}.icon`} icon={Icon} size={21} className="shrink-0 text-accent" />}
+                    <E p={`about.pillars.${i}.t`}>{p.t}</E>
+                  </h3>
+                  <p className={`mt-2 text-[16px] leading-relaxed ${s.body}`}>
+                    <E p={`about.pillars.${i}.d`}>{p.d}</E>
+                  </p>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </div>
     </section>
