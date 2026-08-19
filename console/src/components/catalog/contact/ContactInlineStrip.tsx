@@ -1,94 +1,74 @@
 'use client';
-import { useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+// ─────────────────────────────────────────────────────────────────────────────
+// ContactInlineStrip — recomposed 2026-08-19 against design/catalog-v2/SPEC.md.
+//
+// A compact mid-page capture bar: one line of intent, the phone number as the
+// primary action, and a two-field form as the alternative. It is deliberately
+// lighter than FinalCtaBanner — this one interrupts, that one closes.
+//
+// Adapts to plan via `_meta.selectedPlan`, so `meta` declares no fixed `leadMode`
+// (see the note on `forPlan` in build/categories.tsx). Its own useState/fetch
+// form is gone: labels, validation, aria-invalid and — critically — the error
+// state that the old copy set but never rendered all live in <LeadForm> now.
+//
+// The `border-y` hairlines that used to define this strip are replaced by the
+// soft surface. Sections are separated by mass, not lines (SPEC §1).
+// ─────────────────────────────────────────────────────────────────────────────
 import { PhoneCall } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 import { skinClasses, type SkinId } from '@/lib/skins';
-import { EASE, stillFor } from '@/lib/motion';
 
 export const meta = {
   id: 'contact-inline-strip',
   category: 'contact',
   label: 'Contact / Inline strip',
-  consumes: ['finalCta.eyebrow', 'finalCta.cta', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast'],
-  leadMode: 'phone',
+  consumes: ['finalCta.cta', 'finalCta.sub', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/LeadForm'],
+  skins: ['soft', 'inverted'],
 } as const;
-
-type Status = 'idle' | 'loading' | 'done' | 'error';
 
 export default function ContactInlineStrip({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'soft',
 }: {
   content?: SiteContent;
   skin?: SkinId;
 }) {
-  const reduce = useReducedMotion() ?? false;
-  const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
+  const dark = skin === 'inverted' || skin === 'contrast';
   const { finalCta, brand } = content;
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus('loading');
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, phone }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus('done');
-    } catch {
-      setStatus('error');
-    }
-  }
+  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
-    <section id="contact" className={`border-y ${s.rule} ${s.section} py-12`}>
-      <div className="mx-auto max-w-6xl px-6">
-        <motion.div
-          className="flex flex-wrap items-center gap-6"
-          initial={still ? false : { opacity: 0, y: 10 }}
-          whileInView={still ? undefined : { opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.5 }}
-          transition={{ duration: 0.45, ease: EASE }}
-        >
-          <div className="shrink-0">
-            <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}><E p="finalCta.eyebrow">{finalCta.eyebrow}</E></p>
-            <a href={brand.phoneHref}
-              className={`mt-1 flex items-center gap-1.5 font-heading text-lg font-bold ${s.heading} hover:text-accent`}>
-              <PhoneCall size={20} weight="bold" className="text-accent" />
+    <section id="contact" className={`${s.section} py-12 lg:py-14`}>
+      <div className="mx-auto grid max-w-6xl gap-7 px-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-12">
+        <div>
+          <p className={`font-heading text-[24px] font-extrabold leading-tight tracking-[-0.015em] sm:text-[28px] ${s.heading}`}>
+            {mode === 'email' ? 'Need a hand? Send us a note.' : 'Need a hand? We can call you back.'}
+          </p>
+          <p className={`mt-2 max-w-[44ch] text-[16px] ${s.body}`}>
+            <E p="finalCta.sub">{finalCta.sub}</E>
+          </p>
+
+          <a
+            href={brand.phoneHref}
+            className="mt-5 inline-flex items-center gap-2.5 rounded-lg bg-accent px-5 py-3 text-accentFg transition-[filter] hover:brightness-105"
+          >
+            <PhoneCall size={20} weight="fill" aria-hidden="true" />
+            <span className="whitespace-nowrap text-[19px] font-extrabold tracking-[-0.01em]">
               <E p="brand.phone">{brand.phone}</E>
-            </a>
-          </div>
+            </span>
+          </a>
+        </div>
 
-          <div className={`hidden h-10 w-px sm:block ${skin === 'contrast' ? 'bg-ruleInk' : 'bg-rule'}`} />
-
-          {status === 'done' ? (
-            <p className="font-semibold text-accent">We&apos;ll call you shortly.</p>
-          ) : (
-            <form onSubmit={submit} className="flex flex-1 flex-wrap gap-3">
-              <input type="text" aria-label="Your name" placeholder="Your name" required value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="min-w-[140px] flex-1 rounded-lg border border-rule bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-accent" />
-              <input type="tel" aria-label="Phone number" placeholder="Phone number" required value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="min-w-[140px] flex-1 rounded-lg border border-rule bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-accent" />
-              <button type="submit" disabled={status === 'loading'}
-                className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accentFg transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60">
-                {status === 'loading' ? '...' : <E p="finalCta.cta">{finalCta.cta}</E>}
-              </button>
-            </form>
-          )}
-        </motion.div>
-        {status === 'error' && <p className="mt-3 text-sm text-red-500">Something went wrong. Please try again.</p>}
+        <LeadForm
+          mode={mode}
+          surface={dark ? 'dark' : 'light'}
+          layout="row"
+          submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+        />
       </div>
     </section>
   );

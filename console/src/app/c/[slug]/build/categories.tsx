@@ -56,9 +56,19 @@ export type CategoryEntry = {
 /** Build the studio's component catalog bound to the current effective content. */
 export function buildCategories(effective: SiteContent): CategoryEntry[] {
   // Starter clients capture leads by email; growth/enterprise by phone callback.
-  // Show only the lead-capture variants that match the loaded client's plan.
+  //
+  // A variant with NO `leadMode` adapts to either — it reads `_meta.selectedPlan` itself and
+  // hands the mode to <LeadForm>. Those are always shown. Only a variant that hard-codes one
+  // mode gets filtered by plan.
+  //
+  // This used to be `(v.leadMode ?? 'phone') === …`, which defaulted an absent leadMode to
+  // 'phone' and so hid every adapting variant from starter clients. Combined with the
+  // `*Starter` duplicates being the only email-mode variants — and none of them appearing in
+  // the export allowlist — a starter client could not be built at all. Both halves of that
+  // are now fixed; see the note in lib/export.ts CATALOG.
   const isStarter = effective._meta?.selectedPlan === 'starter';
-  const forPlan = (v: VariantEntry) => (v.leadMode ?? 'phone') === (isStarter ? 'email' : 'phone');
+  const forPlan = (v: VariantEntry) =>
+    v.leadMode === undefined || v.leadMode === (isStarter ? 'email' : 'phone');
 
   return [
     {
@@ -140,7 +150,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       label: 'Final CTA',
       iconName: 'Megaphone',
       variants: [
-        { name: 'FinalCtaBanner',   id: finalCtaBannerMeta.id,   label: finalCtaBannerMeta.label,   skins: skinsFor('FinalCtaBanner'),   leadMode: finalCtaBannerMeta.leadMode,   render: () => <FinalCtaBanner content={effective} /> },
+        { name: 'FinalCtaBanner',   id: finalCtaBannerMeta.id,   label: finalCtaBannerMeta.label,   skins: skinsFor('FinalCtaBanner'),     render: () => <FinalCtaBanner content={effective} /> },
         { name: 'FinalCtaSimple',   id: finalCtaSimpleMeta.id,   label: finalCtaSimpleMeta.label,   skins: skinsFor('FinalCtaSimple'),   leadMode: finalCtaSimpleMeta.leadMode,   render: () => <FinalCtaSimple content={effective} /> },
         { name: 'FinalCtaSplit',    id: finalCtaSplitMeta.id,    label: finalCtaSplitMeta.label,    skins: skinsFor('FinalCtaSplit'),    leadMode: finalCtaSplitMeta.leadMode,    render: (skin: SkinId) => <FinalCtaSplit content={effective} skin={skin} /> },
       ].filter(forPlan),
@@ -152,7 +162,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'ContactSplit',        id: contactSplitMeta.id,         label: contactSplitMeta.label,           skins: skinsFor('ContactSplit'),        leadMode: contactSplitMeta.leadMode,        render: (skin: SkinId) => <ContactSplit content={effective} skin={skin} /> },
         { name: 'ContactCardOverlap',  id: contactCardOverlapMeta.id,   label: contactCardOverlapMeta.label,     skins: skinsFor('ContactCardOverlap'),  leadMode: contactCardOverlapMeta.leadMode,  render: (skin: SkinId) => <ContactCardOverlap content={effective} skin={skin} /> },
-        { name: 'ContactInlineStrip',  id: contactInlineStripMeta.id,   label: contactInlineStripMeta.label,     skins: skinsFor('ContactInlineStrip'),  leadMode: contactInlineStripMeta.leadMode,  render: (skin: SkinId) => <ContactInlineStrip content={effective} skin={skin} /> },
+        { name: 'ContactInlineStrip',  id: contactInlineStripMeta.id,   label: contactInlineStripMeta.label,     skins: skinsFor('ContactInlineStrip'),   render: (skin: SkinId) => <ContactInlineStrip content={effective} skin={skin} /> },
       ].filter(forPlan),
     },
     {

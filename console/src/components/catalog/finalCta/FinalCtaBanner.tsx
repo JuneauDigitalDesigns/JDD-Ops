@@ -1,119 +1,97 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// FinalCtaBanner — recomposed as a dark banner with an inline form bar
-// (see DESIGN-LANGUAGE.md). A giant left-aligned headline over a single-row
-// name/phone/submit bar. Growth/enterprise: phone capture.
+// FinalCtaBanner — recomposed 2026-08-19 against design/catalog-v2/SPEC.md.
+//
+// SERVES BOTH PLANS FROM ONE FILE. It reads `_meta.selectedPlan` and hands the
+// mode to <LeadForm>: starter captures an email (Resend mails the owner),
+// growth/enterprise captures a phone number (the Retell agent calls the lead
+// back). This is what made the seven `*Starter` duplicate components deletable,
+// and it is why `meta` no longer declares a `leadMode` — this component has no
+// fixed one. See categories.tsx `forPlan`, which now treats an absent leadMode as
+// "adapts to either".
+//
+// The phone is the primary action and the form is the alternative, not the other
+// way round (SPEC §4). Previously this section led with a bare name/phone bar and
+// the number appeared nowhere in it.
+//
+// Removed: the wide-tracked uppercase eyebrow, the 60px masthead headline, the
+// two radial accent washes and the `rounded-sm` offset-shadow button. Sections
+// are separated by mass now, not by decoration.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
-import { CheckCircle } from '@phosphor-icons/react';
+import { PhoneCall, CheckCircle } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 
 export const meta = {
   id: 'finalcta-banner',
   category: 'finalCta',
   label: 'Final CTA / Banner',
-  consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
-  leadMode: 'phone',
+  consumes: [
+    'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers',
+    'brand.phone', 'brand.phoneHref',
+  ],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/LeadForm'],
 } as const;
 
-type Status = 'idle' | 'loading' | 'done' | 'error';
-
 export default function FinalCtaBanner({ content = CONTENT }: { content?: SiteContent }) {
-  const reduce = useReducedMotion() ?? false;
-  const { finalCta } = content;
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus('loading');
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, phone }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus('done');
-    } catch {
-      setStatus('error');
-    }
-  }
+  const { finalCta, brand } = content;
+  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
-    <section id="cta" className="relative isolate overflow-hidden bg-ink py-24">
-      {/* Accent washes (driven by the client's accent, no hardcoded color) */}
-      <div className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(60% 80% at 28% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)' }} />
-      <div className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(50% 70% at 100% 100%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%)' }} />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-accent/50" />
-
-      <div className="relative mx-auto max-w-5xl px-6">
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] text-accent">
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="finalCta.eyebrow">{finalCta.eyebrow}</E>
+    <section id="cta" className="bg-inkPanel text-onInk">
+      <div className="mx-auto max-w-6xl px-5 py-14 sm:px-6 lg:grid lg:grid-cols-2 lg:gap-14 lg:py-20">
+        <div>
+          <h2 className="font-heading text-[30px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[36px] lg:text-[42px]">
+            <E p="finalCta.headline">{finalCta.headline}</E>
+          </h2>
+          <p className="mt-4 max-w-[48ch] text-[17px] leading-relaxed text-onInkSoft sm:text-[18px]">
+            <E p="finalCta.sub">{finalCta.sub}</E>
           </p>
-          <h2 className="mt-4 max-w-3xl font-heading text-5xl font-bold leading-[0.92] tracking-[-0.03em] text-bg md:text-6xl"><E p="finalCta.headline">{finalCta.headline}</E></h2>
-          <p className="mt-5 max-w-xl text-balance text-bg/70"><E p="finalCta.sub">{finalCta.sub}</E></p>
-        </motion.div>
 
-        <motion.div
-          className="mt-10"
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-        >
-          {status === 'done' ? (
-            <div className="max-w-lg rounded-xl bg-white/10 p-8">
-              <p className="font-heading text-lg font-semibold text-bg">We&apos;ll be in touch soon.</p>
-              <p className="mt-2 text-sm text-bg/70">Expect a call or message within the hour.</p>
-            </div>
-          ) : (
-            <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                type="text" placeholder="Your name" required value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full flex-1 rounded-lg border border-white/20 bg-white/10 px-4 py-3.5 text-bg placeholder-bg/50 outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-              />
-              <input
-                type="tel" placeholder="Phone number" required value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full flex-1 rounded-lg border border-white/20 bg-white/10 px-4 py-3.5 text-bg placeholder-bg/50 outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-              />
-              <button
-                type="submit" disabled={status === 'loading'}
-                className="shrink-0 rounded-sm bg-accent px-7 py-3.5 font-semibold text-accentFg transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
-                style={{ boxShadow: '4px 4px 0px 0px rgba(255,255,255,0.14)' }}
-              >
-                {status === 'loading' ? 'Sending...' : <E p="finalCta.cta">{finalCta.cta}</E>}
-              </button>
-            </form>
-          )}
+          {/* Primary action. The digits are the point — a visible number is itself a
+              reassurance, and for an urgent repair the call converts, not the form. */}
+          <a
+            href={brand.phoneHref}
+            className="mt-7 inline-flex items-center gap-3 rounded-lg bg-accent px-6 py-4 text-accentFg transition-[filter] hover:brightness-105"
+          >
+            <PhoneCall size={24} weight="fill" aria-hidden="true" />
+            <span className="whitespace-nowrap text-[23px] font-extrabold tracking-[-0.02em]">
+              <E p="brand.phone">{brand.phone}</E>
+            </span>
+          </a>
 
           {finalCta.frictionReducers.length > 0 && (
-            <div className="mt-5 flex flex-wrap gap-4">
+            <ul className="mt-7 grid gap-2.5 border-t border-ruleInk pt-6 sm:grid-cols-2">
               {finalCta.frictionReducers.map((r, i) => (
-                <span key={r} className="flex items-center gap-1.5 text-xs text-bg/60">
-                  <CheckCircle size={13} weight="fill" className="text-accent" />
+                <li key={r} className="flex items-start gap-2 text-[15px] font-semibold leading-snug">
+                  <CheckCircle size={18} weight="fill" className="mt-px shrink-0 text-accent" aria-hidden="true" />
                   <E p={`finalCta.frictionReducers.${i}`}>{r}</E>
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </motion.div>
+        </div>
+
+        {/* The alternative path, for anyone who would rather not call. */}
+        <div className="mt-10 rounded-xl bg-white/[0.07] p-6 lg:mt-0 lg:p-8">
+          <p className="text-[19px] font-extrabold">
+            {mode === 'email' ? 'Or send us a message' : 'Or have us call you back'}
+          </p>
+          <p className="mt-1.5 text-[15px] text-onInkSoft">
+            {mode === 'email'
+              ? 'Tell us what you need and we will reply by email.'
+              : 'Leave a number and we will ring you straight back.'}
+          </p>
+          <LeadForm
+            mode={mode}
+            surface="dark"
+            withMessage
+            className="mt-5"
+            submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+          />
+        </div>
       </div>
     </section>
   );

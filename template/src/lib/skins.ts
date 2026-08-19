@@ -44,7 +44,7 @@ export const SKINS: Record<string, SkinDef[]> = {
   // finalCta
   FinalCtaSplit: [ED, CT],
   // contact
-  ContactSplit: [ED, CT, QT], ContactCardOverlap: [ED, CT], ContactInlineStrip: [ED, CT],
+  ContactSplit: [ED, CT, QT], ContactCardOverlap: [ED, CT], ContactInlineStrip: [SOFT, INV],
   // footer
   FooterColumns: [ED, CT], FooterMinimal: [ED, CT, QT],
   // seo has no skins
