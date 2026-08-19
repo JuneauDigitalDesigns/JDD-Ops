@@ -104,8 +104,15 @@ export function buildCopyUserMessage(
     websiteNotes && websiteNotes.trim()
       ? `Content scanned from the business's own website — treat this as ground truth for facts (name, contact, services, reviews) and rewrite/organize it into the copy:\n${websiteNotes.trim()}`
       : '',
+    // Attributed to the CLIENT, not the operator.
+    //
+    // brandDirectionToDetails() assembles this from what the business owner answered during
+    // onboarding — what makes them different, who they sell to, how they want to sound, what
+    // to avoid. Calling it "guidance from the operator" understated it: an operator's note is
+    // a suggestion, whereas the owner's own account of their business is the most
+    // authoritative positioning input available. The "invent no facts" clause stays.
     details && details.trim()
-      ? `Additional brand-specific guidance from the operator — use it, but invent no facts beyond it:\n${details.trim()}`
+      ? `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone — follow it closely, but invent no facts beyond it:\n${details.trim()}`
       : '',
     `Existing structure to respect — keep these exact counts:`,
     JSON.stringify({ ...counts, reference }, null, 2),

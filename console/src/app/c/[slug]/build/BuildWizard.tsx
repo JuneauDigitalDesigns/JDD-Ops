@@ -91,14 +91,16 @@ function seedDetailsFrom(seed: SiteContent | null): string {
 /**
  * The vertical implied by the client's stated industry, when we can tell.
  *
- * @jdd/schema's BrandIntakeSubmission declares `industry: string; // console maps this to a
- * copywriter VerticalId` — but mapBrandIntakeToIntake never emits it, so today the value the
- * client typed is gone before the console sees it and you pick the vertical by hand. That
- * pick is not cosmetic: it chooses the preset baseline AND the copywriter's system prompt.
+ * The pick is not cosmetic: it chooses the preset baseline AND the copywriter's system
+ * prompt, so getting it from the client rather than from an operator's guess is the whole
+ * point of asking them.
  *
- * Implemented now and inert until the mapper is fixed (a cross-repo change: schema bump plus
- * an agency-site deploy). Falls back to the manual pick whenever nothing matches, so it can
- * never make the current behaviour worse.
+ * This sat here inert for a while: @jdd/schema declared `industry` with the comment "console
+ * maps this to a copywriter VerticalId" but `mapBrandIntakeToIntake` never emitted the value,
+ * so the client's answer was gone before the console saw it. Live as of schema v1.16.0.
+ *
+ * Still falls back to the manual pick whenever nothing matches — "other" is a real answer a
+ * client can give, and an unrecognised industry must not silently pick a wrong vertical.
  */
 function verticalFromIntake(seed: SiteContent | null): VerticalId | null {
   const industry = (seed?._meta as { industry?: string } | undefined)?.industry?.trim().toLowerCase();

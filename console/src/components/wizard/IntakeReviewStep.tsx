@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Warning, BracketsCurly, Copy, X, Check, Sparkle, Globe } from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
-import type { VerticalId } from '@/lib/verticals';
+import { VERTICALS, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import GenerateCopyPanel from '@/app/c/[slug]/build/GenerateCopyPanel';
 import ScrapePanel from '@/app/c/[slug]/build/ScrapePanel';
@@ -128,6 +128,20 @@ export default function IntakeReviewStep({
     }
   }
 
+  /**
+   * The industry the client chose during onboarding, when it maps to a vertical we support.
+   *
+   * `null` for "other" or an unrecognised value — both mean the same thing here, that the
+   * preselected vertical is ours rather than theirs, and the picker should say so.
+   */
+  const clientPickedVertical = ((): VerticalId | null => {
+    const industry = (imported?._meta as { industry?: string } | undefined)?.industry
+      ?.trim()
+      .toLowerCase();
+    if (!industry) return null;
+    return VERTICALS.find((v) => v.id === industry || v.label.toLowerCase() === industry)?.id ?? null;
+  })();
+
   return (
     <div className="flex h-full min-h-0">
       {/* Work column. Keeps max-w-3xl inside: the extra width buys the rail, not wider
@@ -144,7 +158,14 @@ export default function IntakeReviewStep({
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <VerticalPicker vertical={vertical} onChange={onVerticalChange} />
+            {/* Derived from the intake already in scope rather than threaded down from
+                BuildWizard: the client's answer and the imported intake are the same
+                object, and a second prop would give them two chances to disagree. */}
+            <VerticalPicker
+              vertical={vertical}
+              clientPicked={clientPickedVertical}
+              onChange={onVerticalChange}
+            />
             <button type="button" onClick={openJson} className="btn btn-sm">
               <BracketsCurly size={16} /> JSON
             </button>
