@@ -10,12 +10,12 @@ export const meta = {
   label: 'Nav / Emergency 24-7 Bar',
   consumes: ['announcement', 'brand.phone', 'brand.phoneHref', 'brand.name', 'nav'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
-  skins: ['contrast', 'editorial'],
+  skins: ['inverted', 'default'],
 } as const;
 
 export default function NavEmergencyBar({
   content = CONTENT,
-  skin = 'contrast',
+  skin = 'inverted',
 }: {
   content?: SiteContent;
   skin?: SkinId;

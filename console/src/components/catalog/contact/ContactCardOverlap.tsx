@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { PhoneCall, Envelope, MapPin } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
@@ -12,16 +12,15 @@ export const meta = {
   category: 'contact',
   label: 'Contact / Overlap cards',
   consumes: ['finalCta.headline', 'finalCta.sub', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'extensions.contactDetails'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast'],
-  leadMode: 'phone',
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/LeadForm'],
+  skins: ['default', 'soft'],
+  // No fixed leadMode: it reads _meta.selectedPlan and serves either plan.
 } as const;
 
-type Status = 'idle' | 'loading' | 'done' | 'error';
 
 export default function ContactCardOverlap({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -30,26 +29,8 @@ export default function ContactCardOverlap({
   const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
   const { finalCta, brand, extensions } = content;
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
   const mapsUrl = extensions.contactDetails?.mapsUrl;
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus('loading');
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, phone }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus('done');
-    } catch {
-      setStatus('error');
-    }
-  }
+  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
     <section id="contact" className={`py-24 ${s.section}`}>
@@ -64,7 +45,6 @@ export default function ContactCardOverlap({
             viewport={viewportOnce}
             transition={{ duration: 0.5, ease: EASE }}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent200"><E p="finalCta.eyebrow">{finalCta.eyebrow}</E></p>
             <h2 className="mt-3 font-heading text-3xl font-bold tracking-[-0.01em] text-onInk"><E p="finalCta.headline">{finalCta.headline}</E></h2>
             <p className="mt-3 text-onInkSoft"><E p="finalCta.sub">{finalCta.sub}</E></p>
             <div className="mt-8 space-y-4">
@@ -99,29 +79,16 @@ export default function ContactCardOverlap({
             viewport={viewportOnce}
             transition={{ duration: 0.5, ease: EASE, delay: 0.08 }}
           >
-            {status === 'done' ? (
-              <div className="py-6 text-center">
-                <p className={`font-heading text-xl font-bold ${s.heading}`}>Message received.</p>
-                <p className={`mt-2 ${s.body}`}>We&apos;ll be in touch shortly.</p>
-              </div>
-            ) : (
-              <>
-                <h3 className={`font-heading text-xl font-bold ${s.heading}`}>Get a free estimate</h3>
-                <form onSubmit={submit} className="mt-5 space-y-4">
-                  <input type="text" placeholder="Your name" required value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-xl border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
-                  <input type="tel" placeholder="Phone number" required value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full rounded-xl border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
-                  <button type="submit" disabled={status === 'loading'}
-                    className="w-full rounded-xl bg-accent py-3.5 font-semibold text-accentFg shadow-[0_10px_30px_-10px_var(--accent-glow)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60">
-                    {status === 'loading' ? 'Sending...' : <E p="finalCta.cta">{finalCta.cta}</E>}
-                  </button>
-                  {status === 'error' && <p className="text-center text-sm text-red-500">Something went wrong.</p>}
-                </form>
-              </>
-            )}
+            {/* The old inline form had placeholder-only inputs (a placeholder is not an
+                accessible name) and a "Something went wrong." with no recovery route.
+                <LeadForm> owns labels, validation, aria-invalid, the sent state and an error
+                that points at the phone number. */}
+            <h3 className={`font-heading text-xl font-bold ${s.heading}`}>Get a free estimate</h3>
+            <LeadForm
+              mode={mode}
+              className="mt-5"
+              submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+            />
           </motion.div>
         </div>
       </div>

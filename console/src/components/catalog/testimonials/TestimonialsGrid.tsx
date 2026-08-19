@@ -17,7 +17,7 @@ export const meta = {
   label: 'Testimonials / Grid',
   consumes: ['testimonials.eyebrow', 'testimonials.title', 'testimonials.items', 'images.testimonials.avatars'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast'],
+  skins: ['default', 'inverted'],
 } as const;
 
 function StarRow({ count, muted }: { count: number; muted: string }) {
@@ -33,7 +33,7 @@ function StarRow({ count, muted }: { count: number; muted: string }) {
 
 export default function TestimonialsGrid({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -55,10 +55,6 @@ export default function TestimonialsGrid({
           viewport={viewportOnce}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          <p className={`flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] ${s.eyebrow}`}>
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="testimonials.eyebrow">{testimonials.eyebrow}</E>
-          </p>
           <h2 className={`mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] ${s.heading} md:text-5xl`}><E p="testimonials.title">{testimonials.title}</E></h2>
         </motion.div>
 

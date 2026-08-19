@@ -11,12 +11,12 @@ export const meta = {
   label: 'Recent Jobs / Grid',
   consumes: ['work.eyebrow', 'work.title', 'work.sub', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast'],
+  skins: ['default', 'inverted'],
 } as const;
 
 export default function RecentJobsGrid({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -38,7 +38,6 @@ export default function RecentJobsGrid({
           viewport={viewportOnce}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}><E p="work.eyebrow">{work.eyebrow}</E></p>
           <h2 className={`mt-3 font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="work.title">{work.title}</E></h2>
           <p className={`mt-3 ${s.body}`}><E p="work.sub">{work.sub}</E></p>
         </motion.div>

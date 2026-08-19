@@ -32,11 +32,6 @@ export default function FinalCtaSimple({ content = CONTENT }: { content?: SiteCo
           viewport={{ once: true, amount: 0.4 }}
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
         >
-          <p className="flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] text-accent">
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="finalCta.eyebrow">{finalCta.eyebrow}</E>
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-          </p>
           <h2 className="mx-auto mt-6 max-w-2xl font-heading text-5xl font-bold leading-[0.92] tracking-[-0.035em] text-ink md:text-6xl"><E p="finalCta.headline">{finalCta.headline}</E></h2>
           <p className="mx-auto mt-5 max-w-lg leading-relaxed text-inkSoft"><E p="finalCta.sub">{finalCta.sub}</E></p>
 

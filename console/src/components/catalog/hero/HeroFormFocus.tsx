@@ -1,22 +1,39 @@
 'use client';
-import { useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
-import { CheckCircle } from '@phosphor-icons/react';
+// ─────────────────────────────────────────────────────────────────────────────
+// HeroFormFocus — recomposed 2026-08-19 against design/catalog-v2/SPEC.md.
+//
+// The form-led hero, for clients who want lead capture above the fold. HeroSplit
+// is the image-led default; this one trades the photograph for the form.
+//
+// NO ON-LOAD MOTION. Everything here is above the fold (SPEC §9). On HeroSplit
+// the same entrance animation put 84% of a 4.2s LCP into Render Delay on a plain
+// text node, so framer-motion is not imported here either.
+//
+// Its own useState/fetch form is gone in favour of <LeadForm>, which is where
+// labels, validation, aria-invalid and the error state actually live. The old
+// copy had placeholder-only inputs and set an error status it never rendered —
+// a failed POST showed the visitor nothing at all.
+//
+// Adapts to plan via `_meta.selectedPlan`, so it serves starter and growth from
+// one file and declares no fixed `leadMode`.
+// ─────────────────────────────────────────────────────────────────────────────
+import { CheckCircle, PhoneCall } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import { E, useEditing } from '@/lib/editable';
+import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 import { skinClasses, type SkinId } from '@/lib/skins';
-import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
 export const meta = {
   id: 'hero-form',
   category: 'hero',
   label: 'Hero / Lead form',
-  consumes: ['hero.eyebrow', 'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta', 'hero.frictionReducers'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'quiet'],
+  consumes: [
+    'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta',
+    'hero.frictionReducers', 'brand.phone', 'brand.phoneHref',
+  ],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/LeadForm'],
+  skins: ['default', 'soft'],
 } as const;
-
-type Status = 'idle' | 'loading' | 'done' | 'error';
 
 function Headline({ text, emphasis }: { text: string; emphasis: string | null }) {
   if (!emphasis) return <>{text}</>;
@@ -33,103 +50,68 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 
 export default function HeroFormFocus({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
 }) {
-  const reduce = useReducedMotion() ?? false;
-  const editing = useEditing();
-  const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
-  const { hero } = content;
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus('loading');
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, phone }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus('done');
-    } catch {
-      setStatus('error');
-    }
-  }
+  const dark = skin === 'inverted' || skin === 'contrast';
+  const { hero, brand } = content;
+  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
-    <section className={`py-24 ${s.section}`}>
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-14 px-6 lg:grid-cols-2 lg:items-center">
-        {/* Copy */}
-        <motion.div
-          initial={still ? false : { opacity: 0, y: 20 }}
-          whileInView={still ? undefined : { opacity: 1, y: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}>
-            <E p="hero.eyebrow">{hero.eyebrow}</E>
-          </p>
-          <h1 className={`mt-4 font-heading text-5xl font-bold leading-[0.98] tracking-[-0.02em] ${s.heading} md:text-6xl`}>
-            {editing
-              ? <E p="hero.headline" fit>{hero.headline}</E>
-              : <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />}
+    <section id="top" className={`${s.section} py-10 lg:py-16`}>
+      <div className="mx-auto grid max-w-6xl gap-9 px-5 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:items-start lg:gap-14">
+        <div>
+          <h1 className={`font-heading text-[34px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[42px] lg:text-[54px] ${s.heading}`}>
+            <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
-          <p className={`mt-6 text-lg leading-relaxed ${s.body}`}><E p="hero.sub">{hero.sub}</E></p>
+          <p className={`mt-4 max-w-[46ch] text-[17px] leading-relaxed sm:text-[18px] ${s.body}`}>
+            <E p="hero.sub">{hero.sub}</E>
+          </p>
+
+          {/* Even on the form-led hero the number stays reachable — someone with a broken
+              furnace should never have to fill in a form to reach a person (SPEC §4). */}
+          <a
+            href={brand.phoneHref}
+            className="mt-6 inline-flex items-center gap-2.5 rounded-lg bg-accent px-5 py-3.5 text-accentFg transition-[filter] hover:brightness-105"
+          >
+            <PhoneCall size={21} weight="fill" aria-hidden="true" />
+            <span className="whitespace-nowrap text-[21px] font-extrabold tracking-[-0.02em]">
+              <E p="brand.phone">{brand.phone}</E>
+            </span>
+          </a>
 
           {hero.frictionReducers.length > 0 && (
-            <ul className="mt-9 space-y-3">
-              {hero.frictionReducers.map((r, i) => (
-                <li key={r} className={`flex items-center gap-2.5 ${s.body}`}>
-                  <CheckCircle size={17} weight="fill" className="shrink-0 text-accent" />
-                  <E p={`hero.frictionReducers.${i}`}>{r}</E>
+            <ul className={`mt-7 grid max-w-[520px] grid-cols-2 gap-x-4 gap-y-3 border-t pt-5 ${s.rule}`}>
+              {hero.frictionReducers.map((f, i) => (
+                <li key={f} className="flex items-start gap-2 text-[15px] font-semibold leading-snug">
+                  <CheckCircle size={19} weight="fill" className="mt-px shrink-0 text-accent" aria-hidden="true" />
+                  <E p={`hero.frictionReducers.${i}`}>{f}</E>
                 </li>
               ))}
             </ul>
           )}
-        </motion.div>
+        </div>
 
-        {/* Form card — always a bright, high-contrast surface for conversion clarity */}
-        <motion.div
-          className="rounded-3xl border border-rule bg-bg p-8 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.25)]"
-          initial={still ? false : { opacity: 0, x: 20 }}
-          whileInView={still ? undefined : { opacity: 1, x: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.6, ease: EASE, delay: 0.1 }}
+        <div
+          className={`rounded-xl border p-6 lg:p-7 ${
+            dark
+              ? 'border-ruleInk bg-inkPanel2'
+              : 'border-rule/70 bg-bgSoft shadow-[0_1px_2px_rgba(28,16,9,.05),0_16px_34px_-14px_rgba(28,16,9,.24)]'
+          }`}
         >
-          {status === 'done' ? (
-            <div className="py-6 text-center">
-              <CheckCircle size={36} weight="fill" className="mx-auto text-accent" />
-              <p className="mt-3 font-heading text-xl font-semibold text-ink">We&apos;ll call you shortly.</p>
-              <p className="mt-2 text-inkSoft">Expect to hear from us within the hour.</p>
-            </div>
-          ) : (
-            <>
-              <p className="font-heading text-lg font-semibold text-ink"><E p="hero.formLabel">{hero.formLabel}</E></p>
-              <form onSubmit={submit} className="mt-5 space-y-4">
-                <input type="text" placeholder="Your name" required value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-xl border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
-                <input type="tel" placeholder="Phone number" required value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-xl border border-rule bg-bg px-4 py-3 text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent" />
-                <button type="submit" disabled={status === 'loading'}
-                  className="w-full rounded-xl bg-accent py-3.5 font-semibold text-accentFg shadow-[0_10px_30px_-10px_var(--accent-glow)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60">
-                  {status === 'loading' ? 'Sending...' : <E p="hero.cta">{hero.cta}</E>}
-                </button>
-                {status === 'error' && (
-                  <p className="text-center text-sm text-red-500">Something went wrong. Please try again.</p>
-                )}
-              </form>
-            </>
-          )}
-        </motion.div>
+          <p className={`text-[20px] font-extrabold leading-snug ${s.heading}`}>
+            <E p="hero.formLabel">{hero.formLabel}</E>
+          </p>
+          <LeadForm
+            mode={mode}
+            surface={dark ? 'dark' : 'light'}
+            className="mt-4"
+            submitLabel={<E p="hero.cta">{hero.cta}</E>}
+          />
+        </div>
       </div>
     </section>
   );

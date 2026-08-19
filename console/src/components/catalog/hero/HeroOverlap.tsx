@@ -4,6 +4,7 @@ import { PhoneCall, CheckCircle } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
 import { E, useEditing } from '@/lib/editable';
+import { responsiveImage } from '@/lib/img';
 
 export const meta = {
   id: 'hero-overlap',
@@ -41,9 +42,16 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
       {/* Full-bleed background image */}
       {slide?.url ? (
         <img
-          src={slide.url}
+          {...responsiveImage(slide.url)}
           alt={slide.alt}
           loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          /* Full-bleed hero backdrop, so it is almost always the LCP element. It must
+             compete for bandwidth immediately AND be asked for at the right width. */
+          width={1600}
+          height={900}
+          sizes="100vw"
           className="absolute inset-0 -z-10 h-full w-full object-cover"
         />
       ) : (

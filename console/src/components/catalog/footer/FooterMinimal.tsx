@@ -10,7 +10,7 @@ export const meta = {
   label: 'Footer / Minimal',
   consumes: ['brand.name', 'brand.long', 'brand.license', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.social', 'footer.legalLinks', 'footer.legal'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
-  skins: ['editorial', 'contrast', 'quiet'],
+  skins: ['default', 'soft', 'inverted'],
 } as const;
 
 const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
@@ -20,7 +20,7 @@ const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number | string;
 
 export default function FooterMinimal({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;

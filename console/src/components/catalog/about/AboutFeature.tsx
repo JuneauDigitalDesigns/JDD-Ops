@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { responsiveImage } from '@/lib/img';
 import { useCountUp } from '@/lib/useCountUp';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
@@ -18,7 +19,7 @@ export const meta = {
   label: 'About / Mission-led',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.stats', 'images.about.feature', 'brand.short', 'brand.name'],
   sharedDeps: ['framer-motion', '@/lib/useCountUp', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast', 'quiet'],
+  skins: ['default', 'soft', 'inverted'],
 } as const;
 
 function StatItem({
@@ -35,7 +36,7 @@ function StatItem({
 
 export default function AboutFeature({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -72,7 +73,11 @@ export default function AboutFeature({
           transition={{ duration: 0.6, ease: EASE }}
         >
           {img ? (
-            <img src={img} alt={`${brand.name} team`} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+            <img {...responsiveImage(img)} alt={`${brand.name} team`} loading="lazy" decoding="async"
+              /* Out of flow (absolute), so this is not a CLS fix — it is a bytes fix: the
+                 origin was serving one fixed width to every device. */
+              width={1200} height={900} sizes="(min-width: 1024px) 560px, 100vw"
+              className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0 bg-accent-grad">
               <div
@@ -96,10 +101,6 @@ export default function AboutFeature({
           viewport={viewportOnce}
           transition={{ duration: 0.55, ease: EASE, delay: 0.08 }}
         >
-          <p className={`flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] ${s.eyebrow}`}>
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="about.eyebrow">{about.eyebrow}</E>
-          </p>
           <h2 className={`mt-4 font-heading text-3xl font-bold leading-[1.02] tracking-[-0.02em] ${s.heading} md:text-4xl`}>
             <E p="about.title">{about.title}</E>
           </h2>

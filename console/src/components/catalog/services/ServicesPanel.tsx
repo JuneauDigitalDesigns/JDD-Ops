@@ -10,6 +10,7 @@ import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { responsiveImage } from '@/lib/img';
 
 export const meta = {
   id: 'services-bento',
@@ -43,10 +44,6 @@ export default function ServicesPanel({ content = CONTENT }: { content?: SiteCon
           viewport={{ once: true, amount: 0.4 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] text-accent">
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="services.eyebrow">{services.eyebrow}</E>
-          </p>
           <h2 className="mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] text-ink md:text-5xl"><E p="services.title">{services.title}</E></h2>
           <p className="mt-4 text-inkSoft"><E p="services.sub">{services.sub}</E></p>
         </motion.div>
@@ -70,9 +67,16 @@ export default function ServicesPanel({ content = CONTENT }: { content?: SiteCon
                 <div className="absolute inset-0 -z-10 bg-ink" />
                 {item.image?.url && (
                   <img
-                    src={item.image.url}
+                    {...responsiveImage(item.image.url)}
                     alt={item.image.alt}
                     loading="lazy"
+                    decoding="async"
+                    /* This variant renders one image PER TILE, so it is the heaviest in the
+                       catalog by some margin. Asking the origin for a tile-sized image rather
+                       than a full-width one matters more here than anywhere else. */
+                    width={800}
+                    height={600}
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                     className="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 )}

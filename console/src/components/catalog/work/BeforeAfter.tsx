@@ -11,7 +11,7 @@ export const meta = {
   label: 'Recent Jobs / Before and After',
   consumes: ['work.eyebrow', 'work.title', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast', 'quiet'],
+  skins: ['default', 'soft', 'inverted'],
 } as const;
 
 function EmptyImage({ label, big }: { label: string; big?: boolean }) {
@@ -24,7 +24,7 @@ function EmptyImage({ label, big }: { label: string; big?: boolean }) {
 
 export default function BeforeAfter({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -48,7 +48,6 @@ export default function BeforeAfter({
           transition={{ duration: 0.5, ease: EASE }}
           className="mb-11"
         >
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}><E p="work.eyebrow">{work.eyebrow}</E></p>
           <h2 className={`mt-3 font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="work.title">{work.title}</E></h2>
         </motion.div>
 

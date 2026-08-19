@@ -41,10 +41,6 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
           viewport={{ once: true, amount: 0.4 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] text-accent">
-            <span className="hidden h-px w-8 bg-accent sm:inline-block" />
-            <E p="services.eyebrow">{services.eyebrow}</E>
-          </p>
           <h2 className="mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] text-ink md:text-5xl"><E p="services.title">{services.title}</E></h2>
           <p className="mt-4 text-inkSoft"><E p="services.sub">{services.sub}</E></p>
         </motion.div>

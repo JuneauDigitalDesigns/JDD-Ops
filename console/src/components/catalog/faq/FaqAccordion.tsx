@@ -12,12 +12,12 @@ export const meta = {
   label: 'FAQ / Accordion',
   consumes: ['faq.eyebrow', 'faq.title', 'faq.sub', 'faq.items', 'brand.phone', 'brand.phoneHref'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast', 'quiet'],
+  skins: ['default', 'soft', 'inverted'],
 } as const;
 
 export default function FaqAccordion({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -36,7 +36,6 @@ export default function FaqAccordion({
           viewport={viewportOnce}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}><E p="faq.eyebrow">{faq.eyebrow}</E></p>
           <h2 className={`mt-3 font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="faq.title">{faq.title}</E></h2>
           <p className={`mt-3 ${s.body}`}><E p="faq.sub">{faq.sub}</E></p>
         </motion.div>

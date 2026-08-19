@@ -152,7 +152,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'FinalCtaBanner',   id: finalCtaBannerMeta.id,   label: finalCtaBannerMeta.label,   skins: skinsFor('FinalCtaBanner'),     render: () => <FinalCtaBanner content={effective} /> },
         { name: 'FinalCtaSimple',   id: finalCtaSimpleMeta.id,   label: finalCtaSimpleMeta.label,   skins: skinsFor('FinalCtaSimple'),   leadMode: finalCtaSimpleMeta.leadMode,   render: () => <FinalCtaSimple content={effective} /> },
-        { name: 'FinalCtaSplit',    id: finalCtaSplitMeta.id,    label: finalCtaSplitMeta.label,    skins: skinsFor('FinalCtaSplit'),    leadMode: finalCtaSplitMeta.leadMode,    render: (skin: SkinId) => <FinalCtaSplit content={effective} skin={skin} /> },
+        { name: 'FinalCtaSplit',    id: finalCtaSplitMeta.id,    label: finalCtaSplitMeta.label,    skins: skinsFor('FinalCtaSplit'),       render: (skin: SkinId) => <FinalCtaSplit content={effective} skin={skin} /> },
       ].filter(forPlan),
     },
     {
@@ -160,8 +160,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       label: 'Contact',
       iconName: 'Phone',
       variants: [
-        { name: 'ContactSplit',        id: contactSplitMeta.id,         label: contactSplitMeta.label,           skins: skinsFor('ContactSplit'),        leadMode: contactSplitMeta.leadMode,        render: (skin: SkinId) => <ContactSplit content={effective} skin={skin} /> },
-        { name: 'ContactCardOverlap',  id: contactCardOverlapMeta.id,   label: contactCardOverlapMeta.label,     skins: skinsFor('ContactCardOverlap'),  leadMode: contactCardOverlapMeta.leadMode,  render: (skin: SkinId) => <ContactCardOverlap content={effective} skin={skin} /> },
+        { name: 'ContactSplit',        id: contactSplitMeta.id,         label: contactSplitMeta.label,           skins: skinsFor('ContactSplit'),               render: (skin: SkinId) => <ContactSplit content={effective} skin={skin} /> },
+        { name: 'ContactCardOverlap',  id: contactCardOverlapMeta.id,   label: contactCardOverlapMeta.label,     skins: skinsFor('ContactCardOverlap'),   render: (skin: SkinId) => <ContactCardOverlap content={effective} skin={skin} /> },
         { name: 'ContactInlineStrip',  id: contactInlineStripMeta.id,   label: contactInlineStripMeta.label,     skins: skinsFor('ContactInlineStrip'),   render: (skin: SkinId) => <ContactInlineStrip content={effective} skin={skin} /> },
       ].filter(forPlan),
     },

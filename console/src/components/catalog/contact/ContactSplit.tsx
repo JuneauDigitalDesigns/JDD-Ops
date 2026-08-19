@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { PhoneCall, Envelope, MapPin, CheckCircle, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
@@ -13,15 +13,13 @@ export const meta = {
   label: 'Contact / Split form + details',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'extensions.contactDetails'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
-  skins: ['editorial', 'contrast', 'quiet'],
-  leadMode: 'phone',
+  skins: ['default', 'soft'],
 } as const;
 
-type Status = 'idle' | 'sending' | 'sent' | 'error';
 
 export default function ContactSplit({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
@@ -30,32 +28,9 @@ export default function ContactSplit({
   const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
   const { brand, finalCta, extensions } = content;
+  const dark = skin === 'inverted' || skin === 'contrast';
+  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
   const mapsUrl = extensions.contactDetails?.mapsUrl;
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  const touch = (field: string) => setTouched((p) => ({ ...p, [field]: true }));
-  const nameError = touched.name && !name.trim() ? 'Name is required' : '';
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setTouched({ name: true });
-    if (!name.trim()) return;
-    setStatus('sending');
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, phone, message }),
-      });
-      setStatus(res.ok ? 'sent' : 'error');
-    } catch {
-      setStatus('error');
-    }
-  }
 
   return (
     <section id="contact" className={`px-6 py-24 ${s.section}`}>
@@ -67,7 +42,6 @@ export default function ContactSplit({
           viewport={viewportOnce}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${s.eyebrow}`}><E p="finalCta.eyebrow">{finalCta.eyebrow}</E></p>
           <h2 className={`mt-3 font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="finalCta.headline">{finalCta.headline}</E></h2>
           <p className={`mt-3 leading-relaxed ${s.body}`}><E p="finalCta.sub">{finalCta.sub}</E></p>
 
@@ -112,47 +86,17 @@ export default function ContactSplit({
           viewport={viewportOnce}
           transition={{ duration: 0.5, ease: EASE, delay: 0.07 }}
         >
-          {status === 'sent' ? (
-            <div className="flex flex-col items-center gap-4 py-16 text-center">
-              <CheckCircle size={52} weight="fill" className="text-accent" />
-              <div>
-                <p className={`text-lg font-semibold ${s.heading}`}>Message received!</p>
-                <p className={`mt-1 ${s.body}`}>We&apos;ll be in touch shortly.</p>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-              <div>
-                <label className={`mb-1.5 block text-sm font-medium ${s.heading}`} htmlFor="cs-name">Name</label>
-                <input id="cs-name" type="text" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => touch('name')}
-                  className={`w-full rounded-xl border px-4 py-2.5 text-ink outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-rule ${nameError ? 'border-red-400' : 'border-rule bg-bg'}`} />
-                {nameError && <p className="mt-1 text-xs text-red-500">{nameError}</p>}
-              </div>
-              <div>
-                <label className={`mb-1.5 block text-sm font-medium ${s.heading}`} htmlFor="cs-phone">
-                  Phone <span className={s.body}>(optional)</span>
-                </label>
-                <input id="cs-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-xl border border-rule bg-bg px-4 py-2.5 text-ink outline-none transition-colors focus:border-accent" />
-              </div>
-              <div>
-                <label className={`mb-1.5 block text-sm font-medium ${s.heading}`} htmlFor="cs-message">Message</label>
-                <textarea id="cs-message" rows={4} value={message} onChange={(e) => setMessage(e.target.value)}
-                  className="w-full rounded-xl border border-rule bg-bg px-4 py-2.5 text-ink outline-none transition-colors focus:border-accent" />
-              </div>
-              <button type="submit" disabled={status === 'sending'}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-medium text-accentFg shadow-[0_10px_30px_-10px_var(--accent-glow)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50">
-                {status === 'sending' ? 'Sending...' : <E p="finalCta.cta">{finalCta.cta}</E>}
-                {status !== 'sending' && <ArrowRight size={16} />}
-              </button>
-              {status === 'error' && (
-                <p className={`text-center text-sm ${s.body}`}>
-                  Could not send. Please call{' '}
-                  <a href={brand.phoneHref} className="text-accent hover:underline">{brand.phone}</a>.
-                </p>
-              )}
-            </form>
-          )}
+          {/* This was the best of the four hand-rolled forms — it had real labels and an
+              error that named the phone number. It is still a fourth copy of logic that has
+              to be right everywhere, so it moves to <LeadForm> with the rest. The one
+              behaviour lost is the optional-phone case: LeadForm requires a contact method,
+              because a lead with neither a number nor an email cannot be followed up. */}
+          <LeadForm
+            mode={mode}
+            withMessage
+            surface={dark ? 'dark' : 'light'}
+            submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+          />
         </motion.div>
       </div>
     </section>

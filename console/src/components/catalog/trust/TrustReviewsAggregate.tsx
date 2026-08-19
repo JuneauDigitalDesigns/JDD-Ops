@@ -10,12 +10,12 @@ export const meta = {
   label: 'Trust / Reviews Aggregate',
   consumes: ['extensions.reviewBadge', 'trust.label', 'testimonials.items'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
-  skins: ['editorial', 'contrast'],
+  skins: ['default', 'inverted'],
 } as const;
 
 export default function TrustReviewsAggregate({
   content = CONTENT,
-  skin = 'editorial',
+  skin = 'default',
 }: {
   content?: SiteContent;
   skin?: SkinId;
