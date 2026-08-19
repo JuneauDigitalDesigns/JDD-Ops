@@ -4,7 +4,8 @@
 // Asymmetric split: a large feature panel showing the active service, and a rail
 // listing every service. Hover / click a rail row to swap the feature.
 // Adapts the swap pattern from catalog/faq/FaqStickyAside and the split from
-// catalog/work/WorkSpotlight. Structure over decoration.
+// catalog/work/BeforeAfter (renamed from WorkSpotlight in the 2026-08-19 prune).
+// Structure over decoration.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';

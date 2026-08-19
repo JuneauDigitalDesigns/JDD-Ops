@@ -6,15 +6,15 @@ import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
 export const meta = {
-  id: 'work-grid',
+  id: 'recent-jobs-grid',
   category: 'work',
-  label: 'Work / Grid',
+  label: 'Recent Jobs / Grid',
   consumes: ['work.eyebrow', 'work.title', 'work.sub', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['editorial', 'contrast'],
 } as const;
 
-export default function WorkGrid({
+export default function RecentJobsGrid({
   content = CONTENT,
   skin = 'editorial',
 }: {

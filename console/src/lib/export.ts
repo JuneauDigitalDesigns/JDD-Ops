@@ -22,20 +22,34 @@ import { isValidSkin, supportsSkin } from '@/lib/skins';
 
 const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 
-// Allowlist of category -> component file names. Mirrors /api/source's ALLOWED and the
-// catalog registry in app/page.tsx; guards against path traversal via untrusted input.
+/**
+ * THE allowlist of category -> component file names. Guards against path traversal via
+ * untrusted input, and is what `validateEntries` enforces on export.
+ *
+ * SINGLE SOURCE OF TRUTH. `/api/build/source` imports this rather than keeping its own copy.
+ * It used to maintain a byte-identical `ALLOWED` map, and the two drifted: neither ever
+ * listed the `*Starter` lead-capture variants, while the studio's `forPlan` filter in
+ * categories.tsx showed *only* those to starter-plan clients. A starter client could
+ * therefore pick a variant the exporter would then reject with `Unknown component`. That
+ * went unnoticed because every client to date has been on growth.
+ *
+ * Pruned 2026-08-19 from 60 components to 28 (see design/catalog-v2/SPEC.md). Anything
+ * removed here must also go from `SKINS` in lib/skins.ts and the registry in
+ * app/c/[slug]/build/categories.tsx, or the studio will offer something export refuses.
+ */
 export const CATALOG: Record<string, readonly string[]> = {
-  nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta', 'NavEmergencyBar'],
-  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap', 'HeroKinetic'],
-  trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar', 'TrustLicenseInsurance', 'TrustReviewsAggregate'],
-  about:        ['AboutPillars', 'AboutFeature', 'AboutStatBand', 'AboutStory'],
-  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight'],
-  work:         ['WorkCarousel', 'WorkGrid', 'WorkSpotlight', 'WorkMasonry'],
-  faq:          ['FaqAccordion', 'FaqTwoColumn', 'FaqStickyAside', 'FaqCentered'],
-  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsRotator', 'TestimonialsMarquee'],
-  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'FinalCtaGradient', 'FinalCtaQuote'],
-  contact:      ['ContactSplit', 'CtaBanner', 'ContactCardOverlap', 'ContactInlineStrip'],
-  footer:       ['FooterColumns', 'FooterMinimal', 'FooterBrandCta', 'FooterMega'],
+  nav:          ['NavMinimal', 'NavEmergencyBar'],
+  hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap'],
+  trust:        ['TrustBadges', 'TrustReviewsAggregate'],
+  about:        ['AboutFeature', 'AboutStory'],
+  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel'],
+  // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.
+  work:         ['RecentJobsGrid', 'BeforeAfter'],
+  faq:          ['FaqAccordion', 'FaqStickyAside'],
+  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel'],
+  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit'],
+  contact:      ['ContactSplit', 'ContactCardOverlap', 'ContactInlineStrip'],
+  footer:       ['FooterColumns', 'FooterMinimal'],
   seo:          ['SeoDefault', 'SeoLocalBusiness'],
 };
 

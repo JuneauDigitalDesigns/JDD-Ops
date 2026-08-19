@@ -57,14 +57,14 @@ export function hasExportedPage(slug: string): boolean {
   return existsSync(repoPagePath(slug));
 }
 
-/** `import Hero from '@/components/catalog/hero/HeroCentered';` -> name -> categoryId */
+/** `import Hero from '@/components/catalog/hero/HeroSplit';` -> name -> categoryId */
 const IMPORT_RE =
   /^import\s+(\w+)\s+from\s+'@\/components\/catalog\/([\w-]+)\/\1';/gm;
 
 /** The body region wirePage() writes between its two anchors. */
 const BODY_RE = /\{\/\* @studio:body:start \*\/\}([\s\S]*?)\{\/\* @studio:body:end \*\/\}/;
 
-/** `<HeroCentered skin="warm" />` — skin is optional and only present when supported. */
+/** `<HeroSplit skin="contrast" />` — skin is optional and only present when supported. */
 const ELEMENT_RE = /<(\w+)((?:\s+\w+="[^"]*")*)\s*\/>/g;
 
 /** `export { generateMetadata } from '@/components/catalog/seo/SeoDefault';` */

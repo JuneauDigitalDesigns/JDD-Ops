@@ -6,9 +6,9 @@ import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
 
 export const meta = {
-  id: 'work-spotlight',
+  id: 'before-after',
   category: 'work',
-  label: 'Work / Spotlight',
+  label: 'Recent Jobs / Before and After',
   consumes: ['work.eyebrow', 'work.title', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['editorial', 'contrast', 'quiet'],
@@ -22,7 +22,7 @@ function EmptyImage({ label, big }: { label: string; big?: boolean }) {
   );
 }
 
-export default function WorkSpotlight({
+export default function BeforeAfter({
   content = CONTENT,
   skin = 'editorial',
 }: {

@@ -11,29 +11,27 @@ const QT: SkinDef = { id: 'quiet', label: 'Quiet' };
 // Mirrored by the export validation (isValidSkin).
 export const SKINS: Record<string, SkinDef[]> = {
   // hero
-  HeroSplit: [ED, CT, QT], HeroCentered: [ED, CT], HeroFormFocus: [ED, QT],
+  HeroSplit: [ED, CT, QT], HeroFormFocus: [ED, QT],
   // nav
-  NavMinimal: [ED, CT, QT], NavSplitCta: [ED, CT], NavEmergencyBar: [CT, ED],
+  NavMinimal: [ED, CT, QT], NavEmergencyBar: [CT, ED],
   // trust
-  TrustMarquee: [ED, CT, QT], TrustReviewsAggregate: [ED, CT], TrustLicenseInsurance: [ED, CT],
+  TrustReviewsAggregate: [ED, CT],
   // about
-  AboutFeature: [ED, CT, QT], AboutStory: [ED, QT], AboutStatBand: [CT, ED],
+  AboutFeature: [ED, CT, QT], AboutStory: [ED, QT],
   // services
-  ServicesShowcase: [ED, CT, QT], ServicesGrid: [ED, CT], ServicesSpotlight: [ED, CT, QT],
-  // work
-  WorkSpotlight: [ED, CT, QT], WorkGrid: [ED, CT], WorkCarousel: [ED, QT],
+  ServicesGrid: [ED, CT],
+  // work (reframed as recent jobs)
+  BeforeAfter: [ED, CT, QT], RecentJobsGrid: [ED, CT],
   // testimonials
-  TestimonialsRotator: [ED, CT, QT], TestimonialsGrid: [ED, CT], TestimonialsMarquee: [ED, QT],
+  TestimonialsGrid: [ED, CT],
   // faq
-  FaqAccordion: [ED, CT, QT], FaqTwoColumn: [ED, CT], FaqStickyAside: [ED, QT],
+  FaqAccordion: [ED, CT, QT], FaqStickyAside: [ED, QT],
   // finalCta
-  FinalCtaSplit: [ED, CT], FinalCtaGradient: [CT, ED], FinalCtaQuote: [CT, ED, QT],
-  FinalCtaStarter: [ED, CT], FinalCtaStarterCentered: [ED, CT, QT], FinalCtaStarterEditorial: [ED, CT],
+  FinalCtaSplit: [ED, CT],
   // contact
   ContactSplit: [ED, CT, QT], ContactCardOverlap: [ED, CT], ContactInlineStrip: [ED, CT],
-  ContactSplitStarter: [ED, CT, QT], ContactOverlapStarter: [ED, CT],
   // footer
-  FooterColumns: [ED, CT], FooterBrandCta: [CT, ED], FooterMinimal: [ED, CT, QT],
+  FooterColumns: [ED, CT], FooterMinimal: [ED, CT, QT],
   // seo has no skins
 };
 

@@ -11,7 +11,8 @@ import {
 
 // ONE icon registry for schema-driven catalog icons (service items, about pillars). It
 // replaces four verbatim-duplicated lookup maps (ServicesGrid/ServicesAccordion/
-// ServicesSpotlight TAG_ICONS + AboutPillars/AboutStatBand/AboutStory ICON_MAP).
+// ServicesSpotlight TAG_ICONS + AboutPillars/AboutStatBand/AboutStory ICON_MAP — several of
+// those variants were pruned in the 2026-08-19 catalog cut; the registry outlived them).
 //
 // This file is COPIED VERBATIM into client repos at export (template/src/lib/icons.ts is
 // its twin), because catalog components import from `@/lib/icons`. Keep it pure data — no

@@ -2,22 +2,13 @@ import { NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-// Hardcoded allowlist of (category, name) pairs. Anything not in here is rejected.
-// Prevents path traversal and constrains the route to known catalog entries.
-const ALLOWED: Record<string, readonly string[]> = {
-  nav:          ['NavMinimal', 'NavCentered', 'NavAnnouncementBar', 'NavSplitCta', 'NavEmergencyBar'],
-  hero:         ['HeroSplit', 'HeroCentered', 'HeroSlideshow', 'HeroFormFocus', 'HeroOverlap', 'HeroKinetic'],
-  trust:        ['TrustMarquee', 'TrustBadges', 'TrustLogoGrid', 'TrustBar', 'TrustLicenseInsurance', 'TrustReviewsAggregate'],
-  about:        ['AboutPillars', 'AboutFeature', 'AboutStatBand', 'AboutStory'],
-  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight'],
-  work:         ['WorkCarousel', 'WorkGrid', 'WorkSpotlight', 'WorkMasonry'],
-  faq:          ['FaqAccordion', 'FaqTwoColumn', 'FaqStickyAside', 'FaqCentered'],
-  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsRotator', 'TestimonialsMarquee'],
-  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'FinalCtaGradient', 'FinalCtaQuote'],
-  contact:      ['ContactSplit', 'CtaBanner', 'ContactCardOverlap', 'ContactInlineStrip'],
-  footer:       ['FooterColumns', 'FooterMinimal', 'FooterBrandCta', 'FooterMega'],
-  seo:          ['SeoDefault', 'SeoLocalBusiness'],
-} as const;
+// The allowlist of (category, name) pairs. Anything not in here is rejected, which is what
+// prevents path traversal on the untrusted query params below.
+//
+// Imported from lib/export rather than redeclared: this file used to carry a byte-identical
+// copy, and the two drifted. Two hand-maintained copies of the same security allowlist is
+// exactly the shape of bug that goes unnoticed until it matters.
+import { CATALOG as ALLOWED } from '@/lib/export';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
