@@ -26,6 +26,9 @@ const config: Config = {
         onInk: 'var(--on-ink)',
         onInkSoft: 'var(--on-ink-soft)',
         ruleInk: 'var(--rule-ink)',
+        // Availability / emergency cues only ("24/7", "same-day"). A fixed alert red,
+        // AA-adjusted per client background — see urgentTone() in lib/palette.ts.
+        urgent: 'var(--urgent)',
       },
       // `text-accent` resolves to the ACCESSIBLE accent; every other utility keeps the raw
       // brand color. Tailwind consults `theme.textColor` before falling back to

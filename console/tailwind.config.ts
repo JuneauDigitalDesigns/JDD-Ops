@@ -78,6 +78,9 @@ const config: Config = {
         onInk: 'var(--on-ink)',
         onInkSoft: 'var(--on-ink-soft)',
         ruleInk: 'var(--rule-ink)',
+        // Availability / emergency cues only ("24/7", "same-day"). A fixed alert red,
+        // AA-adjusted per client background — see urgentTone() in lib/palette.ts.
+        urgent: 'var(--urgent)',
         // Runbook chrome tokens — bound to global :root vars (JDD light/dark palette).
         surface: 'var(--surface)',
         surface2: 'var(--surface-2)',

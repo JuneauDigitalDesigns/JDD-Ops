@@ -9,6 +9,7 @@
 // stillFor(). See DESIGN-LANGUAGE.md for when each move applies.
 import { useScroll, useTransform, type MotionValue, type Variants } from 'framer-motion';
 import type { RefObject } from 'react';
+import type { SkinId } from '@/lib/skins';
 
 export const EASE = [0.16, 1, 0.3, 1] as const;
 export const viewportOnce = { once: true, amount: 0.3 } as const;
@@ -28,8 +29,17 @@ export const revealStagger = (stagger = 0.06): Variants => ({
   show: { transition: { staggerChildren: stagger } },
 });
 
-/** 'quiet' skin (or prefers-reduced-motion) renders still; others animate on view. */
-export function stillFor(skin: 'editorial' | 'contrast' | 'quiet', reduce: boolean): boolean {
+/**
+ * True when a component should render with no entrance motion.
+ *
+ * Takes the full `SkinId` rather than the old three literals, because the surface roles
+ * (`default` | `soft` | `inverted`) now exist alongside them. None of the roles is a "still"
+ * role: `quiet` was the opt-out, and that job now belongs to the global motion policy
+ * (nothing above the fold animates on load; below-fold reveals are CSS). For a role this
+ * therefore reduces to honouring reduced-motion, which is the part that was ever
+ * load-bearing.
+ */
+export function stillFor(skin: SkinId, reduce: boolean): boolean {
   return reduce || skin === 'quiet';
 }
 

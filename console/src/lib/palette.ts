@@ -29,6 +29,10 @@ export function paletteVars(brand: Brand): CSSProperties {
        authored brand color for fills, borders and icons; anything rendering accent-colored
        TYPE must use this token. Tailwind's `textColor.accent` maps here. */
     '--accent-text': accentText(accent, bg),
+    /* Availability and emergency cues only ("24/7", "same-day"), never decoration. Pulled
+       toward a canonical alert red so it reads as urgency rather than more brand colour,
+       then put through the same AA loop as --accent-text. Keep in step with template. */
+    '--urgent': urgentTone(bg),
     '--bg': bg,
     '--bg-soft': p.bgSoft,
     '--ink': ink,
@@ -145,6 +149,24 @@ function accentText(accent: string, bg: string): string {
   } catch {
     return readableOn(bg);
   }
+}
+
+/** The red every urgency tone is pulled toward. Fixed on purpose: "emergency" should look
+ *  broadly the same across clients, or it stops reading as a signal. */
+const ALERT_RED = '#B3251A';
+
+/**
+ * The urgency tone: a fixed alert red, adjusted only until it is legible on this client's
+ * background.
+ *
+ * Deliberately NOT derived from the brand accent. An earlier version mixed 65% of the accent
+ * in, which made "emergency" a different colour on every site and went muddy for hue-distant
+ * brands (a teal accent produced #7f3f3b, a dull brick). Urgency is a signal, like a stop
+ * sign, and a signal only works if it is the same signal everywhere. The brand colour already
+ * owns the rest of the page.
+ */
+function urgentTone(bg: string): string {
+  return accentText(ALERT_RED, bg);
 }
 
 /** White or `dark` (brand ink), whichever contrasts better against `bg`. */
