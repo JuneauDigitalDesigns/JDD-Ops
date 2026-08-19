@@ -17,3 +17,8 @@ console/export/
 
 # Local Lighthouse runs (raw reports are large; see PERF.md for the record)
 .perf/
+
+# @jdd/ui lives in its own repo (JuneauDigitalDesigns/jdd-ui) and is consumed as a
+# github: dependency. The working copy here is a clone for local development only —
+# tracking it would embed a gitlink that clones of jdd-ops cannot resolve.
+packages/ui/
