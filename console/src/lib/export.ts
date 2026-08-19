@@ -40,7 +40,7 @@ const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 export const CATALOG: Record<string, readonly string[]> = {
   nav:          ['NavMinimal', 'NavEmergencyBar'],
   hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap'],
-  trust:        ['TrustBadges', 'TrustReviewsAggregate'],
+  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea'],
   about:        ['AboutFeature', 'AboutStory'],
   services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel'],
   // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.

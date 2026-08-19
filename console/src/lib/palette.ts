@@ -28,11 +28,11 @@ export function paletteVars(brand: Brand): CSSProperties {
     /* Accent darkened until it clears AA as TEXT on the page background. `--accent` stays the
        authored brand color for fills, borders and icons; anything rendering accent-colored
        TYPE must use this token. Tailwind's `textColor.accent` maps here. */
-    '--accent-text': accentText(accent, bg),
+    '--accent-text': accentText(accent, bg, p.bgSoft),
     /* Availability and emergency cues only ("24/7", "same-day"), never decoration. Pulled
        toward a canonical alert red so it reads as urgency rather than more brand colour,
        then put through the same AA loop as --accent-text. Keep in step with template. */
-    '--urgent': urgentTone(bg),
+    '--urgent': urgentTone(bg, p.bgSoft),
     '--bg': bg,
     '--bg-soft': p.bgSoft,
     '--ink': ink,
@@ -136,18 +136,30 @@ function passesAA(fg: string | null | undefined, bg: string): boolean {
  *
  * Keep in step with template/src/lib/palette.ts.
  */
-function accentText(accent: string, bg: string): string {
+function accentText(accent: string, ...bgs: string[]): string {
   try {
-    const bgLum = relLuminance(bg);
-    const toward = bgLum < 0.18 ? '#ffffff' : '#000000';
+    const [primary] = bgs;
+    // Direction comes from the primary background; a page is light or dark as a whole, and
+    // `--bg-soft` is by definition a near neighbour of `--bg`. (The template twin has an
+    // `isDarkHex` helper for this; this file inlines the same 0.18 threshold.)
+    const toward = relLuminance(primary) < 0.18 ? '#ffffff' : '#000000';
     let candidate = accent;
     for (let i = 0; i < 24; i++) {
-      if (contrastRatio(relLuminance(candidate), bgLum) >= AA_NORMAL) return candidate;
+      // Must clear AA on EVERY surface it can land on, not just --bg. This token is used by
+      // `text-accent`, and a section can be `default` or `soft`, so deriving against --bg
+      // alone left the soft surface untested: it passed by 0.03 on one client palette and
+      // 0.08 on another, which is luck rather than a guarantee.
+      if (bgs.every((b) => contrastRatio(relLuminance(candidate), relLuminance(b)) >= AA_NORMAL)) {
+        return candidate;
+      }
+      // 8% per step, not a big jump: `mix(a,b,t)` is `a + (b-a)*t`, so a coarse t would
+      // blacken the brand color in one pass. Small steps stop at the first passing shade,
+      // which keeps the result recognisably the client's accent.
       candidate = mix(candidate, toward, 0.08);
     }
-    return readableOn(bg);
+    return readableOn(primary);
   } catch {
-    return readableOn(bg);
+    return readableOn(bgs[0]);
   }
 }
 
@@ -165,8 +177,8 @@ const ALERT_RED = '#B3251A';
  * sign, and a signal only works if it is the same signal everywhere. The brand colour already
  * owns the rest of the page.
  */
-function urgentTone(bg: string): string {
-  return accentText(ALERT_RED, bg);
+function urgentTone(...bgs: string[]): string {
+  return accentText(ALERT_RED, ...bgs);
 }
 
 /** White or `dark` (brand ink), whichever contrasts better against `bg`. */

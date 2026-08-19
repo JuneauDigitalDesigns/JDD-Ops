@@ -31,6 +31,7 @@ import { meta as seoLocalBusinessMeta } from '@/components/catalog/seo/SeoLocalB
 // New trade-specific + motion-flagship variants
 import NavEmergencyBar, { meta as navEmergencyMeta } from '@/components/catalog/nav/NavEmergencyBar';
 import TrustReviewsAggregate, { meta as trustReviewsMeta } from '@/components/catalog/trust/TrustReviewsAggregate';
+import ServiceArea, { meta as serviceAreaMeta } from '@/components/catalog/trust/ServiceArea';
 
 import SeoPreviewBody from './SeoPreviewBody';
 import type { SiteContent } from '@/data/site';
@@ -97,6 +98,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'TrustBadges',   id: trustBadgesMeta.id,   label: trustBadgesMeta.label,   skins: skinsFor('TrustBadges'),   render: () => <TrustBadges content={effective} /> },
         { name: 'TrustReviewsAggregate', id: trustReviewsMeta.id, label: trustReviewsMeta.label, skins: skinsFor('TrustReviewsAggregate'), render: (skin) => <TrustReviewsAggregate content={effective} skin={skin} /> },
+        { name: 'ServiceArea', id: serviceAreaMeta.id, label: serviceAreaMeta.label, skins: skinsFor('ServiceArea'), render: (skin: SkinId) => <ServiceArea content={effective} skin={skin} /> },
       ],
     },
     {

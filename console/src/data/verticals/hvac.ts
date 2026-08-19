@@ -196,6 +196,18 @@ export const CONTENT: SiteContent = {
     hours:      null,
     bookingUrl: null,
     portalUrl:  null,
+    // Towns served. Real onboarding fills this from the intake form — brand-intake splits
+    // the operator's free-text list into an array — but no seed or preset ever set it, so
+    // `areaServed` in the JSON-LD has been an empty array on every site shipped to date.
+    // The preset carries an example so both that and <ServiceArea> have something real.
+    serviceArea: [
+      'Juneau',
+      'Douglas',
+      'Mendenhall Valley',
+      'Auke Bay',
+      'Lemon Creek',
+      'Thane',
+    ],
   },
 
   images: {

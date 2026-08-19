@@ -33,7 +33,7 @@ export const SKINS: Record<string, SkinDef[]> = {
   // nav
   NavMinimal: [DEF, INV], NavEmergencyBar: [INV, DEF],
   // trust
-  TrustReviewsAggregate: [DEF, SOFT],
+  TrustReviewsAggregate: [DEF, SOFT], ServiceArea: [SOFT, DEF, INV],
   // about
   AboutFeature: [DEF, SOFT, INV], AboutStory: [DEF, SOFT],
   // services
