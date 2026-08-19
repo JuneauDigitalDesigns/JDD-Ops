@@ -11,7 +11,8 @@ import {
 
 // ONE icon registry for schema-driven catalog icons (service items, about pillars). It
 // replaces four verbatim-duplicated lookup maps (ServicesGrid/ServicesAccordion/
-// ServicesSpotlight TAG_ICONS + AboutPillars/AboutStatBand/AboutStory ICON_MAP).
+// ServicesSpotlight TAG_ICONS + AboutPillars/AboutStatBand/AboutStory ICON_MAP — several of
+// those variants were pruned in the 2026-08-19 catalog cut; the registry outlived them).
 //
 // This file is COPIED VERBATIM into client repos at export (template/src/lib/icons.ts is
 // its twin), because catalog components import from `@/lib/icons`. Keep it pure data — no
@@ -38,13 +39,34 @@ export const ICON_REGISTRY: Record<string, Icon> = {
 /** Ordered keys for the picker grid. */
 export const ICON_PICKER_KEYS: string[] = Object.keys(ICON_REGISTRY);
 
-// Legacy service `tag` words → registry keys. Preserves the icons the old TAG_ICONS map
-// produced, so nothing changes for content that hasn't set an explicit `icon`.
+/**
+ * Service `tag` words → registry keys, used when content has no explicit `icon`.
+ *
+ * A MISSING ENTRY IS SILENT: `serviceIcon` falls through to `Wrench`, so the card still
+ * renders, just with the wrong picture. That is exactly what happened. This table carried
+ * no HVAC vocabulary despite `hvac` being a supported vertical in VERTICAL_PRESETS — the
+ * e2e client's tags are Heating, Cooling, Air Quality, Heat Pump and Emergency, none of
+ * which matched, and "Maintenance" matched but also resolved to wrench. All seven service
+ * cards rendered the identical wrench. It passed every typecheck, build and Lighthouse run
+ * and was only caught by looking at a screenshot.
+ *
+ * Keys must exist in ICON_REGISTRY above. When adding a vertical to VERTICAL_PRESETS, add
+ * its tag vocabulary here as well.
+ */
 const TAG_ALIASES: Record<string, string> = {
+  // generic trades
   cleaning: 'broom', electrical: 'lightning', plumbing: 'drop', painting: 'paintbrush',
-  hvac: 'wind', landscaping: 'tree', construction: 'hardhat', roofing: 'hardhat',
+  landscaping: 'tree', construction: 'hardhat', roofing: 'hardhat',
   flooring: 'house', trimming: 'scissors', carpentry: 'hammer',
-  general: 'wrench', repair: 'wrench', maintenance: 'wrench',
+  general: 'wrench', repair: 'wrench', maintenance: 'gear',
+  installation: 'toolbox', inspection: 'certificate', emergency: 'lightning',
+  // hvac
+  hvac: 'wind', heating: 'fire', furnace: 'fire', boiler: 'fire',
+  cooling: 'snowflake', ac: 'snowflake', 'air conditioning': 'snowflake',
+  'heat pump': 'thermometer', thermostat: 'thermometer',
+  'air quality': 'wind', ventilation: 'wind', ducts: 'wind', 'duct cleaning': 'wind',
+  // plumbing / water
+  drains: 'pipe', 'water heater': 'fire', leaks: 'faucet', sewer: 'pipe',
 };
 
 function lookup(key: string | undefined | null): Icon | null {

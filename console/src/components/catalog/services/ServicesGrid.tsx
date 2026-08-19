@@ -42,7 +42,12 @@ export default function ServicesGrid({
   const s = skinClasses(skin);
   const dark = skin === 'inverted' || skin === 'contrast';
   const { services } = content;
-  if (!services.items.length) return null;
+  // Drop items with no title. The e2e client's schema carries a 7th entry with an empty
+  // `d` and `tag`, which rendered as a card containing one word and a lot of nothing.
+  // Showing what is real and omitting what is not is the rule (SPEC §7) — a half-filled
+  // card looks like the site is broken, not like the client offers that service.
+  const items = services.items.filter((it) => it.t?.trim());
+  if (!items.length) return null;
 
   return (
     <section id="services" className={`${s.section} py-14 lg:py-20`}>
@@ -59,7 +64,7 @@ export default function ServicesGrid({
         </div>
 
         <ul className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {services.items.map((item, i) => (
+          {items.map((item, i) => (
             <li
               key={item.n ?? i}
               className={`flex flex-col rounded-xl border p-6 transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 ${
@@ -79,9 +84,11 @@ export default function ServicesGrid({
               <h3 className={`font-heading text-[20px] font-extrabold leading-snug tracking-[-0.01em] ${s.heading}`}>
                 <E p={`services.items.${i}.t`}>{item.t}</E>
               </h3>
-              <p className={`mt-2.5 text-[16px] leading-relaxed ${s.body}`}>
-                <E p={`services.items.${i}.d`}>{item.d}</E>
-              </p>
+              {item.d?.trim() && (
+                <p className={`mt-2.5 text-[16px] leading-relaxed ${s.body}`}>
+                  <E p={`services.items.${i}.d`}>{item.d}</E>
+                </p>
+              )}
 
               {/* `tag` is real schema data, so it is shown as-is. There is no per-service
                   availability field, and inventing "same-day" copy here would put a promise

@@ -123,6 +123,21 @@ before the bytes arrive. Omitting it cost CLS 0.193 in testing.
 
 Hero image: `fetchpriority="high"`, `loading="eager"`, never animated.
 
+## 10a. Never use opacity to soften text
+
+`--accent-fg` and `--accent-text` are chosen by *measured* contrast, so they are guaranteed
+legible on their surface. An opacity multiplier silently discards that guarantee, and it does
+so in a way that only shows up on some palettes.
+
+Measured: `accentFg` on `#e08b29` is 7.00:1 solid and 5.06:1 at `opacity-80`, so it passed.
+On `#E05C2A` (the hvac preset accent) the same markup is 5.09:1 solid but **3.97:1 at 80%**,
+and Accessibility fell 100 → 96. The bug shipped through every typecheck, build and
+Lighthouse run on the first palette and was only caught when the export pipeline swapped in
+the vertical preset.
+
+Get hierarchy from **size and weight**, not transparency. Opacity is fine on `aria-hidden`
+icons and on `disabled:` states, both of which are exempt from contrast requirements.
+
 ## 11. Focus
 
 One global rule: `3px solid var(--accent-text)`, `outline-offset: 3px`. Every focusable

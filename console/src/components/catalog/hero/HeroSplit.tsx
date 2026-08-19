@@ -106,7 +106,9 @@ export default function HeroSplit({
                 <E p="brand.phone">{brand.phone}</E>
               </span>
               {hero.secondaryCta && (
-                <span className="text-[13.5px] font-semibold opacity-80">
+                /* NO OPACITY. See the stat-band note below — opacity is not a safe way to
+                   soften text on a derived surface. */
+                <span className="text-[13.5px] font-semibold">
                   <E p="hero.secondaryCta">{hero.secondaryCta}</E>
                 </span>
               )}
@@ -137,8 +139,11 @@ export default function HeroSplit({
             right like a printed layer out of register. The wrapper's padding reserves the
             space it occupies so it can never overlap a neighbour. Flat colour, offset — not
             a rotation, mask or texture, which are the editorial moves this pass removed. */}
-        <div className="relative mt-8 pb-3.5 pr-3.5 lg:mt-0">
-          <div className="absolute bottom-0 left-3.5 right-0 top-3.5 rounded-lg bg-accent" aria-hidden="true" />
+        {/* 20px offset, not 14: the accent band below overlaps this section, and at 14 the
+            band ate the whole bottom strip so the only visible trace of the device was a
+            hairline down the right edge. It has to clear the overlap to read as a slab. */}
+        <div className="relative mt-8 pb-5 pr-5 lg:mt-0">
+          <div className="absolute bottom-0 left-5 right-0 top-5 rounded-lg bg-accent" aria-hidden="true" />
           {slide?.url ? (
             <img
               {...responsiveImage(slide.url)}
@@ -173,14 +178,24 @@ export default function HeroSplit({
           `text-accentFg` (measured against the accent, never assumed) keeps it legible on
           any brand colour. */}
       {hero.heroBullets.length > 0 && (
-        <div className="relative z-10 -mt-5 bg-accent text-accentFg shadow-[0_-10px_26px_-14px_rgba(0,0,0,.45)] lg:-mt-7">
+        /* Overlap reduced from -20/-28 so the slab's bottom edge survives it. The band still
+           reads as sitting above the photograph; it just no longer swallows the device. */
+        <div className="relative z-10 -mt-3 bg-accent text-accentFg shadow-[0_-10px_26px_-14px_rgba(0,0,0,.45)] lg:-mt-4">
           <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-y-5 px-5 py-6 sm:grid-cols-4 sm:px-6 lg:py-7">
             {hero.heroBullets.map((b, i) => (
               <li key={b.label}>
                 <p className="font-heading text-[34px] font-extrabold leading-none tracking-[-0.03em] lg:text-[44px]">
                   <E p={`hero.heroBullets.${i}.value`} fit>{b.value}</E>
                 </p>
-                <p className="mt-1.5 text-[14px] font-bold leading-tight opacity-80">
+                {/* NEVER use opacity to soften text sitting on a derived colour.
+                    `--accent-fg` is picked by measured contrast, so it is guaranteed legible
+                    on this band — and then an opacity multiplier silently throws that
+                    guarantee away. Caught by the export pipeline: the hvac preset swaps the
+                    accent to #E05C2A, where accentFg is 5.09:1 solid but only 3.97:1 at 80%,
+                    and Accessibility dropped 100 -> 96. It passed on the previous palette,
+                    which is exactly why opacity is the wrong tool here.
+                    Hierarchy comes from size and weight instead: 14px bold under 44px black. */}
+                <p className="mt-1.5 text-[14px] font-bold leading-tight">
                   <E p={`hero.heroBullets.${i}.label`}>{b.label}</E>
                 </p>
               </li>

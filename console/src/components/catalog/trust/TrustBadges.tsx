@@ -53,7 +53,9 @@ export default function TrustBadges({ content = CONTENT }: { content?: SiteConte
           >
             <Star size={18} weight="fill" aria-hidden="true" />
             {review.rating} / 5
-            <span className="font-semibold opacity-80">({review.count} reviews)</span>
+            {/* No opacity: this sits on the accent, where legibility comes from the measured
+                --accent-fg and an opacity multiplier would discard it. See HeroSplit. */}
+            <span className="font-semibold">({review.count} reviews)</span>
           </a>
         )}
       </div>
