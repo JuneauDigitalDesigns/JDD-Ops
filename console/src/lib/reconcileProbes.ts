@@ -23,7 +23,9 @@ export interface TwilioNumberProbe {
   smsUrl: string | null;
   voiceUrlMatches: boolean | null;
   expected: string | null;
-  recentSendErrors: { total: number; failed: number; codes: number[] } | null;
+  recentSendErrors: { total: number; failed: number; codes: number[]; latestErrored: boolean } | null;
+  /** In the A2P Messaging Service sender pool? null ⇒ no SID to check against, or read failed. */
+  inA2pPool: boolean | null;
   checked: boolean;
 }
 
@@ -67,6 +69,8 @@ export interface ReconcileProbesModule {
     phoneNumber: string | null | undefined;
     /** Host Vercel actually serves, e.g. `acme.vercel.app`. Null ⇒ comparison is unknown. */
     liveHost: string | null;
+    /** A2P Messaging Service SID to check pool membership against. Absent ⇒ inA2pPool stays null. */
+    messagingServiceSid?: string | null;
   }): Promise<TwilioNumberProbe>;
   probeRetellAgent(args: {
     apiKey: string | null;

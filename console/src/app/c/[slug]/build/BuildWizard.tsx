@@ -5,13 +5,13 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Check, ArrowUUpLeft, ArrowUUpRight } from '@phosphor-icons/react';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { SiteContent } from '@/data/site';
-import { VERTICALS, VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
+import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
 import { deepMerge, applyEdits } from '@/lib/merge';
-import { EASE } from '@/lib/motion';
+import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
-import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
-import { brandDirectionToDetails, type BrandDirection } from '@jdd/schema';
-import type { SourceId } from '@/components/wizard/IntakeReviewStep';
+import type { CopyBrief } from '@jdd/schema';
+import { emptyCopyBrief } from '@/lib/copy-brief/mutations';
+import { DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import {
   reconcileOrder,
   enforcePins,
@@ -22,7 +22,7 @@ import {
 import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import StudioStep from './StudioStep';
-import IntakeReviewStep from '@/components/wizard/IntakeReviewStep';
+import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
@@ -61,32 +61,14 @@ type WizardBundle = {
   selections: Selections;
   skins: SkinSelections;
   order: string[];
-  /** Operator guidance for the copywriter. Editable and re-runnable. */
-  details: string;
-  /** The client's existing website. Shared by both source panes — one client, one URL. */
-  scanUrl: string;
-  /** Which intake source pane was open. */
-  source: SourceId;
-  /** Sections ticked for the next generation run. */
-  genSections: Section[];
+  /** The Intake step's own sub-stage (Brief / Prompt / Review). */
+  intakeStage: IntakeStageId;
+  /** Everything the Brief stage's eleven blocks read and write — including which sections
+   *  are ticked for generation (brief.tickedSections), which used to be its own field here. */
+  brief: CopyBrief;
+  /** The model picked on the Prompt stage's run controls. */
+  copyModel: string;
 };
-
-/**
- * The client's own brand answers, compiled into copywriter guidance.
- *
- * The onboarding form asks what makes the business different, who it sells to, the vibe and
- * tone it wants, and what to avoid. All of it lands on `_meta.brandDirection` and, until
- * now, nothing in the console ever read it — the copywriter saw contact details only, so it
- * wrote generic copy and the operator's only recourse was retyping the client's own words.
- *
- * `brandDirectionToDetails` already exists in @jdd/schema for exactly this, and even
- * documents itself as feeding "buildCopyUserMessage's `details` argument". The contract was
- * written; only this call was missing.
- */
-function seedDetailsFrom(seed: SiteContent | null): string {
-  const bd = (seed?._meta as { brandDirection?: BrandDirection } | undefined)?.brandDirection;
-  return brandDirectionToDetails(bd ?? null);
-}
 
 /**
  * The vertical implied by the client's stated industry, when we can tell.
@@ -130,11 +112,9 @@ function freshBundle(seed: SiteContent | null): WizardBundle {
     selections: {},
     skins: {},
     order: [],
-    details: seedDetailsFrom(seed),
-    scanUrl: '',
-    source: 'generate',
-    // A brand-new client has nothing generated, so the first run should write everything.
-    genSections: [...ALL_SECTIONS],
+    intakeStage: 'brief',
+    brief: (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief(),
+    copyModel: DEFAULT_MODEL_ID,
   };
 }
 
@@ -153,6 +133,7 @@ export default function BuildWizard({
   slug,
   seed,
   composition,
+  draftBundle,
 }: {
   slug: string;
   seed: SiteContent | null;
@@ -161,6 +142,8 @@ export default function BuildWizard({
    * Present = this client is already built, and the repo is the source of truth.
    */
   composition: StudioReadBack | null;
+  /** Server-side draft saved by the last session. Survives cache clears and mid-generation refreshes. */
+  draftBundle: Record<string, unknown> | null;
 }) {
   const reduce = useReducedMotion();
 
@@ -184,15 +167,13 @@ export default function BuildWizard({
   const [edits, setEdits] = useState<Record<string, unknown>>({});
 
   // ── Intake inputs ─────────────────────────────────────────────────────────
-  // Lifted out of GenerateCopyPanel / ScrapePanel / IntakeReviewStep so they land in the
-  // bundle. They were local state in components that unmount on step change, which is the
-  // whole reason typed guidance kept disappearing.
-  const [details, setDetails] = useState('');
-  const [scanUrl, setScanUrl] = useState('');
-  const [source, setSource] = useState<SourceId>('generate');
-  /** The client's own answers, kept separately so the panel can offer a way back to them. */
-  const clientDetails = useMemo(() => seedDetailsFrom(seed), [seed]);
-  const [genSections, setGenSections] = useState<Section[]>([...ALL_SECTIONS]);
+  // The Brief's eleven blocks (lib/copy-brief) now own everything that used to live here as
+  // separate details/scanUrl/source/genSections fields — they were lifted into the bundle in
+  // the first place because the step tree unmounts on navigation, and `brief` inherits that
+  // same reasoning: it has to survive the Intake step's own sub-stage navigation too.
+  const [intakeStage, setIntakeStage] = useState<IntakeStageId>('brief');
+  const [brief, setBrief] = useState<CopyBrief>(emptyCopyBrief);
+  const [copyModel, setCopyModel] = useState<string>(DEFAULT_MODEL_ID);
 
   // ── Builder layer ─────────────────────────────────────────────────────────
   const [selections, setSelections] = useState<Selections>({});
@@ -202,6 +183,7 @@ export default function BuildWizard({
   // A ref rather than state: it must not itself trigger a render, and it is always read in
   // the same tick the selection it describes is reconciled.
   const pendingInsert = useRef<{ id: string; at: number } | null>(null);
+  const saveDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * False until the hydration effect has applied this client's saved bundle. Guards the
    * persist effect below: effects run in declaration order, so on the very first commit
@@ -215,7 +197,7 @@ export default function BuildWizard({
   const effective = useMemo(
     () => {
       const merged = applyEdits(
-        deepMerge(deepMerge(VERTICAL_PRESETS[vertical], imported ?? {}), generated ?? {}),
+        deepMerge(deepMerge(presetFor(vertical), imported ?? {}), generated ?? {}),
         edits,
       );
       // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
@@ -268,19 +250,47 @@ export default function BuildWizard({
   // the first commit's empty state would clobber what's in storage. See `hydrated`.
   useEffect(() => {
     if (!hydrated.current) return;
+    const bundle: WizardBundle = {
+      vertical, imported, generated, edits, selections, skins, order,
+      intakeStage, brief, copyModel,
+    };
     try {
-      const bundle: WizardBundle = {
-        vertical, imported, generated, edits, selections, skins, order,
-        details, scanUrl, source, genSections,
-      };
       window.localStorage.setItem(bundleKey(slug), JSON.stringify(bundle));
     } catch {
       /* storage full or unavailable */
     }
+    // Also save to the server (debounced) so the draft survives cache clears and
+    // mid-generation refreshes. Fire-and-forget — no user-visible error state.
+    if (saveDraftTimer.current) clearTimeout(saveDraftTimer.current);
+    saveDraftTimer.current = setTimeout(() => {
+      fetch('/api/build/save-draft', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, bundle }),
+      }).catch(() => { /* best-effort */ });
+    }, 700);
   }, [
     slug, vertical, imported, generated, edits, selections, skins, order,
-    details, scanUrl, source, genSections,
+    intakeStage, brief, copyModel,
   ]);
+
+  // Persist the brief durably to clients/{slug}/site.ts (_meta.copyBrief) — separate from the
+  // draft save above, which writes .draft.json and gets deleted on a successful export (T13
+  // in the intake rebuild plan). The brief has to survive past launch, so it needs its own
+  // debounced save straight to the file the export route never touches. Watches only `brief`
+  // (not the whole bundle) so an unrelated Studio edit doesn't trigger an extra write here.
+  const saveBriefTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    if (saveBriefTimer.current) clearTimeout(saveBriefTimer.current);
+    saveBriefTimer.current = setTimeout(() => {
+      fetch('/api/build/save-brief', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, brief }),
+      }).catch(() => { /* best-effort */ });
+    }, 700);
+  }, [slug, brief]);
 
   // ── Undo/redo — two view-scoped stacks (Intake vs Studio) ─────────────────
   // Each step's undo/redo drives its own stack. Both snapshots include `edits` (shared: the
@@ -358,6 +368,12 @@ export default function BuildWizard({
       return { ...base, [path]: value };
     });
   }, [step, studioCheckpointEdit, intakeCheckpointEdit]);
+  /** The Brief stage's own edits — always on the Intake stack, regardless of which outer
+   *  step is active, since the Brief only exists on the Intake step. */
+  const updateBrief = useCallback((mutate: (b: CopyBrief) => CopyBrief) => {
+    intakeCheckpointEdit();
+    setBrief((b) => mutate(b));
+  }, [intakeCheckpointEdit]);
   /**
    * Apply a saved bundle to state.
    *
@@ -373,22 +389,17 @@ export default function BuildWizard({
     setSelections(b.selections ?? {});
     setSkins(b.skins ?? {});
     setOrder(b.order ?? []);
-    // Only seed when the bundle has no `details` KEY — deliberately not "when the text is
-    // empty". Keyed off emptiness, clearing the box would refill it on the next remount,
-    // which is more infuriating than the bug this replaces.
-    setDetails(b.details ?? seedDetailsFrom(seed));
-    setScanUrl(b.scanUrl ?? '');
-    setSource(b.source ?? 'generate');
-    // An old bundle has no selection; a fresh run should write everything.
-    setGenSections(b.genSections?.length ? b.genSections : [...ALL_SECTIONS]);
-    // `seed` is read for the brandDirection prefill, so it belongs in the deps — an empty
+    setIntakeStage(b.intakeStage ?? 'brief');
+    // Falls back to the durably-saved brief (site.ts's _meta.copyBrief, P4 of the intake
+    // rebuild) rather than an empty one — a bundle can be missing the key entirely (an old
+    // save predating the Brief stage) or the client's localStorage can simply be gone, and
+    // either way the brief the operator built last time should still be there.
+    setBrief(b.brief ?? (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief());
+    setCopyModel(b.copyModel ?? DEFAULT_MODEL_ID);
+    // `seed` is read for the durable-brief fallback, so it belongs in the deps — an empty
     // array here would pin this callback to the first client's intake.
   }, [seed]);
   // Each of these replaces a whole content layer, so each is one undo step (Intake stack).
-  const importSite = useCallback((site: SiteContent) => {
-    intakeCheckpoint();
-    setImported(site);
-  }, [intakeCheckpoint]);
   /**
    * Fold a generation result into the generated layer.
    *
@@ -407,6 +418,22 @@ export default function BuildWizard({
   const clearGenerated = useCallback(() => {
     intakeCheckpoint();
     setGenerated(null);
+  }, [intakeCheckpoint]);
+  /**
+   * Set (or, with `value === undefined`, remove) one top-level key of the generated overlay.
+   * Backs the Review stage's per-section "Revert" — restoring a section to what it was
+   * before the last run means either putting back that run's OWN prior value (when one
+   * exists) or removing the key entirely so the merge falls through to imported/preset
+   * content, and `undefined` is what signals "no prior value" through to here.
+   */
+  const setGeneratedSection = useCallback((section: string, value: unknown) => {
+    intakeCheckpoint();
+    setGenerated((prev) => {
+      const next: Record<string, unknown> = { ...(prev ?? {}) };
+      if (value === undefined) delete next[section];
+      else next[section] = value;
+      return Object.keys(next).length ? (next as Partial<SiteContent>) : null;
+    });
   }, [intakeCheckpoint]);
   // The Styles/Text reset buttons live in the Studio control bar — one undo step on the Studio stack.
   const resetEdits = useCallback(() => {
@@ -563,14 +590,13 @@ export default function BuildWizard({
         selections: composition.selections,
         skins: composition.skins,
         order: composition.order,
-        details: saved?.details,
-        scanUrl: saved?.scanUrl,
-        source: saved?.source,
-        genSections: saved?.genSections,
+        intakeStage: saved?.intakeStage ?? draftBundle?.intakeStage as IntakeStageId | undefined,
+        brief: (saved?.brief ?? draftBundle?.brief as CopyBrief | undefined) ?? (seed?._meta.copyBrief as CopyBrief | undefined),
+        copyModel: saved?.copyModel ?? draftBundle?.copyModel as string | undefined,
       });
     } else {
-      // ── Never exported: the local draft is the only record there is. ────────────────
-      applyBundle(saved ?? freshBundle(seed));
+      // ── Never exported: local storage wins, then the server draft, then a fresh start. ──
+      applyBundle(saved ?? draftBundle ?? freshBundle(seed));
     }
 
     // Undo across a client switch would restore another client's content into this one.
@@ -590,11 +616,7 @@ export default function BuildWizard({
     setStepIndex(nextIndex);
   }
 
-  const variants = {
-    enter: (d: number) => ({ x: reduce ? 0 : d > 0 ? '100%' : '-100%', opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (d: number) => ({ x: reduce ? 0 : d > 0 ? '-100%' : '100%', opacity: 0 }),
-  };
+  const variants = stepVariants(reduce);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-uiCanvas">
@@ -681,7 +703,10 @@ export default function BuildWizard({
               <ArrowLeft size={14} /> Back
             </button>
           )}
-          {!isLast && (
+          {/* Hidden on the Intake step: IntakeStep now owns its own "Approve & continue to
+              Studio" action on its last sub-stage, so a second Next here would be a
+              redundant, confusing second way to do the same thing. */}
+          {!isLast && step !== 'intake' && (
             <button
               type="button"
               onClick={() => go(stepIndex + 1)}
@@ -703,7 +728,7 @@ export default function BuildWizard({
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: reduce ? 0 : 0.42, ease: EASE }}
+            transition={stepTransition(reduce)}
             className="absolute inset-0"
           >
             {/* overflow-HIDDEN, not auto: the Intake step is two panes that each own their
@@ -711,8 +736,9 @@ export default function BuildWizard({
                 on top of theirs. */}
             {step === 'intake' && (
               <div className="h-full overflow-hidden">
-                <IntakeReviewStep
-                  slug={slug}
+                <IntakeStep
+                  stage={intakeStage}
+                  onStageChange={setIntakeStage}
                   vertical={vertical}
                   onVerticalChange={changeVertical}
                   effective={effective}
@@ -720,23 +746,17 @@ export default function BuildWizard({
                   generated={generated}
                   onGenerated={applyGenerated}
                   onClearGenerated={clearGenerated}
+                  onSetGeneratedSection={setGeneratedSection}
                   onReplaceContent={replaceContent}
                   imported={imported}
-                  onImport={importSite}
-                  // go(2) — both of these were dead. STEPS has two entries and go() rejects
-                  // anything past the last index, so "Go to Studio" and "Edit in Studio"
-                  // silently did nothing. Left over from when picking a client was step 0.
+                  // go(2) was dead. STEPS has two entries and go() rejects anything past the
+                  // last index, so "Go to Studio" silently did nothing. Left over from when
+                  // picking a client was step 0.
                   onDone={() => go(STUDIO_STEP)}
-                  onEditInStudio={(s) => { setFocusSection(s); go(STUDIO_STEP); }}
-                  details={details}
-                  onDetailsChange={setDetails}
-                  clientDetails={clientDetails}
-                  scanUrl={scanUrl}
-                  onScanUrlChange={setScanUrl}
-                  source={source}
-                  onSourceChange={setSource}
-                  genSections={genSections}
-                  onGenSectionsChange={setGenSections}
+                  brief={brief}
+                  onBriefChange={updateBrief}
+                  copyModel={copyModel}
+                  onCopyModelChange={setCopyModel}
                 />
               </div>
             )}

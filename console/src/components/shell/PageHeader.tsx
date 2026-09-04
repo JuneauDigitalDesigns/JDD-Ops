@@ -18,7 +18,9 @@ export default function PageHeader({
   actions,
 }: {
   title: string;
-  lede?: string;
+  /** A plain string in every caller so far; ReactNode so a lede can carry state-dependent
+   *  styling (e.g. the Briefing's freshness line going amber when the sweep is stale). */
+  lede?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   return (

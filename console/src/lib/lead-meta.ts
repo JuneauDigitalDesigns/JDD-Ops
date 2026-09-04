@@ -70,3 +70,23 @@ export function isStale(lead: { stage: LeadStage; updatedAt?: number; receivedAt
   if (!stageCanGoStale(lead.stage)) return false;
   return Date.now() - (lead.updatedAt ?? lead.receivedAt) > LEAD_STALE_MS;
 }
+
+/** localStorage key holding the epoch-ms of the last time the board was viewed. */
+export const LEADS_LAST_SEEN_KEY = 'jdd:leads:lastSeenAt';
+
+/**
+ * A lead that arrived after the operator last looked at the board.
+ *
+ * Exists because a lead from a call enters at `qualified`, not `new` — so the one place you
+ * would think to look for it is the one place it never appears. Without an arrival marker the
+ * only way to spot a new card is to already know which column it lands in.
+ *
+ * Deliberately keyed off `receivedAt`, not `updatedAt`: this marks ARRIVAL, not activity. A
+ * lead you dragged to Quoted yesterday is not news today.
+ *
+ * A null `lastSeenAt` is a first-ever visit and marks NOTHING, rather than flagging the whole
+ * board as new.
+ */
+export function isUnseen(lead: { receivedAt: number }, lastSeenAt: number | null): boolean {
+  return lastSeenAt !== null && lead.receivedAt > lastSeenAt;
+}

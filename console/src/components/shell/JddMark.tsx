@@ -20,8 +20,8 @@ export default function JddMark() {
   return (
     <Link
       href="/"
-      aria-label="All clients"
-      title="All clients"
+      aria-label="Briefing"
+      title="Briefing"
       className="shrink-0 rounded-[5px] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
     >
       <Image

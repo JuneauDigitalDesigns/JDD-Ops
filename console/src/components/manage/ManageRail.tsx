@@ -8,6 +8,7 @@ import {
   Globe,
   Lock,
   Microphone,
+  Quotes,
   RocketLaunch,
   Sliders,
   UserCircle,
@@ -39,6 +40,7 @@ const ICONS: Record<ManageSection['icon'], Icon> = {
   microphone: Microphone,
   portal: UserCircle,
   warning: Warning,
+  quotes: Quotes,
 };
 
 export default function ManageRail({

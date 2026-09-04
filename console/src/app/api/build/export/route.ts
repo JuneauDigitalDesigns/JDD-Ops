@@ -20,10 +20,10 @@ import {
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
+import { resolveVerticalIds } from '@/lib/verticals-registry';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
 import { loadGithubToken } from '@/lib/opsSecrets';
-
-const VALID_VERTICALS = new Set<string>(['hvac', 'roofing', 'plumbing', 'lawn-care', 'car-detailing']);
+import { deleteDraft } from '@/lib/draft';
 
 /** npm install and next build are both legitimately slow; past this they are stuck, not slow. */
 const NPM_TIMEOUT_MS = 10 * 60_000;
@@ -86,6 +86,15 @@ type Body = {
 };
 
 export async function POST(req: Request) {
+  // Computed per-request, not at module load: it reads console/.state/verticals.json, which
+  // an operator can edit (via the vertical editor, or by hand) while this server process is
+  // still running. A module-scope Set would freeze whatever existed at server start and
+  // never see a newly added custom vertical, or a vertical whose id was corrected, without
+  // a restart. Was also a hardcoded Set missing 'health' — a health client exported with
+  // vertical = null, and withPlaceholders(content, null ?? 'hvac') silently filled its empty
+  // image slots with HVAC stock photography.
+  const VALID_VERTICALS = new Set<string>(resolveVerticalIds());
+
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -445,6 +454,8 @@ export async function POST(req: Request) {
           step(`Pushed ${pushed.sha ?? ''} to origin/${target.remoteBranch}.`);
         }
 
+        // The repo is now the source of truth; the draft is stale.
+        deleteDraft(slug);
         send({
           type: 'done',
           slug,

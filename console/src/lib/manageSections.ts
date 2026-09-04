@@ -17,6 +17,7 @@ export type SectionId =
   | 'domain'
   | 'voice-agent'
   | 'portal'
+  | 'featured'
   | 'danger';
 
 export interface ManageSection {
@@ -25,7 +26,7 @@ export interface ManageSection {
   /** One line under the section title. */
   lede: string;
   /** Key into ManageRail's icon map. */
-  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'portal' | 'warning';
+  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'portal' | 'warning' | 'quotes';
   /** Which plans get this section. */
   plans: Plan[];
   /** Rendered visually apart, after a spacer and rule, with a danger-toned icon. */
@@ -77,6 +78,13 @@ export const MANAGE_SECTIONS: ManageSection[] = [
     label: 'Portal',
     lede: 'Which account this client signs into the portal with.',
     icon: 'portal',
+    plans: ALL,
+  },
+  {
+    id: 'featured',
+    label: 'Featured',
+    lede: 'Publish this client to the agency homepage once they’ve opted in.',
+    icon: 'quotes',
     plans: ALL,
   },
   {

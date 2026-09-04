@@ -41,7 +41,14 @@ export type AuditAction =
   | 'airtable.repair'
   | 'repair.undo'
   | 'client.teardown.start'
-  | 'client.teardown';
+  | 'client.teardown'
+  | 'featured.publish'
+  | 'featured.unpublish'
+  | 'go-live.stripe-prices'
+  | 'go-live.kv-reset'
+  | 'go-live.env-sync'
+  | 'go-live.turnstile'
+  | 'go-live.stripe-webhook';
 
 export interface AuditEntry {
   /** ISO timestamp. */

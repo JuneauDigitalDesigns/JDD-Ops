@@ -16,6 +16,7 @@
     "sync-env": "node scripts/sync-vercel-env.js",
     "repair-portal": "node scripts/repair-portal-sites.js",
     "audit-analytics": "node scripts/audit-analytics.js",
+    "verify-make": "node scripts/verify-make.js",
     "audit-billing": "node scripts/audit-billing.js",
     "backfill-agent-limits": "node scripts/backfill-agent-limits.js",
     "backfill-agent-ids": "node scripts/backfill-account-agent-ids.js",
@@ -29,7 +30,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@clerk/backend": "^3.5.0",
-    "@jdd/schema": "github:JuneauDigitalDesigns/jdd-schema#v1.16.0",
+    "@jdd/schema": "github:JuneauDigitalDesigns/jdd-schema#v1.18.0",
     "@octokit/rest": "^21.0.2",
     "@upstash/redis": "^1.38.0",
     "airtable": "^0.12.2",

@@ -1,265 +1,144 @@
-import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { BUILT_IN_VERTICALS, type CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import { getAnthropicKey } from '@/lib/anthropic';
-import { brandCopywriterSystem, buildCopyUserMessage } from '@/lib/brand-copywriter-prompt';
 import { buildCopySchema, ALL_SECTIONS, type Section, type CopyResult } from '@/lib/copy-schema';
-import { VERTICALS, type VerticalId } from '@/lib/verticals';
-import { scanWebsiteNotes, normalizeUrl } from '@/lib/website-scan';
+import { resolveBrief } from '@/lib/copy-brief/resolve';
+import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
+import { chunkSections } from '@/lib/copy-brief/chunking';
+import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
+import { isValidModelId, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 
 export const runtime = 'nodejs';
 
-function mergeArray<B, C>(base: B[], copy: C[] | undefined, apply: (b: B, c: C) => B): B[] {
-  if (!Array.isArray(base)) return base;
-  return base.map((b, i) => (copy && copy[i] ? apply(b, copy[i]) : b));
+/**
+ * Brief-driven, streaming replacement for the old details/url-based, single-JSON-response
+ * route (P6 of the intake rebuild). The structured-output merge logic (turning the
+ * copywriter's CopyResult into a Partial<SiteContent> overlay) is unchanged — it moved
+ * verbatim to lib/copy-brief/apply-generated.ts. What changed is everything upstream of it:
+ * the prompt is compiled per-chunk from the Brief's eleven resolved blocks
+ * (compileBriefPrompt) instead of two fixed functions fed a free-text `details` string, and
+ * results stream back as NDJSON so the Prompt stage can show per-section progress instead of
+ * waiting on one opaque request.
+ *
+ * Scanning is NOT done here any more (D4 — the duplicated-scan defect): the Brief's Website
+ * block already carries whatever notes /api/build/scan-site fetched, so this route never
+ * calls web_fetch itself.
+ */
+
+interface Body {
+  vertical?: string;
+  base?: SiteContent;
+  imported?: SiteContent | null;
+  brief?: CopyBrief;
+  sections?: Section[];
+  model?: string;
 }
 
+const REFUSAL = '__refusal__';
+
 export async function POST(req: Request) {
-  let body: { vertical?: VerticalId; base?: SiteContent; details?: string; sections?: Section[]; url?: string };
+  let body: Body;
   try {
-    body = (await req.json()) as typeof body;
+    body = (await req.json()) as Body;
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
-  }
-  const { base, vertical, details } = body;
-  if (!base || !base.brand) {
-    return NextResponse.json({ error: 'Missing base content.' }, { status: 400 });
-  }
-  if (!vertical || !VERTICALS.some((v) => v.id === vertical)) {
-    return NextResponse.json({ error: 'Unknown vertical.' }, { status: 400 });
+    return new Response('Invalid JSON body.', { status: 400 });
   }
 
-  // Only request sections we support; brand is always included.
-  const requested = Array.isArray(body.sections)
-    ? body.sections.filter((s): s is Section => ALL_SECTIONS.includes(s))
-    : ALL_SECTIONS;
-  const want = new Set<Section>(['brand', ...requested]);
-  const sections = ALL_SECTIONS.filter((s) => want.has(s));
+  const { base, brief } = body;
+  if (!base || !base.brand) return new Response('Missing base content.', { status: 400 });
+  if (!brief) return new Response('Missing brief.', { status: 400 });
 
-  // Optional website URL to scan and normalize up-front.
-  let scanUrl: string | undefined;
-  if (typeof body.url === 'string' && body.url.trim()) {
-    try {
-      scanUrl = normalizeUrl(body.url);
-    } catch (e) {
-      return NextResponse.json({ error: e instanceof Error ? e.message : 'Invalid URL.' }, { status: 400 });
-    }
-  }
+  const vertical = BUILT_IN_VERTICALS.find((v) => v.id === body.vertical);
+  if (!vertical) return new Response('Unknown vertical.', { status: 400 });
+
+  const modelId = body.model && isValidModelId(body.model) ? body.model : DEFAULT_MODEL_ID;
+
+  const requested = Array.isArray(body.sections) ? body.sections.filter((s): s is Section => ALL_SECTIONS.includes(s)) : [];
+  const sections = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
+  const chunks = chunkSections(sections);
+  const wantedSet = new Set<Section>(['brand', ...sections]);
 
   let key: string;
   try {
     key = getAnthropicKey();
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'No API key.' }, { status: 500 });
+    return new Response(e instanceof Error ? e.message : 'No API key.', { status: 500 });
   }
-
   const client = new Anthropic({ apiKey: key });
-  const model = process.env.CONSOLE_COPY_MODEL || 'claude-opus-4-8';
+  const imported = body.imported ?? null;
 
-  // Phase 1 — scan the website with web_fetch when a URL was supplied.
-  let websiteNotes: string | undefined;
-  if (scanUrl) {
-    try {
-      websiteNotes = await scanWebsiteNotes(client, scanUrl);
-    } catch (e) {
-      return NextResponse.json(
-        { error: `Website scan failed: ${e instanceof Error ? e.message : 'unknown error'}` },
-        { status: 502 },
-      );
-    }
-  }
+  const ctx = { vertical, effective: base, imported, brief, tickedSections: sections };
+  const blocks = resolveBrief(ctx);
 
-  // Phase 2 — structured copy generation, CHUNKED. Requesting all sections in one
-  // json_schema compiles a grammar Claude rejects as too large, so we split the sections
-  // into small chunks, generate them in parallel (each with its own small schema), and
-  // merge the results. Section keys are disjoint, so the merge is a plain Object.assign;
-  // brand is just another chunk member (buildCopySchema(chunk, false)).
-  const REFUSAL = '__refusal__';
-  const CHUNK_SIZE = 2;
-  const chunks: Section[][] = [];
-  for (let i = 0; i < sections.length; i += CHUNK_SIZE) chunks.push(sections.slice(i, i + CHUNK_SIZE));
+  const encoder = new TextEncoder();
+  let closed = false;
 
-  // Re-capture the guard-narrowed values as locals so the closure keeps their narrowed types.
-  const vId: VerticalId = vertical;
-  const baseContent: SiteContent = base;
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (obj: unknown) => {
+        if (closed) return;
+        controller.enqueue(encoder.encode(`${JSON.stringify(obj)}\n`));
+      };
+      const finish = () => {
+        if (closed) return;
+        closed = true;
+        controller.close();
+      };
 
-  async function generateChunk(chunk: Section[]): Promise<Partial<CopyResult>> {
-    const res = await client.messages.create({
-      model,
-      max_tokens: 4000,
-      system: brandCopywriterSystem(vId),
-      output_config: { format: { type: 'json_schema', schema: buildCopySchema(chunk, false) } },
-      messages: [{ role: 'user', content: buildCopyUserMessage(vId, baseContent, details, chunk, websiteNotes) }],
-    });
-    if (res.stop_reason === 'refusal') throw new Error(REFUSAL);
-    const tb = res.content.find((b) => b.type === 'text');
-    if (!tb || tb.type !== 'text') throw new Error('No copy returned.');
-    return JSON.parse(tb.text) as Partial<CopyResult>;
-  }
+      send({ type: 'start', sections, chunks: chunks.length });
 
-  const settled = await Promise.allSettled(chunks.map(generateChunk));
-  const ok = settled
-    .filter((s): s is PromiseFulfilledResult<Partial<CopyResult>> => s.status === 'fulfilled')
-    .map((s) => s.value);
+      async function generateChunk(chunk: Section[]): Promise<{ chunk: Section[]; result: Partial<CopyResult> } | null> {
+        for (const s of chunk) send({ type: 'section', section: s, status: 'writing' });
+        try {
+          const { system, user } = compileBriefPrompt(ctx, blocks, chunk);
+          const res = await client.messages.create({
+            model: modelId,
+            max_tokens: 4000,
+            system,
+            output_config: { format: { type: 'json_schema', schema: buildCopySchema(chunk, false) } },
+            messages: [{ role: 'user', content: user }],
+          });
+          if (res.stop_reason === 'refusal') throw new Error(REFUSAL);
+          const tb = res.content.find((b) => b.type === 'text');
+          if (!tb || tb.type !== 'text') throw new Error('No copy returned.');
+          const result = JSON.parse(tb.text) as Partial<CopyResult>;
+          for (const s of chunk) send({ type: 'section', section: s, status: 'done' });
+          send({ type: 'usage', model: modelId, input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens });
+          return { chunk, result };
+        } catch (e) {
+          const message =
+            e instanceof Error && e.message === REFUSAL ? 'The model declined this request.'
+            : e instanceof Anthropic.APIError ? `${e.status ?? ''} ${e.message}`.trim()
+            : e instanceof Error ? e.message
+            : 'Generation failed.';
+          for (const s of chunk) send({ type: 'section', section: s, status: 'failed', error: message });
+          return null;
+        }
+      }
 
-  // Only fail the whole request if EVERY chunk failed; otherwise merge what succeeded.
-  if (ok.length === 0) {
-    const reason = (settled.find((s) => s.status === 'rejected') as PromiseRejectedResult | undefined)?.reason;
-    if (reason instanceof Error && reason.message === REFUSAL) {
-      return NextResponse.json(
-        { error: 'The model declined this request. Try again or adjust your details.' },
-        { status: 422 },
-      );
-    }
-    const msg =
-      reason instanceof Anthropic.APIError ? `${reason.status ?? ''} ${reason.message}`.trim()
-      : reason instanceof Error ? reason.message
-      : 'Copy request failed.';
-    return NextResponse.json({ error: `Claude request failed: ${msg}` }, { status: 502 });
-  }
+      try {
+        const settled = await Promise.all(chunks.map(generateChunk));
+        const ok = settled.filter((r): r is NonNullable<typeof r> => r !== null);
 
-  const copy: Partial<CopyResult> = Object.assign({}, ...ok);
+        if (ok.length === 0) {
+          send({ type: 'error', message: 'Every section failed. See the per-section errors above.' });
+          finish();
+          return;
+        }
 
-  // Build the overlay for ONLY the requested sections so unselected content is left untouched.
-  const generated: Partial<SiteContent> = {};
+        const merged: Partial<CopyResult> = Object.assign({}, ...ok.map((r) => r.result));
+        const generated = applyGeneratedCopy(base, merged, wantedSet);
+        send({ type: 'done', generated });
+      } catch (e) {
+        send({ type: 'error', message: e instanceof Error ? e.message : 'Generation failed.' });
+      } finally {
+        finish();
+      }
+    },
+  });
 
-  if (want.has('brand')) {
-    const cb = copy.brand;
-    const brand = { ...base.brand };
-    if (cb) {
-      if (cb.tagline) brand.tagline = cb.tagline;
-      if (cb.name) { brand.name = cb.name; brand.short = cb.short ?? cb.name; }
-      else if (cb.short) brand.short = cb.short;
-      if (cb.long) brand.long = cb.long;
-      if (cb.established) brand.established = cb.established;
-      if (cb.phone) { brand.phone = cb.phone; brand.phoneHref = `tel:${cb.phone.replace(/[^0-9+]/g, '')}`; }
-      if (cb.email) brand.email = cb.email;
-      if (cb.address) brand.address = cb.address;
-      if (cb.license) brand.license = cb.license;
-    }
-    generated.brand = brand;
-  }
-
-  if (want.has('announcement') && copy.announcement?.text) {
-    generated.announcement = copy.announcement.text;
-  }
-
-  if (want.has('trust') && copy.trust) {
-    generated.trust = {
-      ...base.trust,
-      ...(copy.trust.label ? { label: copy.trust.label } : {}),
-      ...(copy.trust.logos?.length ? { logos: copy.trust.logos } : {}),
-    };
-  }
-
-  if (want.has('hero')) {
-    const h: Partial<NonNullable<CopyResult['hero']>> = copy.hero ?? {};
-    generated.hero = {
-      ...base.hero,
-      eyebrow: h.eyebrow ?? base.hero.eyebrow,
-      headline: h.headline ?? base.hero.headline,
-      headlineEmphasis: h.headlineEmphasis ?? base.hero.headlineEmphasis,
-      sub: h.sub ?? base.hero.sub,
-      cta: h.cta ?? base.hero.cta,
-      secondaryCta: h.secondaryCta ?? base.hero.secondaryCta,
-      formLabel: h.formLabel ?? base.hero.formLabel,
-      trust: h.trust ?? base.hero.trust,
-      badge: h.badge ?? base.hero.badge,
-      frictionReducers: h.frictionReducers?.length ? h.frictionReducers : base.hero.frictionReducers,
-      heroBullets: h.heroBullets?.length ? h.heroBullets : base.hero.heroBullets,
-    };
-  }
-
-  if (want.has('about')) {
-    const a: Partial<NonNullable<CopyResult['about']>> = copy.about ?? {};
-    generated.about = {
-      ...base.about,
-      eyebrow: a.eyebrow ?? base.about.eyebrow,
-      title: a.title ?? base.about.title,
-      body: a.body ?? base.about.body,
-      pillars: mergeArray(base.about.pillars, a.pillars, (b, c) => ({ ...b, t: c.t ?? b.t, d: c.d ?? b.d })),
-      stats: a.stats?.length
-        ? mergeArray(base.about.stats, a.stats, (b, c) => ({ ...b, n: c.n ?? b.n, l: c.l ?? b.l }))
-        : base.about.stats,
-    };
-  }
-
-  if (want.has('services')) {
-    const s: Partial<NonNullable<CopyResult['services']>> = copy.services ?? {};
-    generated.services = {
-      ...base.services,
-      eyebrow: s.eyebrow ?? base.services.eyebrow,
-      title: s.title ?? base.services.title,
-      sub: s.sub ?? base.services.sub,
-      items: mergeArray(base.services.items, s.items, (b, c) => ({
-        ...b, t: c.t ?? b.t, d: c.d ?? b.d, tag: c.tag ?? b.tag,
-      })),
-    };
-  }
-
-  if (want.has('work')) {
-    const w: Partial<NonNullable<CopyResult['work']>> = copy.work ?? {};
-    generated.work = {
-      ...base.work,
-      eyebrow: w.eyebrow ?? base.work.eyebrow,
-      title: w.title ?? base.work.title,
-      sub: w.sub ?? base.work.sub,
-      projects: w.projects?.length
-        ? mergeArray(base.work.projects, w.projects, (b, c) => ({
-            ...b, t: c.t ?? b.t, loc: c.loc ?? b.loc, yr: c.yr ?? b.yr, scope: c.scope ?? b.scope, size: c.size ?? b.size, caption: c.caption ?? b.caption,
-          }))
-        : base.work.projects,
-    };
-  }
-
-  if (want.has('testimonials')) {
-    const t: Partial<NonNullable<CopyResult['testimonials']>> = copy.testimonials ?? {};
-    generated.testimonials = {
-      ...base.testimonials,
-      eyebrow: t.eyebrow ?? base.testimonials.eyebrow,
-      title: t.title ?? base.testimonials.title,
-      items: mergeArray(base.testimonials.items, t.items, (b, c) => ({
-        ...b, q: c.q ?? b.q, a: c.a ?? b.a, r: c.r ?? b.r, company: c.company ?? b.company, stars: c.stars ?? b.stars,
-      })),
-    };
-  }
-
-  if (want.has('faq')) {
-    const f: Partial<NonNullable<CopyResult['faq']>> = copy.faq ?? {};
-    generated.faq = {
-      ...base.faq,
-      eyebrow: f.eyebrow ?? base.faq.eyebrow,
-      title: f.title ?? base.faq.title,
-      sub: f.sub ?? base.faq.sub,
-      items: f.items?.length ? f.items.map((c) => ({ q: c.q, a: c.a })) : base.faq.items,
-    };
-  }
-
-  if (want.has('finalCta')) {
-    const f: Partial<NonNullable<CopyResult['finalCta']>> = copy.finalCta ?? {};
-    generated.finalCta = {
-      ...base.finalCta,
-      eyebrow: f.eyebrow ?? base.finalCta.eyebrow,
-      headline: f.headline ?? base.finalCta.headline,
-      sub: f.sub ?? base.finalCta.sub,
-      cta: f.cta ?? base.finalCta.cta,
-      secondary: f.secondary ?? base.finalCta.secondary,
-      frictionReducers: f.frictionReducers?.length ? f.frictionReducers : base.finalCta.frictionReducers,
-    };
-  }
-
-  if (want.has('footer') && copy.footer?.blurb) {
-    generated.footer = { ...base.footer, blurb: copy.footer.blurb };
-  }
-
-  if (want.has('seo')) {
-    const s: Partial<NonNullable<CopyResult['seo']>> = copy.seo ?? {};
-    generated.seo = {
-      ...base.seo,
-      title: s.title ?? base.seo.title,
-      description: s.description ?? base.seo.description,
-    };
-  }
-
-  return NextResponse.json({ generated });
+  return new Response(stream, {
+    headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' },
+  });
 }

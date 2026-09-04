@@ -567,7 +567,7 @@ RETELL_API_KEY=${process.env.RETELL_API_KEY || ''}
 RETELL_SIP_DOMAIN=${process.env.RETELL_SIP_DOMAIN || 'sip.retellai.com'}
 TWILIO_NUMBER=${keep('TWILIO_NUMBER')}
 CLIENT_FORWARD_PHONE=${content.brand.phone}
-CLIENT_FORWARD_RING_SECONDS=${keep('CLIENT_FORWARD_RING_SECONDS') || '25'}
+CLIENT_FORWARD_RING_SECONDS=${keep('CLIENT_FORWARD_RING_SECONDS') || '15'}
 AIRTABLE_BASE_ID=${keep('AIRTABLE_BASE_ID')}
 RETELL_POST_CALL_WEBHOOK_URL=${keep('RETELL_POST_CALL_WEBHOOK_URL')}
 VERCEL_PROJECT_NAME=${siteSlug}
@@ -873,72 +873,89 @@ async function provisionTwilioNumber(content, siteSlug, clientDir) {
   const vercelHost = vercelAppHost(siteSlug);
   const voiceUrl   = `https://${vercelHost}.vercel.app/api/voice`;
 
-  const digits   = (content.brand.phone || '').replace(/\D/g, '');
-  const areaCode = digits.length >= 10 ? digits.slice(-10, -7) : null;
+  // We buy LOCAL numbers only, never toll-free. A toll-free number cannot join the A2P 10DLC
+  // Messaging Service, so its texts fail with 30034 until a separate Toll-Free Verification
+  // clears (1–3 weeks) — a client provisioned that way is silently textless. A local number in
+  // the client's region joins the campaign immediately, so SMS works the day we provision.
+  //
+  // Search is geography-first: ZIP from the business address, then the brand-phone area code
+  // if it's one we serve, then the configured defaults (Central FL / Orlando metro by default),
+  // then anywhere in the default region. Region + area codes are env-driven so expanding beyond
+  // Florida later is a config edit, not a code change.
+  const allowedAreaCodes = (process.env.TWILIO_DEFAULT_AREA_CODES || '407,321,689')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const defaultRegion = process.env.TWILIO_DEFAULT_REGION || 'FL';
+
+  const addressText = content.brand?.address || content.brand?.contactDetails?.address || '';
+  const zip = (addressText.match(/\b\d{5}\b/) || [])[0] || null;
+  const phoneDigits = (content.brand.phone || '').replace(/\D/g, '');
+  const phoneAreaCode = phoneDigits.length >= 10 ? phoneDigits.slice(-10, -7) : null;
+
+  // Priority-ordered search strategies; first hit wins. Labels are for the log.
+  const strategies = [];
+  if (zip) strategies.push({ label: `ZIP ${zip}`, query: { inPostalCode: zip } });
+  if (phoneAreaCode && allowedAreaCodes.includes(phoneAreaCode)) {
+    strategies.push({ label: `area code ${phoneAreaCode} (brand phone)`, query: { areaCode: phoneAreaCode } });
+  }
+  for (const ac of allowedAreaCodes) {
+    strategies.push({ label: `area code ${ac}`, query: { areaCode: ac } });
+  }
+  strategies.push({ label: `region ${defaultRegion}`, query: { inRegion: defaultRegion } });
 
   let numberRecord = null;
-
-  if (areaCode) {
-    console.log(`  Searching for local number in area code ${areaCode}…`);
-    const results = await client.availablePhoneNumbers('US').local.list({ areaCode, limit: 1 });
+  for (const { label, query } of strategies) {
+    console.log(`  Searching for a local number by ${label}…`);
+    const results = await client.availablePhoneNumbers('US').local.list({ ...query, limit: 1 });
     if (results.length) {
       numberRecord = await client.incomingPhoneNumbers.create({
         phoneNumber: results[0].phoneNumber,
         voiceUrl,
         voiceMethod: 'POST',
       });
-      console.log(`  Purchased local number ${numberRecord.phoneNumber}`);
-    } else {
-      console.log(`  No local number in ${areaCode} — falling back to toll-free`);
+      console.log(`  Purchased local number ${numberRecord.phoneNumber} (${label})`);
+      break;
     }
-  } else {
-    console.log(`  Could not derive an area code from brand.phone="${content.brand.phone}" — using toll-free`);
   }
 
   if (!numberRecord) {
-    const tfResults = await client.availablePhoneNumbers('US').tollFree.list({ limit: 1 });
-    if (!tfResults.length) fail(8, `No toll-free numbers available in Twilio account`);
-    numberRecord = await client.incomingPhoneNumbers.create({
-      phoneNumber: tfResults[0].phoneNumber,
-      voiceUrl,
-      voiceMethod: 'POST',
-    });
-    console.log(`  Purchased toll-free number ${numberRecord.phoneNumber}`);
-    // A toll-free number cannot join the A2P 10DLC Messaging Service — that pool is
-    // local-only. Voice works fine, but every outbound text from this number fails with
-    // 30034 until it clears its own Toll-Free Verification, which is a separate
-    // submission and takes 1–3 weeks. Silence here is how a client ends up "provisioned"
-    // and permanently textless.
-    console.warn(`  ⚠ TOLL-FREE FALLBACK — SMS alerts will NOT deliver from this number.`);
-    console.warn(`    Toll-free numbers are ineligible for the A2P 10DLC Messaging Service.`);
-    console.warn(`    Submit Toll-Free Verification for ${numberRecord.phoneNumber} (1–3 weeks),`);
-    console.warn(`    or release it and buy a local number in a nearby area code instead.`);
+    fail(8,
+      `No local US number available (tried ${strategies.map((s) => s.label).join(', ')}). ` +
+      'We never fall back to toll-free — it cannot join the A2P campaign. Widen ' +
+      'TWILIO_DEFAULT_AREA_CODES / TWILIO_DEFAULT_REGION in .env and re-run.');
   }
 
   const number = numberRecord.phoneNumber;
   patchEnvLocal(clientDir, 'TWILIO_NUMBER', number);
 
-  // Local numbers join the registered A2P campaign's sender pool. Sending outside the
-  // Messaging Service is exactly the unregistered-sender case carriers reject.
-  const isTollFree = /^\+1(800|833|844|855|866|877|888)/.test(number);
+  // The number must live in the A2P Messaging Service or its texts are unregistered-sender
+  // sends (30034). preflight already hard-failed if this client wants SMS without the SID; a
+  // client with no SMS consent doesn't need the pool, so the SID is optional here.
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  if (!isTollFree) {
-    if (!messagingServiceSid) {
-      console.warn(`  ⚠ TWILIO_MESSAGING_SERVICE_SID not set — ${number} is not in the A2P sender pool.`);
-      console.warn(`    Add it by hand in the Twilio console, or SMS alerts will fail with 30034.`);
-    } else {
-      try {
-        await client.messaging.v1
-          .services(messagingServiceSid)
-          .phoneNumbers.create({ phoneNumberSid: numberRecord.sid });
-        console.log(`  Added ${number} to A2P Messaging Service ${messagingServiceSid}`);
-      } catch (err) {
-        // Non-fatal: the number works for voice regardless, and this is recoverable with
-        // two clicks. Failing the whole onboarding over it would be the wrong trade.
-        console.warn(`  ⚠ Could not add ${number} to Messaging Service: ${err.message}`);
-        console.warn(`    Add it by hand, or SMS alerts from this number will fail with 30034.`);
+  if (messagingServiceSid) {
+    try {
+      await client.messaging.v1
+        .services(messagingServiceSid)
+        .phoneNumbers.create({ phoneNumberSid: numberRecord.sid });
+    } catch (err) {
+      // "already in service" is fine; anything else we surface via the verify below.
+      if (!/already/i.test(err?.message || '')) {
+        console.warn(`  ⚠ Adding ${number} to Messaging Service raised: ${err.message}`);
       }
     }
+    // Trust nothing: read the pool back and confirm the number actually landed. A 200 from
+    // create is not proof it stuck, and "we think SMS works" is exactly the silent failure
+    // this whole change exists to kill.
+    const pool = await client.messaging.v1.services(messagingServiceSid).phoneNumbers.list({ limit: 1000 });
+    const joined = pool.some((p) => p.sid === numberRecord.sid || p.phoneNumber === number);
+    if (!joined) {
+      fail(8,
+        `Bought ${number} but it did not land in Messaging Service ${messagingServiceSid}'s sender pool — ` +
+        'SMS from it would fail with 30034. Add it by hand (Twilio Console → Messaging → Services → ' +
+        'Sender Pool) and re-run, or investigate the API error above. No SMS was wired.');
+    }
+    console.log(`  Added ${number} to A2P Messaging Service ${messagingServiceSid} (verified in pool)`);
+  } else {
+    console.log(`  TWILIO_MESSAGING_SERVICE_SID not set — skipping A2P pool join (this client sends no SMS).`);
   }
 
   return number;
@@ -1755,6 +1772,23 @@ function preflight(intake) {
     fmt('TWILIO_ACCOUNT_SID', 'AC');
     fmt('AIRTABLE_API_KEY', 'pat');
     fmt('AIRTABLE_WORKSPACE_ID', 'wsp');
+
+    // SMS to the owner requires an A2P 10DLC Messaging Service. Without the SID the client
+    // number can't join the campaign and every post-call text fails with 30034 — so if this
+    // client has SMS consent on file, a missing SID is a hard error, not a warning. A client
+    // with no SMS consent doesn't text, so the SID stays optional for them.
+    const smsWanted = intake.smsAlerts?.consented === true && Boolean(intake.smsAlerts?.phone);
+    if (smsWanted) {
+      if (!process.env.TWILIO_MESSAGING_SERVICE_SID) {
+        errors.push(
+          'SMS alerts are consented but TWILIO_MESSAGING_SERVICE_SID is not set — the client number ' +
+          'cannot join the A2P 10DLC campaign and every post-call text fails with error 30034. ' +
+          "Twilio Console → Messaging → Services → your campaign's service → copy the MG… SID into .env.",
+        );
+      } else {
+        fmt('TWILIO_MESSAGING_SERVICE_SID', 'MG');
+      }
+    }
   }
 
   for (const w of warnings) console.warn(`  ⚠ ${w}`);
@@ -1763,6 +1797,37 @@ function preflight(intake) {
     fail(0, `Pre-flight failed (${errors.length} issue${errors.length === 1 ? '' : 's'}) — fix .env and re-run. No resources were created.`);
   }
   console.log('  ✓ Pre-flight passed');
+}
+
+/**
+ * Live A2P readiness check — only when this client actually texts (growth/enterprise with
+ * SMS consent on file). The sync preflight already hard-fails if the SID is missing; this
+ * goes one step further and asks Twilio whether the Messaging Service has an APPROVED
+ * campaign. Adding a number to a service whose campaign is still pending buys a number that
+ * silently 30034s on every send, and campaign approval takes days — far better to stop here
+ * with a checklist than to provision a client who can't text and not find out for a week.
+ */
+async function verifyA2pRegistered(intake) {
+  if (DRY_RUN || intake.plan === 'starter') return;
+  const smsWanted = intake.smsAlerts?.consented === true && Boolean(intake.smsAlerts?.phone);
+  if (!smsWanted) return;
+  const sid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  if (!sid) return; // preflight already hard-failed; guard defensively.
+
+  const client = twilio(requireEnv('TWILIO_ACCOUNT_SID'), requireEnv('TWILIO_AUTH_TOKEN'));
+  let service;
+  try {
+    service = await client.messaging.v1.services(sid).fetch();
+  } catch (err) {
+    fail(0, `Could not read Messaging Service ${sid} (${err.message}). Check TWILIO_MESSAGING_SERVICE_SID in .env. No resources were created.`);
+  }
+  if (service.usAppToPersonRegistered !== true) {
+    fail(0,
+      `Messaging Service ${sid} has no approved A2P 10DLC campaign (usAppToPersonRegistered=${service.usAppToPersonRegistered}). ` +
+      'Register the campaign and wait for carrier approval (Twilio Console → Messaging → Regulatory Compliance → A2P 10DLC) ' +
+      'before onboarding a client that texts. No resources were created.');
+  }
+  console.log(`  ✓ A2P campaign approved on Messaging Service ${sid}`);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1793,6 +1858,7 @@ async function main() {
   const intake = await loadIntake(args.schema);
   validateIntake(intake);
   preflight(intake);
+  await verifyA2pRegistered(intake);
 
   const provisioned = [];
   let sharedBaseId = null;

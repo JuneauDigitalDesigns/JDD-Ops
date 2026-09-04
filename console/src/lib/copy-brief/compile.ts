@@ -1,3 +1,17 @@
+/**
+ * The copywriter prompt compiler — relocated here verbatim from the deleted
+ * lib/brand-copywriter-prompt.ts (P3 of the intake rebuild). This move is intentionally a
+ * pure relocation with NO behavior change: `brandCopywriterSystem` and `buildCopyUserMessage`
+ * produce byte-identical output to the file they replaced (verified against the actual old
+ * module before it was deleted — see the git history of this change for the comparison).
+ *
+ * Deliberately NOT yet wired to @jdd/schema's VerticalDef (role/guardrails/forbidden) or to
+ * a CopyBrief's blocks. That integration is the Brief stage's job (P5): once an operator can
+ * edit role/guardrails/forbidden/facts/etc. as separate blocks, the assembled prompt is
+ * naturally going to read differently from this hardcoded version — at which point "matches
+ * the old wording exactly" stops being the right bar. This file is the bridge: it proves the
+ * *relocation* didn't change anything, before the *redesign* is allowed to.
+ */
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
@@ -33,6 +47,70 @@ export function brandCopywriterSystem(vertical: VerticalId): string {
   return vertical === 'health' ? HEALTH_SYSTEM : HOME_SERVICE_SYSTEM;
 }
 
+export interface SectionCounts {
+  pillars: number;
+  stats: number;
+  services: number;
+  testimonials: number;
+  faq: number;
+  heroBullets: number;
+  heroFriction: number;
+  ctaFriction: number;
+}
+
+/**
+ * The per-section instruction line buildCopyUserMessage sends the copywriter, extracted so
+ * the Brief stage's `sections` block (copy-brief/resolve.ts) can show the SAME text as a
+ * default — rather than a second hand-copied set of these strings that could silently drift
+ * from what the model is actually told. Returns null for a section with no line (there is
+ * none today; every ALL_SECTIONS member has one).
+ */
+export function sectionInstructionLine(section: Section, counts: SectionCounts): string | null {
+  switch (section) {
+    case 'brand':
+      return '- brand.tagline: short, memorable. Populate brand name/phone/email/address/license ONLY when grounded (see rules); otherwise omit them.';
+    case 'announcement':
+      return '- announcement.text: one short promotional/seasonal line (or a general welcome if nothing specific is known).';
+    case 'trust':
+      return '- trust: a short label, plus logos[] ONLY for real certifications/affiliations found in the notes or details — omit logos if none are grounded.';
+    case 'hero':
+      return `- hero: eyebrow, headline, headlineEmphasis (an EXACT substring of headline to accent, or omit), sub (one sentence), cta (action + outcome), secondaryCta, formLabel, trust (one credibility sentence), badge (short), frictionReducers (exactly ${counts.heroFriction} short bullets), heroBullets (exactly ${counts.heroBullets} of {value, label}).`;
+    case 'about':
+      return `- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}, and exactly ${counts.stats} stats {n = short value, l = label}.`;
+    case 'services':
+      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars, tag = short category}.`;
+    case 'work':
+      return '- work: eyebrow, title, sub; include projects ONLY if real projects/case studies are grounded in the notes.';
+    case 'testimonials':
+      return `- testimonials: eyebrow, title, and exactly ${counts.testimonials} items {q = quote, a = "First L.", r = role, company = optional location/company, stars = 1–5}.`;
+    case 'faq':
+      return `- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs grounded in the facts.`;
+    case 'finalCta':
+      return `- finalCta: eyebrow, headline, sub, cta, secondary (short "or call…" style line), frictionReducers (exactly ${counts.ctaFriction} short bullets).`;
+    case 'footer':
+      return '- footer.blurb: a 1–2 sentence company blurb.';
+    case 'seo':
+      return '- seo: title, description.';
+    default:
+      return null;
+  }
+}
+
+/** Build the SectionCounts a base SiteContent implies — shared by buildCopyUserMessage and
+ *  the sections block resolver so "how many of each" is computed in exactly one place. */
+export function countsFor(base: SiteContent): SectionCounts {
+  return {
+    pillars: base.about.pillars.length,
+    stats: base.about.stats.length,
+    services: base.services.items.length,
+    testimonials: base.testimonials.items.length,
+    faq: base.faq.items.length,
+    heroBullets: base.hero.heroBullets.length,
+    heroFriction: base.hero.frictionReducers.length,
+    ctaFriction: base.finalCta.frictionReducers.length,
+  };
+}
+
 export function buildCopyUserMessage(
   vertical: VerticalId,
   base: SiteContent,
@@ -56,46 +134,18 @@ export function buildCopyUserMessage(
     certifications: x?.trustBadges?.length ? x.trustBadges : undefined,
     notableClients: base.trust?.logos?.length ? base.trust.logos : undefined,
   };
-  const counts = {
-    pillars: base.about.pillars.length,
-    stats: base.about.stats.length,
-    services: base.services.items.length,
-    testimonials: base.testimonials.items.length,
-    faq: base.faq.items.length,
-    heroBullets: base.hero.heroBullets.length,
-    heroFriction: base.hero.frictionReducers.length,
-    ctaFriction: base.finalCta.frictionReducers.length,
-  };
+  const counts = countsFor(base);
   const reference = {
     hero: { eyebrow: base.hero.eyebrow, headline: base.hero.headline },
     serviceTags: base.services.items.map((s) => s.tag),
   };
 
   const lines: string[] = [];
-  if (want.has('brand'))
-    lines.push('- brand.tagline: short, memorable. Populate brand name/phone/email/address/license ONLY when grounded (see rules); otherwise omit them.');
-  if (want.has('announcement'))
-    lines.push('- announcement.text: one short promotional/seasonal line (or a general welcome if nothing specific is known).');
-  if (want.has('trust'))
-    lines.push('- trust: a short label, plus logos[] ONLY for real certifications/affiliations found in the notes or details — omit logos if none are grounded.');
-  if (want.has('hero'))
-    lines.push(`- hero: eyebrow, headline, headlineEmphasis (an EXACT substring of headline to accent, or omit), sub (one sentence), cta (action + outcome), secondaryCta, formLabel, trust (one credibility sentence), badge (short), frictionReducers (exactly ${counts.heroFriction} short bullets), heroBullets (exactly ${counts.heroBullets} of {value, label}).`);
-  if (want.has('about'))
-    lines.push(`- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}, and exactly ${counts.stats} stats {n = short value, l = label}.`);
-  if (want.has('services'))
-    lines.push(`- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars, tag = short category}.`);
-  if (want.has('work'))
-    lines.push('- work: eyebrow, title, sub; include projects ONLY if real projects/case studies are grounded in the notes.');
-  if (want.has('testimonials'))
-    lines.push(`- testimonials: eyebrow, title, and exactly ${counts.testimonials} items {q = quote, a = "First L.", r = role, company = optional location/company, stars = 1–5}.`);
-  if (want.has('faq'))
-    lines.push(`- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs grounded in the facts.`);
-  if (want.has('finalCta'))
-    lines.push(`- finalCta: eyebrow, headline, sub, cta, secondary (short "or call…" style line), frictionReducers (exactly ${counts.ctaFriction} short bullets).`);
-  if (want.has('footer'))
-    lines.push('- footer.blurb: a 1–2 sentence company blurb.');
-  if (want.has('seo'))
-    lines.push('- seo: title, description.');
+  for (const s of ALL_SECTIONS) {
+    if (!want.has(s)) continue;
+    const line = sectionInstructionLine(s, counts);
+    if (line) lines.push(line);
+  }
 
   return [
     `Industry vertical: ${label}.`,
@@ -120,4 +170,23 @@ export function buildCopyUserMessage(
     lines.join('\n'),
     `Be specific and grounded in the ${label} vertical. Return only JSON matching the schema.`,
   ].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Convenience wrapper bundling both halves of the prompt, for a future Stage 2 "review the
+ * full prompt" preview that needs { system, user } together rather than two separate calls.
+ * Not yet used by generate-copy/route.ts, which still calls the two functions above directly
+ * to keep this move a no-behavior-change relocation.
+ */
+export function compilePrompt(
+  vertical: VerticalId,
+  base: SiteContent,
+  details?: string,
+  sections: Section[] = ALL_SECTIONS,
+  websiteNotes?: string,
+): { system: string; user: string } {
+  return {
+    system: brandCopywriterSystem(vertical),
+    user: buildCopyUserMessage(vertical, base, details, sections, websiteNotes),
+  };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Gear } from '@phosphor-icons/react';
+import { Gear, RocketLaunch } from '@phosphor-icons/react';
 import JddMark from './shell/JddMark';
 
 /**
@@ -36,6 +36,15 @@ export default function ConsoleNav() {
       {/* ── NAVIGATE ──────────────────────────────────────────────────────── */}
       <JddMark />
 
+      {/* Static, not a portal target — the roster is reachable from every route, not just
+          the ones that fill #console-tools-slot below. It used to live only as a btn-xs
+          inside the briefing's own header; that made it the quietest interactive thing on
+          the page it's meant to be the main next step from, and unreachable everywhere
+          else. */}
+      <Link href="/clients" className="shrink-0 rounded-[6px] px-2 py-1 text-xs text-fg2 transition-colors hover:bg-[var(--surface-2)] hover:text-fg">
+        Clients
+      </Link>
+
       {/* The tool switcher (see <ToolSwitcher>). Empty on / and /leads, which have
           no client selected — there the mark stands alone. */}
       <div id="console-tools-slot" className="flex shrink-0 items-center" />
@@ -59,6 +68,17 @@ export default function ConsoleNav() {
 
         {/* Route-scoped utilities — Refresh on / and /leads. */}
         <div id="console-utility-slot" className="flex items-center gap-1" />
+
+        {/* /go-live is the production migration wizard — a one-time walk through taking JDD
+            live. Sits beside setup because both are one-time, account-wide checklists. */}
+        <Link
+          href="/go-live"
+          title="Go live — production migration"
+          aria-label="Go live — production migration"
+          className="flex h-7 w-7 items-center justify-center rounded-[6px] text-fg3 transition-colors hover:bg-[var(--surface-2)] hover:text-fg"
+        >
+          <RocketLaunch size={15} />
+        </Link>
 
         {/* /setup is the one-time master setup checklist. It had no link path into it
             from anywhere in the app until this gear existed. */}

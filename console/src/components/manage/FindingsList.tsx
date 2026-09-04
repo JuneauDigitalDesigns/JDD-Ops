@@ -24,7 +24,7 @@ import { relativeTime } from '@/lib/relativeTime';
  * not look like a check that passed.
  */
 
-const SEVERITY_META: Record<
+export const SEVERITY_META: Record<
   Severity,
   { label: string; Icon: typeof WarningOctagon; color: string; lede: string }
 > = {

@@ -19,7 +19,7 @@ import {
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CaretDown, CaretUp } from '@phosphor-icons/react';
 import { orderAt, renormalise } from '@/lib/kanban';
-import { LEAD_COLOR, LEAD_LABEL } from '@/lib/lead-meta';
+import { LEAD_COLOR, LEAD_LABEL, isUnseen } from '@/lib/lead-meta';
 import { LEAD_STAGES, type LeadStage, type QueuedLead } from '@/lib/leadTypes';
 import LeadCard, { LeadFace } from './LeadCard';
 
@@ -27,10 +27,12 @@ const COLLAPSIBLE: ReadonlySet<LeadStage> = new Set(['won', 'lost']);
 const LS_KEY = 'jdd:leads:collapsed';
 
 function Column({
-  stage, count, collapsed, onToggleCollapse, children,
+  stage, count, unseen = 0, collapsed, onToggleCollapse, children,
 }: {
   stage: LeadStage;
   count: number;
+  /** Arrived since the last visit. Shown so the right column is obvious without scanning cards. */
+  unseen?: number;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   children?: React.ReactNode;
@@ -60,6 +62,15 @@ function Column({
           {LEAD_LABEL[stage]}
         </span>
         <span className="meta text-fg3">{count}</span>
+        {unseen > 0 && (
+          <span
+            className="meta mt-1 shrink-0 rounded-full px-1.5"
+            title={`${unseen} new since your last visit`}
+            style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
+          >
+            {unseen}
+          </span>
+        )}
         <button
           type="button"
           onClick={onToggleCollapse}
@@ -87,7 +98,18 @@ function Column({
           style={{ background: LEAD_COLOR[stage], boxShadow: `0 0 8px 1px ${LEAD_COLOR[stage]}` }}
         />
         <span className="meta truncate">{LEAD_LABEL[stage]}</span>
-        <span className="meta ml-auto shrink-0">{count}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {unseen > 0 && (
+            <span
+              className="meta rounded-full px-1.5"
+              title={`${unseen} new since your last visit`}
+              style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
+            >
+              {unseen} new
+            </span>
+          )}
+          <span className="meta">{count}</span>
+        </span>
         {canCollapse && (
           <button
             type="button"
@@ -128,11 +150,13 @@ function buildColumns(leads: QueuedLead[]): Record<LeadStage, string[]> {
 }
 
 export default function LeadBoard({
-  leads, onOpen, onPlace,
+  leads, onOpen, onPlace, lastSeenAt = null,
 }: {
   leads: QueuedLead[];
   onOpen: (id: string) => void;
   onPlace: (id: string, next: { stage?: LeadStage; order?: number }) => void;
+  /** Epoch-ms of the previous visit, or null on a first-ever one. See isUnseen. */
+  lastSeenAt?: number | null;
 }) {
   const byId = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
   const orderMap = useMemo(
@@ -258,11 +282,16 @@ export default function LeadBoard({
         {LEAD_STAGES.map((stage) => {
           const ids = cols[stage];
           const isCollapsed = collapsed.has(stage);
+          const unseenCount = ids.reduce((n, id) => {
+            const lead = byId.get(id);
+            return lead && isUnseen(lead, lastSeenAt) ? n + 1 : n;
+          }, 0);
           return (
             <Column
               key={stage}
               stage={stage}
               count={ids.length}
+              unseen={unseenCount}
               collapsed={isCollapsed}
               onToggleCollapse={COLLAPSIBLE.has(stage) ? () => toggleCollapse(stage) : undefined}
             >
@@ -271,7 +300,14 @@ export default function LeadBoard({
                   {ids.map((id) => {
                     const lead = byId.get(id);
                     if (!lead) return null;
-                    return <LeadCard key={id} lead={lead} onOpen={() => onOpen(id)} />;
+                    return (
+                      <LeadCard
+                        key={id}
+                        lead={lead}
+                        unseen={isUnseen(lead, lastSeenAt)}
+                        onOpen={() => onOpen(id)}
+                      />
+                    );
                   })}
                   {ids.length === 0 && <p className="px-1 py-4 text-center text-2xs text-fg3">—</p>}
                 </SortableContext>

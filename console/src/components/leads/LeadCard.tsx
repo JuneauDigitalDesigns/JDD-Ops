@@ -26,7 +26,17 @@ export const SOURCE_ICON: Record<LeadSource, typeof Phone> = {
 };
 
 /** The visual card. Rendered in a column and (undecorated) inside the DragOverlay. */
-export function LeadFace({ lead, dragging }: { lead: QueuedLead; dragging?: boolean }) {
+export function LeadFace({
+  lead,
+  dragging,
+  unseen,
+}: {
+  lead: QueuedLead;
+  dragging?: boolean;
+  /** Arrived since the last visit. Marked with a dot, because a lead from a call enters at
+   *  Qualified rather than New and is otherwise findable only if you already know that. */
+  unseen?: boolean;
+}) {
   const stale = isStale(lead);
   // A record written by an older build could carry a source this one doesn't know about, and a
   // card that throws is worse than a card with the wrong glyph.
@@ -62,8 +72,17 @@ export function LeadFace({ lead, dragging }: { lead: QueuedLead; dragging?: bool
         </span>
 
         <div className="flex min-w-0 flex-col gap-0.5">
-          <h3 className="truncate font-display text-[15px] font-semibold leading-tight tracking-tightish">
-            {lead.businessName}
+          <h3 className="flex items-center gap-1.5 truncate font-display text-[15px] font-semibold leading-tight tracking-tightish">
+            {/* Additive glyph, not a border treatment: `stale` already owns the border, so a
+                lead can be both new and stale without the two fighting over one property. */}
+            {unseen && (
+              <span
+                title="New since your last visit"
+                className="h-[6px] w-[6px] shrink-0 rounded-full"
+                style={{ background: 'var(--accent)', boxShadow: '0 0 6px 1px var(--accent)' }}
+              />
+            )}
+            <span className="truncate">{lead.businessName}</span>
           </h3>
           <span className="truncate text-xs text-fg2">{lead.name}</span>
         </div>
@@ -88,7 +107,15 @@ export function LeadFace({ lead, dragging }: { lead: QueuedLead; dragging?: bool
   );
 }
 
-export default function LeadCard({ lead, onOpen }: { lead: QueuedLead; onOpen: () => void }) {
+export default function LeadCard({
+  lead,
+  onOpen,
+  unseen,
+}: {
+  lead: QueuedLead;
+  onOpen: () => void;
+  unseen?: boolean;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
   });
@@ -116,7 +143,7 @@ export default function LeadCard({ lead, onOpen }: { lead: QueuedLead; onOpen: (
       className="cursor-pointer touch-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
       aria-label={`${lead.businessName} — open lead`}
     >
-      <LeadFace lead={lead} />
+      <LeadFace lead={lead} unseen={unseen} />
     </div>
   );
 }

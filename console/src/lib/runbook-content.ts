@@ -26,7 +26,25 @@ export type Block =
   | { t: 'diagram'; kind: 'call-routing' | 'pipeline' | 'post-call'; siteSlug?: string }
   // Success criteria: what you should observe if the step worked. Previously written as a
   // trailing "You should see: …" info callout, which read as advice rather than a check.
-  | { t: 'verify'; title?: string; items: { text: string; detail?: string }[] };
+  | { t: 'verify'; title?: string; items: { text: string; detail?: string }[] }
+  // An in-app action button (go-live wizard only). Runs one of the guarded /api/go-live/*
+  // endpoints. `destructive` actions force a dry-run preview before the real run can fire;
+  // read-only ones (preflight) run straight away. BlockView renders <RunBlock>.
+  | {
+      t: 'run';
+      action:
+        | 'preflight'
+        | 'stripe-go-live'
+        | 'kv-reset'
+        | 'env-sync'
+        | 'turnstile-provision'
+        | 'stripe-webhook';
+      label: string;
+      /** Forces dry-run → confirm before a real run. */
+      destructive?: boolean;
+      /** Extra body sent to the endpoint (e.g. { scope: 'test' }). */
+      params?: Record<string, string>;
+    };
 
 /**
  * Which blocks break out of the stage's prose column.
@@ -551,7 +569,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
       },
       {
         id: 'a-twilio-a2p',
-        title: 'Register JDD for outbound SMS (A2P 10DLC / toll-free)',
+        title: 'Register JDD for outbound SMS (A2P 10DLC)',
         why: 'US carriers block SMS from unregistered numbers. Register once so client numbers can text owners; per-number attach/verify happens during each onboarding.',
         blocks: [
           {
@@ -563,8 +581,8 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
               { text: 'Sample message: “Juneau Digital Designs call alert: Callback requested. New lead Maria Alvarez, callback (930) 555-0117. Reply STOP to opt out.” Must match the Make master body and /sms-terms.' },
               { text: 'Opt-in description: consent is a separate unchecked checkbox beside a mobile-number field on the PUBLIC agreement page, juneaudigitaldesigns.com/agreement?plan=growth (no login). Tell the reviewer to open that URL and scroll to “Your details”. Consent is not a condition of purchase, and alerts only activate after Stripe payment completes.' },
               { text: 'Point the reviewer at juneaudigitaldesigns.com/sms-terms (linked in the site footer) for program name, message types, frequency, rates, and STOP/HELP.' },
-              { text: 'Sender Pool holds the client LOCAL numbers; onboard.js adds each one automatically when TWILIO_MESSAGING_SERVICE_SID is set.' },
-              { text: 'Toll-free numbers cannot join the pool — they need per-number Toll-Free Verification instead (onboard.js warns loudly when it falls back to one).' },
+              { text: 'Sender Pool holds the client LOCAL numbers; onboard.js adds each one automatically AND reads the pool back to confirm it landed when TWILIO_MESSAGING_SERVICE_SID is set. If a client has SMS consent, onboarding now HARD-FAILS (no resources created) when the SID is unset or the campaign is not yet approved — it no longer provisions a silently-textless client.' },
+              { text: 'We never buy toll-free numbers — provisioning is local-only (Central FL by default via TWILIO_DEFAULT_AREA_CODES / TWILIO_DEFAULT_REGION, searched business-address ZIP → brand area code → defaults → region), so every provisioned number is A2P-eligible.' },
             ],
           },
           { t: 'callout', tone: 'warn', body: 'Carrier approval takes days — do this early. Until a number’s registration is approved, owner SMS silently fails with error 30034 (call logging still works).' },

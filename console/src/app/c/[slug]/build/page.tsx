@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import type { SiteContent } from '@/data/site';
 import { loadIntake, withPlan } from '@/lib/intake';
 import { clientDir } from '@/lib/paths';
+import { readDraft } from '@/lib/draft';
 import { readStudioComposition } from '@/lib/studio-readback';
 import BuildWizard from './BuildWizard';
 
@@ -27,6 +28,7 @@ export default async function BuildPage({ params }: { params: { slug: string } }
   // is what lets the studio open a live client showing its real sections instead of a blank
   // page — the composition used to exist only in whichever browser last built it.
   const composition = readStudioComposition(params.slug);
+  const draftBundle = readDraft(params.slug);
 
-  return <BuildWizard slug={params.slug} seed={seed} composition={composition} />;
+  return <BuildWizard slug={params.slug} seed={seed} composition={composition} draftBundle={draftBundle} />;
 }

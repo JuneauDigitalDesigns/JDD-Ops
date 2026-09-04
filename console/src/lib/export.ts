@@ -516,9 +516,15 @@ export function copySiteData(repoRoot: string, slug: string): void {
  * interface text (SITE_TYPES_SOURCE from @jdd/schema) ahead of the serialized CONTENT so the
  * generated repo defines its own local type and needs no @jdd/schema dependency on its own
  * Vercel deploy. JSON.stringify makes this data-only (no code injection from edits).
+ *
+ * Strips `_meta.copyBrief` before it ever reaches a client repo: the Brief stage's saved
+ * inputs (business-fact overrides, custom fields, prompt edits) are operator-only working
+ * data, not content the client's site should ship with, and the repo is public.
  */
 export function writeSiteContent(repoRoot: string, slug: string, content: SiteContent): void {
-  const output = `${SITE_TYPES_SOURCE}\nexport const CONTENT: SiteContent = ${JSON.stringify(content, null, 2)};\n`;
+  const { copyBrief: _copyBrief, ...restMeta } = content._meta;
+  const stripped: SiteContent = { ...content, _meta: restMeta };
+  const output = `${SITE_TYPES_SOURCE}\nexport const CONTENT: SiteContent = ${JSON.stringify(stripped, null, 2)};\n`;
   const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
   writeFileSync(dest, output, 'utf8');
 }

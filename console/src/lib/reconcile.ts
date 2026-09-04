@@ -127,7 +127,8 @@ export async function reconcileClient(
   const vercel = vercelConfigured ? await loadVercelSync().catch(() => null) : null;
   const retellKey = loadRetellApiKey();
   const makeKey = loadMakeApiKey();
-  const { twilioAccountSid, twilioAuthToken, airtableApiKey } = loadTeardownCredentials();
+  const { twilioAccountSid, twilioAuthToken, twilioMessagingServiceSid, airtableApiKey } =
+    loadTeardownCredentials();
 
   const siteCount = ctx.sites.length;
   const sharedBase = ctx.isEnterprise;
@@ -204,6 +205,7 @@ export async function reconcileClient(
       makeKey,
       twilioAccountSid,
       twilioAuthToken,
+      twilioMessagingServiceSid,
       airtableApiKey,
       quiet: opts.quiet ?? false,
     });
@@ -234,6 +236,7 @@ interface SiteSweepArgs {
   makeKey: string | null;
   twilioAccountSid: string | null;
   twilioAuthToken: string | null;
+  twilioMessagingServiceSid: string | null;
   airtableApiKey: string | null;
   quiet: boolean;
 }
@@ -543,6 +546,7 @@ async function reconcileVoice(
       authToken: a.twilioAuthToken,
       phoneNumber: number,
       liveHost,
+      messagingServiceSid: a.twilioMessagingServiceSid,
     });
 
     if (!tw.checked) {
@@ -585,10 +589,40 @@ async function reconcileVoice(
         );
       }
 
+      // Proactive A2P check: the number exists but is not in the campaign's sender pool, so
+      // its FIRST post-call text will 30034. inA2pPool is a tri-state — only act on an
+      // explicit false, and stand down if it is already failing observably (below) so one
+      // cause doesn't paint two red rows.
+      const already30034 = !!(
+        tw.recentSendErrors &&
+        tw.recentSendErrors.codes.includes(30034) &&
+        tw.recentSendErrors.latestErrored
+      );
+      if (tw.inA2pPool === false && !already30034) {
+        findings.push(
+          f({
+            id: 'twilio.notInA2pPool',
+            severity: 'red',
+            area: 'voice',
+            siteSlug,
+            title: 'Number not in the A2P sender pool',
+            detail:
+              'This number is not in the Messaging Service that holds the approved A2P 10DLC campaign, so ' +
+              'the first post-call text will fail with 30034 and every one after it — silently, since the ' +
+              'scenario reports success. Add it in Twilio Console → Messaging → Services → your campaign’s ' +
+              'service → Sender Pool.',
+            actual: number,
+          }),
+        );
+      }
+
       // Billed-but-undelivered SMS. The scenario reports success either way, so nothing
-      // else in the stack can see this.
+      // else in the stack can see this. Only a CURRENT failure is a red row: Twilio's log
+      // isn't scoped to "since the fix", so 30034s from before a number joined the A2P pool
+      // sit in the window and would otherwise report a resolved problem forever. The most
+      // recent send is the live-health signal.
       const errs = tw.recentSendErrors;
-      if (errs && errs.failed > 0) {
+      if (errs && errs.failed > 0 && errs.latestErrored) {
         const a2p = errs.codes.includes(30034);
         findings.push(
           f({
@@ -609,6 +643,30 @@ async function reconcileVoice(
         );
       }
     }
+  }
+
+  // ── Ring window vs voicemail race ─────────────────────────────────────────
+  // Above ~20s the owner's carrier voicemail can answer the forward before Twilio times out;
+  // Twilio scores that as answered (completed), so the Retell fallback never runs and the
+  // caller lands in voicemail. Only flag an explicit high value — an unset var falls back to
+  // the safe 15s default in voice.route.ts, which isn't a problem.
+  const ring = Number.parseInt(site.env.CLIENT_FORWARD_RING_SECONDS ?? '', 10);
+  if (Number.isFinite(ring) && ring > 20) {
+    findings.push(
+      f({
+        id: 'twilio.ringWindow',
+        severity: 'amber',
+        area: 'voice',
+        siteSlug,
+        title: `Ring window ${ring}s can let voicemail beat Retell`,
+        detail:
+          'On no-answer the owner’s carrier voicemail can pick up before this timeout, which Twilio treats ' +
+          'as answered — so the Retell fallback never runs and the caller sits in voicemail. Set ' +
+          'CLIENT_FORWARD_RING_SECONDS to ~15 (below typical voicemail pickup) and redeploy.',
+        expected: '≤ 20',
+        actual: String(ring),
+      }),
+    );
   }
 
   // ── Retell ────────────────────────────────────────────────────────────────

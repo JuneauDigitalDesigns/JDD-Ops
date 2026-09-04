@@ -99,6 +99,23 @@ export function loadMakeApiKey(): string | null {
 }
 
 /**
+ * The Vercel Blob read/write token, for the /manage → Featured publish flow to upload a
+ * client's screenshot straight to the agency site's blob store. Same contract as the rest
+ * of this module — the value goes to `@vercel/blob` and nowhere else, never a response body.
+ *
+ * This is the agency Vercel project's token: uploads must land in the store the deployed
+ * homepage serves from. The console is local-only, so it holds it in jdd-ops/.env alongside
+ * VERCEL_TOKEN rather than getting it from a Vercel runtime env.
+ */
+export function loadBlobToken(): string | null {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+    if (ops.BLOB_READ_WRITE_TOKEN) process.env.BLOB_READ_WRITE_TOKEN = ops.BLOB_READ_WRITE_TOKEN;
+  }
+  return process.env.BLOB_READ_WRITE_TOKEN ?? null;
+}
+
+/**
  * The Stripe key, for looking up a client's subscription from /manage → Portal when the
  * portal record lost its `stripeSubscriptionId`.
  *
@@ -172,6 +189,7 @@ export function loadPortalOpsConfig(): { baseUrl: string | null; secret: string 
 export function loadTeardownCredentials(): {
   twilioAccountSid: string | null;
   twilioAuthToken: string | null;
+  twilioMessagingServiceSid: string | null;
   airtableApiKey: string | null;
   clerkSecretKey: string | null;
 } {
@@ -180,6 +198,7 @@ export function loadTeardownCredentials(): {
   return {
     twilioAccountSid: pick('TWILIO_ACCOUNT_SID'),
     twilioAuthToken: pick('TWILIO_AUTH_TOKEN'),
+    twilioMessagingServiceSid: pick('TWILIO_MESSAGING_SERVICE_SID'),
     airtableApiKey: pick('AIRTABLE_API_KEY'),
     clerkSecretKey: pick('CLERK_SECRET_KEY'),
   };

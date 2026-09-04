@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowsClockwise, CircleNotch, Plus } from '@phosphor-icons/react';
 import type { DemoCall, QueuedLead } from '@/lib/leadTypes';
+import { LEADS_LAST_SEEN_KEY } from '@/lib/lead-meta';
 import PageHeader from '@/components/shell/PageHeader';
 import RefreshButton from '@/components/shell/RefreshButton';
 import WarnBanner from '@/components/shell/WarnBanner';
@@ -42,12 +43,45 @@ export default function LeadsView() {
    */
   const [narrow, setNarrow] = useState(false);
   const hasData = useRef(false);
+  /**
+   * When the operator last looked at this board, held for the whole session.
+   *
+   * Read once and then frozen: refreshing it while the view is open would clear a card's
+   * "new" dot the instant it rendered, which is the one moment it needs to be visible.
+   */
+  const [lastSeenAt, setLastSeenAt] = useState<number | null>(null);
+  const lastSeenRead = useRef(false);
 
   useEffect(() => {
     const check = () => setNarrow(window.innerWidth < 900);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Read the stamp on mount, write a fresh one on the way out.
+  //
+  // The ref guard is what makes this survive StrictMode: dev mounts, unmounts and remounts,
+  // and the simulated unmount fires the cleanup below. Without the guard the remount would
+  // re-read the stamp it had just written and nothing would ever show as new in dev.
+  useEffect(() => {
+    if (!lastSeenRead.current) {
+      lastSeenRead.current = true;
+      try {
+        const raw = window.localStorage.getItem(LEADS_LAST_SEEN_KEY);
+        const parsed = raw ? Number(raw) : NaN;
+        setLastSeenAt(Number.isFinite(parsed) ? parsed : null);
+      } catch {
+        setLastSeenAt(null); // storage unavailable; mark nothing rather than everything
+      }
+    }
+    return () => {
+      try {
+        window.localStorage.setItem(LEADS_LAST_SEEN_KEY, String(Date.now()));
+      } catch {
+        /* storage full or unavailable */
+      }
+    };
   }, []);
 
   const load = useCallback(async () => {
@@ -268,7 +302,7 @@ export default function LeadsView() {
                       The funnel needs five columns side by side. Widen the window, or read the
                       Calls tab — it works at this size.
                     </p>
-                    <Link href="/" className="btn btn-sm mt-3">
+                    <Link href="/clients" className="btn btn-sm mt-3">
                       <ArrowLeft size={13} /> All clients
                     </Link>
                   </div>
@@ -283,7 +317,7 @@ export default function LeadsView() {
                   {newLeadButton}
                 </div>
               ) : (
-                <LeadBoard leads={leads} onOpen={setOpenId} onPlace={patch} />
+                <LeadBoard leads={leads} onOpen={setOpenId} onPlace={patch} lastSeenAt={lastSeenAt} />
               )
             ) : (
               <CallsTab calls={calls} onOpenLead={setOpenId} />

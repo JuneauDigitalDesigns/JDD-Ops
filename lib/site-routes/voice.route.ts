@@ -14,8 +14,14 @@ function toE164(raw: string): string | null {
 
 // Twilio inbound voice webhook.
 // Dials the client's real phone first; if they don't answer within
-// CLIENT_FORWARD_RING_SECONDS (default 25), Twilio POSTs to /api/voice/no-answer
+// CLIENT_FORWARD_RING_SECONDS (default 15), Twilio POSTs to /api/voice/no-answer
 // which connects the Retell AI.
+//
+// The 15s default is deliberately BELOW typical mobile voicemail pickup (~20-25s). If the
+// window is longer, the owner's carrier voicemail answers the forward leg before Twilio times
+// out; Twilio scores that as answered (DialCallStatus=completed), the no-answer branch never
+// runs, and the caller lands in voicemail instead of the Retell agent. Owners whose voicemail
+// answers earlier than ~15s can still race it — that's the one case this can't cover.
 export async function POST(req: NextRequest) {
   const forwardPhone = toE164(process.env.CLIENT_FORWARD_PHONE ?? '');
   if (!forwardPhone) {
@@ -25,9 +31,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Ring window is env-tunable per client; fall back to 25s if unset/invalid.
+  // Ring window is env-tunable per client; fall back to 15s if unset/invalid (see header
+  // note: longer windows let carrier voicemail beat the Retell handoff).
   const ringSecondsRaw = parseInt(process.env.CLIENT_FORWARD_RING_SECONDS ?? '', 10);
-  const ringSeconds = Number.isFinite(ringSecondsRaw) && ringSecondsRaw > 0 ? ringSecondsRaw : 25;
+  const ringSeconds = Number.isFinite(ringSecondsRaw) && ringSecondsRaw > 0 ? ringSecondsRaw : 15;
 
   // Originate the forward leg from the JDD-owned Twilio number, not the inbound
   // caller's number. Passing an arbitrary customer caller ID through gets rejected

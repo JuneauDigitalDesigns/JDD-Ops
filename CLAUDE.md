@@ -66,13 +66,32 @@ JDD owns all numbers via the master Twilio account (`TWILIO_ACCOUNT_SID` /
 `TWILIO_AUTH_TOKEN`). Clients have no Twilio access. Number costs ~$2/mo,
 bundled into the client fee.
 
+**Numbers are LOCAL only — never toll-free.** A toll-free number can't join the
+A2P 10DLC Messaging Service, so its texts fail with 30034 until a separate
+Toll-Free Verification clears. `provisionTwilioNumber` searches geography-first
+(business-address ZIP → brand-phone area code → `TWILIO_DEFAULT_AREA_CODES`,
+default `407,321,689` → `TWILIO_DEFAULT_REGION`, default `FL`) and hard-fails if
+no local number is available rather than buying toll-free. Expanding to new
+regions is an env edit.
+
+**A2P SMS:** the sending number must live in the `TWILIO_MESSAGING_SERVICE_SID`
+sender pool (which holds the approved campaign) or every post-call text 30034s.
+onboard.js adds each local number to the pool and reads it back to confirm; for
+a client with SMS consent, the pre-flight hard-fails when the SID is unset or the
+campaign isn't approved, so we never provision a silently-textless client. The
+reconcile engine also flags any live number that isn't in the pool.
+
 **Inbound call routing (two-hop):**
 1. Caller dials the Twilio number → Twilio POSTs to `/api/voice` on the client site
 2. `/api/voice` normalizes `CLIENT_FORWARD_PHONE` (brand's real phone) to E.164 and
-   dials it with a timeout of `CLIENT_FORWARD_RING_SECONDS` (default 25s). The
+   dials it with a timeout of `CLIENT_FORWARD_RING_SECONDS` (default 15s). The
    forward leg sets `callerId=TWILIO_NUMBER` so it originates from the JDD-owned
    number (arbitrary customer caller IDs get rejected by carriers/STIR-SHAKEN —
-   Twilio 13224)
+   Twilio 13224). **Keep this below ~20s:** if the forward rings long enough for the
+   owner's carrier voicemail to answer, Twilio scores that as answered
+   (`DialCallStatus=completed`), the no-answer branch never fires, and the caller
+   lands in voicemail instead of the Retell agent. Owners whose voicemail picks up
+   earlier than ~15s can still race it — the one case a short window can't cover.
 3. If answered: normal call, done
 4. If no-answer / busy / failed: `/api/voice/no-answer` calls Retell's
    `POST https://api.retellai.com/v2/register-phone-call` API (Bearer

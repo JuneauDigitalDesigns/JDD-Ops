@@ -8,6 +8,7 @@ import DeploymentsSection from '@/components/manage/DeploymentsSection';
 import DomainSection from '@/components/manage/DomainSection';
 import VoiceAgentSection from '@/components/manage/VoiceAgentSection';
 import PortalSection from '@/components/manage/PortalSection';
+import FeaturedSection from '@/components/manage/FeaturedSection';
 import DangerSection from '@/components/manage/DangerSection';
 import SectionPlaceholder from '@/components/manage/SectionPlaceholder';
 
@@ -74,6 +75,8 @@ export default async function ManageSectionPage({
       return <VoiceAgentSection />;
     case 'portal':
       return <PortalSection />;
+    case 'featured':
+      return <FeaturedSection />;
     case 'danger':
       return <DangerSection />;
   }

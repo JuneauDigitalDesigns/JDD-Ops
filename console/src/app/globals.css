@@ -33,6 +33,7 @@
   --accent-glow: rgba(210, 84, 47, 0.28);
 
   --fg: #14120c;
+  --fg-1: #2b2820;               /* softened body color — was referenced by 7 files, never defined */
   --fg-2: #43402c;
   --fg-3: #7a715a;
   --rule: rgba(20, 18, 12, 0.16);
@@ -343,6 +344,20 @@
   .btn-danger:hover { background: var(--danger); color: var(--bg); border-color: var(--danger); }
   .btn-sm { min-height: var(--control-h-sm); padding: 0 11px; font-size: 13px; border-radius: 7px; }
   .btn-xs { min-height: 26px; padding: 0 9px; font-size: 12.5px; border-radius: 6px; gap: 6px; }
+  /* Outlined in the accent teal rather than filled — a "louder secondary" for the one
+     action on a screen that's always the next thing to do, without claiming the primary
+     slot. Full .btn height; distinct from .btn-primary's coral fill. */
+  .btn-accent {
+    border-color: var(--accent);
+    color: var(--accent-text, var(--accent));
+    font-weight: 500;
+  }
+  .btn-accent:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent-text, var(--accent));
+    transform: translateY(-1px);
+  }
 
   /* ── Text input ──────────────────────────────────────────────────────────
      The class form of INPUT_CLS in components/fields. Both must stay in sync;
@@ -400,6 +415,35 @@
     border: 1px solid var(--rule);
     color: var(--fg-2);
     word-break: break-all;
+  }
+
+  /* ── Severity proportion bar ────────────────────────────────────────────
+     The Briefing's "Needs attention" summary — a stacked bar showing the
+     red/amber/unknown split at a glance, in place of an inert counts line.
+     Segments are sized by the caller via inline flex-grow. */
+  .sev-bar {
+    display: flex;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--rule-weak);
+  }
+  .sev-bar > span { display: block; height: 100%; }
+  .sev-bar .s-red { background: var(--danger); }
+  .sev-bar .s-amber { background: var(--warn); }
+  .sev-bar .s-unknown { background: var(--fg-3); }
+
+  /* ── Area tag ────────────────────────────────────────────────────────────
+     Labels a finding row with its `area` (site/voice/leads/billing/portal/
+     account) — DM Mono at the 11.5px floor, since it sits beside .meta text. */
+  .area-tag {
+    font-family: var(--font-dm-mono), monospace;
+    font-size: 11.5px;
+    color: var(--fg-3);
+    border: 1px solid var(--rule-weak);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
   }
 
   /* ── Step connector rail ────────────────────────────────────────────── */

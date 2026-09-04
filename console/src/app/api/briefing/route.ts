@@ -61,6 +61,9 @@ export interface BriefingPayload {
   clientCount: number;
   /** Clients with no cached sweep — their state is unknown, not healthy. */
   staleSlugs: string[];
+  /** Same population as `staleSlugs`, with brand names — for a briefing UI that groups
+   *  never-swept clients alongside real findings rather than listing bare slugs. */
+  stale: { slug: string; brandName: string }[];
   /**
    * Client records in KV whose folder isn't on this machine — provisioned elsewhere, or
    * torn down and left behind. They used to be silently folded into `stages`, which is why
@@ -200,12 +203,14 @@ export async function GET() {
     overageBilledCents: 0,
   };
   const staleSlugs: string[] = [];
+  const stale: BriefingPayload['stale'] = [];
   let newestCheck: number | null = null;
 
   for (const ctx of clients) {
     const result = results[ctx.slug];
     if (!result) {
       staleSlugs.push(ctx.slug);
+      stale.push({ slug: ctx.slug, brandName: ctx.brandName });
       continue;
     }
     newestCheck = Math.max(newestCheck ?? 0, result.checkedAt);
@@ -332,6 +337,7 @@ export async function GET() {
     stages,
     clientCount: clients.length,
     staleSlugs,
+    stale,
     recordsWithoutFolder,
     foldersWithoutRecord,
     checkedAt: newestCheck,

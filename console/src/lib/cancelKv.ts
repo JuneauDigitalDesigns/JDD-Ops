@@ -99,6 +99,15 @@ export interface FeaturedRequestRecord {
   quote?: string;
   showName: boolean;
   showLink: boolean;
+  /**
+   * The candidate showcase image set at opt-in — the client's own upload, or an
+   * auto-captured screenshot of `siteUrl`. Absent when auto-capture failed or hasn't run.
+   * Immutable on the portal side after the opt-in that set it (see the agency repo's mirror
+   * of this interface); the publish route can still recapture or accept an operator upload.
+   */
+  image?: string;
+  /** How the client chose to source `image` — absent on records predating this field. */
+  imageMode?: 'upload' | 'auto';
 }
 
 export const getFeaturedRequestRecord = cache(
@@ -128,23 +137,45 @@ export async function listFeaturedRequestRecords(): Promise<FeaturedRequestRecor
 const FEATURED_PUB_INDEX = 'jdd:featured:published';
 const FEATURED_PUB_KEY = (slug: string) => `jdd:featured:published:${slug}`;
 
+/**
+ * What the homepage actually renders. Consent is baked in here rather than left to the
+ * homepage to honor: `businessName` and `url` are present only for a credited listing — an
+ * anonymous one has neither, by construction, so there is nothing for the render to leak.
+ * `trade` is gone; the approved card design dropped the industry eyebrow entirely.
+ *
+ * Mirrors app/lib/cancel-kv.ts's `PublishedFeaturedSite` in the agency site repo. Keep the
+ * two in sync — they read and write the same KV keys.
+ */
 export interface PublishedFeaturedSite {
   slug: string;
-  businessName: string;
-  trade: string;
-  url: string;
-  image: string;
+  image: string; // Vercel Blob URL (public.blob.vercel-storage.com) — a runtime CDN asset, not a /public file
+  businessName?: string; // present iff credited
+  url?: string; // present iff credited — name and link move together
+  quote?: string;
 }
 
-/** Publish a site to the homepage. Xander calls this after capturing the screenshot. */
-export async function publishFeaturedSite(site: PublishedFeaturedSite): Promise<void> {
+/**
+ * Publish a site to the homepage. `optedInAt` is the sort score — the same value the
+ * agency site's `getPublishedFeaturedSites()` reads back `rev` (newest first) — so a
+ * republish (e.g. a new screenshot) doesn't reshuffle the row by bumping it to "now".
+ */
+export async function publishFeaturedSite(
+  site: PublishedFeaturedSite,
+  optedInAt: number,
+): Promise<void> {
   const redis = getRedis();
-  const now = Date.now();
   await Promise.all([
     redis.set(FEATURED_PUB_KEY(site.slug), site),
-    redis.zadd(FEATURED_PUB_INDEX, { score: now, member: site.slug }),
+    redis.zadd(FEATURED_PUB_INDEX, { score: optedInAt, member: site.slug }),
   ]);
 }
+
+/** Read back the current published record, so the publish UI can show whether — and how —
+ *  a client is already live before the operator republishes. */
+export const getPublishedFeaturedSite = cache(
+  async (slug: string): Promise<PublishedFeaturedSite | null> =>
+    getRedis().get<PublishedFeaturedSite>(FEATURED_PUB_KEY(slug)),
+);
 
 /** Un-publish (called by the teardown flow or after the client opts out and is live). */
 export async function unpublishFeaturedSite(slug: string): Promise<void> {

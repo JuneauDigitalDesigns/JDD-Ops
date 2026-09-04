@@ -3,6 +3,7 @@ import { CaretRight, Terminal, Warning, Info, ArrowSquareOut, Crosshair, ArrowBe
 import type { Block } from '@/lib/runbook-content';
 import { expectedPhases, mergeRun, restingPhases } from '@/lib/run-plan';
 import CopyButton from './CopyButton';
+import RunBlock from './RunBlock';
 import { useRunbookCtx } from './RunbookContext';
 import CallRoutingFlow from './flow/CallRoutingFlow';
 import PipelineFlow from './flow/PipelineFlow';
@@ -228,6 +229,16 @@ export default function BlockView({ block }: { block: Block }) {
             {block.json}
           </pre>
         </div>
+      );
+
+    case 'run':
+      return (
+        <RunBlock
+          action={block.action}
+          label={block.label}
+          destructive={block.destructive}
+          params={block.params}
+        />
       );
 
     case 'link':

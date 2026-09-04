@@ -183,6 +183,16 @@ export const PREVIEW_PLACEHOLDERS: Record<VerticalId, PreviewImageSet> = {
   },
 };
 
+/**
+ * The curated placeholder set for a vertical id, falling back to HVAC when the id is
+ * unknown to this client bundle (a custom vertical, before that data is threaded through
+ * as a prop — see lib/verticals-registry.ts for the server-only full registry). Named so
+ * every lookup goes through one guarded place instead of repeating the ?? fallback.
+ */
+export function placeholdersFor(vertical: VerticalId): PreviewImageSet {
+  return PREVIEW_PLACEHOLDERS[vertical] ?? PREVIEW_PLACEHOLDERS.hvac;
+}
+
 /** A slot needs a placeholder if it's empty or still holds a preset picsum seed. */
 function needsPlaceholder(v: unknown): boolean {
   if (typeof v === 'string' && v.includes('picsum.photos')) return true;
@@ -233,7 +243,7 @@ export function fillImagePlaceholders(
   vertical: VerticalId,
   opts: { includeWork?: boolean } = {},
 ): PlaceholderFill {
-  const set = PREVIEW_PLACEHOLDERS[vertical] ?? PREVIEW_PLACEHOLDERS.hvac;
+  const set = placeholdersFor(vertical);
   const c: SiteContent =
     typeof structuredClone === 'function'
       ? structuredClone(effective)

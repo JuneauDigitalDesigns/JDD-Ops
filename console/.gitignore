@@ -6,3 +6,6 @@ node_modules/
 .env*.local
 .state/
 .uploads/
+
+# Throwaway design mockups — not shipped
+.design/
