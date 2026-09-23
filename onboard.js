@@ -34,6 +34,7 @@ import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
 import {
   syncEnvToVercel,
+  syncVercelFirewall,
   sanitizeProjectName,
   vercelAppHost,
   getVercelProjectId,
@@ -1282,6 +1283,7 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
     }
     dryLog(`would lookup/create Vercel project "${projectName}" linked to GitHub repo ${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug}`);
     dryLog(`would push env vars from ${clientDir}/.env.local + NEXT_PUBLIC_BRAND_NAME="${content.brand.name}"`);
+    dryLog(`would sync Vercel Firewall rules (global 200/60s per-IP → challenge; AI/search-bot 100/60s per-IP → deny)`);
     return { dryRun: true };
   }
   if (!process.env.VERCEL_TOKEN) {
@@ -1297,6 +1299,17 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
         LEAD_DELIVERY_MODE: plan === 'starter' ? 'email' : 'callback',
       },
     });
+
+    // Apply the standard anti-scraping WAF rate limits. Best-effort: a firewall failure
+    // (plan, permission, transient) must never fail onboarding — the per-repo robots.ts +
+    // middleware.ts already protect the site regardless.
+    const fw = await syncVercelFirewall(siteSlug);
+    if (fw.ok) {
+      console.log(`  ✓ Firewall rules synced: ${fw.applied.join('; ')}`);
+    } else {
+      console.warn(`  ⚠ Firewall rules not applied: ${fw.reason}. Retry later with the console or re-run onboard.`);
+    }
+
     return result;
   } catch (err) {
     console.error(`  ✗ Vercel sync failed: ${err.message}`);
