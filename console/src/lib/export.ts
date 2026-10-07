@@ -44,14 +44,18 @@ export const CATALOG: Record<string, readonly string[]> = {
   nav:          ['NavMinimal', 'NavEmergencyBar'],
   // v2.2: the lightweight header that opens a non-home page. Reads its copy from
   // SiteContent.subpages[route].header, not a global CONTENT import.
-  pageHeader:   ['PageHeaderSimple'],
+  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal'],
   hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap'],
   trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea'],
-  about:        ['AboutFeature', 'AboutStory'],
+  // New section category (decision 18). Reads about.pillars; no new schema field.
+  differentiators: ['DifferentiatorsIndex', 'DifferentiatorsPanels', 'DifferentiatorsRail'],
+  about:        ['AboutFeature', 'AboutStory', 'AboutSticky'],
   services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight'],
   // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.
   work:         ['RecentJobsGrid', 'BeforeAfter', 'WorkSpotlight', 'WorkMasonry'],
-  faq:          ['FaqAccordion', 'FaqStickyAside'],
+  // New section category (decision 18). Reads about.stats; StatsBand is the one count-up.
+  stats:        ['StatsBand', 'StatsLedger'],
+  faq:          ['FaqAccordion', 'FaqStickyAside', 'FaqIndex'],
   testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsMarquee'],
   finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit'],
   contact:      ['ContactSplit', 'ContactCardOverlap', 'ContactInlineStrip'],
@@ -61,7 +65,7 @@ export const CATALOG: Record<string, readonly string[]> = {
 
 // Categories that map to a JSX body slot in page.tsx (everything except seo, which is
 // wired as a generateMetadata re-export instead of a rendered element).
-const BODY_SLOTS = ['nav', 'pageHeader', 'hero', 'trust', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'contact', 'footer'];
+const BODY_SLOTS = ['nav', 'pageHeader', 'hero', 'trust', 'differentiators', 'about', 'services', 'work', 'stats', 'testimonials', 'faq', 'finalCta', 'contact', 'footer'];
 
 export type Entry = { categoryId: string; name: string; label?: string; skin?: string };
 

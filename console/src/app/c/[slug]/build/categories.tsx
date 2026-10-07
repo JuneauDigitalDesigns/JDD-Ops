@@ -24,6 +24,16 @@ import ServicesSpotlight, { meta as servicesSpotlightMeta } from '@/components/c
 import WorkSpotlight, { meta as workSpotlightMeta } from '@/components/catalog/work/WorkSpotlight';
 import WorkMasonry, { meta as workMasonryMeta } from '@/components/catalog/work/WorkMasonry';
 import TestimonialsMarquee, { meta as testimonialsMarqueeMeta } from '@/components/catalog/testimonials/TestimonialsMarquee';
+import DifferentiatorsIndex, { meta as differentiatorsIndexMeta } from '@/components/catalog/differentiators/DifferentiatorsIndex';
+import DifferentiatorsPanels, { meta as differentiatorsPanelsMeta } from '@/components/catalog/differentiators/DifferentiatorsPanels';
+import DifferentiatorsRail, { meta as differentiatorsRailMeta } from '@/components/catalog/differentiators/DifferentiatorsRail';
+import StatsBand, { meta as statsBandMeta } from '@/components/catalog/stats/StatsBand';
+import StatsLedger, { meta as statsLedgerMeta } from '@/components/catalog/stats/StatsLedger';
+import PageHeaderEditorial, { meta as pageHeaderEditorialMeta } from '@/components/catalog/pageHeader/PageHeaderEditorial';
+import PageHeaderOverlap, { meta as pageHeaderOverlapMeta } from '@/components/catalog/pageHeader/PageHeaderOverlap';
+import PageHeaderMinimal, { meta as pageHeaderMinimalMeta } from '@/components/catalog/pageHeader/PageHeaderMinimal';
+import AboutSticky, { meta as aboutStickyMeta } from '@/components/catalog/about/AboutSticky';
+import FaqIndex, { meta as faqIndexMeta } from '@/components/catalog/faq/FaqIndex';
 import ContactSplit, { meta as contactSplitMeta } from '@/components/catalog/contact/ContactSplit';
 import ContactCardOverlap, { meta as contactCardOverlapMeta } from '@/components/catalog/contact/ContactCardOverlap';
 import ContactInlineStrip, { meta as contactInlineStripMeta } from '@/components/catalog/contact/ContactInlineStrip';
@@ -54,9 +64,9 @@ export type VariantEntry = {
 };
 
 export type CategoryEntry = {
-  id: 'nav' | 'pageHeader' | 'hero' | 'trust' | 'about' | 'services' | 'work' | 'testimonials' | 'faq' | 'finalCta' | 'contact' | 'footer' | 'seo';
+  id: 'nav' | 'pageHeader' | 'hero' | 'trust' | 'differentiators' | 'about' | 'services' | 'work' | 'stats' | 'testimonials' | 'faq' | 'finalCta' | 'contact' | 'footer' | 'seo';
   label: string;
-  iconName: 'Compass' | 'Sun' | 'SealCheck' | 'Users' | 'ListChecks' | 'Briefcase' | 'Star' | 'Question' | 'Megaphone' | 'Phone' | 'Article' | 'Code';
+  iconName: 'Compass' | 'Sun' | 'SealCheck' | 'Users' | 'ListChecks' | 'Briefcase' | 'Star' | 'Question' | 'Megaphone' | 'Phone' | 'Article' | 'Code' | 'Lightning' | 'ChartBar';
   variants: VariantEntry[];
 };
 
@@ -105,6 +115,9 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
             />
           ),
         },
+        { name: 'PageHeaderEditorial', id: pageHeaderEditorialMeta.id, label: pageHeaderEditorialMeta.label, skins: skinsFor('PageHeaderEditorial'), render: () => <PageHeaderEditorial data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
+        { name: 'PageHeaderOverlap',  id: pageHeaderOverlapMeta.id,  label: pageHeaderOverlapMeta.label,  skins: skinsFor('PageHeaderOverlap'),  render: () => <PageHeaderOverlap data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
+        { name: 'PageHeaderMinimal',  id: pageHeaderMinimalMeta.id,  label: pageHeaderMinimalMeta.label,  skins: skinsFor('PageHeaderMinimal'),  render: () => <PageHeaderMinimal data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
       ],
     },
     {
@@ -128,12 +141,23 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       ],
     },
     {
+      id: 'differentiators',
+      label: 'Differentiators',
+      iconName: 'Lightning',
+      variants: [
+        { name: 'DifferentiatorsIndex',  id: differentiatorsIndexMeta.id,  label: differentiatorsIndexMeta.label,  skins: skinsFor('DifferentiatorsIndex'),  render: (skin) => <DifferentiatorsIndex content={effective} skin={skin} /> },
+        { name: 'DifferentiatorsPanels', id: differentiatorsPanelsMeta.id, label: differentiatorsPanelsMeta.label, skins: skinsFor('DifferentiatorsPanels'), render: (skin) => <DifferentiatorsPanels content={effective} skin={skin} /> },
+        { name: 'DifferentiatorsRail',   id: differentiatorsRailMeta.id,   label: differentiatorsRailMeta.label,   skins: skinsFor('DifferentiatorsRail'),   render: (skin) => <DifferentiatorsRail content={effective} skin={skin} /> },
+      ],
+    },
+    {
       id: 'about',
       label: 'About',
       iconName: 'Users',
       variants: [
         { name: 'AboutFeature',  id: aboutFeatureMeta.id,  label: aboutFeatureMeta.label,  skins: skinsFor('AboutFeature'),  render: (skin) => <AboutFeature content={effective} skin={skin} /> },
         { name: 'AboutStory',    id: aboutStoryMeta.id,    label: aboutStoryMeta.label,    skins: skinsFor('AboutStory'),    render: (skin) => <AboutStory content={effective} skin={skin} /> },
+        { name: 'AboutSticky',   id: aboutStickyMeta.id,   label: aboutStickyMeta.label,   skins: skinsFor('AboutSticky'),   render: (skin) => <AboutSticky content={effective} skin={skin} /> },
       ],
     },
     {
@@ -160,12 +184,22 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       ],
     },
     {
+      id: 'stats',
+      label: 'Stats',
+      iconName: 'ChartBar',
+      variants: [
+        { name: 'StatsBand',   id: statsBandMeta.id,   label: statsBandMeta.label,   skins: skinsFor('StatsBand'),   render: (skin) => <StatsBand content={effective} skin={skin} /> },
+        { name: 'StatsLedger', id: statsLedgerMeta.id, label: statsLedgerMeta.label, skins: skinsFor('StatsLedger'), render: (skin) => <StatsLedger content={effective} skin={skin} /> },
+      ],
+    },
+    {
       id: 'faq',
       label: 'FAQ',
       iconName: 'Question',
       variants: [
         { name: 'FaqAccordion',   id: faqAccordionMeta.id,   label: faqAccordionMeta.label,   skins: skinsFor('FaqAccordion'),   render: (skin) => <FaqAccordion content={effective} skin={skin} /> },
         { name: 'FaqStickyAside', id: faqStickyAsideMeta.id, label: faqStickyAsideMeta.label, skins: skinsFor('FaqStickyAside'), render: (skin) => <FaqStickyAside content={effective} skin={skin} /> },
+        { name: 'FaqIndex',       id: faqIndexMeta.id,       label: faqIndexMeta.label,       skins: skinsFor('FaqIndex'),       render: (skin) => <FaqIndex content={effective} skin={skin} /> },
       ],
     },
     {

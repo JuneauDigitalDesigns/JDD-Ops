@@ -7,8 +7,8 @@ import type { SkinId } from '@/lib/skins';
 // The standard page sequence for body sections. `seo` is non-visual (wired as
 // generateMetadata) and is deliberately excluded from the body order.
 export const CANONICAL_ORDER = [
-  'nav', 'hero', 'trust', 'about', 'services', 'work',
-  'testimonials', 'faq', 'finalCta', 'contact', 'footer',
+  'nav', 'hero', 'trust', 'differentiators', 'services', 'work',
+  'stats', 'testimonials', 'faq', 'finalCta', 'contact', 'footer',
 ] as const;
 
 // Nav is pinned to the top of the page, Footer to the bottom; everything else

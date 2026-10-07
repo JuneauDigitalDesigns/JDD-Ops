@@ -17,7 +17,7 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@jdd/schema": "github:JuneauDigitalDesigns/jdd-schema#v1.21.0",
-    "@jdd/ui": "github:JuneauDigitalDesigns/jdd-ui#v1.0.5",
+    "@jdd/ui": "github:JuneauDigitalDesigns/jdd-ui#v1.0.6",
     "@phosphor-icons/react": "^2.1.7",
     "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.8.0",

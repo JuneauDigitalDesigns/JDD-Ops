@@ -736,3 +736,51 @@ client repo, which is the only check that proves copy-paste portability. The com
 AUTHORING_CONTRACT import rules (only `@/data/site`, `@/lib/*`, framer-motion, phosphor), and they
 compile in the console build, but the standalone-repo export remains the real proof. Plus each new
 component viewed in the console picker against HVAC, side by side with its specimen.
+
+## Phase 8, COMPLETE 2026-10-07. Cut `@jdd/ui` v1.0.6.
+
+Catalog wave 2: two new section categories, the three page-header archetypes, and third variants for
+about and faq. Ten components, no `@jdd/schema` change (differentiators reads `about.pillars`, stats
+reads `about.stats`, both already in the schema and already generated/editable). Build gate green.
+
+**Built (console/src/components/catalog/):**
+- `differentiators/DifferentiatorsIndex` (editorial-index, [DEF,SOFT]), `DifferentiatorsPanels`
+  (stacked-panels, [SOFT,DEF,INV]), `DifferentiatorsRail` (inline-strip, [DEF,SOFT]). Read
+  `about.pillars`, return null empty.
+- `stats/StatsBand` (count-up-centerpiece, **signature:true**, [INV,DEF]) and `stats/StatsLedger`
+  (numbered-ledger, [DEF,SOFT]). Read `about.stats`, return null empty. StatsBand uses the shared
+  `useCountUp` (confirmed console/template copies in sync), gated on `stillFor` so it shows the final
+  value immediately when still; it is the only component that counts up (decision 18 amends SPEC §9).
+- `pageHeader/PageHeaderEditorial` (editorial-index), `PageHeaderOverlap` (overlap-split),
+  `PageHeaderMinimal` (inline-strip). Skinless, exact `{data: PageHeaderContent; editPrefix?}` shape
+  matching PageHeaderSimple. PageHeaderOverlap's "overlap" is an ink band + overlapping card, NOT a
+  photo: PageHeaderContent has no image field, so nothing is claimed and no gradient is used.
+- `about/AboutSticky` (sticky-swap, [DEF,SOFT]) and `faq/FaqIndex` (editorial-index, [DEF,SOFT,INV]).
+  Archetypes verified unique within about (Feature=count-up-centerpiece, Story=asymmetric-split,
+  Sticky=sticky-swap) and faq (Accordion=accordion, StickyAside=sticky-swap, Index=editorial-index).
+
+All seven declared archetypes confirmed present in `src/lib/archetypes.ts`.
+
+**Registration:** CATALOG gained `differentiators` + `stats` keys and the five new variants on
+existing categories; `BODY_SLOTS` gained differentiators (between trust and about) and stats (after
+work). `categories.tsx` CategoryEntry id union + iconName union extended (`Lightning`, `ChartBar` —
+note `iconName` is vestigial data, read by no resolver, so no resolver cases to add), ten imports,
+two new CategoryEntry objects, five new variant rows. `page-order.ts` `CANONICAL_ORDER` replaced
+with the researched order `['nav','hero','trust','differentiators','services','work','stats',
+'testimonials','faq','finalCta','contact','footer']`. `skins.ts` seven new entries via §0.3 loop,
+tag **v1.0.6** pushed, both consumers re-pinned + verified at 1.0.6.
+
+**CANONICAL_ORDER dropped `about`** (per the plan's exact array): about is no longer a default home
+body section, which matches Phase 9's home templates (none place an about block; about lives on the
+about-* page templates). CAVEAT worth knowing: `reconcileOrder` filters selections through
+CANONICAL_ORDER, so an about section selected on a non-home page is no longer ordered by it. No test
+covers that and no live client exists yet; Phase 9 reworks page structure and ordering, so verify
+about-page ordering there.
+
+**Build gate 2026-10-07:** `console npm test` 183/182/1 (0 fail); `console npm run build` EXIT 0;
+`template npm run build` EXIT 0; `@jdd/ui` 1.0.6 in both trees.
+
+**Owed to the user (deferred):** the plan's export test (a scratch client whose home template carries
+differentiators + stats, built inside the client repo, to prove the new BODY_SLOTS ids wire through
+wirePages), and the picker/side-by-side visual review. Phase 9 places all Phase-7/8 components into
+PAGE_TEMPLATES and sets rhythm (un-skips page-rhythm test 3).
