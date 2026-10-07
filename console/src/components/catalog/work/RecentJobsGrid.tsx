@@ -12,8 +12,9 @@ export const meta = {
   consumes: ['work.eyebrow', 'work.title', 'work.sub', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'inverted'],
-  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
-  archetype: 'card-grid',
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category.
+   *  Recomposed in Phase 7: the first cell spans two rows and two columns. */
+  archetype: 'hero-first-grid',
   /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
    *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
    *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
@@ -48,25 +49,26 @@ export default function RecentJobsGrid({
           <p className={`mt-3 ${s.body}`}><E p="work.sub">{work.sub}</E></p>
         </motion.div>
 
-        <div className="mt-11 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* hero-first-grid: the first cell spans 2 rows and 2 cols on sm+; the image fills the
+            cell via flex so the recompose does not depend on a fixed per-cell aspect. */}
+        <div className="mt-11 grid grid-cols-1 gap-6 sm:auto-rows-[200px] sm:grid-cols-2 lg:grid-cols-3">
           {work.projects.map((p, i) => (
             <motion.article
               key={i}
-              className={`group overflow-hidden rounded-2xl border ${s.cardRule} ${s.card}`}
+              className={`group flex flex-col overflow-hidden rounded-2xl border ${s.cardRule} ${s.card} ${i === 0 ? 'sm:col-span-2 sm:row-span-2' : ''}`}
               initial={still ? false : { opacity: 0, y: 20 }}
               whileInView={still ? undefined : { opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.45, ease: EASE, delay: still ? 0 : i * 0.06 }}
-              style={{ gridRow: i === 0 ? 'span 2' : 'auto' }}
             >
-              <div className="relative overflow-hidden" style={{ aspectRatio: i === 0 ? '3/4' : '4/3' }}>
+              <div className="relative min-h-[180px] flex-1 overflow-hidden sm:min-h-0">
                 {p.image?.url ? (
-                  /* Ratio follows the wrapper's i===0 split. width/height only supply the intrinsic ratio so the box is reserved before the bytes land; CSS still sets the rendered size. */
-                  <img src={p.image.url} alt={p.image.alt} loading="lazy" width={i === 0 ? 1200 : 1600} height={i === 0 ? 1600 : 1200}
+                  /* width/height only supply the intrinsic ratio so the box is reserved before the bytes land; CSS (object-cover, flex-fill) sets the rendered size. */
+                  <img src={p.image.url} alt={p.image.alt} loading="lazy" width={i === 0 ? 1600 : 1200} height={i === 0 ? 1000 : 900}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                   // Decision 30(b): the contract §3 hatch, not a branded gradient slab.
-                  <div className="relative flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
+                  <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
                     <span className="font-heading text-5xl font-black leading-none text-inkSoft/30">{String(i + 1).padStart(2, '0')}</span>
                   </div>
                 )}

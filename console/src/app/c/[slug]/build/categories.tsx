@@ -19,6 +19,11 @@ import FaqAccordion, { meta as faqAccordionMeta } from '@/components/catalog/faq
 import FaqStickyAside, { meta as faqStickyAsideMeta } from '@/components/catalog/faq/FaqStickyAside';
 import TestimonialsGrid, { meta as testimonialsGridMeta } from '@/components/catalog/testimonials/TestimonialsGrid';
 import TestimonialsCarousel from '@/components/catalog/testimonials/TestimonialsCarousel';
+import ServicesShowcase, { meta as servicesShowcaseMeta } from '@/components/catalog/services/ServicesShowcase';
+import ServicesSpotlight, { meta as servicesSpotlightMeta } from '@/components/catalog/services/ServicesSpotlight';
+import WorkSpotlight, { meta as workSpotlightMeta } from '@/components/catalog/work/WorkSpotlight';
+import WorkMasonry, { meta as workMasonryMeta } from '@/components/catalog/work/WorkMasonry';
+import TestimonialsMarquee, { meta as testimonialsMarqueeMeta } from '@/components/catalog/testimonials/TestimonialsMarquee';
 import ContactSplit, { meta as contactSplitMeta } from '@/components/catalog/contact/ContactSplit';
 import ContactCardOverlap, { meta as contactCardOverlapMeta } from '@/components/catalog/contact/ContactCardOverlap';
 import ContactInlineStrip, { meta as contactInlineStripMeta } from '@/components/catalog/contact/ContactInlineStrip';
@@ -139,6 +144,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'ServicesGrid',      id: servicesGridMeta.id,      label: servicesGridMeta.label,      skins: skinsFor('ServicesGrid'),      render: (skin) => <ServicesGrid content={effective} skin={skin} /> },
         { name: 'ServicesAccordion', id: servicesAccordionMeta.id, label: servicesAccordionMeta.label, skins: skinsFor('ServicesAccordion'), render: () => <ServicesAccordion content={effective} /> },
         { name: 'ServicesPanel',     id: servicesPanelMeta.id,     label: servicesPanelMeta.label,     skins: skinsFor('ServicesPanel'),     render: () => <ServicesPanel content={effective} /> },
+        { name: 'ServicesShowcase',  id: servicesShowcaseMeta.id,  label: servicesShowcaseMeta.label,  skins: skinsFor('ServicesShowcase'),  render: (skin) => <ServicesShowcase content={effective} skin={skin} /> },
+        { name: 'ServicesSpotlight', id: servicesSpotlightMeta.id, label: servicesSpotlightMeta.label, skins: skinsFor('ServicesSpotlight'), render: (skin) => <ServicesSpotlight content={effective} skin={skin} /> },
       ],
     },
     {
@@ -148,6 +155,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'RecentJobsGrid',      id: recentJobsGridMeta.id,      label: recentJobsGridMeta.label,      skins: skinsFor('RecentJobsGrid'),      render: (skin) => <RecentJobsGrid content={effective} skin={skin} /> },
         { name: 'BeforeAfter', id: beforeAfterMeta.id, label: beforeAfterMeta.label, skins: skinsFor('BeforeAfter'), render: (skin) => <BeforeAfter content={effective} skin={skin} /> },
+        { name: 'WorkSpotlight', id: workSpotlightMeta.id, label: workSpotlightMeta.label, skins: skinsFor('WorkSpotlight'), render: (skin) => <WorkSpotlight content={effective} skin={skin} /> },
+        { name: 'WorkMasonry', id: workMasonryMeta.id, label: workMasonryMeta.label, skins: skinsFor('WorkMasonry'), render: (skin) => <WorkMasonry content={effective} skin={skin} /> },
       ],
     },
     {
@@ -166,6 +175,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'TestimonialsGrid',     id: testimonialsGridMeta.id,     label: testimonialsGridMeta.label,     skins: skinsFor('TestimonialsGrid'),     render: (skin) => <TestimonialsGrid content={effective} skin={skin} /> },
         { name: 'TestimonialsCarousel', id: 'testimonials-carousel',     label: 'Testimonials / Carousel',      skins: skinsFor('TestimonialsCarousel'), render: () => <TestimonialsCarousel content={effective} /> },
+        { name: 'TestimonialsMarquee',  id: testimonialsMarqueeMeta.id,  label: testimonialsMarqueeMeta.label,  skins: skinsFor('TestimonialsMarquee'), render: (skin) => <TestimonialsMarquee content={effective} skin={skin} /> },
       ],
     },
     {

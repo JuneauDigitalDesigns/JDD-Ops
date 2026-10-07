@@ -681,3 +681,58 @@ node_modules trees.
 **Owed to the user (deferred, not a blocker):** the real-browser look at the sticky bar on a
 390px-wide window of the template dev server and the Lenis scroll feel, plus reduced-motion. Folded
 into the same real-browser review owed from Phases 1 to 3 and Phase 5.
+
+## Phase 7, COMPLETE 2026-10-07. Cut `@jdd/ui` v1.0.5.
+
+Catalog wave 1: the five components DESIGN-LANGUAGE.md promised, transcribed from the approved
+`mockups-sections.html` specimens, plus the RecentJobsGrid recompose. Build gate green.
+
+**Built (console/src/components/catalog/), each on the console convention (E, skinClasses, meta with
+archetype+signature, Phase 1 tokens):**
+- `services/ServicesShowcase.tsx`: `editorial-index`, skins [DEF, SOFT]. Numbered rows on hairline
+  rules, numerals NEUTRAL (decision 10), desktop-only CSS hover image reveal (not content, so §8 is
+  satisfied), numbers from `services.items[].n`.
+- `services/ServicesSpotlight.tsx`: `stacked-panels`, skins [SOFT, DEF, INV]. One column; hierarchy
+  from a tall lead panel (with image on desktop) vs compact panels; NO cursor glow (decision 28).
+- `work/WorkSpotlight.tsx`: `feature-rail`, skins [DEF, INV]. `useState` + `AnimatePresence` feature
+  swap, rail active cue is INK not accent (decision 10), returns null on `work.hidden` / empty, 390
+  collapses the rail to a stacked list above the feature.
+- `work/WorkMasonry.tsx`: `horizontal-pin`, **signature:true** (the only one in wave 1), skins
+  [DEF, SOFT]. framer `useScroll`/`useTransform` pin (no GSAP), measured track distance; reduced
+  motion renders a plain `overflow-x-auto` scroll-snap rail with no transform and no sticky pin.
+- `testimonials/TestimonialsMarquee.tsx`: `marquee`, skins [SOFT, DEF]. Drag/scroll rail, NO
+  autoplay (SPEC §9 survives decision 21), with a visible scroll-progress affordance.
+- `work/RecentJobsGrid.tsx` RECOMPOSED to `hero-first-grid` (first cell spans 2 rows and 2 cols via
+  `sm:col-span-2 sm:row-span-2` over `sm:auto-rows`, image flex-fills). File name, `meta.id`,
+  `category`, `consumes` all unchanged (CATALOG, SKINS, categories, PAGE_TEMPLATES and the two
+  shipped repos key off the name). archetype flipped `card-grid` -> `hero-first-grid`.
+
+Resulting counts: services 5, work 4, testimonials 3, matching Phase 0's reconciled note.
+
+**Registration (§0.5):** `CATALOG` in export.ts (services/work/testimonials arrays extended);
+`SKINS` in packages/ui/src/skins.ts (five new entries) via the §0.3 loop, tag **v1.0.5** pushed and
+both consumers re-pinned + verified at 1.0.5; `categories.tsx` five imports + five VariantEntry rows.
+
+**DEVIATION: PAGE_TEMPLATES NOT modified in Phase 7.** The plan said to add each new component to at
+least one existing template "so the studio shows them." Did not, deliberately: (1) the new variants
+are already studio-selectable through the catalog picker (`categories.tsx` variants), which is the
+swap mechanism; (2) the build+test gate does not require PAGE_TEMPLATES membership (the
+CATALOG/registry/SKINS-agree test does not read templates); (3) Phase 9 is explicitly the phase that
+places components into templates and sets `rhythm` (it un-skips page-rhythm test 3), so a makeshift
+placement now would be reworked there; (4) adding a second same-category section to an existing
+template degrades that template's default output, and adding WorkMasonry (signature) risks the
+<=2-signature page-rhythm rule. Flag for the user; Phase 9 will place all five properly.
+
+**A §10a fix made in passing:** WorkSpotlight's rail subtitle initially used `opacity-80` on text.
+The opacity lint only fires on bg-accent ancestors so it would not have caught it, but SPEC §10a
+bans opacity on text regardless of surface, so it was removed (hierarchy from size/weight).
+
+**Build gate 2026-10-07:** `console npm test` 183/182/1 (0 fail); `console npm run build` EXIT 0;
+`template npm run build` EXIT 0; `@jdd/ui` 1.0.5 in both trees.
+
+**Owed to the user (deferred):** the plan's real export test, Launch a template containing each new
+component against a scratch slug so the export route runs `npm install` + `npm run build` INSIDE a
+client repo, which is the only check that proves copy-paste portability. The components follow the
+AUTHORING_CONTRACT import rules (only `@/data/site`, `@/lib/*`, framer-motion, phosphor), and they
+compile in the console build, but the standalone-repo export remains the real proof. Plus each new
+component viewed in the console picker against HVAC, side by side with its specimen.
