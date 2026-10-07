@@ -35,7 +35,7 @@ function stateColor(state: string): string {
 }
 
 export default function DeploymentsSection() {
-  const { ctx, site } = useManage();
+  const { ctx, site, confirmWrite } = useManage();
   const [rows, setRows] = useState<DeploymentRecord[] | null>(null);
   const [reason, setReason] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
@@ -66,6 +66,14 @@ export default function DeploymentsSection() {
   }, [load]);
 
   async function redeploy() {
+    if (
+      !(await confirmWrite({
+        title: 'Redeploy to production',
+        effect: `Triggers a new production build of ${site.slug} on Vercel with the current env vars.`,
+      }))
+    ) {
+      return;
+    }
     setDeploying(true);
     setNotice(null);
     try {

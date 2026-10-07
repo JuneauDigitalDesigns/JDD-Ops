@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, Flask, LinkSimple, Play, Warning, Wrench, XCircle } from '@phosphor-icons/react';
+import { CheckCircle, Flask, LinkBreak, LinkSimple, Play, Warning, Wrench, XCircle } from '@phosphor-icons/react';
 import { useManage } from './ManageContext';
 import SectionHeader from './SectionHeader';
 import PortalRepairPanel, { type RepairSite } from './PortalRepairPanel';
@@ -42,6 +42,7 @@ export default function PortalSection() {
   const [email, setEmail] = useState('');
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
+  const [detaching, setDetaching] = useState<string | null>(null);
   const [result, setResult] = useState<AttachResult | null>(null);
 
   const load = useCallback(async () => {
@@ -99,6 +100,39 @@ export default function PortalSection() {
     }
   }
 
+  async function detach(s: PortalSite) {
+    const acct = state?.email;
+    if (!acct) return;
+    if (
+      !(await confirmWrite({
+        title: `Detach ${s.slug} from ${acct}`,
+        effect: `Removes ${s.slug} from the portal account for ${acct} in the live KV store. The site will stop appearing in that account's portal. Other sites on the account are kept, and you can re-attach it afterwards.`,
+        danger: true,
+      }))
+    ) {
+      return;
+    }
+    setDetaching(s.slug);
+    setResult(null);
+    try {
+      const res = await fetch('/api/manage/detach-portal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: ctx.slug, email: acct, siteSlug: s.slug }),
+      });
+      const body = (await res.json()) as { ok?: boolean; error?: string };
+      if (body.error || !body.ok) {
+        setResult({ error: body.error ?? 'Detach failed.' });
+      } else {
+        await load();
+      }
+    } catch (err) {
+      setResult({ error: err instanceof Error ? err.message : 'Detach failed.' });
+    } finally {
+      setDetaching(null);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
       <SectionHeader
@@ -151,6 +185,19 @@ export default function PortalSection() {
                     {!s.mine && <span className="text-fg3">· another client</span>}
                     {s.airtableBaseId && (
                       <span className="ml-auto font-mono text-fg3">{s.airtableBaseId}</span>
+                    )}
+                    {state.email && (
+                      <button
+                        type="button"
+                        onClick={() => void detach(s)}
+                        disabled={detaching !== null || running}
+                        className={`btn btn-sm ${s.airtableBaseId ? '' : 'ml-auto'}`}
+                        title="Remove this site from the account"
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        <LinkBreak size={12} />
+                        {detaching === s.slug ? 'Detaching…' : 'Detach'}
+                      </button>
                     )}
                   </div>
                 ))}

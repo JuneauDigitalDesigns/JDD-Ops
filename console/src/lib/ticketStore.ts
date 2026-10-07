@@ -54,7 +54,7 @@ function getRedis(): Redis {
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
     if (!url || !token) {
       throw new Error(
-        'Ticket queue not configured — set KV_REST_API_URL and KV_REST_API_TOKEN in console/.env.local ' +
+        'Ticket queue not configured — set KV_REST_API_URL and KV_REST_API_TOKEN in jdd-ops/.env ' +
           '(the same pair the lead/intake queues use).',
       );
     }

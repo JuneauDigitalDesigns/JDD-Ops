@@ -26,7 +26,7 @@ function getRedis(): Redis {
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
     if (!url || !token) {
       throw new Error(
-        'KV not configured — set KV_REST_API_URL and KV_REST_API_TOKEN in console/.env.local.',
+        'KV not configured — set KV_REST_API_URL and KV_REST_API_TOKEN in jdd-ops/.env.',
       );
     }
     _redis = new Redis({ url, token });

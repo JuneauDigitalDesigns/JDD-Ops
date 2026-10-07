@@ -50,7 +50,7 @@ function getRedis(): Redis {
     if (!url || !token) {
       throw new Error(
         'Client records not configured — set KV_REST_API_URL and KV_REST_API_TOKEN in ' +
-          'console/.env.local (the same pair the lead queue uses).',
+          'jdd-ops/.env (the same pair the lead queue uses).',
       );
     }
     _redis = new Redis({ url, token });

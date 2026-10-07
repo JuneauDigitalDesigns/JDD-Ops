@@ -47,7 +47,7 @@ function getRedis(): Redis {
     if (!url || !token) {
       throw new Error(
         'Reconcile store not configured — set KV_REST_API_URL and KV_REST_API_TOKEN in ' +
-          'console/.env.local.',
+          'jdd-ops/.env.',
       );
     }
     _redis = new Redis({ url, token });

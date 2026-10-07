@@ -27,6 +27,7 @@ export type AuditAction =
   | 'deploy.trigger'
   | 'portal.attach'
   | 'portal.repair'
+  | 'portal.detach'
   | 'agent.prompt.save'
   | 'agent.prompt.push'
   | 'domain.add'
