@@ -22,6 +22,6 @@
       "@template/*": ["../template/src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../template/src/lib/structuredData.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../template/src/lib/structuredData.ts", "../template/src/lib/StickyCallBar.tsx"],
   "exclude": ["node_modules"]
 }

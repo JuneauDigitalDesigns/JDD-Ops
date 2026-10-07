@@ -630,3 +630,54 @@ settled. Phase 6 may begin.
 Fields Phase 13 intake must add, collected from the `[from intake]` brackets used: service city,
 license number, year established, years-local, review count, review source, warranty term, named
 service-area towns. Review count, review source and warranty term are beyond decision 29's list.
+
+## Phase 6, COMPLETE 2026-10-07. Cut `@jdd/ui` v1.0.4.
+
+Page chrome: the sticky call bar and the smooth-scroll layer. Build gate green.
+
+**Built:**
+- `template/src/lib/StickyCallBar.tsx` (new, `'use client'`): mobile-only (`lg:hidden`),
+  IntersectionObserver on `#top` (always-visible fallback when absent), digits at
+  `text-lead font-extrabold` + assurance at `text-fine`, 56px min tap target, `bg-accent`
+  `text-accentFg`, upward shadow, urgent badge only when it reads as availability, a sibling
+  spacer reserving its height so it never covers the footer, one CSS transform transition gated on
+  prefers-reduced-motion, aria region + `aria-label`. No `stillFor` (no skin). Returns null when
+  `phoneHref` is empty.
+- `template/src/lib/SmoothScroll.tsx` (new, `'use client'`): Lenis behind all four mandatory
+  guards (dynamic `import('lenis')`, `ssr:false` at the layout import site, prefers-reduced-motion
+  early return that never constructs Lenis, `window.self !== window.top` iframe check). Renders null.
+- `lenis ^1.1.18` added to template and console `package.json` (resolved to 1.3.26).
+- `template/src/app/layout.tsx`: `dynamic(() => import('@/lib/SmoothScroll'), { ssr:false })` +
+  `StickyCallBar`, rendered after children before `<Analytics/>`. (Next 14.2.35 allows ssr:false
+  in a server component, so the plan's code built as written; the Next 15 restriction does not apply.)
+- `console/src/app/c/[slug]/build/PageStudio.tsx`: StickyCallBar rendered in the `mode="flow"`
+  preview, imported via `@template/lib/StickyCallBar`, fed the console's rich `effective` content.
+- `console/tsconfig.json`: added `../template/src/lib/StickyCallBar.tsx` to `include`.
+- `packages/ui/src/motion.ts`: `parallaxY` marked `@deprecated` (kept exported so an already-exported
+  repo keeps compiling); header rewritten for the per-page motion budget (decision 26). No live
+  component used `parallaxY`, cursor glow or `clipReveal` (greped: only an `export.ts` comment), so
+  nothing was stripped. §0.3 loop run, tag **v1.0.4** pushed, both consumers re-pinned and verified
+  installed at 1.0.4.
+- `console/test/catalog-invariants.test.mjs`: new test banning `parallaxY` and `--mx/--my`
+  cursor-glow in any catalog component (passes trivially today; guards the future).
+
+**PLAN DEFECT found and resolved.** The plan's layout wiring read `CONTENT.hero.trust` and
+`CONTENT.announcement`, but `template/src/data/site.ts` is the FIXED minimal seed schema
+(brand/services/faq/testimonials/seo/_meta) with neither field, and its own contract forbids adding
+per-client fields. So the template build failed `Property 'hero' does not exist on type
+'SiteContent'`. Resolved by passing `assurance={null} badge={null}` in the TEMPLATE layout only
+(not inventing a value; a missing field stays null). The console preview still passes the real
+`effective.hero?.trust` / `effective.announcement`, so the bar shows the assurance line and
+availability badge in the Studio and in console-Studio-built content. **Consequence to surface:**
+sites provisioned via the onboard.js template-splice path (minimal schema) will show the call bar
+with digits only, no assurance line or badge, because the seed schema has no field to carry them.
+Giving every client site the assurance line on the bar would need an additive optional field in the
+template schema, which is a separate decision (its contract says the schema is fixed).
+
+**Build gate, 2026-10-07:** `console npm test` 183/182/1 (the ban test is the +1); `console npm run
+build` EXIT 0; `template npm run build` EXIT 0; `@jdd/ui` 1.0.4 and `lenis` 1.3.26 confirmed in both
+node_modules trees.
+
+**Owed to the user (deferred, not a blocker):** the real-browser look at the sticky bar on a
+390px-wide window of the template dev server and the Lenis scroll feel, plus reduced-motion. Folded
+into the same real-browser review owed from Phases 1 to 3 and Phase 5.

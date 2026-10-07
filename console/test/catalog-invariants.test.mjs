@@ -42,6 +42,21 @@ test('catalog is non-empty (guards against a broken glob silently passing everyt
   assert.ok(ALL.length > 20, `expected >20 components, found ${ALL.length}`);
 });
 
+// Decision 28 cut the two ornamental signature effects. parallaxY stays EXPORTED from
+// @jdd/ui/motion (removing it would break an already-exported client repo), but no catalog
+// component may call it, and no component may hand-roll the cursor-glow it also cut (a pointer
+// handler writing --mx/--my CSS vars). Both were a whole component's identity once.
+test('no component uses the cut signature effects: parallaxY or cursor glow (decision 28)', () => {
+  const offenders = [];
+  for (const c of ALL) {
+    if (/\bparallaxY\b/.test(c.src)) offenders.push(`${c.rel}: parallaxY`);
+    if (/onMouseMove/.test(c.src) && /--m[xy]\b/.test(c.src)) {
+      offenders.push(`${c.rel}: cursor glow (--mx/--my from a pointer handler)`);
+    }
+  }
+  assert.deepEqual(offenders, [], `cut signature effects present:\n${offenders.join('\n')}`);
+});
+
 // ── The four sources that must agree ─────────────────────────────────────────
 // Drift here is what let a starter client pick a variant the exporter would then reject.
 test('CATALOG, the studio registry and SKINS agree', () => {

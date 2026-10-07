@@ -19,6 +19,7 @@ import { templatesFor, applyTemplate, pageMetaFor } from './page-templates';
 import { composePage, renderSection } from './compose-page';
 import SectionControlPanel from './SectionControlPanel';
 import PreviewFrame from './PreviewFrame';
+import StickyCallBar from '@template/lib/StickyCallBar';
 import PagesMenu from './PagesMenu';
 import SiteStylePanel from './SiteStylePanel';
 import LaunchDialog from './LaunchDialog';
@@ -233,6 +234,15 @@ export default function PageStudio({
               <EditProvider setField={setField} overrides={effective.overrides}>
                 <PreviewFrame brand={effective.brand} mode="flow" className="w-full">
                   {editableNodes.map((n) => <Fragment key={n.key}>{n.node}</Fragment>)}
+                  {/* The operator must see the call bar to design it. Its iframe check is
+                      deliberately absent (only SmoothScroll self-disables in the preview), so the
+                      IntersectionObserver works here against #top. */}
+                  <StickyCallBar
+                    phone={effective.brand.phone}
+                    phoneHref={effective.brand.phoneHref}
+                    assurance={effective.hero?.trust || null}
+                    badge={effective.announcement || null}
+                  />
                 </PreviewFrame>
               </EditProvider>
             </div>
