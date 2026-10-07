@@ -15,6 +15,12 @@ export const meta = {
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion', '@/lib/LeadForm'],
   skins: ['default', 'soft'],
   // No fixed leadMode: it reads _meta.selectedPlan and serves either plan.
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'overlap-split',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 
@@ -36,10 +42,13 @@ export default function ContactCardOverlap({
     <section id="contact" className={`py-24 ${s.section}`}>
       <div className="mx-auto max-w-5xl px-6">
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-          {/* Details card — always a dark, accent-lit panel: the signature of this layout */}
+          {/* Details card: always a dark panel, which is the signature of this layout.
+              Decision 30(b) removed the accent glow that used to sit on top of it. A soft radial
+              wash is decoration, not structure, and the overlap itself is what carries this
+              component. */}
           <motion.div
             className="relative overflow-hidden rounded-[28px] p-8 text-onInk shadow-xl lg:sticky lg:top-24"
-            style={{ background: 'radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 60%), var(--ink-panel)' }}
+            style={{ background: 'var(--ink-panel)' }}
             initial={still ? false : { opacity: 0, y: 16 }}
             whileInView={still ? undefined : { opacity: 1, y: 0 }}
             viewport={viewportOnce}

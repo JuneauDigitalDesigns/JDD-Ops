@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { opsRoot, clientDir } from '@/lib/paths';
+import { lockedReason } from '@/lib/onboardingGate';
 
 // Spawn `npm run onboard -- --schema clients/{slug}/site.ts [--dry-run]` in the jdd-ops
 // root, streaming each output line as NDJSON so the UI narrates progress live. Mirrors the
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
+    async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
 
       // Validate before spawning.
@@ -50,6 +51,15 @@ export async function POST(req: Request) {
       const schemaRel = `clients/${slug}/site.ts`;
       if (!existsSync(resolve(clientDir(slug), 'site.ts'))) {
         send({ type: 'error', message: `No intake at ${schemaRel}.` });
+        controller.close();
+        return;
+      }
+
+      // Onboarding gate, third layer: this spawns real provisioning (Twilio, Retell, Vercel),
+      // which must never run against a placeholder folder from a converted lead.
+      const lockedMsg = await lockedReason(slug);
+      if (lockedMsg) {
+        send({ type: 'error', message: lockedMsg });
         controller.close();
         return;
       }

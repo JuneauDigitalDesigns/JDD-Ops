@@ -1,4 +1,8 @@
 import type { Config } from 'tailwindcss';
+import {
+  fontSize, letterSpacing, spacing, borderRadius, boxShadow, maxWidth,
+} from './src/styles/tokens';
+import rhythm from './src/styles/rhythm.plugin';
 
 // Colors + fonts are bound to CSS variables that `app/layout.tsx` sets on <body>
 // from CONTENT.brand.palette / .typography. Components use portable tokens like
@@ -49,12 +53,19 @@ const config: Config = {
         sans: 'var(--font-sans)',
         heading: 'var(--font-heading)',
       },
+      fontSize,
+      letterSpacing,
+      spacing,
+      borderRadius,
+      boxShadow,
+      maxWidth,
       backgroundImage: {
+        // DEPRECATED by decision 30(b): no new component may use it. Kept so shipped repos still build.
         'accent-grad': 'var(--accent-grad)',
       },
     },
   },
-  plugins: [],
+  plugins: [rhythm],
 };
 
 export default config;

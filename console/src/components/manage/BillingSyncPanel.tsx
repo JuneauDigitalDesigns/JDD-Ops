@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useManage } from './ManageContext';
 import { ArrowsClockwise, CheckCircle, CurrencyDollar, Warning, XCircle } from '@phosphor-icons/react';
 
 /**
@@ -36,6 +37,7 @@ export default function BillingSyncPanel({
   siteSlug: string;
   email: string;
 }) {
+  const { confirmWrite } = useManage();
   const [state, setState] = useState<BillingState | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -60,6 +62,15 @@ export default function BillingSyncPanel({
 
   async function sync() {
     if (!state?.recordPlan) return;
+    if (
+      !(await confirmWrite({
+        title: 'Sync billing in Stripe',
+        effect: `Changes the live Stripe subscription for ${email} to the ${state.recordPlan} plan via the production portal. This moves real money.`,
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setSyncing(true);
     setResult(null);
     try {

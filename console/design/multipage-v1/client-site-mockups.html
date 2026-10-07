@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Multi-page client site — design mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ---------------------------------------------------------------------------
+     Design tokens. In production these come from the client's brand.palette in
+     site.ts, so treat every color here as themeable per client. Type, spacing,
+     and layout are what this mockup pins down.
+  --------------------------------------------------------------------------- */
+  :root{
+    --accent:#E2591E;      /* CTA / emphasis — client-themeable */
+    --accent-600:#C24713;
+    --ink:#16202B;         /* headings, dark text */
+    --ink-soft:#586472;    /* body text */
+    --bg:#FFFFFF;
+    --bg-soft:#F6F3EC;     /* warm paper band */
+    --rule:#E7E0D4;
+    --dark:#131C25;        /* dark contrast sections */
+    --dark-soft:#1E2B37;
+    --dark-line:#2C3B49;
+    --star:#F5A623;
+
+    --wrap:1180px;
+    --pad:clamp(20px,5vw,64px);
+    --r:6px;
+    --r-lg:14px;
+    --shadow:0 1px 2px rgba(19,28,37,.06),0 12px 30px -18px rgba(19,28,37,.28);
+    --shadow-lg:0 30px 60px -30px rgba(19,28,37,.45);
+    --font:"Inter",system-ui,sans-serif;
+    --display:"Archivo","Inter",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--font);color:var(--ink);background:var(--bg);line-height:1.55;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{font-family:var(--display);line-height:1.05;letter-spacing:-.02em;margin:0;color:var(--ink)}
+  p{margin:0}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding-left:var(--pad);padding-right:var(--pad)}
+  .icon{width:1em;height:1em;display:inline-block;vertical-align:-.125em;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+
+  /* --- Eyebrow ------------------------------------------------------------ */
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;
+    font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  .eyebrow::before{content:"";width:26px;height:2px;background:var(--accent);border-radius:2px}
+  .eyebrow.on-dark{color:#F6B48C}
+  .eyebrow.on-dark::before{background:#F6B48C}
+
+  /* --- Buttons ------------------------------------------------------------ */
+  .btn{display:inline-flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;font-size:.95rem;
+    padding:14px 22px;border-radius:var(--r);border:1.5px solid transparent;cursor:pointer;transition:.18s ease;white-space:nowrap}
+  .btn .icon{width:1.05em;height:1.05em}
+  .btn-accent{background:var(--accent);color:#fff}
+  .btn-accent:hover{background:var(--accent-600);transform:translateY(-1px)}
+  .btn-dark{background:var(--ink);color:#fff}
+  .btn-dark:hover{background:#0c141c;transform:translateY(-1px)}
+  .btn-ghost{background:transparent;border-color:var(--rule);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink);background:#fff}
+  .btn-ghost.on-dark{color:#fff;border-color:var(--dark-line)}
+  .btn-ghost.on-dark:hover{border-color:#fff}
+  .btn-lg{padding:17px 28px;font-size:1.02rem}
+
+  /* --- Section rhythm ----------------------------------------------------- */
+  section{padding:clamp(56px,8vw,104px) 0}
+  .sec-head{max-width:640px;margin-bottom:44px}
+  .sec-head h2{font-size:clamp(1.9rem,3.6vw,2.75rem);margin-top:14px}
+  .sec-head p{color:var(--ink-soft);font-size:1.08rem;margin-top:14px}
+  .accent{color:var(--accent)}
+
+  /* ===========================================================================
+     MOCKUP CHROME (the review tool — NOT part of the site design)
+  =========================================================================== */
+  .mock-bar{position:sticky;top:0;z-index:100;background:#0C1218;color:#fff;border-bottom:1px solid #24313d}
+  .mock-bar .wrap{display:flex;align-items:center;gap:18px;padding-top:11px;padding-bottom:11px;flex-wrap:wrap}
+  .mock-tag{font-family:var(--display);font-weight:800;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#7C8A98}
+  .mock-tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .mock-tabs button{font-family:var(--display);font-weight:700;font-size:.82rem;color:#AEB9C4;background:transparent;border:1px solid transparent;
+    padding:7px 13px;border-radius:20px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:7px}
+  .mock-tabs button:hover{color:#fff;background:#1a242e}
+  .mock-tabs button.active{color:#0C1218;background:#fff}
+  .mock-tabs .tmpl{font-weight:600;font-size:.68rem;opacity:.6}
+  .mock-tabs button.active .tmpl{opacity:.55}
+  .mock-opt{margin-left:auto;font-size:.72rem;color:#7C8A98;font-weight:600}
+
+  /* ===========================================================================
+     SITE NAV (shared chrome)
+  =========================================================================== */
+  .nav{position:sticky;top:47px;z-index:60;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule)}
+  .nav .wrap{display:flex;align-items:center;gap:28px;padding-top:16px;padding-bottom:16px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--display);font-weight:800;font-size:1.14rem;letter-spacing:-.02em}
+  .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:1.1rem}
+  .brand small{display:block;font-family:var(--font);font-weight:500;font-size:.66rem;letter-spacing:.02em;color:var(--ink-soft);margin-top:-2px}
+  .nav-links{display:flex;gap:4px;margin-left:8px}
+  .nav-links a{font-family:var(--display);font-weight:600;font-size:.95rem;color:var(--ink-soft);padding:8px 13px;border-radius:6px;transition:.15s;cursor:pointer}
+  .nav-links a:hover{color:var(--ink);background:var(--bg-soft)}
+  .nav-links a[aria-current="page"]{color:var(--accent)}
+  .nav-cta{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .nav-phone{font-family:var(--display);font-weight:800;font-size:1.02rem;display:flex;align-items:center;gap:8px}
+  .nav-phone .icon{color:var(--accent)}
+  @media(max-width:860px){.nav-links{display:none}.nav-phone span{display:none}}
+
+  /* ===========================================================================
+     PAGE VISIBILITY
+  =========================================================================== */
+  .page{display:none}
+  .page.active{display:block;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ===========================================================================
+     HERO (home only — conversion hero, reads CONTENT.hero)
+  =========================================================================== */
+  .hero{background:radial-gradient(120% 120% at 85% 0%,#fbece0 0%,var(--bg-soft) 42%,var(--bg) 100%);border-bottom:1px solid var(--rule)}
+  .hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,72px);align-items:center;
+    padding-top:clamp(48px,7vw,88px);padding-bottom:clamp(48px,7vw,88px)}
+  .hero h1{font-size:clamp(2.5rem,5.4vw,4.1rem);font-weight:800}
+  .hero h1 .accent{position:relative;white-space:nowrap}
+  .hero .sub{color:var(--ink-soft);font-size:1.16rem;margin-top:22px;max-width:34ch}
+  .hero-stats{display:flex;gap:26px;margin-top:26px;flex-wrap:wrap}
+  .hero-stats div{display:flex;align-items:center;gap:9px;font-weight:600;font-size:.94rem;color:var(--ink)}
+  .hero-stats .icon{color:var(--accent);width:1.25em;height:1.25em}
+  /* lead form card */
+  .lead{background:#fff;border:1px solid var(--rule);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:26px}
+  .lead h3{font-size:1.32rem}
+  .lead .lead-sub{color:var(--ink-soft);font-size:.94rem;margin-top:6px}
+  .lead form{display:grid;gap:12px;margin-top:18px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.76rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-soft)}
+  .field input{font-family:var(--font);font-size:1rem;padding:13px 14px;border:1.5px solid var(--rule);border-radius:var(--r);background:#fff;transition:.15s}
+  .field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(226,89,30,.14)}
+  .lead .fine{display:flex;align-items:center;gap:8px;justify-content:center;color:var(--ink-soft);font-size:.82rem;margin-top:4px}
+  .lead .fine .icon{color:#28a745;width:1.15em;height:1.15em}
+  .rating-inline{display:flex;align-items:center;gap:9px;margin-top:16px;font-size:.9rem;color:var(--ink-soft)}
+  .stars{color:var(--star);letter-spacing:2px;font-size:.95rem}
+  @media(max-width:820px){.hero .wrap{grid-template-columns:1fr}}
+
+  /* ===========================================================================
+     TRUST BAR (shared section)
+  =========================================================================== */
+  .trust{background:var(--ink);color:#fff;padding:26px 0}
+  .trust .wrap{display:flex;align-items:center;gap:30px;flex-wrap:wrap;justify-content:space-between}
+  .trust .item{display:flex;align-items:center;gap:11px;font-weight:600;font-size:.96rem}
+  .trust .item .icon{color:#F6B48C;width:1.4em;height:1.4em}
+  .trust .sep{width:1px;height:26px;background:var(--dark-line)}
+  @media(max-width:760px){.trust .sep{display:none}.trust .wrap{gap:16px 26px}}
+
+  /* ===========================================================================
+     ABOUT (feature: image + copy + pillars + stats)
+  =========================================================================== */
+  .about .wrap{display:grid;grid-template-columns:.95fr 1.05fr;gap:clamp(32px,5vw,64px);align-items:center}
+  .about-media{position:relative}
+  .pillars{display:grid;gap:16px;margin-top:26px}
+  .pillar{display:flex;gap:14px;align-items:flex-start}
+  .pillar .pi{flex:none;width:42px;height:42px;border-radius:10px;background:#fdeee4;color:var(--accent);display:grid;place-items:center;font-size:1.2rem}
+  .pillar h4{font-size:1.05rem}
+  .pillar p{color:var(--ink-soft);font-size:.94rem;margin-top:3px}
+  .statstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px;border-top:1px solid var(--rule);padding-top:26px}
+  .statstrip .n{font-family:var(--display);font-weight:800;font-size:2.1rem;letter-spacing:-.03em;color:var(--ink)}
+  .statstrip .l{color:var(--ink-soft);font-size:.86rem;margin-top:2px}
+  @media(max-width:820px){.about .wrap{grid-template-columns:1fr}.about-media{order:-1}}
+
+  /* --- Photo placeholder frame ------------------------------------------- */
+  .photo{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--rule);
+    background:linear-gradient(135deg,#20303d,#324757);aspect-ratio:4/3;display:grid;place-items:center}
+  .photo::after{content:attr(data-label);position:absolute;bottom:12px;left:12px;font-size:.72rem;font-weight:600;
+    color:#fff;background:rgba(0,0,0,.42);padding:5px 10px;border-radius:20px;backdrop-filter:blur(3px)}
+  .photo .icon{width:46px;height:46px;color:rgba(255,255,255,.5)}
+  .photo.tall{aspect-ratio:3/4}
+  .float-card{position:absolute;right:-14px;bottom:-18px;background:#fff;border:1px solid var(--rule);border-radius:12px;
+    box-shadow:var(--shadow-lg);padding:14px 16px;display:flex;align-items:center;gap:12px}
+  .float-card .big{font-family:var(--display);font-weight:800;font-size:1.6rem;color:var(--accent);line-height:1}
+  .float-card small{color:var(--ink-soft);font-size:.78rem}
+
+  /* ===========================================================================
+     SERVICES GRID + CARDS
+  =========================================================================== */
+  .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .svc{border:1px solid var(--rule);border-radius:var(--r-lg);padding:26px;background:#fff;transition:.2s;position:relative;overflow:hidden}
+  .svc:hover{transform:translateY(-4px);box-shadow:var(--shadow);border-color:#dccfbb}
+  .svc .ic{width:50px;height:50px;border-radius:12px;background:var(--bg-soft);color:var(--accent);display:grid;place-items:center;font-size:1.5rem;margin-bottom:18px}
+  .svc:hover .ic{background:var(--accent);color:#fff}
+  .svc .tag{font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+  .svc h3{font-size:1.25rem;margin:8px 0 8px}
+  .svc p{color:var(--ink-soft);font-size:.95rem}
+  .svc .more{display:inline-flex;align-items:center;gap:6px;margin-top:16px;font-family:var(--display);font-weight:700;font-size:.88rem;color:var(--accent)}
+  @media(max-width:900px){.svc-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.svc-grid{grid-template-columns:1fr}}
+
+  /* ===========================================================================
+     WORK / RECENT JOBS
+  =========================================================================== */
+  .work-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .job{border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--rule);background:#fff}
+  .job .photo{border:0;border-radius:0;aspect-ratio:16/11}
+  .job .body{padding:18px}
+  .job .meta{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--ink-soft);font-weight:600}
+  .job h4{font-size:1.08rem;margin-top:8px}
+  .job .scope{font-size:.88rem;color:var(--ink-soft);margin-top:4px}
+  @media(max-width:900px){.work-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.work-grid{grid-template-columns:1fr}}
+
+  /* ===========================================================================
+     TESTIMONIALS
+  =========================================================================== */
+  .tg{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .quote{border:1px solid var(--rule);border-radius:var(--r-lg);padding:26px;background:#fff;display:flex;flex-direction:column}
+  .quote .stars{margin-bottom:14px}
+  .quote p{font-size:1.02rem;color:var(--ink);flex:1}
+  .quote .who{display:flex;align-items:center;gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid var(--rule)}
+  .avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#f4a06f);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:800}
+  .who b{font-size:.95rem;display:block}
+  .who small{color:var(--ink-soft);font-size:.82rem}
+  @media(max-width:900px){.tg{grid-template-columns:1fr}.tg .quote:nth-child(n+3){display:none}}
+  .tg.full .quote:nth-child(n+3){display:flex}
+  @media(min-width:901px){.tg.full{grid-template-columns:repeat(3,1fr)}}
+
+  /* ===========================================================================
+     PAGE HEADER (the new element — subpages only)  [pageHeader category]
+  =========================================================================== */
+  .ph{background:var(--bg-soft);border-bottom:1px solid var(--rule)}
+  .ph .wrap{padding-top:clamp(44px,6vw,74px);padding-bottom:clamp(44px,6vw,74px)}
+  .ph .crumbs{font-size:.82rem;color:var(--ink-soft);font-weight:600;margin-bottom:16px}
+  .ph .crumbs a{cursor:pointer}
+  .ph .crumbs a:hover{color:var(--accent)}
+  .ph h1{font-size:clamp(2.2rem,4.6vw,3.4rem);font-weight:800;margin-top:12px}
+  .ph p{color:var(--ink-soft);font-size:1.12rem;margin-top:16px;max-width:56ch}
+  .ph .ph-cta{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap}
+  /* image variant */
+  .ph.image{background:var(--dark);border-color:var(--dark-line);color:#fff;position:relative;overflow:hidden}
+  .ph.image::before{content:"";position:absolute;inset:0;background:
+    linear-gradient(100deg,rgba(19,28,37,.92) 40%,rgba(19,28,37,.55) 100%),
+    linear-gradient(135deg,#2a3d4b,#43606f);}
+  .ph.image .wrap{position:relative}
+  .ph.image h1{color:#fff}
+  .ph.image p{color:#C4D0DA}
+  .ph.image .crumbs{color:#8fa0ad}
+  .ph .badge{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--rule);border-radius:20px;
+    padding:6px 13px;font-size:.8rem;font-weight:700;color:var(--ink)}
+  .ph.image .badge{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff}
+  .ph .badge .stars{font-size:.85rem}
+
+  /* ===========================================================================
+     FAQ (accordion + sticky-aside variants)
+  =========================================================================== */
+  .faq-acc{max-width:820px;margin:0 auto}
+  details.qa{border-bottom:1px solid var(--rule);padding:4px 0}
+  details.qa summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;
+    padding:20px 4px;font-family:var(--display);font-weight:700;font-size:1.1rem}
+  details.qa summary::-webkit-details-marker{display:none}
+  details.qa summary .pm{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--rule);display:grid;place-items:center;transition:.2s;color:var(--accent)}
+  details.qa[open] summary .pm{background:var(--accent);color:#fff;border-color:var(--accent);transform:rotate(45deg)}
+  details.qa p{color:var(--ink-soft);padding:0 4px 22px;max-width:70ch}
+  .faq-split{display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(28px,5vw,56px);align-items:start}
+  .faq-split .aside{position:sticky;top:130px}
+  @media(max-width:820px){.faq-split{grid-template-columns:1fr}.faq-split .aside{position:static}}
+
+  /* ===========================================================================
+     CONTACT (split: form + details)
+  =========================================================================== */
+  .contact-split{display:grid;grid-template-columns:1fr .9fr;gap:clamp(28px,5vw,56px);align-items:start}
+  .contact-card{background:#fff;border:1px solid var(--rule);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:30px}
+  .contact-card form{display:grid;gap:14px;margin-top:8px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field textarea{font-family:var(--font);font-size:1rem;padding:13px 14px;border:1.5px solid var(--rule);border-radius:var(--r);min-height:110px;resize:vertical}
+  .field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(226,89,30,.14)}
+  .details .drow{display:flex;gap:15px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--rule)}
+  .details .drow .di{flex:none;width:44px;height:44px;border-radius:11px;background:var(--bg-soft);color:var(--accent);display:grid;place-items:center;font-size:1.25rem}
+  .details .drow b{display:block;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+  .details .drow .v{font-family:var(--display);font-weight:700;font-size:1.08rem;margin-top:2px}
+  .details .drow .v small{display:block;font-family:var(--font);font-weight:400;font-size:.86rem;color:var(--ink-soft)}
+  .map{margin-top:20px;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--rule);aspect-ratio:16/8;
+    background:
+      linear-gradient(0deg,rgba(226,89,30,.06),rgba(226,89,30,.06)),
+      repeating-linear-gradient(0deg,#eef1ee 0 39px,#e2e7e2 39px 40px),
+      repeating-linear-gradient(90deg,#eef1ee 0 39px,#e2e7e2 39px 40px);
+    position:relative;display:grid;place-items:center}
+  .map .pin{width:40px;height:40px;color:var(--accent)}
+  .map::after{content:"Service area map";position:absolute;bottom:10px;left:12px;font-size:.72rem;font-weight:600;color:var(--ink-soft);background:#fff;padding:4px 9px;border-radius:14px}
+  @media(max-width:820px){.contact-split{grid-template-columns:1fr}.row2{grid-template-columns:1fr}}
+
+  /* --- Service area chips ------------------------------------------------- */
+  .areas{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .areas span{border:1px solid var(--rule);background:#fff;border-radius:20px;padding:8px 15px;font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:7px}
+  .areas span .icon{color:var(--accent)}
+
+  /* ===========================================================================
+     FINAL CTA (dark band)
+  =========================================================================== */
+  .cta{background:var(--dark);color:#fff;position:relative;overflow:hidden}
+  .cta::before{content:"";position:absolute;inset:0;background:radial-gradient(90% 120% at 100% 0%,rgba(226,89,30,.28),transparent 55%)}
+  .cta .wrap{position:relative;display:grid;grid-template-columns:1.2fr .8fr;gap:44px;align-items:center}
+  .cta h2{color:#fff;font-size:clamp(2rem,4vw,3rem)}
+  .cta p{color:#C4D0DA;font-size:1.12rem;margin-top:16px;max-width:44ch}
+  .cta .frs{display:flex;gap:22px;margin-top:22px;flex-wrap:wrap}
+  .cta .frs div{display:flex;align-items:center;gap:8px;font-size:.92rem;color:#dfe7ee}
+  .cta .frs .icon{color:#F6B48C}
+  .cta-box{background:rgba(255,255,255,.06);border:1px solid var(--dark-line);border-radius:var(--r-lg);padding:24px;text-align:center}
+  .cta-box .big{font-family:var(--display);font-weight:800;font-size:2rem}
+  .cta-box .big a{color:#fff}
+  .cta-box .or{color:#8fa0ad;font-size:.82rem;margin:12px 0;letter-spacing:.1em}
+  @media(max-width:820px){.cta .wrap{grid-template-columns:1fr}}
+
+  /* ===========================================================================
+     FOOTER (shared chrome)
+  =========================================================================== */
+  .foot{background:#0C1218;color:#9aa7b3;padding:64px 0 30px}
+  .foot .top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:36px}
+  .foot .brand{color:#fff;margin-bottom:14px}
+  .foot .brand small{color:#7C8A98}
+  .foot .blurb{font-size:.94rem;max-width:32ch}
+  .foot h5{color:#fff;font-family:var(--display);font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}
+  .foot ul{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+  .foot ul a{font-size:.92rem;cursor:pointer}
+  .foot ul a:hover{color:#fff}
+  .foot .social{display:flex;gap:10px;margin-top:18px}
+  .foot .social a{width:38px;height:38px;border-radius:9px;border:1px solid #24313d;display:grid;place-items:center;color:#fff}
+  .foot .social a:hover{background:var(--accent);border-color:var(--accent)}
+  .foot .bottom{margin-top:40px;padding-top:22px;border-top:1px solid #1c2833;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:.82rem}
+  @media(max-width:820px){.foot .top{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.foot .top{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- SVG sprite ------------------------------------------------------------- -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="ic-flame" viewBox="0 0 24 24"><path d="M12 3c1 3 4 4 4 8a4 4 0 1 1-8 0c0-1 .5-2 1-2.5C9.5 10 9 7 12 3z"/><path d="M12 21a4 4 0 0 0 4-4"/></symbol>
+  <symbol id="ic-snow" viewBox="0 0 24 24"><path d="M12 2v20M4 6l16 12M20 6L4 18"/><path d="M12 6l-2-2m2 2 2-2m-2 14 2 2m-2-2-2 2"/></symbol>
+  <symbol id="ic-wind" viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 16h15a3 3 0 1 1-3 3M3 12h9"/></symbol>
+  <symbol id="ic-wrench" viewBox="0 0 24 24"><path d="M14 6a4 4 0 0 0 5 5l-9 9-5-5 9-9z"/><path d="M14 6l-2-2a4 4 0 0 0-5-1"/></symbol>
+  <symbol id="ic-gauge" viewBox="0 0 24 24"><path d="M12 14l4-4"/><path d="M4 18a8 8 0 1 1 16 0"/><circle cx="12" cy="14" r="1.2"/></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
+  <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
+  <symbol id="ic-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="ic-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="ic-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="ic-star" viewBox="0 0 24 24"><path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.9 6.7 19.5l1.1-6L3.4 9.3l6-.8z"/></symbol>
+  <symbol id="ic-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="ic-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></symbol>
+  <symbol id="ic-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M9 14l-2 7 5-3 5 3-2-7"/></symbol>
+  <symbol id="ic-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.5M15 20a6 6 0 0 1 6 0"/></symbol>
+  <symbol id="ic-dollar" viewBox="0 0 24 24"><path d="M12 3v18M8 8a3 3 0 0 1 3-3h2a3 3 0 0 1 0 6h-2a3 3 0 0 0 0 6h2a3 3 0 0 0 3-3"/></symbol>
+</svg>
+
+<!-- =====================  MOCKUP TOOLBAR  (review tool)  ================== -->
+<div class="mock-bar">
+  <div class="wrap">
+    <span class="mock-tag">Mockup · client site</span>
+    <div class="mock-tabs" id="tabs">
+      <button data-target="home" class="active">Home <span class="tmpl">home-standard</span></button>
+      <button data-target="services">Services <span class="tmpl">services-standard</span></button>
+      <button data-target="about">About <span class="tmpl">about-standard</span></button>
+      <button data-target="contact">Contact <span class="tmpl">contact-standard</span></button>
+      <button data-target="reviews">Reviews <span class="tmpl">optional · reviews-standard</span></button>
+    </div>
+    <span class="mock-opt">Sample: Summit Comfort Heating &amp; Air (HVAC)</span>
+  </div>
+</div>
+
+<!-- =====================  SITE NAV  (shared chrome)  ===================== -->
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" data-nav="home">
+      <span class="mark"><svg class="icon"><use href="#ic-snow"/></svg></span>
+      <span>Summit Comfort<small>Heating &amp; Air · Central FL</small></span>
+    </a>
+    <div class="nav-links" id="navlinks">
+      <a data-nav="home">Home</a>
+      <a data-nav="services">Services</a>
+      <a data-nav="about">About</a>
+      <a data-nav="reviews">Reviews</a>
+      <a data-nav="contact">Contact</a>
+    </div>
+    <div class="nav-cta">
+      <span class="nav-phone"><svg class="icon"><use href="#ic-phone"/></svg><span>(352) 555-0140</span></span>
+      <a class="btn btn-accent" data-nav="contact">Get a free quote</a>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+<!-- =======================================================================
+     PAGE: HOME  (home-standard)
+     nav · hero · trust · about · services · work · testimonials · finalCta · footer
+======================================================================== -->
+<div class="page active" id="home">
+
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">Licensed &amp; insured · 24/7 emergency service</span>
+        <h1>AC out? We can be there <span class="accent">today.</span></h1>
+        <p class="sub">Same-day repairs, honest flat-rate quotes, and technicians who show up on time. Keeping Central Florida homes comfortable since 2009.</p>
+        <div class="hero-stats">
+          <div><svg class="icon"><use href="#ic-clock"/></svg>Same-day service</div>
+          <div><svg class="icon"><use href="#ic-award"/></svg>15+ years local</div>
+          <div><svg class="icon"><use href="#ic-shield"/></svg>5-year labor warranty</div>
+        </div>
+      </div>
+      <div class="lead">
+        <h3>Get a free quote</h3>
+        <p class="lead-sub">Tell us what is going on and we will call you right back.</p>
+        <form onsubmit="return false">
+          <div class="field"><label>Full name</label><input placeholder="Jordan Reyes" /></div>
+          <div class="field"><label>Phone</label><input placeholder="(352) 555-0000" /></div>
+          <button class="btn btn-accent btn-lg" style="justify-content:center">Request my quote <svg class="icon"><use href="#ic-arrow"/></svg></button>
+          <div class="fine"><svg class="icon"><use href="#ic-check"/></svg>No obligation. Response within 1 hour.</div>
+        </form>
+        <div class="rating-inline"><span class="stars">★★★★★</span> 4.9 from 340+ local homeowners</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="trust">
+    <div class="wrap">
+      <div class="item"><svg class="icon"><use href="#ic-shield"/></svg>Licensed &amp; insured · CAC1234567</div>
+      <div class="sep"></div>
+      <div class="item"><svg class="icon"><use href="#ic-clock"/></svg>24/7 emergency service</div>
+      <div class="sep"></div>
+      <div class="item"><svg class="icon"><use href="#ic-dollar"/></svg>Financing available</div>
+      <div class="sep"></div>
+      <div class="item"><svg class="icon"><use href="#ic-check"/></svg>Satisfaction guaranteed</div>
+    </div>
+  </div>
+
+  <section class="about">
+    <div class="wrap">
+      <div class="about-media">
+        <div class="photo" data-label="Photo: technician + van"><svg class="icon"><use href="#ic-camera"/></svg></div>
+        <div class="float-card"><span class="big">9k+</span><small>homes kept<br/>comfortable</small></div>
+      </div>
+      <div>
+        <span class="eyebrow">About us</span>
+        <h2>Family-owned comfort specialists you can actually reach.</h2>
+        <p style="color:var(--ink-soft);font-size:1.06rem;margin-top:16px">We started Summit Comfort to do HVAC the honest way: clear pricing, no upsells, and a real person on the phone. Every technician is background-checked, NATE-certified, and trained to leave your home cleaner than they found it.</p>
+        <div class="pillars">
+          <div class="pillar"><span class="pi"><svg class="icon"><use href="#ic-dollar"/></svg></span><div><h4>Upfront flat-rate pricing</h4><p>You approve the price before we start. No surprises on the invoice.</p></div></div>
+          <div class="pillar"><span class="pi"><svg class="icon"><use href="#ic-users"/></svg></span><div><h4>Certified technicians</h4><p>NATE-certified, background-checked, and never subcontracted out.</p></div></div>
+          <div class="pillar"><span class="pi"><svg class="icon"><use href="#ic-clock"/></svg></span><div><h4>Fast response</h4><p>Same-day appointments and true 24/7 emergency coverage.</p></div></div>
+        </div>
+        <div class="statstrip">
+          <div><div class="n">15 yrs</div><div class="l">Serving Lake County</div></div>
+          <div><div class="n">9,000+</div><div class="l">Homes serviced</div></div>
+          <div><div class="n">4.9★</div><div class="l">Average rating</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--bg-soft)">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">What we do</span>
+        <h2>Complete heating and cooling, <span class="accent">done right.</span></h2>
+        <p>From a noisy 2 a.m. breakdown to a planned system upgrade, one local team handles it all.</p>
+      </div>
+      <div class="svc-grid" id="home-svc"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Recent work</span>
+        <h2>Jobs we finished this month.</h2>
+        <p>Real installs and repairs across the towns we serve.</p>
+      </div>
+      <div class="work-grid">
+        <div class="job"><div class="photo" data-label="Photo: install"><svg class="icon"><use href="#ic-camera"/></svg></div><div class="body"><div class="meta"><span>Clermont, FL</span><span>2026</span></div><h4>Full system replacement</h4><p class="scope">3-ton high-efficiency heat pump, one day turnaround.</p></div></div>
+        <div class="job"><div class="photo" data-label="Photo: mini-split"><svg class="icon"><use href="#ic-camera"/></svg></div><div class="body"><div class="meta"><span>Winter Garden, FL</span><span>2026</span></div><h4>Ductless mini-split install</h4><p class="scope">Two-zone system for a converted garage suite.</p></div></div>
+        <div class="job"><div class="photo" data-label="Photo: repair"><svg class="icon"><use href="#ic-camera"/></svg></div><div class="body"><div class="meta"><span>Groveland, FL</span><span>2026</span></div><h4>Emergency AC repair</h4><p class="scope">Same-night compressor fix, family cooling again by 9 p.m.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--bg-soft)">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Reviews</span><h2>Neighbors who trust us.</h2></div>
+      <div class="tg" id="home-tg"></div>
+    </div>
+  </section>
+
+  <!-- finalCta -->
+  <div class="cta-anchor"></div>
+</div><!-- /home -->
+
+<!-- =======================================================================
+     PAGE: SERVICES  (services-standard)
+     pageHeader · services · faq · finalCta
+======================================================================== -->
+<div class="page" id="services">
+  <section class="ph">
+    <div class="wrap">
+      <div class="crumbs"><a data-nav="home">Home</a> / Services</div>
+      <span class="eyebrow">What we do</span>
+      <h1>Our Services</h1>
+      <p>From emergency repairs to full system installs and maintenance plans, we keep Central Florida homes comfortable every season.</p>
+      <div class="ph-cta">
+        <a class="btn btn-accent" data-nav="contact">Get a free quote <svg class="icon"><use href="#ic-arrow"/></svg></a>
+        <a class="btn btn-ghost"><svg class="icon"><use href="#ic-phone"/></svg> (352) 555-0140</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap"><div class="svc-grid" id="svc-svc"></div></div>
+  </section>
+
+  <section style="background:var(--bg-soft)">
+    <div class="wrap">
+      <div class="sec-head" style="margin-left:auto;margin-right:auto;text-align:center"><span class="eyebrow" style="justify-content:center">FAQ</span><h2>Questions before you book.</h2></div>
+      <div class="faq-acc" id="svc-faq"></div>
+    </div>
+  </section>
+  <div class="cta-anchor"></div>
+</div><!-- /services -->
+
+<!-- =======================================================================
+     PAGE: ABOUT  (about-standard)
+     pageHeader(image) · about · service-area · testimonials · finalCta
+======================================================================== -->
+<div class="page" id="about">
+  <section class="ph image">
+    <div class="wrap">
+      <div class="crumbs"><a data-nav="home">Home</a> / About</div>
+      <span class="badge"><svg class="icon"><use href="#ic-award"/></svg> Locally owned since 2009</span>
+      <h1 style="margin-top:16px">About Summit Comfort</h1>
+      <p>Fifteen years of honest HVAC work across Lake County. Here is who we are and why homeowners keep calling us back.</p>
+    </div>
+  </section>
+
+  <section class="about">
+    <div class="wrap">
+      <div class="about-media">
+        <div class="photo tall" data-label="Photo: the team"><svg class="icon"><use href="#ic-users"/></svg></div>
+      </div>
+      <div>
+        <span class="eyebrow">Our story</span>
+        <h2>Built on referrals, not gimmicks.</h2>
+        <p style="color:var(--ink-soft);font-size:1.06rem;margin-top:16px">Owner Marcus Lane spent a decade installing systems for a national chain before starting Summit Comfort in his garage. The promise was simple: treat every home like it belongs to family, quote a fair price, and stand behind the work.</p>
+        <p style="color:var(--ink-soft);font-size:1.06rem;margin-top:14px">Today we are a team of twelve certified technicians, and nearly every new customer still comes from a neighbor's recommendation.</p>
+        <div class="statstrip">
+          <div><div class="n">12</div><div class="l">Certified techs</div></div>
+          <div><div class="n">100%</div><div class="l">NATE-certified</div></div>
+          <div><div class="n">1 hr</div><div class="l">Avg callback time</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--bg-soft)">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Service area</span><h2>Proudly serving Lake County and Central Florida.</h2><p>If you are nearby and not listed, call us. We probably cover you too.</p></div>
+      <div class="areas">
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Clermont</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Minneola</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Groveland</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Winter Garden</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Montverde</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Mascotte</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Oakland</span>
+        <span><svg class="icon"><use href="#ic-pin"/></svg>Ferndale</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Reviews</span><h2>What neighbors say.</h2></div>
+      <div class="tg" id="about-tg"></div>
+    </div>
+  </section>
+  <div class="cta-anchor"></div>
+</div><!-- /about -->
+
+<!-- =======================================================================
+     PAGE: CONTACT  (contact-standard)
+     pageHeader · contact · faq(sticky) · finalCta
+======================================================================== -->
+<div class="page" id="contact">
+  <section class="ph">
+    <div class="wrap">
+      <div class="crumbs"><a data-nav="home">Home</a> / Contact</div>
+      <span class="eyebrow">Get in touch</span>
+      <h1>Let's get you comfortable.</h1>
+      <p>Call for same-day service, or send a message and we will respond within the hour during business hours.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap contact-split">
+      <div class="contact-card">
+        <h3 style="font-size:1.4rem">Send us a message</h3>
+        <form onsubmit="return false">
+          <div class="row2">
+            <div class="field"><label>Name</label><input placeholder="Jordan Reyes" /></div>
+            <div class="field"><label>Phone</label><input placeholder="(352) 555-0000" /></div>
+          </div>
+          <div class="field"><label>Email</label><input placeholder="you@email.com" /></div>
+          <div class="field"><label>How can we help?</label><textarea placeholder="My AC is blowing warm air..."></textarea></div>
+          <button class="btn btn-accent btn-lg" style="justify-content:center">Send message <svg class="icon"><use href="#ic-arrow"/></svg></button>
+        </form>
+      </div>
+      <div class="details">
+        <div class="drow"><span class="di"><svg class="icon"><use href="#ic-phone"/></svg></span><div><b>Call or text</b><div class="v">(352) 555-0140</div></div></div>
+        <div class="drow"><span class="di"><svg class="icon"><use href="#ic-mail"/></svg></span><div><b>Email</b><div class="v">hello@summitcomfort.com</div></div></div>
+        <div class="drow"><span class="di"><svg class="icon"><use href="#ic-pin"/></svg></span><div><b>Office</b><div class="v">210 Citrus Tower Blvd<small>Clermont, FL 34711</small></div></div></div>
+        <div class="drow"><span class="di"><svg class="icon"><use href="#ic-clock"/></svg></span><div><b>Hours</b><div class="v">Mon–Fri, 7a–7p<small>24/7 emergency line always open</small></div></div></div>
+        <div class="map"><svg class="icon pin"><use href="#ic-pin"/></svg></div>
+      </div>
+    </div>
+  </section>
+  <div class="cta-anchor"></div>
+</div><!-- /contact -->
+
+<!-- =======================================================================
+     PAGE: REVIEWS  (optional · reviews-standard)
+     pageHeader · testimonials · trust(reviews aggregate) · finalCta
+======================================================================== -->
+<div class="page" id="reviews">
+  <section class="ph">
+    <div class="wrap">
+      <div class="crumbs"><a data-nav="home">Home</a> / Reviews</div>
+      <span class="badge"><span class="stars">★★★★★</span> 4.9 average · 340+ reviews</span>
+      <h1 style="margin-top:16px">What our customers say</h1>
+      <p>We have earned our reputation one honest visit at a time. Here is what Central Florida homeowners think.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap"><div class="tg full" id="rev-tg"></div></div>
+  </section>
+
+  <section style="background:var(--ink);color:#fff">
+    <div class="wrap" style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center">
+      <div><div class="statstrip" style="border:0;padding:0;margin:0;display:block"><div class="n" style="color:#fff;font-size:2.6rem">4.9★</div><div class="l" style="color:#9fb0bd">Average rating</div></div></div>
+      <div><div class="n" style="color:#fff;font-family:var(--display);font-weight:800;font-size:2.6rem">340+</div><div class="l" style="color:#9fb0bd">Verified reviews</div></div>
+      <div><div class="n" style="color:#fff;font-family:var(--display);font-weight:800;font-size:2.6rem">98%</div><div class="l" style="color:#9fb0bd">Would recommend</div></div>
+      <div><div class="n" style="color:#fff;font-family:var(--display);font-weight:800;font-size:2.6rem">9k+</div><div class="l" style="color:#9fb0bd">Homes served</div></div>
+    </div>
+  </section>
+  <div class="cta-anchor"></div>
+</div><!-- /reviews -->
+
+</main>
+
+<!-- =====================  SHARED FINAL CTA + FOOTER  ===================== -->
+<template id="cta-tpl">
+  <section class="cta">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow on-dark">Ready when you are</span>
+        <h2>Ready for reliable comfort?</h2>
+        <p>Book a same-day visit or get a free, no-pressure quote on a new system.</p>
+        <div class="frs">
+          <div><svg class="icon"><use href="#ic-check"/></svg>Free estimates</div>
+          <div><svg class="icon"><use href="#ic-check"/></svg>Upfront pricing</div>
+          <div><svg class="icon"><use href="#ic-check"/></svg>1-hour callback</div>
+        </div>
+      </div>
+      <div class="cta-box">
+        <div style="color:#9fb0bd;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700">Call now</div>
+        <div class="big"><a href="tel:3525550140">(352) 555-0140</a></div>
+        <div class="or">— OR —</div>
+        <a class="btn btn-accent btn-lg" style="width:100%;justify-content:center" data-nav="contact">Request a free quote</a>
+      </div>
+    </div>
+  </section>
+</template>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="brand"><span class="mark"><svg class="icon"><use href="#ic-snow"/></svg></span><span style="color:#fff">Summit Comfort<small>Heating &amp; Air</small></span></div>
+        <p class="blurb">Honest, local heating and cooling for Central Florida homes since 2009. Licensed, insured, and always on call.</p>
+        <div class="social">
+          <a>f</a><a>in</a><a>◎</a>
+        </div>
+      </div>
+      <div><h5>Services</h5><ul><li><a data-nav="services">AC Repair</a></li><li><a data-nav="services">AC Installation</a></li><li><a data-nav="services">Heating &amp; Furnace</a></li><li><a data-nav="services">Maintenance Plans</a></li></ul></div>
+      <div><h5>Company</h5><ul><li><a data-nav="about">About us</a></li><li><a data-nav="reviews">Reviews</a></li><li><a data-nav="services">Service area</a></li><li><a data-nav="contact">Contact</a></li></ul></div>
+      <div><h5>Contact</h5><ul><li><a>(352) 555-0140</a></li><li><a>hello@summitcomfort.com</a></li><li><a>Clermont, FL 34711</a></li><li><a>24/7 emergency line</a></li></ul></div>
+    </div>
+    <div class="bottom">
+      <span>© 2026 Summit Comfort Heating &amp; Air. FL License CAC1234567.</span>
+      <span>Privacy · Terms · Accessibility</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  /* ---- Content data (mirrors the section content the builder fills) ---- */
+  const SERVICES = [
+    {ic:'ic-snow',  tag:'Cooling',    t:'AC Repair',            d:'Fast diagnosis and same-day fixes for any make or model.'},
+    {ic:'ic-wind',  tag:'Cooling',    t:'AC Installation',      d:'High-efficiency systems sized right for your home and budget.'},
+    {ic:'ic-flame', tag:'Heating',    t:'Heating & Furnace',    d:'Heat pumps and furnaces installed, tuned, and repaired.'},
+    {ic:'ic-wrench',tag:'Air quality',t:'Duct Cleaning',        d:'Clear out dust and allergens for cleaner air and better flow.'},
+    {ic:'ic-gauge', tag:'Plans',      t:'Maintenance Plans',    d:'Twice-yearly tune-ups that prevent breakdowns and cut bills.'},
+    {ic:'ic-shield',tag:'Air quality',t:'Indoor Air Quality',   d:'Filtration, UV, and humidity control for a healthier home.'},
+  ];
+  const REVIEWS = [
+    {n:'Dana R.',   loc:'Clermont, FL',     q:'Called at 7am with no AC, and they had a tech at my door by 10. Fixed it, explained everything, and the price was exactly what they quoted.'},
+    {n:'Miguel S.', loc:'Winter Garden, FL',q:'We got three quotes for a new system. Summit was not the cheapest, but they were the only ones who actually measured and explained the sizing. Zero regrets.'},
+    {n:'Priya K.',  loc:'Groveland, FL',    q:'Honest, on time, and they wore booties in the house without being asked. This is our HVAC company for good now.'},
+    {n:'Tom B.',    loc:'Minneola, FL',     q:'The maintenance plan already paid for itself. They caught a failing capacitor before it left us sweating in July.'},
+    {n:'Alicia M.', loc:'Montverde, FL',    q:'Straightforward pricing and no upsell games. The technician showed me the worn part instead of just telling me.'},
+    {n:'Wes & Carol',loc:'Oakland, FL',     q:'Twelve years with our old unit and Summit made the replacement painless. Cooler house, lower bills, friendly crew.'},
+  ];
+  const FAQS = [
+    {q:'Do you charge for estimates?', a:'No. Quotes on repairs and new system installs are always free and come with no obligation.'},
+    {q:'How fast can you come out?',   a:'Most repair calls are handled same-day, and our emergency line is staffed 24/7 for no-cool and no-heat situations.'},
+    {q:'Do you offer financing?',      a:'Yes. We offer flexible financing on new systems with approved credit, including 0% options at certain times of year.'},
+    {q:'Are you licensed and insured?',a:'Fully. We carry Florida license CAC1234567 and full liability coverage. Every technician is background-checked and NATE-certified.'},
+    {q:'What areas do you serve?',     a:'Lake County and the surrounding Central Florida communities, including Clermont, Minneola, Groveland, and Winter Garden.'},
+  ];
+  const svcCard = s => `<div class="svc"><div class="ic"><svg class="icon"><use href="#${s.ic}"/></svg></div><div class="tag">${s.tag}</div><h3>${s.t}</h3><p>${s.d}</p><span class="more">Learn more <svg class="icon"><use href="#ic-arrow"/></svg></span></div>`;
+  const initials = n => n.split(/[ &]+/).slice(0,2).map(w=>w[0]).join('');
+  const revCard = r => `<div class="quote"><div class="stars">★★★★★</div><p>“${r.q}”</p><div class="who"><span class="avatar">${initials(r.n)}</span><div><b>${r.n}</b><small>${r.loc}</small></div></div></div>`;
+  const faqRow = f => `<details class="qa"><summary>${f.q}<span class="pm"><svg class="icon"><use href="#ic-arrow"/></svg></span></summary><p>${f.a}</p></details>`;
+
+  document.getElementById('home-svc').innerHTML = SERVICES.map(svcCard).join('');
+  document.getElementById('svc-svc').innerHTML  = SERVICES.map(svcCard).join('');
+  document.getElementById('home-tg').innerHTML  = REVIEWS.slice(0,3).map(revCard).join('');
+  document.getElementById('about-tg').innerHTML = REVIEWS.slice(0,3).map(revCard).join('');
+  document.getElementById('rev-tg').innerHTML   = REVIEWS.map(revCard).join('');
+  document.getElementById('svc-faq').innerHTML  = FAQS.map(faqRow).join('');
+  /* the + icon in FAQ rows: reuse arrow rotated? simpler: overwrite with a plus glyph */
+  document.querySelectorAll('.qa .pm .icon use').forEach(u=>u.setAttribute('href','#ic-arrow'));
+
+  // Inject shared final CTA into every page's anchor
+  const ctaHTML = document.getElementById('cta-tpl').innerHTML;
+  document.querySelectorAll('.cta-anchor').forEach(a=>a.outerHTML = ctaHTML);
+  // home has its CTA anchor too
+  // (querySelectorAll already handled all including home)
+
+  /* ---- Page switching (tab bar + in-site nav both drive this) ---- */
+  const pages = ['home','services','about','contact','reviews'];
+  function show(id){
+    if(!pages.includes(id)) return;
+    document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.id===id));
+    document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.target===id));
+    document.querySelectorAll('#navlinks a').forEach(a=>a.toggleAttribute('aria-current', a.dataset.nav===id));
+    const navlink = document.querySelector('#navlinks a[data-nav="'+id+'"]');
+    document.querySelectorAll('#navlinks a').forEach(a=>a.removeAttribute('aria-current'));
+    if(navlink) navlink.setAttribute('aria-current','page');
+    window.scrollTo({top:0,behavior:'instant' in window ? 'instant':'auto'});
+  }
+  document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.target)));
+  document.addEventListener('click',e=>{
+    const el = e.target.closest('[data-nav]');
+    if(el){ e.preventDefault(); show(el.dataset.nav); }
+  });
+  show('home');
+</script>
+</body>
+</html>

@@ -18,7 +18,6 @@ import ClientCard from './ClientCard';
 import IndexControls, { type SortKey } from './IndexControls';
 import IntakeCard from './IntakeCard';
 import IntakeImportDialog from './IntakeImportDialog';
-import NewClientDialog from './NewClientDialog';
 import PendingOnboardCard, { type PendingOnboardSummary } from './PendingOnboardCard';
 
 /**
@@ -123,7 +122,11 @@ export default function ClientIndex() {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [creating, setCreating] = useState(false);
+  /**
+   * The client Convert just created, from `/clients?new=<slug>`. Held in state and the param
+   * stripped straight away, so a refresh doesn't replay the scroll and flash.
+   */
+  const [highlightSlug, setHighlightSlug] = useState<string | null>(null);
   /**
    * `_`-prefixed fixtures are hidden by default — clients/ holds a handful of `_e2e*` folders
    * the provisioning tests run against, and a front door that is half test data is not a front
@@ -235,9 +238,26 @@ export default function ClientIndex() {
     });
   }, []);
 
-  // A client just created has no work in it yet, so it goes straight to Build rather than
-  // through the status routing at /c/{slug}.
-  const openBuild = useCallback((slug: string) => router.push(`/c/${slug}/build`), [router]);
+  // Read the ?new= param once. window rather than useSearchParams: that hook forces a Suspense
+  // boundary around this whole tree for one optional flag.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('new');
+    if (!slug) return;
+    setHighlightSlug(slug);
+    router.replace('/clients');
+  }, [router]);
+
+  // Scroll to the new card once the grid has it, flash it, then let the flash go. Waits on
+  // `loading` because the card can't exist before the roster has loaded. A card hidden by an
+  // active filter is simply absent, and the scroll is skipped rather than forced.
+  useEffect(() => {
+    if (!highlightSlug || loading) return;
+    document
+      .getElementById(`client-card-${highlightSlug}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const t = setTimeout(() => setHighlightSlug(null), 2600);
+    return () => clearTimeout(t);
+  }, [highlightSlug, loading]);
 
   /**
    * Claim a signup and reload the roster so its card converts in place.
@@ -369,9 +389,9 @@ export default function ClientIndex() {
     <div className="relative z-10 flex h-full flex-col">
       {/* The bar used to carry all four of these plus a "Clients" title. Now: the title is a
           real h1 in the page below, Refresh is an icon in the navbar's utility cluster
-          (where every route's refresh lives), "New client" is a fixed button in the controls
-          row below (not a grid cell — its position shouldn't move with the filters), and
-          only the cross-route link is left as an action. */}
+          (where every route's refresh lives), and only the cross-route links are left as
+          actions. There is deliberately no "New client" button: every client starts as a
+          lead and is created by Convert on /leads. */}
       <NavSlot>
         <Link href="/archive" className="btn btn-xs">
           Archive
@@ -436,7 +456,6 @@ export default function ClientIndex() {
               onToggleFixtures={toggleFixtures}
               shown={entries.length}
               total={clients.length + intakes.length + pendingOnboard.length}
-              onNew={() => setCreating(true)}
             />
 
             {intakeError && (
@@ -474,6 +493,7 @@ export default function ClientIndex() {
                     health={health[c.slug]}
                     lastTouched={activity[c.slug]}
                     attention={attentionBySlug.get(c.slug)}
+                    highlight={c.slug === highlightSlug}
                     onSelect={() => router.push(`/c/${c.slug}`)}
                   />
                 );
@@ -486,8 +506,11 @@ export default function ClientIndex() {
                   'No matches.'
                 ) : (
                   <>
-                    No clients yet. Use <span className="font-medium text-fg2">New client</span> to add
-                    one.
+                    No clients yet. Clients start as leads: convert a won lead from the{' '}
+                    <Link href="/leads" className="font-medium text-fg2 underline">
+                      Leads board
+                    </Link>
+                    .
                   </>
                 )}
               </p>
@@ -495,8 +518,6 @@ export default function ClientIndex() {
           </div>
         </div>
       )}
-
-      {creating && <NewClientDialog onCreated={openBuild} onClose={() => setCreating(false)} />}
 
       {pendingIntake && (
         <IntakeImportDialog

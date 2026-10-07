@@ -1,5 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
-import { getManageClient, SLUG_RE } from '@/lib/manageSites';
+import { getManageClient, isManageable, SLUG_RE } from '@/lib/manageSites';
+import { getOnboardingGate } from '@/lib/onboardingGate';
+import AwaitingOnboarding from '@/components/manage/AwaitingOnboarding';
 import { DEFAULT_SECTION, findSection, MANAGE_SECTIONS } from '@/lib/manageSections';
 import { getPendingOnboardRecord, buildPendingClientContext, pendingKvConfigured } from '@/lib/pendingKv';
 import OverviewSection from '@/components/manage/OverviewSection';
@@ -30,6 +32,13 @@ export default async function ManageSectionPage({
   if (!SLUG_RE.test(params.slug)) notFound();
 
   let ctx = await getManageClient(params.slug);
+
+  // Same marking the manage layout does; see there for why it is a copy of the cached context.
+  if (ctx && ctx.sites.length > 0 && !isManageable(ctx)) {
+    const gate = await getOnboardingGate(ctx);
+    if (!gate.onboarded) ctx = { ...ctx, awaitingOnboarding: { email: gate.email } };
+  }
+
   if (!ctx || ctx.sites.length === 0) {
     if (!pendingKvConfigured()) notFound();
     try {
@@ -55,6 +64,18 @@ export default async function ManageSectionPage({
       <SectionPlaceholder
         title={`${section.label} unavailable`}
         message="This section becomes available once the client completes onboarding."
+      />
+    );
+  }
+
+  // A converted lead still waiting on the agency-site onboarding: Overview is the welcome-email
+  // card, and everything else is locked until they finish.
+  if (ctx.awaitingOnboarding) {
+    if (section.id === 'overview') return <AwaitingOnboarding />;
+    return (
+      <SectionPlaceholder
+        title={`${section.label} unavailable`}
+        message="This section becomes available once the client completes onboarding on the agency site."
       />
     );
   }

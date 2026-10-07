@@ -122,6 +122,25 @@ export interface DomainConfig {
   acceptedChallenges: string[];
 }
 
+export interface FirewallRule {
+  name: string;
+  present: boolean;
+  active: boolean;
+  id: string | null;
+}
+
+export interface FirewallStatus {
+  ok: boolean;
+  reason?: string;
+  rules: FirewallRule[];
+}
+
+export interface FirewallSyncResult {
+  ok: boolean;
+  reason?: string;
+  applied?: string[];
+}
+
 interface VercelSyncModule {
   sanitizeProjectName(slug: string): string;
   /** Exported by the module but previously undeclared here. */
@@ -157,6 +176,10 @@ interface VercelSyncModule {
   getDomainConfig(domain: string): Promise<DomainConfig>;
   /** Throws, unlike the list* functions. */
   triggerRedeploy(opts: { slug: string; log?: (line: string) => void }): Promise<Deployment>;
+  /** Read current JDD firewall rule state. Never throws — degrades to { ok: false }. */
+  getFirewallStatus(slug: string): Promise<FirewallStatus>;
+  /** Apply/update the JDD WAF rules. Never throws — degrades to { ok: false }. */
+  syncVercelFirewall(slug: string, opts?: { log?: (line: string) => void }): Promise<FirewallSyncResult>;
 }
 
 const cache = new Map<string, Promise<VercelSyncModule>>();

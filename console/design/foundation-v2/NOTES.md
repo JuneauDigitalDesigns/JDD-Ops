@@ -1,0 +1,567 @@
+# Implementation notes: template fidelity upgrade (v2)
+
+Running log kept by the executor. Phase 0 onward appends below the prerequisites section.
+Read `PLAN-template-fidelity-v2.md` for what each step means; this file only records outcomes.
+
+## Prerequisites, completed 2026-10-05
+
+| # | Outcome |
+|---|---|
+| P1 | `npm install` in `template/` resolved `@jdd/ui@1.0.2` under the active `JuneauDigitalDesigns` gh account. `npm run build` passed clean (11 routes). |
+| P4 | Read the full uncommitted `jdd-schema` diff before touching it: additive only, matched the plan's table exactly (`ServiceItem.detail`, `AboutContent.story`, `SectionStyle`, `PageHeaderContent`, `SubpageContent`, `SiteContent.subpages`, plus `SiteContent.sectionStyles`). `npm run build` and `npm test` (219/219) passed pre-tag. Bumped `package.json` to `1.20.0` by hand (not `npm version`), committed `591d856`, tagged `v1.20.0`, pushed. All six additions confirmed present in `dist/site.d.ts`, never checked against `src`. |
+| P2 | Ran as a side effect of P4's re-pin step, per the plan's own note. `npm install "github:JuneauDigitalDesigns/jdd-schema#v1.20.0"` in `console/` rewrote `package.json`'s `@jdd/schema` entry from `file:../../jdd-schema` to the github tag directly; no manual edit needed. `npm run check-schema` prints the expected success line with all three consumers agreeing at `1.20.0`. |
+| P3 | No action taken, by design. `packages/ui` tree still shows only `M src/palette.ts` (the uncommitted `sectionVars`), nothing staged, no stash. Left for Phase 2 to delete. |
+
+Full verification run, all green:
+- `cd template && npm ls @jdd/ui` → `@jdd/ui@1.0.2`; `npm run build` → exit 0
+- `grep -nE "detail\?|story\?|SectionStyle|PageHeaderContent|SubpageContent|subpages" jdd-schema/dist/site.d.ts` → all six present
+- `console: npm run check-schema` → `@jdd/schema pinned and installed consistently at github:JuneauDigitalDesigns/jdd-schema#v1.20.0.`
+- `jdd-ops: node onboard.js --schema clients/_e2e_test_growth/site.ts --dry-run` → exit 0 (pre-existing `_meta.missingFields` warnings on that fixture are unrelated to this change)
+- `juneau-digital-designs: npm run build` → exit 0
+
+One transient tooling error (a Bash safety-classifier hiccup, "claude-sonnet-5 is temporarily unavailable") interrupted the agency build on the first attempt; retried immediately and it passed. Not a code or schema issue.
+
+No deviations from the plan. Decision 48's correction stands: `services.items[].detail` now exists in both the copy-generation schema (`console/src/lib/copy-schema.ts`, already committed) and the site-content schema (`@jdd/schema`, now tagged `v1.20.0`).
+
+## §0.1 known-green baseline, established 2026-10-06
+
+| Command | Result |
+|---|---|
+| `cd template && npm run build` | pass, exit 0 |
+| `cd console && npm test` | pass, 106/106, 6 suites |
+| `cd console && npm run build` | pass, exit 0, after one unrelated detour (below) |
+| `cd console && npm run check-schema` | pass, pinned at `v1.20.0` across all three consumers |
+
+**Detour, not caused by this plan.** The first `console && npm run build` attempt EPERM'd on
+`.next/trace`, then a naive retry hung for 3 hours because the retry was piped through `tail`,
+which silently discarded the real exit code (`cmd | tail; echo $?` reports `tail`'s exit code,
+not the build's). Root cause of the EPERM: a live `next dev -p 3040` server (PIDs 27300/26132/
+32284) was holding the `.next` directory. Identified via `Get-CimInstance Win32_Process`, asked
+before touching it, user confirmed, stopped it, `rm -rf .next`, rebuilt clean.
+
+That rebuild then surfaced a real, pre-existing, plan-unrelated type error: `audit.ts` had an
+uncommitted `'client.welcome'` addition to `AuditAction` plus a new untracked 74-line
+`src/app/api/manage/firewall/route.ts` that used `action: 'firewall.apply'`, never added to the
+union. Investigated before touching anything (this looked like interrupted in-progress work, not
+mine to silently fix): `getFirewallStatus`/`syncVercelFirewall` already existed and worked in
+`vercelSync.ts`, the route called them correctly, this was one missing union member from done.
+Asked the user; they confirmed. Added `| 'firewall.apply'` to `AuditAction`. A second, different
+error then surfaced: `detail: result` failed because `FirewallSyncResult` (a closed interface,
+no index signature) can't satisfy `Record<string, unknown>`. Asked again rather than assuming
+blanket permission extended past the first fix; confirmed; changed to `detail: { ...result }`
+(a spread, not a cast). Re-ran `npm test` (106/106, confirming the two edits were isolated) and
+`npm run build` (real exit 0, captured to a log file, not through `tail`, this time). Both fixes
+are mechanical completions of an already-working feature, not design decisions: no behavior was
+invented, nothing beyond the two compile errors was touched, nothing was committed.
+
+**Lesson for later phases:** never pipe a build command through `tail` or any filter when the
+exit code matters; capture to a file with `cmd > log 2>&1; echo $? >> log` instead, the way the
+retry above did. A pipeline's `$?` is the last command's exit code, not the first's, and that
+silently converts a real failure into a false green.
+
+## Verified catalog inventory (0.A, re-confirmed 2026-10-06)
+
+```
+about/        AboutFeature, AboutStory
+contact/      ContactCardOverlap, ContactInlineStrip, ContactSplit
+faq/          FaqAccordion, FaqStickyAside
+finalCta/     FinalCtaBanner, FinalCtaSimple, FinalCtaSplit
+footer/       FooterColumns, FooterMinimal
+hero/         HeroFormFocus, HeroOverlap, HeroSplit
+nav/          NavEmergencyBar, NavMinimal
+pageHeader/   PageHeaderSimple
+seo/          SeoDefault, SeoLocalBusiness
+services/     ServicesAccordion, ServicesGrid, ServicesPanel
+testimonials/ TestimonialsCarousel, TestimonialsGrid
+trust/        ServiceArea, TrustBadges, TrustReviewsAggregate
+work/         BeforeAfter, RecentJobsGrid
+```
+30 components, 15 categories. Matched the plan's assumption exactly. The seven cited-but-absent
+files (`services/ServicesShowcase.tsx`, `services/ServicesSpotlight.tsx`, `work/WorkSpotlight.tsx`,
+`work/WorkGrid.tsx`, `work/WorkMasonry.tsx`, `testimonials/TestimonialsRotator.tsx`, and any
+testimonials marquee) were confirmed absent.
+
+## Reconciled archetype table
+
+Written into `console/DESIGN-LANGUAGE.md`. Copied here so Phase 4 has one place to transcribe
+`meta.archetype` values from without re-opening that file:
+
+| Archetype id | Reference implementation | Status |
+|---|---|---|
+| `asymmetric-split` | `hero/HeroSplit.tsx` | built |
+| `form-led-split` | `hero/HeroFormFocus.tsx` | built |
+| `full-bleed-overlay` | `hero/HeroOverlap.tsx` | built |
+| `card-grid` | `services/ServicesGrid.tsx` | built |
+| `sticky-swap` | `services/ServicesAccordion.tsx`, `faq/FaqStickyAside.tsx` | built |
+| `dense-mosaic` | `services/ServicesPanel.tsx`, `testimonials/TestimonialsGrid.tsx` | built |
+| `accordion` | `faq/FaqAccordion.tsx` | built |
+| `snap-carousel` | `testimonials/TestimonialsCarousel.tsx` | built |
+| `count-up-centerpiece` | `about/AboutFeature.tsx` | built |
+| `before-after` | `work/BeforeAfter.tsx` | built |
+| `overlap-split` | `contact/ContactCardOverlap.tsx`, `finalCta/FinalCtaSplit.tsx` | built |
+| `inline-strip` | `trust/TrustBadges.tsx`, `contact/ContactInlineStrip.tsx`, `footer/FooterMinimal.tsx` | built |
+| `aggregate-badge` | `trust/TrustReviewsAggregate.tsx` | built |
+| `map-list` | `trust/ServiceArea.tsx` | built |
+| `full-bleed-band` | `finalCta/FinalCtaBanner.tsx` | built |
+| `centered-statement` | `finalCta/FinalCtaSimple.tsx`, `pageHeader/PageHeaderSimple.tsx` | built |
+| `column-grid` | `footer/FooterColumns.tsx` | built |
+| `sticky-bar` | `nav/NavMinimal.tsx` | built |
+| `stacked-bars` | `nav/NavEmergencyBar.tsx` | built |
+| `editorial-index` | `services/ServicesShowcase.tsx` | not built, Phase 7 |
+| `stacked-panels` | `services/ServicesSpotlight.tsx` | not built, Phase 7 |
+| `feature-rail` | `work/WorkSpotlight.tsx` | not built, Phase 7 |
+| `horizontal-pin` | `work/WorkMasonry.tsx` | not built, Phase 7 |
+| `marquee` | `testimonials/TestimonialsMarquee.tsx` | not built, Phase 7 |
+| `hero-first-grid` | `work/RecentJobsGrid.tsx` | recomposed in Phase 7; today it is `card-grid` |
+| `numbered-ledger` | `stats/StatsLedger.tsx` | not built, Phase 8 |
+| `none` | `seo/SeoDefault.tsx`, `seo/SeoLocalBusiness.tsx` | built |
+
+`AboutStory.tsx` has no assigned archetype yet; Phase 4 assigns it when walking all 30 `meta`
+exports, not guessed here.
+
+## Phase 0, completed 2026-10-06
+
+Edited three files, no `.tsx` changes, no token/palette/font changes, confirmed by the clean
+`npm test` and `npm run build` passes above (the only build failure was the pre-existing,
+unrelated firewall gap, fixed and logged separately above).
+
+- `console/DESIGN-LANGUAGE.md`: full rewrite. Header block added verbatim. Archetype table
+  replaced with the reconciled 27-row table. `WorkGrid`/`TestimonialsRotator` deletion note
+  (decision 42) added directly under the table. "Five services variants" claim corrected to
+  three, with the Phase 7 addition noted. Testimonials per-category guidance lost "Rotator".
+  Motion section rewritten for decisions 26/28 (budget per page, not per section; cursor glow
+  and `parallaxY` cut). Editorial-print signature's eyebrow and numerals moved to neutral
+  (decision 10): `bg-accent` to `bg-rule`, "accent active" to "full-ink active". The two deleted
+  tracking snippets now point at Phase 1's real token names (`tracking-display`, `tracking-wide`)
+  rather than the invented ones; confirmed the actual names by reading Phase 1's `letterSpacing`
+  export before writing, since the eyebrow case needed `tracking-wide`, not `tracking-tight`, and
+  Phase 1's own comment on `wide` warns against assuming the old dramatic eyebrow tracking.
+- `design/catalog-v2/SPEC.md`: §9 amendment note added verbatim (decision 18), bullet glyph
+  matched exactly (`•`, not `-`).
+- `studio/catalog/COMPONENTS.md`: full replacement with the six-line superseded pointer.
+  `AUTHORING_CONTRACT.md` untouched, as instructed.
+
+**Judgment calls made, not specified by the plan:**
+1. Also fixed the intro line's echo of the "five services variants" claim (it said "the five
+   `services/*` variants", same error repeated two paragraphs above the one the plan named).
+   Leaving it would have contradicted the correction one section later.
+2. Converted per-category guidance to reference archetype ids/built-status consistently with the
+   new table, beyond the single required testimonials edit, since the header block's own claim
+   ("archetype ids are the same vocabulary") would otherwise be false for that section.
+3. Fixed the Guardrails section's "one signature motion moment per section" bullet, which
+   directly contradicted the decision-26 rewrite two sections above it in the same document.
+4. Stripped every em-dash in the file while rewriting it (not just the ones in content the plan
+   explicitly edited), per the hard constraint to strip existing ones when editing a page. Zero
+   remain, confirmed by `grep -cP '\x{2014}'`.
+
+No `@jdd/ui` tag cut this phase (no `packages/ui` source changed). No smooth-scroll decision to
+make, decision 54 already settles it.
+
+## Phase 1, completed 2026-10-06
+
+Gap G2 closed. The exported template now has a real token layer, shared with the console so the
+studio preview and the export cannot drift.
+
+**Created:**
+- `template/src/styles/tokens.ts`: the shared token source. Dependency-free (no imports at all),
+  because Tailwind's jiti config loader reads it from two different directories. Carries
+  `fontSize` (8 steps, fluid clamp with tracking baked into the display sizes),
+  `letterSpacing` (4), `spacing` (gutter + 3 section bands), `borderRadius` (3), `boxShadow` (5,
+  including the offset-shadow CTA pair), `maxWidth` (2). Values transcribed from SPEC §3 and §5,
+  not invented; I checked the clamp formulas against SPEC §3's measured table (h1 36 to 58px
+  capped, h2 32 to 42px) before writing.
+- `template/src/styles/rhythm.plugin.ts`: emits `rh-bleed | rh-tight | rh-normal | rh-loose |
+  rh-text`. Ships the classes before anything applies them, per the plan, so Phase 9a's wiring
+  can be verified as a separate change.
+
+**Modified:**
+- `template/tailwind.config.ts`: added the two imports, spliced the six scales into
+  `theme.extend` after `fontFamily`, `plugins: []` to `plugins: [rhythm]`, and added the
+  decision-30(b) deprecation comment above `accent-grad`. Every pre-existing key preserved
+  byte-for-byte (verified by reading the whole file back).
+- `console/tailwind.config.ts`: imported the same tokens under `brand*` aliases, added the
+  `../template/src/lib/**` content glob for Phase 6, `plugins: [rhythm]`, and merged each scale
+  with the brand tokens spread FIRST so chrome always wins a name collision. Added `spacing` and
+  `maxWidth` keys (chrome had neither). Recorded the one intentional collision in a comment:
+  chrome's `borderRadius.panel: 12px` beats tokens' `14px`, because `rounded-panel` has to keep
+  matching `.panel` in `globals.css`.
+
+**One deviation from the plan, and why.** The plan's `tokens.ts` listing ends `fontSize` with
+`as const`. That does not compile: `as const` freezes each `[size, config]` pair into a
+`readonly` tuple, and Tailwind's `Config` type requires a mutable tuple there, so
+`console/tailwind.config.ts:45` failed with "is 'readonly' and cannot be assigned to the mutable
+type". Fixed by giving `fontSize` an explicit
+`Record<string, [string, { lineHeight: string; letterSpacing?: string }]>` annotation and
+dropping its `as const`. A type annotation adds no runtime import, so the module stays
+dependency-free as required. The other five exports keep `as const` (plain string values, no
+tuple problem). **No token value changed**, only the typing mechanism.
+
+**Verification, all green:**
+- `console: npm run build` exit 0, `npm test` 106/106, `template: npm run build` exit 0
+- Generated CSS proof (the build alone does not prove utilities emit): added the plan's
+  throwaway specimen block, rebuilt, and confirmed in
+  `.next/static/css/216d0bd74b192043.css`: `rh-loose` present, `display-1`'s clamp present as
+  `clamp(2.25rem,1.42rem + 3.6vw,3.625rem)` (Tailwind normalizes `3.60vw` to `3.6vw`, a
+  formatting no-op), and all 15 specimen tokens present.
+- Specimen block deleted, template rebuilt clean (page size back to the original 138 B,
+  confirming no residue), console re-verified 106/106 and exit 0.
+
+**Two process notes.** First, a scripted `grep -c` check reported 0 for every class and briefly
+looked like a real failure; the bug was mine, not the build's: with a single CSS file `grep -c`
+omits the `filename:` prefix, so the `awk -F: '{s+=$2}'` summing nothing. Re-ran against the
+file directly and everything was present. Second, a `npm run build` intended for `template/` ran
+in `console/` instead, because the Bash tool's working directory persists between calls. It was
+caught after 6 minutes by checking the log (it said `jdd-console@0.1.0`, not
+`business-site-template@0.1.0`). **Always `cd` explicitly in a build command and confirm the
+package name in the log header before trusting the result.**
+
+**Not done, deliberately (plan's Out of scope):** no colour change (Phase 2), no font change
+(Phase 3), no migration of the ~30 catalog components onto these tokens (Phases 7 to 9, as each
+is touched). The plan explicitly forbids a sweeping find-and-replace here, since this phase's
+gate cannot detect visual regressions.
+
+**Still owed to the user from this phase:** the real-browser look at the eight type steps at
+390px and 1440px. The specimen has been deleted, so that check is best folded into Phase 5's
+mockups or Phase 12's reference site, both of which are real user gates with real pages to look
+at. Flagged rather than silently skipped.
+
+## Phase 2, completed 2026-10-06. Cut `@jdd/ui` v1.0.3.
+
+Decision 9 landed: every default ground is off pure white and every default ink off pure black
+and cool navy.
+
+**Verified the plan's measured claims before writing them down**, rather than trusting them.
+All three were exact: `inkSoft #584E45` on `bg #FAF7F2` is **7.59:1**, on `bgSoft #F1EBE2` is
+**6.84:1**, and `ink #1A1512` on `bg` is **16.94:1**.
+
+**`packages/ui/src/palette.ts`** (2a): added `WARM_INK = #1A1512` and `WARM_PAPER = #FBF8F4`;
+`readableOn`'s default and light candidate both moved off pure values; `accentText`'s step target
+moved to `WARM_PAPER` / `#181310`; the two `#0f1b2d` literals in `--accent-fg` and `onInk` moved
+to `WARM_INK`. The `passesAA` guard, the 24-iteration bound, the 8%-per-step mix and the
+every-surface loop were all left exactly as they were, as instructed: each is load-bearing and
+each documents a shipped defect.
+
+**2b:** deleted the uncommitted `SectionStyleLike` + `sectionVars` from `@jdd/ui` and left the
+explanatory comment. Verified first that nothing imports them from the package: every consumer
+(`PageStudio.tsx`, the generated import in `export.ts`) resolves to the local
+`@/lib/palette` twin. Confirmed the console and template `sectionVars` bodies are still
+byte-identical with the plan's `diff` command; they are, so no alignment was needed.
+
+**2d:** the warm set applied to all seven palettes (`src/data/site.ts` plus the six verticals),
+each keeping its own `accent` and `accentFg` untouched. `globals.css`'s `:root` moved to the warm
+set plus the `#1F5C7A` trade-coded accent (measured: 6.85:1 as text on bg, 6.17:1 on bgSoft,
+6.91:1 for accent-fg on accent).
+
+**Decision 10's token side:** added the comment above `skinClasses` and deliberately did NOT
+change the `eyebrow` values, per the plan: changing them would silently restyle every exported
+repo on its next overwrite, and eyebrows are being removed rather than recoloured.
+
+### Three deviations and additions, all deliberate
+
+1. **`rampTarget` also moved to `WARM_PAPER`.** The plan listed four edits in `palette.ts` and
+   did not mention `rampTarget = dark ? bg : '#ffffff'`, but its own verification step expects
+   zero non-comment `#ffffff` in the file, which is only satisfiable if this one moves too. It is
+   also correct on the merits: mixing the accent toward pure white produced faintly COOL tints
+   (`--accent-050/100/200`) sitting on a warm paper ground, the exact mismatch decision 9 exists
+   to remove. These are background tints, so the change is not contrast-bearing.
+2. **Created `packages/ui/tsconfig.json`.** The package's `typecheck` script has always pointed
+   at a `tsconfig.json` that did not exist, so `npm run typecheck` failed with TS5058 instead of
+   checking anything. Since §0.3a step 1 uses typecheck as the first gate of every `@jdd/ui`
+   release, and this plan cuts four more (v1.0.4 to v1.0.7), the gate had to become real before
+   the first one. It now passes and did catch nothing, which is the expected outcome.
+3. **One `0f1b2d` string remains in `palette.ts`**, against the plan's "expect ZERO". It is
+   inside the comment documenting what `WARM_INK` replaced. Confirmed no live occurrence remains
+   anywhere in `packages/ui/src`, `console/src/data` or `template/src/styles`.
+
+### A real pre-existing accessibility defect this phase exposed
+
+Extending the contrast suite's `ACCENTS` to the six shipped vertical accents, as 2e instructs,
+surfaced a genuine shipped bug that has nothing to do with decision 9:
+
+**lawn-care's accent `#3D8E40` cannot carry AA-compliant text as a solid fill with ANY
+foreground.** Measured every candidate: warm ink `#1A1512` = **4.43**, old navy `#0f1b2d` =
+4.23, pure white = 4.08, warm paper `#FBF8F4` = 3.86. The bar is 4.5. So the lawn-care preset
+ships a primary CTA that fails WCAG AA **today**, and did before this phase. Decision 9 improves
+it (4.23 to 4.43) without clearing the bar.
+
+Not fixed here, because fixing it means changing the vertical's accent and decision 11 reserves
+per-vertical accents for that vertical's own cycle, which the plan lists in Phase 2's out of
+scope. Handled in the suite as a **named, documented exception rather than a weakened
+assertion**: `UNREACHABLE_FG` holds exactly one accent, carries the measured numbers, and the
+test still asserts the derivation returns the best available option (>= 4.4). A third test,
+`lawn-care is the ONLY palette with an unreachable accent foreground`, pins the exception so it
+cannot quietly grow to a second vertical.
+
+**This needs a decision from the user**: change lawn-care's accent to something slightly darker
+that can clear 4.5, or accept a non-compliant CTA on that vertical until its own cycle.
+
+### 2e, as built
+
+- **`console/test/helpers/contrast.mjs`** (new): `AA`, `TYPO`, `varsFor`, `assertPaletteAA`,
+  `assertWarm`. No `node:test` import, so Phase 12 can import it without re-running tests.
+- **`palette-contrast.test.mjs`**: `LIGHT`/`DEEP_SOFT` replaced by `WARM`/`WARM_DEEP`, `DARK`
+  kept; `ACCENTS` extended with the six shipped accents plus the new globals default; four new
+  tests (every shipped palette is warm / clears AA / the lawn-care exception is unique / the
+  pre-hydration `:root` is warm / a warm ground never resolves pure white).
+- **The three existing assertions survived unchanged**, as required. In particular
+  `'an already-legible accent is passed through unchanged'` was predicted by the plan to possibly
+  fail on the warm base; re-measured, `#1f6f78` is 5.45:1 on bg and **4.92:1** on bgSoft, so it
+  still clears AA and comes back untouched. No assertion was weakened.
+- **One implementation deviation:** the "every shipped palette" test reads the palettes by
+  parsing the `.ts` files from disk rather than importing them. Importing fails even with tsx in
+  the test command, because those modules carry `import type { SiteContent } from "@jdd/schema"`
+  and the schema's exports map declares only `types` and `import` conditions, so tsx's CJS-side
+  resolution throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. Parsing is also closer to the test's stated
+  intent: it asserts on what is literally written on disk, which is what a careless future edit
+  changes.
+
+### Verification, all green
+
+- `packages/ui: npm run typecheck` exit 0 (now a real gate)
+- `console: npm test` **165/165** (was 106; the new contrast tests account for the rest)
+- `console: npm run build` exit 0, `template: npm run build` exit 0 (confirmed
+  `business-site-template@0.1.0` in the log header, per the Phase 1 lesson)
+- `@jdd/ui` v1.0.3 present in BOTH `console/node_modules` and `template/node_modules`, with
+  `WARM_PAPER` confirmed in both installed copies
+- greps: zero live `0f1b2d`, every `#ffffff` in a comment, `sectionVars` comment-only
+
+**A note on why the suite initially showed 5 failures.** The first run was against the still-
+installed v1.0.2, so the tests were checking new expectations against old code. That is inherent
+to this package's shape (consumers read a pinned GitHub tag, not the local source), so for any
+`@jdd/ui` change the release must land before its tests can pass. Worth remembering for
+v1.0.4 to v1.0.7.
+
+**Still owed to the user:** the side-by-side look at the warm ground versus the old pure white,
+in the template dev server and the console preview. Deferred to the same place as Phase 1's type
+specimen, since both want a real browser on a real page.
+
+## Phase 3, completed 2026-10-06. No `@jdd/ui` tag (no `packages/ui/src` change).
+
+Gap G1 closed. The AI-tell font list is gone; the operator now picks one curated pairing that
+moves all six typography fields together.
+
+**Verified the five families before writing anything that depends on them**, against
+`node_modules/next/dist/compiled/@next/font/dist/google/font-data.json` on Next 14.2.35. All five
+present, and the plan's claim that **Instrument Sans caps at 700** is exactly right: it ships
+400/500/600/700 and no 800. That is why a pairing carries its own display weight instead of
+inheriting SPEC §3's blanket 800, and asking next/font for a weight a family lacks is a build
+error. A new test now asserts every pairing's weights against that same font data, so this class
+of error is caught in a second rather than in a two-minute build.
+
+**Built:** `console/src/lib/fonts.ts` replaced (FONT_PAIRINGS, DEFAULT_PAIRING_ID, pairingFor,
+typographyFor, pairingIdFromStack); both `fonts.loader.ts` files rekeyed to the five families;
+`TypographyPane.tsx`'s two font lists collapsed into one `PairingList` whose specimens render at
+each pairing's real display treatment, with the weight pickers and sliders demoted under an
+`Overrides` heading; `FontSelect` replaced by `PairingSelect` (the `role` filter axis is gone,
+since decision 7 makes display and body the same family); all seven authored
+`brand.typography` objects moved to `instrument`.
+
+**No `@jdd/schema` change**, as the plan requires: `pairingIdFromStack` recovers the selected
+pairing from the `stack` string already in `brand.typography.fontSans`, so there is no
+`pairingId` field and no version bump.
+
+**The two loaders' asymmetry was preserved and is now enforced in both directions.** The template
+keeps `preload: false` on every family and keeps `fontVarsFor`'s selectivity; the console
+deliberately does not. A new test asserts the console does NOT adopt `preload: false`, so a
+future "let us make these consistent" edit fails loudly rather than silently re-introducing the
+292KB regression the template loader's header documents.
+
+### An addition the plan's file list omitted
+
+The plan listed seven `brand.typography` objects to update: `console/src/data/site.ts` plus the
+six verticals. It did not include **`template/src/data/site.ts`**, the standalone-template seed.
+Left alone, that file kept a system stack, so `fontVarsFor` returned an empty string,
+`<html class="">` carried no font class, and `cd template && npm run dev` rendered in the OS
+font. That would have made the plan's own "look at it" verification meaningless. Updated its
+typography to `instrument` and, for the same reason, its palette to the Phase 2 warm set, which
+Phase 2 had also skipped for this file while updating `globals.css` for explicitly the same
+"standalone-template palette" rationale. An export overwrites this file with the client's own
+content, so neither change can reach a client site.
+
+### The plan's woff2 expectation was wrong, and the real behaviour is better than it looks
+
+The plan says `ls .next/static/media/*.woff2 | wc -l` should print **2** (one family, two
+weights). It prints **12**, and all five `--font-*` variables appear in the emitted CSS. That is
+not a regression and not a misconfiguration: constructing five families in the loader module
+makes next/font emit all five families' files at build time, regardless of which one a brand
+references. There is no way to avoid that, because the brand is data read at render time while
+font emission happens at build time.
+
+What actually matters is what a VISITOR transfers, and that is correct. Verified on the rendered
+output:
+
+- `<html lang="en" class="__variable_cc14e6">` carries exactly ONE font-variable class.
+- The class that defines `--font-instrument` in the CSS is `__variable_cc14e6`: the same one.
+  So only Instrument resolves in `font-sans` / `font-heading`; the other four classes are dead
+  CSS that no element carries, and a browser fetches a font file only when a matching family is
+  actually needed for rendered text.
+
+So the 12 files are deploy weight, not transfer weight, and the selectivity `fontVarsFor` exists
+for is intact. **The plan's verification line should be read as "exactly one font-variable class
+reaches the html element", not "two files on disk."**
+
+### A new operational risk worth knowing about
+
+The first clean template build FAILED with
+`TypeError: Cannot read properties of null (reading '1')` from `next/font`, at
+`google/loader.js:112`, which regexes a font file URL for its extension. I chased it properly
+before concluding: confirmed all five families and weights exist in the installed font data,
+confirmed the Google CSS2 API returns HTTP 200 and `.woff2` URLs for every one of the five
+(including under next/font's exact Chrome/104 User-Agent), and read next/font's URL builder and
+CSS parser. Nothing was wrong. A retry passed.
+
+It was a **transient network failure during next/font's build-time fetch**, surfacing as a
+null-dereference rather than a network error. Two consequences:
+
+1. The console build had passed moments earlier only because its `.next` was warm; a clean build
+   had to fetch. A cached build can hide this.
+2. **The export route runs `npm run build` inside the client repo.** Moving off system stacks
+   means every client build now depends on a live Google Fonts fetch, so a flaky network can fail
+   an export with a cryptic null-dereference. Worth a retry in the export path if it is ever seen
+   in practice. This risk did not exist while every preset used a system stack.
+
+### The intended byte trade, recorded
+
+Every client site goes from **zero** font bytes (a system stack ships nothing) to **one**
+self-hosted family at two weights, fetched after CSS establishes it is wanted (`preload: false`).
+That is the deliberate cost of G1: a system stack is the most average possible answer, and no
+combination from the old eight-font list read Tier B.
+
+### Verification, all green
+
+- `console: npm test` **172/172** (was 165; the 7 new font tests)
+- `console: npm run build` exit 0; `template: npm run build` exit 0 (`business-site-template`
+  confirmed in the log header)
+- `grep -rn "FONT_OPTIONS\|FontSelect" src/` finds **zero** live references
+- exactly one font-variable class on `<html>`, and it is the Instrument one
+
+**Still owed to the user:** clicking through all five pairings in the Brand drawer and watching
+the live preview change family, weight, tracking and line height on each click, plus judging
+whether `instrument` carries a 58px `display-1` convincingly at 700. Folded into the same
+real-browser review as Phases 1 and 2.
+
+## Phase 4, CLOSED 2026-10-07 (code + tests 2026-10-06, build gate run 2026-10-07). No `@jdd/ui` tag.
+
+The variety rule and the four bans are mechanical now. All edits and tests are in; the one thing
+not done is the final `npm run build` on console and template, which was interrupted. **Phase 4
+is not closed until those two builds pass.** Nothing below changed `packages/ui/src`, so no tag.
+
+**Built:**
+- `console/src/lib/archetypes.ts` (new): the 27-value `ARCHETYPES` vocabulary +
+  `COLLISION_EXEMPT_CATEGORIES = ['seo']`. Dependency-free, client-safe.
+- `archetype` + `signature` added to all 30 component metas (4b table), via a scripted insert
+  before each meta's `} as const;`. `id`/`category`/`consumes`/`skins` untouched. `RecentJobsGrid`
+  is declared `card-grid` (what it IS today), not `hero-first-grid`; Phase 7 flips it when it
+  recomposes. `AboutFeature` is the one `signature: true`.
+- The nine gradient substitutions (4c): `HeroOverlap` and `ServicesPanel` scrims to flat `bg-ink/55`
+  and `bg-ink/60`; `ContactCardOverlap` radial glow to flat `var(--ink-panel)`; `FinalCtaSplit`
+  `bg-accent-grad`+`text-white` to `bg-accent`+`text-accentFg`; `AboutFeature` panel to `bg-accent`;
+  the four image-absent fallbacks (`HeroSplit`, `ServicesAccordion`, `BeforeAfter`,
+  `RecentJobsGrid`) to the AUTHORING_CONTRACT §3 hatch.
+- Four new catalog-invariants tests (archetype declared+known, collision, three-up 30a, gradient
+  30b) plus an icon-weight 30c test and a NEW `text-white` lint. The last one closes a real hole:
+  the existing opacity lint only caught `opacity-N` utilities, so slash-opacity like `text-white/85`
+  slipped past both it and me. Found and fixed remaining `text-white/85|90|15` in `AboutFeature`
+  and `FinalCtaSplit`.
+- `console/test/page-rhythm.test.mjs` (new): test 1 (<=1 inverted/page, decision 12) and test 2
+  (<=2 signature/page, decision 26) run; **test 3 (uniform-rhythm 30d) ships SKIPPED** for Phase 9
+  to un-skip when `SectionRef` gains `rhythm`.
+- `DESIGN-LANGUAGE.md`: one paragraph under the archetype table on how the lint enforces it.
+
+**Verified:** `npm test` = **182 tests, 181 pass, 1 skipped, 0 fail** (8 suites). All three lints
+were proven to bite by deliberately breaking each (collision, gradient, three-up), confirming the
+exact error message, and reverting; a final `npm test` matched 182/181/1 with no residue. The
+decision-30a three-clause phrasing passes `ServicesGrid`/`RecentJobsGrid`/`TestimonialsGrid` with
+no allowlist, as the plan predicted.
+
+**Build gate, run 2026-10-07, closes Phase 4:**
+- `cd console && npm run build` → **EXIT 0** (Compiled successfully, 22 static pages), but only
+  after fixing ONE real syntax error the "TS-valid by inspection" claim missed:
+  `AboutFeature.tsx`'s image-absent fallback had a JSX comment in `{/* … */}` braces sitting as a
+  bare sibling at the head of the ternary's `: ( … )` branch, before `<div>`. A parenthesized JSX
+  branch must be a single expression, so the braces made it two adjacent expressions and swc threw
+  `Unexpected token \`section\`` (mis-pointed at the `return`'s `<section>`, not the real line).
+  Fix was minimal: drop the braces so it is plain comment trivia (`/* … */`). Grepped the whole
+  catalog for the same antipattern (`? (` / `) : (` immediately followed by `{/*`): no other
+  instance. This is exactly the class of error the build gate exists to catch past inspection.
+- `cd template && npm run build` → **EXIT 0** (`business-site-template@0.1.0` confirmed in the log
+  header per the Phase 1 lesson; Compiled successfully).
+- `cd console && npm test` → **182 tests, 181 pass, 0 fail, 1 skipped**. The one skip is
+  `section rhythm is never uniform (decision 30d)`, the intended Phase 9 skip. Count unchanged by
+  the lawn-care edit below (bodies edited, no test added/removed).
+
+**Build-environment note (the §0.1 EPERM lesson, recurring):** the first gate run EPERM'd on
+`.next/trace`. Root cause again a live `next dev -p 3040` console server (plus a lingering process
+from the first failed build) holding `.next`. Stopped all console next processes, confirmed they
+stayed down (no auto-restarter), `rm -rf .next`, rebuilt clean. Also note: a background build's
+harness-reported "exit code 0" is the WRAPPER's, not the build's — the real code was written into
+the log as `EXIT=$?` and read from there. The first run genuinely exited 1 despite a "0" summary.
+
+## lawn-care accent darkened 2026-10-07 (resolves the Phase 2 open AA decision). No `@jdd/ui` tag.
+
+Decision from the user (2026-10-07): resolve the lawn-care WCAG AA defect now rather than defer to
+its own vertical cycle. The accent `#3D8E40` could not clear AA 4.5 as a button fill with any
+foreground (best 4.43 against warm ink). Darkened to **`#2F7A33`**, chosen by measuring candidates
+against the real `@jdd/ui` derivation on the warm base: `--accent-fg` (white, honoured) on the fill
+= **5.31**, `--accent-text` on bg = 5.52, on bgSoft = 4.98 — comfortable margins on all three, and
+a natural deepening of the same lawn green rather than a hue change.
+
+- `console/src/data/verticals/lawn-care.ts`: `accent` `#3D8E40` → `#2F7A33`. `accentFg` kept
+  `#FFFFFF` (now legible at 5.31; every vertical uses white, `assertWarm` does not touch accentFg).
+- `console/test/palette-contrast.test.mjs`: the `UNREACHABLE_FG` exception machinery removed
+  entirely — the `Set`, the special-case branch in the button-fill test (now a plain `>= AA`
+  assert), and the `lawn-care.ts` skip in `every shipped palette clears AA`. The pinning test was
+  rewritten from `lawn-care is the ONLY palette with an unreachable accent foreground` to
+  **`no shipped palette has an unreachable accent foreground`** (asserts `failing === []`), so a
+  future accent regressing below 4.5 still fails loudly. The `ACCENTS` entry updated to `#2F7A33`.
+- **`studio/preview/src/data/verticals/lawn-care.ts` deliberately NOT touched.** That tree has no
+  `package.json`, is in no workspace or build, is labelled "studio/preview WIP" in git, and carries
+  a stale pre-decision-9 palette (pure-white grounds) that was never warm-migrated. Editing only its
+  accent would be meaningless against its stale base. Flagged, not changed.
+
+---
+
+# CROSS-SESSION DRIFT discovered 2026-10-07 — RECONCILED 2026-10-07
+
+**RESOLUTION (2026-10-07, at the user's direction, as the first task of this session):** all three
+consumers re-pinned and reinstalled at **`github:JuneauDigitalDesigns/jdd-schema#v1.21.0`** and
+`npm run check-schema` is now **GREEN**. v1.21.0 is a clean additive superset of v1.20.0 — its only
+diff is a standalone `src/ticket.ts` module plus one re-export in `index.ts` (verified
+`git diff v1.20.0 v1.21.0`), and it sits directly on top of the v1.20.0 commit in linear history,
+so no content field from P4 was lost. Steps taken:
+- `console/package.json` and `jdd-ops/package.json` pins `#v1.20.0` → `#v1.21.0`.
+- Force-reinstalled with `npm install "github:JuneauDigitalDesigns/jdd-schema#v1.21.0"` in both
+  `console/` and the `jdd-ops/` root (a plain install would not re-resolve the locked sha). Done
+  with the `JuneauDigitalDesigns` gh account active.
+- agency was already correct (`#v1.21.0`, installed 1.21.0) and was left untouched, including its
+  `feat/portal-support-tickets` branch / PR #21.
+- `check-schema` prints all three `✓` at v1.21.0.
+
+**Phase 13 consequence still stands:** v1.21.0 is now TAKEN by tickets, so Phase 13 must cut
+**`v1.22.0`**. Treat every "v1.21.0" in the plan's Phase 13 as v1.22.0.
+
+---
+
+Original drift record (kept for history):
+
+A support-tickets feature landed between sessions and it collides with the plan's schema
+versioning. Measured 2026-10-07:
+
+- `@jdd/schema/package.json` is now **v1.21.0** (was v1.20.0 when P4 tagged it). A v1.21.0 tag is
+  pushed. Per MEMORY.md's "JDD support tickets" entry: agency site pinned v1.21.0 (PR #21 open),
+  console side uncommitted and shimmed.
+- **`npm run check-schema` is now RED**, through no fault of the fidelity work: console pin
+  `v1.20.0`, jdd-ops root pin `v1.20.0`, agency pin `v1.21.0`. The three no longer agree.
+- **The console's installed `@jdd/schema` is v1.21.0 while its pin still says v1.20.0** (a shim:
+  node_modules pulled forward to get ticket types, pin not updated).
+- `audit.ts` gained `ticket.status | ticket.reply | ticket.delete` (plus the `firewall.apply` I
+  added in Phase 0's detour). This is the ticket work, intentional, leave it.
+
+**Consequences for the plan:**
+1. **Phase 13's reserved `v1.21.0` is now TAKEN. Phase 13 must cut `v1.22.0`.** The plan says
+   v1.21.0 in several places; treat every one as v1.22.0.
+2. The next session's first `npm run build` on console is fine (it builds against installed
+   v1.21.0, which is a superset), but **`check-schema` will fail** until someone reconciles the
+   pins. That reconciliation belongs to whoever owns the tickets feature, not to the fidelity
+   plan, but the fidelity executor must not mistake the red check-schema for their own regression.
+3. `@jdd/ui` is UNAFFECTED and correct: both consumers pinned and installed at v1.0.3.

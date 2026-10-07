@@ -48,7 +48,7 @@ interface FeaturedState {
  * show a name or link a client opted out of.
  */
 export default function FeaturedSection() {
-  const { ctx, siteSlug } = useManage();
+  const { ctx, siteSlug, confirmWrite } = useManage();
   const [state, setState] = useState<FeaturedState | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [working, setWorking] = useState(false);
@@ -81,6 +81,14 @@ export default function FeaturedSection() {
     // to fall back to (the client's own image, or an auto-capture it can run itself).
     const hasFallback = Boolean(request?.image) || request?.imageMode === 'auto';
     if (!file && !opts.recapture && !hasFallback) return;
+    if (
+      !(await confirmWrite({
+        title: 'Publish to the featured gallery',
+        effect: `Uploads a screenshot to the agency blob store and lists ${ctx.slug} on the live homepage.`,
+      }))
+    ) {
+      return;
+    }
     setWorking(true);
     setResult(null);
     try {
@@ -104,6 +112,14 @@ export default function FeaturedSection() {
   }
 
   async function unpublish() {
+    if (
+      !(await confirmWrite({
+        title: 'Remove from the featured gallery',
+        effect: `Removes ${ctx.slug} from the live homepage gallery.`,
+      }))
+    ) {
+      return;
+    }
     setWorking(true);
     setResult(null);
     try {

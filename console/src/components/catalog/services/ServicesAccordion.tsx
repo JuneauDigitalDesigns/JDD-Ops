@@ -19,6 +19,12 @@ export const meta = {
   label: 'Services / Accordion',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/icons'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'sticky-swap',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 export default function ServicesAccordion({ content = CONTENT }: { content?: SiteContent }) {
@@ -101,8 +107,11 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                   {cur.image?.url ? (
                     <img src={cur.image.url} alt={cur.image.alt} width={1600} height={1000} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-accent-grad">
-                      <span className="font-heading text-8xl font-black leading-none text-white/25">{curNum}</span>
+                    // Decision 30(b): the contract §3 hatch instead of a branded gradient slab.
+                    // The heavy numeral stays, on the neutral ground, where it reads as an index
+                    // rather than as decoration on a colour field.
+                    <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
+                      <span className="font-heading text-8xl font-black leading-none text-inkSoft/30">{curNum}</span>
                     </div>
                   )}
                 </motion.div>

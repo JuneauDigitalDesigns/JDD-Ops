@@ -174,4 +174,8 @@ export interface BriefContext {
    *  Section[] since Section (copy-schema.ts) is a console-only type the schema package
    *  doesn't know about. */
   tickedSections: Section[];
+  /** The site's non-home pages, when this is a multi-page build. Drives the `subpages`
+   *  generation section (one header + SEO per route) and the page-awareness prompt segments.
+   *  Empty/undefined for a legacy single-page site. */
+  subpages?: { route: string; pageType: string; label: string }[];
 }

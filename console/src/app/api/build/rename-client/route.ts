@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolveRepoRoot, isValidSlug, rewriteClientSchema } from '@/lib/export';
+import { guardOnboarded } from '@/lib/onboardingGate';
 
 // Rename a client's *display name* (brand.name) in clients/<slug>/site.ts.
 //
@@ -22,6 +23,9 @@ export async function POST(req: Request) {
 
     if (!isValidSlug(slug)) return NextResponse.json({ error: 'Invalid slug.' }, { status: 400 });
     if (!name) return NextResponse.json({ error: 'Name cannot be empty.' }, { status: 400 });
+
+    const locked = await guardOnboarded(slug);
+    if (locked) return locked;
 
     const repoRoot = resolveRepoRoot();
     const file = resolve(repoRoot, 'clients', slug, 'site.ts');

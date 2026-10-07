@@ -51,6 +51,42 @@ export function loadVercelCredentials(): boolean {
 }
 
 /**
+ * KV (Upstash) credentials for every console store (accounts, leads, intake, tickets,
+ * client records, reconcile, cancel/featured). Copies the production pair out of
+ * jdd-ops/.env into process.env without clobbering an existing value, so the console reads
+ * the SAME instance as the agency site. Idempotent; safe to call per request.
+ *
+ * This is the single source of truth: console/.env.local must NOT define KV_* anymore,
+ * or it would re-introduce the test/prod drift this replaced.
+ */
+export function loadKvCredentials(): boolean {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const keys = ['KV_REST_API_URL', 'KV_REST_API_TOKEN', 'KV_REST_API_READ_ONLY_TOKEN'] as const;
+  for (const key of keys) {
+    if (!process.env[key] && ops[key]) process.env[key] = ops[key];
+  }
+  return Boolean(
+    (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) &&
+      (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN),
+  );
+}
+
+/**
+ * Hostname of the KV instance recorded in jdd-ops/.env (the production one). Read-only,
+ * does not touch process.env, never returns the token. Used by the kv-reset guard.
+ */
+export function opsKvHost(): string | null {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const url = ops.KV_REST_API_URL || ops.UPSTASH_REDIS_REST_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The master Retell key, for pushing a tuned agent prompt from /manage. Same contract as
  * loadVercelCredentials: copies out of jdd-ops/.env into process.env, never into a
  * response body.

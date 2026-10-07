@@ -1,6 +1,8 @@
 import 'server-only';
 import { Redis } from '@upstash/redis';
 import type { GoLiveResult } from './types';
+import { isProductionKvHost } from '../envSignals';
+import { opsKvHost } from '../opsSecrets';
 
 /**
  * Clear JDD data from the KV instance the console is currently pointed at (whatever
@@ -30,6 +32,22 @@ export async function runKvReset(dryRun: boolean): Promise<GoLiveResult> {
     return { ok: false, dryRun, error: 'No KV creds in this process — set KV_REST_API_URL/TOKEN.' };
   }
   const { redis, host } = conn;
+
+  // HARD GUARD: the cutover is done and the console now resolves KV to production via
+  // loadKvCredentials(). This tool deletes every jdd:* key, so it must never run against the
+  // production instance, not even as a dry run's follow-up. Refuse before any SCAN/DEL.
+  // Also compare against the production host recorded in jdd-ops/.env, in case the marker
+  // ever changes with a re-provisioned instance.
+  const opsHost = opsKvHost();
+  if (isProductionKvHost(host) ||(opsHost && host === opsHost)) {
+    return {
+      ok: false,
+      dryRun,
+      error:
+        `Refusing to reset ${host}: this is the PRODUCTION KV instance. kv-reset is a ` +
+        'one-time test-instance cleanup tool and is disabled against production.',
+    };
+  }
 
   // Collect every jdd:* key.
   const keys: string[] = [];

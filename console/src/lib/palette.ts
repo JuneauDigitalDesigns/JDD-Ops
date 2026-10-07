@@ -18,8 +18,56 @@
 // typography. This is the same class of intentional seam as editable.tsx.
 export { paletteVars, contrast, readableOn } from '@jdd/ui/palette';
 
+import { paletteVars as _paletteVars, type BrandLike } from '@jdd/ui/palette';
 import type { CSSProperties } from 'react';
 import type { Brand } from '@jdd/schema';
+
+/**
+ * Per-section style, declared STRUCTURALLY (mirrors @jdd/schema's SectionStyle) so this helper
+ * stays portable to the template + client repos, which have no @jdd/schema dependency. Keep in
+ * sync with the twin in template/src/lib/palette.ts.
+ */
+export type SectionStyleLike = {
+  accent?: string;
+  bg?: string;
+  bgSoft?: string;
+  headingWeight?: number;
+  scale?: number;
+};
+
+/**
+ * CSS custom properties to scope onto ONE section's wrapper element, so that section renders with
+ * its own palette/typography as an OVERRIDE LAYER over the global brand.
+ *
+ * Returns `{}` for a falsy/empty style, so callers can skip wrapping entirely (and a reset that
+ * writes `{}` produces no wrapper on export). When any palette slot is overridden, the slots are
+ * merged into the brand palette and run back through paletteVars(), so the derived tokens
+ * (--accent-fg, --accent-text, the tint ramp, the dark contrast surface) recompute and stay
+ * AA-correct against the section's own background — the "auto-guard + derive" behavior.
+ *
+ * NOTE: this must stay byte-identical to the twin in template/src/lib/palette.ts (and the copy in
+ * @jdd/ui/palette once that package is next published) — the console preview and the exported
+ * client site must resolve section colors the same way.
+ */
+export function sectionVars(brand: BrandLike, style?: SectionStyleLike | null): CSSProperties {
+  if (!style || Object.keys(style).length === 0) return {};
+  const out: Record<string, string | number> = {};
+  if (style.accent || style.bg || style.bgSoft) {
+    const merged: BrandLike = {
+      ...brand,
+      palette: {
+        ...brand.palette,
+        ...(style.accent ? { accent: style.accent } : {}),
+        ...(style.bg ? { bg: style.bg } : {}),
+        ...(style.bgSoft ? { bgSoft: style.bgSoft } : {}),
+      },
+    };
+    Object.assign(out, _paletteVars(merged));
+  }
+  if (style.headingWeight) out['--heading-weight'] = String(style.headingWeight);
+  if (style.scale && style.scale !== 1) out.zoom = style.scale;
+  return out as CSSProperties;
+}
 
 export function typographyVars(brand: Brand): CSSProperties {
   const t = brand.typography;

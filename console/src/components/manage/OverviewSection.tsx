@@ -11,6 +11,7 @@ import {
   Globe,
   Question,
   RocketLaunch,
+  ShieldCheck,
   Sliders,
   SpinnerGap,
   Warning,
@@ -72,6 +73,12 @@ export default function OverviewSection() {
     loading: false,
     count: null,
   });
+  const [firewall, setFirewall] = useState<{
+    loading: boolean;
+    allActive?: boolean;
+    applying: boolean;
+    reason?: string;
+  }>({ loading: true, applying: false });
   const [activity, setActivity] = useState<AuditEntry[] | null>(null);
 
   /**
@@ -195,6 +202,57 @@ export default function OverviewSection() {
       setDrift({ loading: false, count: null, reason: 'Check failed.' });
     }
   }, [ctx.slug, site.slug]);
+
+  // Firewall: lazy-load after other tiles so the page feels instant.
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/manage/firewall?slug=${encodeURIComponent(ctx.slug)}`, {
+          cache: 'no-store',
+        });
+        const body = (await res.json()) as {
+          ok?: boolean;
+          reason?: string;
+          rules?: Array<{ name: string; present: boolean; active: boolean }>;
+        };
+        if (!cancelled) {
+          setFirewall({
+            loading: false,
+            applying: false,
+            allActive: body.ok === true && (body.rules ?? []).every((r) => r.present && r.active),
+            reason: body.reason,
+          });
+        }
+      } catch {
+        if (!cancelled) setFirewall({ loading: false, applying: false });
+      }
+    }, 800);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [ctx.slug]);
+
+  const applyFirewall = useCallback(async () => {
+    setFirewall((f) => ({ ...f, applying: true }));
+    try {
+      const res = await fetch('/api/manage/firewall', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: ctx.slug }),
+      });
+      const body = (await res.json()) as { ok?: boolean; reason?: string };
+      setFirewall((f) => ({
+        ...f,
+        applying: false,
+        allActive: body.ok === true,
+        reason: body.ok ? undefined : (body.reason ?? 'Apply failed.'),
+      }));
+    } catch {
+      setFirewall((f) => ({ ...f, applying: false, reason: 'Apply failed.' }));
+    }
+  }, [ctx.slug]);
 
   const liveUrl = domains.liveUrl;
 
@@ -325,7 +383,7 @@ export default function OverviewSection() {
         </div>
       )}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile
           icon={<RocketLaunch size={15} weight="fill" />}
           label="Last deploy"
@@ -370,6 +428,51 @@ export default function OverviewSection() {
                 <ArrowsClockwise size={11} /> Check
               </button>
             )
+          }
+        />
+
+        <Tile
+          icon={<ShieldCheck size={15} weight="fill" />}
+          label="Firewall"
+          loading={firewall.loading}
+          tone={
+            firewall.loading
+              ? 'idle'
+              : firewall.allActive
+                ? 'ok'
+                : firewall.reason
+                  ? 'idle'
+                  : 'warn'
+          }
+          value={
+            firewall.loading
+              ? '—'
+              : firewall.allActive
+                ? 'rules active'
+                : firewall.reason
+                  ? 'unavailable'
+                  : 'rules missing'
+          }
+          detail={
+            firewall.reason ??
+            (firewall.allActive ? 'WAF rate-limits applied' : 'protection not applied')
+          }
+          action={
+            !firewall.loading && !firewall.allActive && !firewall.reason ? (
+              <button
+                type="button"
+                onClick={applyFirewall}
+                disabled={firewall.applying}
+                className="btn btn-xs"
+              >
+                {firewall.applying ? (
+                  <SpinnerGap size={11} className="animate-spin" />
+                ) : (
+                  <ShieldCheck size={11} />
+                )}
+                {firewall.applying ? 'Applying…' : 'Apply'}
+              </button>
+            ) : undefined
           }
         />
       </div>

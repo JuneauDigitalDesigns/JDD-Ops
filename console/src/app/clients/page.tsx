@@ -1,4 +1,6 @@
 import ClientIndex from '@/components/picker/ClientIndex';
+import EnvBanner from '@/components/manage/EnvBanner';
+import { readOpsConfig } from '@/lib/opsConfig';
 
 /**
  * The searchable client roster.
@@ -11,14 +13,21 @@ import ClientIndex from '@/components/picker/ClientIndex';
  *
  * The `.onboard-chrome` scope (dotfield) is the surface these roster views were designed
  * on and came up with them from /onboard.
+ *
+ * The environment banner sits above it so PRODUCTION / mixed is visible before you open a
+ * client, not only after.
  */
 export const dynamic = 'force-dynamic';
 
 export default function ClientsPage() {
+  const { envMode, envSignals } = readOpsConfig();
   return (
-    <div className="onboard-chrome h-full">
-      <div className="dotfield" aria-hidden />
-      <ClientIndex />
+    <div className="flex h-full min-h-0 flex-col">
+      <EnvBanner envMode={envMode} envSignals={envSignals} />
+      <div className="onboard-chrome min-h-0 flex-1">
+        <div className="dotfield" aria-hidden />
+        <ClientIndex />
+      </div>
     </div>
   );
 }

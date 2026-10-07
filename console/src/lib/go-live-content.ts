@@ -234,23 +234,34 @@ export function buildGoLive(): Phase[] {
         {
           id: 'env-cutover',
           title: 'Set the remaining prod env + sync to ops',
-          why: 'Vercel is the source of truth. Set the last production values on the agency project, then pull the shared subset (price IDs, OPS_SHARED_SECRET, the A2P messaging SID) down into jdd-ops/.env so audit-billing and the console never drift from the app.',
+          why: 'Vercel is the source of truth. Set the last production values on the agency project by hand, then pull the shared subset (the four Stripe price IDs and OPS_SHARED_SECRET) down into jdd-ops/.env so audit-billing and the console never drift from the app.',
           est: '~10 min',
           blocks: [
+            {
+              t: 'callout',
+              tone: 'info',
+              title: 'Set these by hand',
+              body: 'Enter these in the Vercel dashboard under the agency project, Production scope. The values below show the format to expect, not literal values: paste your real secret. Nothing on this step writes to Vercel.',
+            },
             {
               t: 'env',
               file: 'agency env (Vercel, Production scope)',
               vars: [
                 { key: 'NEXT_PUBLIC_SITE_URL', value: SITE_URL },
-                { key: 'OPS_SHARED_SECRET', value: '(a long random value — same in jdd-ops/.env)', pending: true },
-                { key: 'TWILIO_MESSAGING_SERVICE_SID', value: 'MG… (your approved A2P service)', pending: true },
+                { key: 'OPS_SHARED_SECRET', value: '(a long random value, same in jdd-ops/.env)', pending: true },
               ],
             },
             {
               t: 'callout',
               tone: 'info',
+              title: 'Not TWILIO_MESSAGING_SERVICE_SID',
+              body: 'The agency project does not need TWILIO_MESSAGING_SERVICE_SID unless you turn on double opt-in checkout SMS (SMS_DOUBLE_OPTIN=true). It otherwise lives only in jdd-ops/.env as a master Twilio credential and is not synced from the app.',
+            },
+            {
+              t: 'callout',
+              tone: 'info',
               title: 'Then sync',
-              body: 'Run env-sync to copy the shared values into jdd-ops/.env. It previews a masked diff first and never touches master credentials or the Stripe secret key.',
+              body: 'Run env-sync to copy the shared subset (Stripe price IDs and OPS_SHARED_SECRET) into jdd-ops/.env. It previews a masked diff first, writes only jdd-ops/.env, never Vercel, and never touches master credentials or the Stripe secret key.',
             },
             { t: 'run', action: 'env-sync', label: 'Sync to jdd-ops/.env', destructive: true },
           ],

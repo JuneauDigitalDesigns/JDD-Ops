@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { LiveUrlSource } from '@/lib/manageSites';
-import type { ClientContext, SiteInfo } from '@/lib/types';
+import type { ClientContext, EnvMode, SiteInfo } from '@/lib/types';
+import ConfirmWrite, { type ConfirmWriteRequest } from './ConfirmWrite';
 
 /**
  * Client identity for everything under /manage/[slug].
@@ -59,6 +60,13 @@ interface ManageContextValue {
   /** Shared so the rail, Overview, and the Domain section agree and fetch once. */
   domains: DomainState;
   refreshDomains: () => Promise<void>;
+  /** Backing environment (production / test / mixed). */
+  envMode: EnvMode;
+  /**
+   * Gate for mutating actions. Resolves true at once when envMode is `test`; otherwise opens
+   * the confirm dialog and resolves with the operator's choice. Call BEFORE any fetch.
+   */
+  confirmWrite: (req: Omit<ConfirmWriteRequest, 'client'> & { client?: string }) => Promise<boolean>;
 }
 
 const Ctx = createContext<ManageContextValue | null>(null);
@@ -71,12 +79,34 @@ export function useManage(): ManageContextValue {
 
 export function ManageProvider({
   ctx,
+  envMode = 'test',
   children,
 }: {
   ctx: ClientContext;
+  envMode?: EnvMode;
   children: React.ReactNode;
 }) {
   const router = useRouter();
+
+  // Confirm-before-write: one dialog for the whole shell, driven by a promise so call sites
+  // read as `if (!(await confirmWrite({...}))) return;`.
+  const [pendingConfirm, setPendingConfirm] = useState<ConfirmWriteRequest | null>(null);
+  const resolveRef = useRef<((ok: boolean) => void) | null>(null);
+  const confirmWrite = useCallback<ManageContextValue['confirmWrite']>(
+    (req) => {
+      if (envMode === 'test') return Promise.resolve(true);
+      return new Promise<boolean>((resolve) => {
+        resolveRef.current = resolve;
+        setPendingConfirm({ ...req, client: req.client ?? ctx.slug });
+      });
+    },
+    [envMode, ctx.slug],
+  );
+  const settleConfirm = useCallback((ok: boolean) => {
+    resolveRef.current?.(ok);
+    resolveRef.current = null;
+    setPendingConfirm(null);
+  }, []);
   const pathname = usePathname();
   const params = useSearchParams();
 
@@ -153,9 +183,18 @@ export function ManageProvider({
       multiSite: ctx.sites.length > 1,
       domains,
       refreshDomains,
+      envMode,
+      confirmWrite,
     }),
-    [ctx, site, setSiteSlug, domains, refreshDomains],
+    [ctx, site, setSiteSlug, domains, refreshDomains, envMode, confirmWrite],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      {pendingConfirm && (
+        <ConfirmWrite request={pendingConfirm} envMode={envMode} onResolve={settleConfirm} />
+      )}
+    </Ctx.Provider>
+  );
 }

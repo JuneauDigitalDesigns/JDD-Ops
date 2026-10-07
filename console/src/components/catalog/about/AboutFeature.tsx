@@ -20,6 +20,12 @@ export const meta = {
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.stats', 'images.about.feature', 'brand.short', 'brand.name'],
   sharedDeps: ['framer-motion', '@/lib/useCountUp', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'soft', 'inverted'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'count-up-centerpiece',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: true,
 } as const;
 
 function StatItem({
@@ -79,15 +85,22 @@ export default function AboutFeature({
               width={1200} height={900} sizes="(min-width: 1024px) 560px, 100vw"
               className="absolute inset-0 h-full w-full object-cover" />
           ) : (
-            <div className="absolute inset-0 bg-accent-grad">
+            /* Flat accent panel (decision 30b). The dot grid below is hard-stopped, so it is a
+               halftone rather than a feather, and stays. */
+            <div className="absolute inset-0 bg-accent">
               <div
                 className="absolute inset-0 opacity-[0.12]"
                 style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)', backgroundSize: '22px 22px' }}
               />
-              <span className="absolute -right-4 top-1/2 -translate-y-1/2 font-heading text-[9rem] font-black leading-none text-white/15">
+              {/* `text-accentFg`, never a hard-coded white: the on-accent foreground is DERIVED
+                  by measured contrast, and hard-coding white discards that guarantee on exactly
+                  the palettes where it matters. The giant initial is decoration, so it keeps its
+                  opacity and is aria-hidden; the label is real text, so per SPEC §10a it takes no
+                  opacity and gets its hierarchy from size and tracking instead. */}
+              <span aria-hidden className="absolute -right-4 top-1/2 -translate-y-1/2 font-heading text-[9rem] font-black leading-none text-accentFg/15">
                 {brand.short?.[0] ?? brand.name?.[0] ?? '★'}
               </span>
-              <span className="absolute left-8 top-1/2 -translate-y-1/2 text-xs uppercase tracking-widest text-white/85">
+              <span className="absolute left-8 top-1/2 -translate-y-1/2 text-fine uppercase tracking-wide text-accentFg">
                 {brand.short || brand.name}
               </span>
             </div>

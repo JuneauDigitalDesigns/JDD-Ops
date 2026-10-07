@@ -12,6 +12,12 @@ export const meta = {
   consumes: ['brand.name', 'brand.long', 'brand.license', 'brand.established', 'brand.address', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.cols', 'footer.social', 'footer.legalLinks', 'footer.legal'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
   skins: ['inverted', 'default'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'column-grid',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {

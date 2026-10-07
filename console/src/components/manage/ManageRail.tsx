@@ -53,7 +53,9 @@ export default function ManageRail({
   const active = useSelectedLayoutSegment();
   const params = useSearchParams();
 
-  const isPending = Boolean(ctx.pendingOnboarding);
+  // Both kinds of not-yet-onboarded client get the same rail: Overview open, the rest locked,
+  // no Danger row (there is no infrastructure to tear down).
+  const isPending = Boolean(ctx.pendingOnboarding || ctx.awaitingOnboarding);
   const allSections = sectionsForPlan(ctx.plan);
   const sections = allSections.filter((s) => !s.danger);
   const dangerSection = allSections.find((s) => s.danger);
@@ -63,7 +65,10 @@ export default function ManageRail({
 
   // From Vercel, not from seo.canonical — that field is a placeholder until someone fills
   // it in, and linking to it sent you to a domain the client never owned.
-  const liveUrl = domains.liveUrl;
+  //
+  // Not shown for a client still waiting on onboarding: its site.ts is a vertical preset, so
+  // the canonical is a placeholder like yourhvaccompany.com, and there is no site to link to.
+  const liveUrl = ctx.awaitingOnboarding ? null : domains.liveUrl;
   const unverifiedUrl = domains.source === 'canonical';
 
   return (

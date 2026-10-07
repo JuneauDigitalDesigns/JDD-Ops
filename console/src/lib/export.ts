@@ -10,15 +10,18 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import type { SiteContent, IntakeEnvelope } from '@jdd/schema';
+import { routePath, styleKeyFor, type SiteComposition } from '@/lib/pages';
+import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { findOpsRoot } from '@/lib/opsRoot';
 import { isValidSkin, supportsSkin } from '@/lib/skins';
+import { VERTICAL_PRESETS } from '@/lib/verticals';
 
 const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 
@@ -39,6 +42,9 @@ const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
  */
 export const CATALOG: Record<string, readonly string[]> = {
   nav:          ['NavMinimal', 'NavEmergencyBar'],
+  // v2.2: the lightweight header that opens a non-home page. Reads its copy from
+  // SiteContent.subpages[route].header, not a global CONTENT import.
+  pageHeader:   ['PageHeaderSimple'],
   hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap'],
   trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea'],
   about:        ['AboutFeature', 'AboutStory'],
@@ -55,7 +61,7 @@ export const CATALOG: Record<string, readonly string[]> = {
 
 // Categories that map to a JSX body slot in page.tsx (everything except seo, which is
 // wired as a generateMetadata re-export instead of a rendered element).
-const BODY_SLOTS = ['nav', 'hero', 'trust', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'contact', 'footer'];
+const BODY_SLOTS = ['nav', 'pageHeader', 'hero', 'trust', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'contact', 'footer'];
 
 export type Entry = { categoryId: string; name: string; label?: string; skin?: string };
 
@@ -499,6 +505,172 @@ export function wirePage(repoRoot: string, slug: string, entries: Entry[]): void
   writeFileSync(resolve(repoDirFor(repoRoot, slug), 'src', 'app', 'page.tsx'), src, 'utf8');
 }
 
+// ─── Multi-page export ────────────────────────────────────────────────────────
+
+/**
+ * The de-duplicated set of catalog components a whole composition uses — chrome (nav/footer/seo)
+ * plus every page's body sections, unique by categoryId+name. This is what placeComponents copies
+ * and validateEntries checks, so a component shared across pages is placed exactly once.
+ */
+export function collectSectionRefs(comp: SiteComposition): Entry[] {
+  const seen = new Set<string>();
+  const out: Entry[] = [];
+  const add = (ref: { categoryId: string; name: string; skin?: string }) => {
+    const key = `${ref.categoryId}::${ref.name}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ categoryId: ref.categoryId, name: ref.name, skin: ref.skin });
+  };
+  add(comp.chrome.nav);
+  add(comp.chrome.footer);
+  add(comp.chrome.seo);
+  for (const page of comp.pages) for (const ref of page.sections) add(ref);
+  return out;
+}
+
+/** `skin="…"` only for components that declare the prop — same guard as wirePage. */
+function skinAttr(ref: { name: string; skin?: string }): string {
+  return ref.skin && supportsSkin(ref.name) ? ` skin="${ref.skin}"` : '';
+}
+
+/** The neutral header baked into a subpage when SiteContent.subpages[route] is absent, so a
+ *  page whose header copy hasn't been generated still builds and renders. */
+function fallbackHeaderLiteral(label: string): string {
+  return JSON.stringify({ eyebrow: '', title: label, sub: '', cta: null });
+}
+
+/**
+ * Generate every page file for a multi-page site from the composition. Each page renders
+ * nav + its body sections + footer. Home keeps the rich SEO generateMetadata re-export; subpages
+ * get literal metadata + their header copy from CONTENT.subpages[route] (with safe fallbacks).
+ * The @studio:body markers are kept so the single-page read-back parser still recovers the home
+ * composition. Fully regenerated each export (idempotent); stale routes are pruned.
+ */
+export function wirePages(
+  repoRoot: string,
+  slug: string,
+  comp: SiteComposition,
+  sectionStyles: Record<string, SectionStyle> = {},
+): void {
+  const repoDir = repoDirFor(repoRoot, slug);
+
+  /** The sectionStyles key for a ref IF it carries a non-empty style, else null. A reset writes
+   *  `{}`, which must NOT produce a wrapper — keeps unstyled/reset pages byte-identical to before. */
+  const styledKeyOf = (ref: { id?: string; categoryId: string; name: string }): string | null => {
+    const k = styleKeyFor(ref);
+    const s = k ? sectionStyles[k] : undefined;
+    return s && Object.keys(s).length > 0 ? k : null;
+  };
+
+  for (const page of comp.pages) {
+    const isHomePage = page.route === '';
+    const hasHeader = page.sections.some((r) => r.categoryId === 'pageHeader');
+    const allRefs = [comp.chrome.nav, ...page.sections, comp.chrome.footer];
+    const pageHasStyled = allRefs.some((r) => styledKeyOf(r) !== null);
+    // subpages read CONTENT for metadata/header; a styled page reads CONTENT for sectionVars too.
+    const needsContent = !isHomePage || hasHeader || pageHasStyled;
+
+    // Unique component imports: nav, each section, footer.
+    const importRefs = [comp.chrome.nav, ...page.sections, comp.chrome.footer];
+    const seenImp = new Set<string>();
+    const importLines = importRefs
+      .filter((r) => {
+        const k = `${r.categoryId}/${r.name}`;
+        if (seenImp.has(k)) return false;
+        seenImp.add(k);
+        return true;
+      })
+      .map((r) => `import ${r.name} from '@/components/catalog/${r.categoryId}/${r.name}';`);
+
+    const lines: string[] = [];
+    if (!isHomePage) lines.push(`import type { Metadata } from 'next';`);
+    if (needsContent) lines.push(`import { CONTENT } from '@/data/site';`);
+    if (pageHasStyled) lines.push(`import { sectionVars } from '@/lib/palette';`);
+    lines.push(...importLines, '');
+
+    if (isHomePage) {
+      lines.push(`export { generateMetadata } from '@/components/catalog/seo/${comp.chrome.seo.name}';`, '');
+    } else {
+      const rk = JSON.stringify(page.route);
+      lines.push(
+        `export const metadata: Metadata = {`,
+        `  title: CONTENT.subpages?.[${rk}]?.seo?.title ?? CONTENT.brand.name,`,
+        `  description: CONTENT.subpages?.[${rk}]?.seo?.description ?? CONTENT.brand.tagline,`,
+        `};`,
+        '',
+      );
+    }
+
+    /** Emit one section element, wrapped in a sectionVars div only when it carries a style.
+     *  Unstyled → a single 6-space-indented line, identical to the pre-styling output. */
+    const emit = (inner: string, ref: { id?: string; categoryId: string; name: string }): string[] => {
+      const k = styledKeyOf(ref);
+      if (!k) return [`      ${inner}`];
+      return [
+        `      <div style={sectionVars(CONTENT.brand, CONTENT.sectionStyles?.[${JSON.stringify(k)}])}>`,
+        `        ${inner}`,
+        `      </div>`,
+      ];
+    };
+
+    lines.push(
+      `export default function Page() {`,
+      `  return (`,
+      `    <main className="font-sans text-ink">`,
+      `      {/* @studio:body:start */}`,
+      ...emit(`<${comp.chrome.nav.name}${skinAttr(comp.chrome.nav)} />`, comp.chrome.nav),
+    );
+    for (const ref of page.sections) {
+      if (ref.categoryId === 'pageHeader') {
+        const rk = JSON.stringify(page.route);
+        lines.push(...emit(`<${ref.name} data={CONTENT.subpages?.[${rk}]?.header ?? ${fallbackHeaderLiteral(page.label)}} />`, ref));
+      } else {
+        lines.push(...emit(`<${ref.name}${skinAttr(ref)} />`, ref));
+      }
+    }
+    lines.push(
+      ...emit(`<${comp.chrome.footer.name}${skinAttr(comp.chrome.footer)} />`, comp.chrome.footer),
+      `      {/* @studio:body:end */}`,
+      `    </main>`,
+      `  );`,
+      `}`,
+    );
+
+    const dest = resolve(repoDir, ...routePath(page.route).split('/'));
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, lines.join('\n') + '\n', 'utf8');
+  }
+
+  pruneStaleRoutes(repoDir, comp);
+}
+
+/**
+ * Delete `src/app/<route>/page.tsx` (and its now-empty dir) for any route generated by a previous
+ * export that this composition no longer has. Tracked in `.studio-pages.json` at the repo root.
+ */
+function pruneStaleRoutes(repoDir: string, comp: SiteComposition): void {
+  const stateFile = resolve(repoDir, '.studio-pages.json');
+  const current = comp.pages.map((p) => p.route).filter((r) => r !== '');
+  let prev: string[] = [];
+  if (existsSync(stateFile)) {
+    try {
+      const parsed = JSON.parse(readFileSync(stateFile, 'utf8')) as unknown;
+      if (Array.isArray(parsed)) prev = parsed.filter((r): r is string => typeof r === 'string');
+    } catch {
+      /* unreadable state file — treat as no prior routes */
+    }
+  }
+  for (const route of prev) {
+    if (current.includes(route) || !route) continue;
+    try {
+      rmSync(resolve(repoDir, 'src', 'app', route), { recursive: true, force: true });
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
+  writeFileSync(stateFile, JSON.stringify(current) + '\n', 'utf8');
+}
+
 /**
  * Copy the preview's v2.1 site.ts into the client repo, overwriting the
  * template's minimal placeholder schema so exported repos build with rich data.
@@ -564,6 +736,56 @@ export function writeClientIntake(repoRoot: string, slug: string, intake: Intake
     '// Source of truth for onboard.js (npm run onboard -- --schema clients/' + slug + '/site.ts).\n\n';
   const output = `${header}export const INTAKE = ${JSON.stringify(intake, null, 2)};\n`;
   writeFileSync(resolve(clientDir, 'site.ts'), output, 'utf8');
+}
+
+/**
+ * Seed a real clients/<slug>/site.ts from a vertical preset.
+ *
+ * Moved here from the deleted /api/clients/create route: Convert-to-Client on /leads is now
+ * the only way a client folder comes into being by hand. Only brand.name/short are supplied
+ * by the operator; everything else keeps its preset placeholder and stays listed in
+ * `_meta.missing_fields` (CLAUDE.md: never invent values), minus `brand.name`.
+ *
+ * Throws with `code: 'EXISTS'` when the folder already has a site.ts, so the caller can 409
+ * rather than overwrite, and with `code: 'BAD_VERTICAL'` for an unknown preset.
+ */
+export function seedClientFolder(input: {
+  repoRoot: string;
+  slug: string;
+  name: string;
+  plan: 'starter' | 'growth' | 'enterprise';
+  vertical: string;
+}): void {
+  const { repoRoot, slug, name, plan, vertical } = input;
+  if (!isValidSlug(slug)) throw new Error(`Invalid slug "${slug}".`);
+
+  const preset = VERTICAL_PRESETS[vertical];
+  if (!preset) throw Object.assign(new Error('Unknown vertical.'), { code: 'BAD_VERTICAL' });
+
+  if (existsSync(resolve(repoRoot, 'clients', slug, 'site.ts'))) {
+    throw Object.assign(new Error(`clients/${slug}/site.ts already exists, pick another slug.`), {
+      code: 'EXISTS',
+    });
+  }
+
+  const envelope: IntakeEnvelope = {
+    plan,
+    siteCount: 1,
+    sites: [
+      {
+        ...preset,
+        brand: { ...preset.brand, name, short: name },
+        _meta: {
+          ...preset._meta,
+          generated_at: new Date().toISOString(),
+          selectedPlan: plan,
+          missing_fields: preset._meta.missing_fields.filter((f) => f !== 'brand.name'),
+        },
+      },
+    ],
+  };
+
+  writeClientIntake(repoRoot, slug, envelope);
 }
 
 /**

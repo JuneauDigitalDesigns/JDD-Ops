@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowsClockwise, CircleNotch, Plus } from '@phosphor-icons/react';
 import type { DemoCall, QueuedLead } from '@/lib/leadTypes';
 import { LEADS_LAST_SEEN_KEY } from '@/lib/lead-meta';
@@ -11,6 +12,7 @@ import WarnBanner from '@/components/shell/WarnBanner';
 import CallsTab from './CallsTab';
 import LeadBoard from './LeadBoard';
 import LeadModal from './LeadModal';
+import CallScript from './script/CallScript';
 
 /**
  * The leads screen: the funnel, and the raw call feed behind it.
@@ -24,6 +26,7 @@ import LeadModal from './LeadModal';
 type Tab = 'board' | 'calls';
 
 export default function LeadsView() {
+  const router = useRouter();
   const [leads, setLeads] = useState<QueuedLead[]>([]);
   const [calls, setCalls] = useState<DemoCall[]>([]);
   const [siteUrl, setSiteUrl] = useState('https://juneaudigitaldesigns.com');
@@ -31,6 +34,8 @@ export default function LeadsView() {
   const [openId, setOpenId] = useState<string | null>(null);
   /** The lead this session just created by hand — opens with its name field already live. */
   const [freshId, setFreshId] = useState<string | null>(null);
+  /** The lead whose call script is open. Layered over the modal, which stays mounted beneath. */
+  const [scriptId, setScriptId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -222,6 +227,7 @@ export default function LeadsView() {
 
   const openLead = leads.find((l) => l.id === openId) ?? null;
   const openCall = openLead?.callId ? calls.find((c) => c.callId === openLead.callId) ?? null : null;
+  const scriptLead = leads.find((l) => l.id === scriptId) ?? null;
 
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const addedThisWeek = leads.filter((l) => Date.now() - l.receivedAt < WEEK_MS).length;
@@ -338,6 +344,24 @@ export default function LeadsView() {
           }}
           onPatch={(p) => patch(openLead.id, p)}
           onDelete={removeLead}
+          onOpenScript={() => setScriptId(openLead.id)}
+          // The roster reads `?new=` to scroll to and flash the card this just created.
+          onConverted={(slug) => {
+            setOpenId(null);
+            setFreshId(null);
+            router.push(`/clients?new=${encodeURIComponent(slug)}`);
+          }}
+        />
+      )}
+
+      {scriptLead && (
+        <CallScript
+          lead={scriptLead}
+          narrow={narrow}
+          onClose={() => setScriptId(null)}
+          // `silent` is read by the PATCH route, not stored: autosaves must not each write a
+          // "Notes updated" line into the activity trail.
+          onSaveNotes={(notes, silent) => patch(scriptLead.id, { notes, silent })}
         />
       )}
     </div>

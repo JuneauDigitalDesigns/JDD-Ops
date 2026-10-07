@@ -30,10 +30,11 @@ export interface CopyResult {
     eyebrow: string;
     title: string;
     body: string;
+    story?: string[];
     pillars: { t: string; d: string }[];
     stats?: { n: string; l: string }[];
   };
-  services: { eyebrow: string; title: string; sub: string; items: { t: string; d: string; tag: string }[] };
+  services: { eyebrow: string; title: string; sub: string; items: { t: string; d: string; tag: string; detail?: string }[] };
   work: {
     eyebrow: string;
     title: string;
@@ -49,13 +50,28 @@ export interface CopyResult {
   finalCta: { eyebrow: string; headline: string; sub: string; cta: string; secondary?: string; frictionReducers?: string[] };
   footer: { blurb?: string };
   seo: { title: string; description: string };
+  /** Per-subpage header + SEO for a multi-page site. One entry per non-home route; the route
+   *  discriminator keeps the JSON schema a fixed shape (no dynamic object keys). Merged into
+   *  SiteContent.subpages by applyGeneratedCopy. Only requested when the run carries subpages. */
+  subpages?: {
+    items: {
+      route: string;
+      eyebrow: string;
+      title: string;
+      sub: string;
+      ctaLabel?: string;
+      ctaHref?: string;
+      seoTitle: string;
+      seoDescription: string;
+    }[];
+  };
 }
 
 export type Section = keyof CopyResult;
 
 export const ALL_SECTIONS: Section[] = [
   'brand', 'announcement', 'trust', 'hero', 'about', 'services',
-  'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo',
+  'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo', 'subpages',
 ];
 
 const str = { type: 'string' } as const;
@@ -81,14 +97,14 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
   ),
   about: obj(
     {
-      eyebrow: str, title: str, body: str,
+      eyebrow: str, title: str, body: str, story: arr(str),
       pillars: arr(obj({ t: str, d: str }, ['t', 'd'])),
       stats: arr(obj({ n: str, l: str }, ['n', 'l'])),
     },
     ['eyebrow', 'title', 'body', 'pillars'],
   ),
   services: obj(
-    { eyebrow: str, title: str, sub: str, items: arr(obj({ t: str, d: str, tag: str }, ['t', 'd', 'tag'])) },
+    { eyebrow: str, title: str, sub: str, items: arr(obj({ t: str, d: str, tag: str, detail: str }, ['t', 'd', 'tag'])) },
     ['eyebrow', 'title', 'sub', 'items'],
   ),
   work: obj(
@@ -112,6 +128,15 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
   ),
   footer: obj({ blurb: str }, []),
   seo: obj({ title: str, description: str }, ['title', 'description']),
+  subpages: obj(
+    {
+      items: arr(obj(
+        { route: str, eyebrow: str, title: str, sub: str, ctaLabel: str, ctaHref: str, seoTitle: str, seoDescription: str },
+        ['route', 'eyebrow', 'title', 'sub', 'seoTitle', 'seoDescription'],
+      )),
+    },
+    ['items'],
+  ),
 };
 
 /**

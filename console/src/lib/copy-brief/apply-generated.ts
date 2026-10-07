@@ -76,6 +76,7 @@ export function applyGeneratedCopy(
       eyebrow: a.eyebrow ?? base.about.eyebrow,
       title: a.title ?? base.about.title,
       body: a.body ?? base.about.body,
+      story: a.story?.length ? a.story : base.about.story,
       pillars: mergeArray(base.about.pillars, a.pillars, (b, c) => ({ ...b, t: c.t ?? b.t, d: c.d ?? b.d })),
       stats: a.stats?.length
         ? mergeArray(base.about.stats, a.stats, (b, c) => ({ ...b, n: c.n ?? b.n, l: c.l ?? b.l }))
@@ -91,7 +92,7 @@ export function applyGeneratedCopy(
       title: s.title ?? base.services.title,
       sub: s.sub ?? base.services.sub,
       items: mergeArray(base.services.items, s.items, (b, c) => ({
-        ...b, t: c.t ?? b.t, d: c.d ?? b.d, tag: c.tag ?? b.tag,
+        ...b, t: c.t ?? b.t, d: c.d ?? b.d, tag: c.tag ?? b.tag, detail: c.detail ?? b.detail,
       })),
     };
   }
@@ -158,6 +159,26 @@ export function applyGeneratedCopy(
       title: s.title ?? base.seo.title,
       description: s.description ?? base.seo.description,
     };
+  }
+
+  if (want.has('subpages') && copy.subpages?.items?.length) {
+    // Route-keyed merge onto whatever subpages the base already carries, so regenerating one
+    // page's copy never drops the others. Each item folds header + per-page SEO into the
+    // SiteContent.subpages[route] shape; a cta only survives when BOTH label and href are given.
+    const map = { ...(base.subpages ?? {}) };
+    for (const it of copy.subpages.items) {
+      if (!it.route) continue;
+      map[it.route] = {
+        header: {
+          eyebrow: it.eyebrow,
+          title: it.title,
+          sub: it.sub,
+          cta: it.ctaLabel && it.ctaHref ? { label: it.ctaLabel, href: it.ctaHref } : null,
+        },
+        seo: { title: it.seoTitle, description: it.seoDescription },
+      };
+    }
+    generated.subpages = map;
   }
 
   return generated;

@@ -12,22 +12,26 @@ export const CONTENT: SiteContent = {
     email:       "owner@yourlawncare.com",
     address:     "123 Main St, Your City, ST 00000",
     license:     null,
+
+    // Decision 9: warm unbleached ground, warm charcoal ink, shared across every vertical.
+    // Measured 2026-10-06: inkSoft on bg 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1.
+    // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
-      accent:   "#3D8E40",
+      accent:   "#2F7A33",
       accentFg: "#FFFFFF",
-      bg:       "#FFFFFF",
-      bgSoft:   "#F2F9F2",
-      ink:      "#0F1F10",
-      inkSoft:  "#3D5440",
-      rule:     "#C3DEC4",
+      bg:       "#FAF7F2",
+      bgSoft:   "#F1EBE2",
+      ink:      "#1A1512",
+      inkSoft:  "#584E45",
+      rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      fontHeading:       "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      fontSans:          "var(--font-instrument), system-ui, sans-serif",
+      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
       headingWeight:     700,
       bodyWeight:        400,
-      headingTracking:   "-0.01em",
-      headingLineHeight: 1.2,
+      headingTracking:   "-0.022em",
+      headingLineHeight: 1.02,
     },
   },
 
@@ -39,50 +43,35 @@ export const CONTENT: SiteContent = {
     { label: "Quote",    href: "#cta" },
   ],
 
-  announcement: "Spring lawn treatments are booking fast — reserve your spot today!",
+  announcement: "Spring lawn treatments are booking fast, reserve your spot today!",
 
   trust: {
     label: "Our promise",
-    logos: [
-      "Eco-Friendly Products",
-      "Satisfaction Guaranteed",
-      "Locally Owned",
-      "Fully Insured",
-      "Free Estimates",
-    ],
+    logos: [], // de-clawed — certifications come from onboarding (notableClients)
   },
 
   hero: {
     eyebrow:          "Your Neighborhood Lawn Experts",
     headline:         "A Greener Lawn Starts Here",
     headlineEmphasis: "Greener",
-    sub:              "Professional mowing, fertilization, aeration, and seasonal treatments — reliable weekly service that keeps your lawn looking its best all year.",
-    formLabel:        "Get a free lawn quote — no obligation.",
+    sub:              "Professional mowing, fertilization, aeration, and seasonal treatments, reliable weekly service that keeps your lawn looking its best all year.",
+    formLabel:        "Get a free lawn quote, no obligation.",
     placeholder:      "Your email address",
     cta:              "Get a Free Quote",
     secondaryCta:     "Call (555) 555-0100",
     trust:            "Locally owned and operated with eco-friendly products and a 100% satisfaction guarantee.",
-    badge:            "Free Lawn Quote",
-    frictionReducers: [
-      "Free estimates",
-      "Eco-friendly products",
-      "Locally owned",
-      "Satisfaction guaranteed",
-    ],
-    heroBullets: [
-      { value: "200+",  label: "Lawns maintained" },
-      { value: "Eco",   label: "Friendly products" },
-      { value: "4.9",   label: "Average rating" },
-      { value: "100%",  label: "Satisfaction" },
-    ],
+    // De-clawed: badge, friction reducers and hero stats are unverified claims — client-supplied at onboarding.
+    badge:            null,
+    frictionReducers: [],
+    heroBullets:      [],
   },
 
   about: {
     eyebrow: "Who We Are",
     title:   "Locally Grown Lawn Care",
-    body:    "We're a locally owned lawn care company that takes pride in the neighborhoods we serve. We use eco-friendly products, keep a consistent weekly schedule, and treat every lawn like it's our own — because our reputation depends on yours looking great.",
+    body:    "We're a locally owned lawn care company that takes pride in the neighborhoods we serve. We use eco-friendly products, keep a consistent weekly schedule, and treat every lawn like it's our own, because our reputation depends on yours looking great.",
     pillars: [
-      { k: "shield", t: "Fully Insured",          d: "We carry full liability insurance on every job — your property is always protected." },
+      { k: "shield", t: "Fully Insured",          d: "We carry full liability insurance on every job, your property is always protected." },
       { k: "clock",  t: "Reliable Scheduling",    d: "Weekly service on a consistent day. If we're delayed by weather, we notify you in advance." },
       { k: "tag",    t: "Eco-Friendly Products",   d: "We use low-impact fertilizers and pesticides that are safe for kids, pets, and pollinators." },
       { k: "star",   t: "Satisfaction Guarantee",  d: "Not happy with a visit? We'll come back and re-do the work at no charge." },
@@ -100,7 +89,7 @@ export const CONTENT: SiteContent = {
     title:   "Full-Season Lawn Care",
     sub:     "Weekly maintenance, seasonal treatments, and everything your lawn needs to thrive.",
     items: [
-      { n: "01", t: "Lawn Mowing",              d: "Regular weekly or bi-weekly mowing, edging, and blowing — on the same day, every time.", tag: "Maintenance" },
+      { n: "01", t: "Lawn Mowing",              d: "Regular weekly or bi-weekly mowing, edging, and blowing, on the same day, every time.", tag: "Maintenance" },
       { n: "02", t: "Fertilization",            d: "Custom fertilization programs matched to your grass type and local soil conditions.", tag: "Treatments" },
       { n: "03", t: "Core Aeration",            d: "Relieve soil compaction to improve root depth, water absorption, and fertilizer uptake.", tag: "Aeration" },
       { n: "04", t: "Leaf Removal",             d: "Fall cleanups and ongoing leaf removal to keep your lawn clean through winter.", tag: "Seasonal" },
@@ -133,7 +122,7 @@ export const CONTENT: SiteContent = {
     sub:     "Everything you need to know before booking.",
     items: [
       { q: "How often should my lawn be mowed?", a: "During the growing season, most lawns benefit from weekly mowing. We adjust cut height and frequency based on grass type and growth rate, and we can switch to bi-weekly service during slow-growth periods." },
-      { q: "Are your products safe for kids and pets?", a: "Yes. We use EPA-registered, low-toxicity products and follow labeled re-entry intervals. We'll always let you know when you can safely return to treated areas — typically 1–2 hours after application dries." },
+      { q: "Are your products safe for kids and pets?", a: "Yes. We use EPA-registered, low-toxicity products and follow labeled re-entry intervals. We'll always let you know when you can safely return to treated areas, typically 1–2 hours after application dries." },
       { q: "When is the best time to aerate?", a: "For cool-season grasses (fescue, bluegrass, rye): fall is ideal. For warm-season grasses (Bermuda, zoysia, St. Augustine): late spring to early summer. Aerating at the right time maximizes recovery and benefit." },
       { q: "What does a weed control program include?", a: "Our program includes a pre-emergent application in early spring to prevent crabgrass and other annuals, followed by post-emergent treatments throughout the season to knock out any weeds that do appear." },
       { q: "Can you over-seed a thin or patchy lawn?", a: "Absolutely. We pair aeration with over-seeding for the best germination results. Fall is the ideal time for cool-season grasses. We select seed varieties appropriate for your specific sun/shade conditions." },
@@ -146,7 +135,7 @@ export const CONTENT: SiteContent = {
     sub:      "Get a free, no-pressure quote for weekly service, seasonal treatments, or a one-time spring clean-up.",
     cta:      "Get a Free Quote",
     secondary: "Call (555) 555-0100",
-    frictionReducers: ["Free estimates", "Eco-friendly products", "Satisfaction guaranteed"],
+    frictionReducers: [], // de-clawed — client-supplied at onboarding
   },
 
   footer: {
@@ -182,12 +171,7 @@ export const CONTENT: SiteContent = {
   },
 
   extensions: {
-    trustBadges: [
-      "Eco-Friendly Products",
-      "Satisfaction Guaranteed",
-      "Locally Owned & Operated",
-      "Fully Insured",
-    ],
+    trustBadges: null, // de-clawed — certifications come from onboarding
     reviewBadge: null,
     contactDetails: {
       address: "123 Main St, Your City, ST 00000",

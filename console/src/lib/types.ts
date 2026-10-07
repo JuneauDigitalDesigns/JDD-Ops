@@ -71,6 +71,21 @@ export interface ClientContext {
   sites: SiteInfo[];
   /** Non-null when this client paid but hasn't submitted the wizard yet (KV-only, no disk). */
   pendingOnboarding?: PendingOnboardingMeta | null;
+  /**
+   * Non-null on a placeholder folder from a converted lead whose client hasn't onboarded on the
+   * agency site yet. Unlike `pendingOnboarding` this client HAS a folder; it just has nothing
+   * worth building. Set at request time by the manage layout from lib/onboardingGate, never
+   * read off disk. `email` is where the welcome email goes.
+   */
+  awaitingOnboarding?: { email: string | null } | null;
+  /**
+   * A custom, externally-built site (not a JDD-template build) that we only *manage* from here.
+   * Read from site.ts `_meta.externalManaged`. Its repo and Vercel env are owned elsewhere, so
+   * the console must never push env or redeploy it — the Environment/Deployments sections gate
+   * those actions on this flag. It is also treated as `live` on disk (see getClientContext),
+   * since an externally-deployed site has no local `repo/` to make it look "needs-build".
+   */
+  externalManaged?: boolean;
 }
 
 // ── Durable runbook state (runbook/.state/progress.json) ─────────────────────
@@ -98,5 +113,15 @@ export interface OpsConfig {
   portalSignInUrl?: string; // agency NEXT_PUBLIC_CLERK_SIGN_IN_URL → absolute
   siteUrl?: string; // agency NEXT_PUBLIC_SITE_URL, no trailing slash
   serviceAccountEmail?: string; // GOOGLE_SERVICE_ACCOUNT_KEY → client_email
+  /**
+   * Which backing environment this console is wired to, derived from key PREFIXES and KV
+   * HOST only (never values). `mixed` means the signals disagree, the bug class that sent
+   * writes to the test KV while Clerk/Stripe were live.
+   */
+  envMode?: EnvMode;
+  /** Per-signal readout behind envMode, for the banner. Non-secret labels only. */
+  envSignals?: Array<{ label: string; signal: 'production' | 'test' | 'unknown' }>;
 }
+
+export type EnvMode = 'production' | 'test' | 'mixed';
 

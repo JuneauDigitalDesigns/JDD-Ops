@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import { CaretDown, SpinnerGap, Warning } from '@phosphor-icons/react';
 import PlanChip from '@/components/PlanChip';
 import PlanDowngradePanel from './PlanDowngradePanel';
+import { useManage } from './ManageContext';
 import type { ClientContext } from '@/lib/types';
 
 /**
@@ -29,6 +30,7 @@ interface UpgradeResponse {
 }
 
 export default function PlanControl({ ctx, onChanged }: { ctx: ClientContext; onChanged: () => void }) {
+  const { confirmWrite } = useManage();
   const editable = ctx.hasIntake && !ctx.isEnterprise && ctx.plan !== 'enterprise' && ctx.sites.length === 1;
   const target = ctx.plan === 'starter' ? 'growth' : 'starter';
 
@@ -58,6 +60,14 @@ export default function PlanControl({ ctx, onChanged }: { ctx: ClientContext; on
   }
 
   async function runUpgrade() {
+    if (
+      !(await confirmWrite({
+        title: 'Upgrade plan to growth',
+        effect: `Changes ${ctx.slug} to the growth plan: provisions a voice agent and phone number and updates the live portal account. Billing is synced separately.`,
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

@@ -40,6 +40,8 @@ import type {
 
 const RETURN_ONLY_JSON = 'Return ONLY a JSON object that conforms to the provided output schema. No prose, no markdown, no code fences.';
 
+const MULTI_PAGE_RULES = 'This is a MULTI-PAGE website, not a single landing page. Copy for one page must never duplicate another page\'s wording — each page stands on its own. The About page carries the detailed company story; the Services page carries per-service detail; every non-home page has a distinct header and its own SEO title and description.';
+
 /** One paragraph of the compiled prompt, tagged with the block that produced it.
  *  `blockId` is null for the handful of lines that aren't sourced from any block (the
  *  vertical-label opener, the brand instruction, the closing "be specific" line) —
@@ -68,7 +70,7 @@ function customFieldsFor(blocks: ResolvedBlock[], kind: string, sections: Sectio
   return custom.fields.filter((f) => f.kind === kind && (f.sections.length === 0 || f.sections.some((s) => sections.includes(s as Section))));
 }
 
-function systemSegments(blocks: ResolvedBlock[]): PromptSegment[] {
+function systemSegments(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment[] {
   const role = find<ProseBlock>(blocks, 'role');
   const guardrails = find<ProseBlock>(blocks, 'guardrails');
   const forbidden = find<ForbiddenBlock>(blocks, 'forbidden');
@@ -88,8 +90,22 @@ function systemSegments(blocks: ResolvedBlock[]): PromptSegment[] {
       segments.push({ blockId: 'forbidden', label: forbidden.label, text: [clicheLine, extra].filter(Boolean).join(' ') });
     }
   }
+  if (ctx.subpages?.length) {
+    segments.push({ blockId: null, label: 'Multi-page', text: MULTI_PAGE_RULES });
+  }
   segments.push({ blockId: null, label: 'Output format', text: RETURN_ONLY_JSON });
   return segments;
+}
+
+/** Names the site's pages and what each carries, so the copywriter writes standalone,
+ *  non-redundant per-page copy. Null on a single-page build (no subpages). */
+function siteStructureSegment(ctx: BriefContext): PromptSegment | null {
+  if (!ctx.subpages?.length) return null;
+  const pageList = ctx.subpages.map((p) => `${p.label} (/${p.route})`).join(', ');
+  return {
+    blockId: null, label: 'Site structure',
+    text: `This is a multi-page website. Home is a lean landing page (hero, trust, services, testimonials, final CTA). Dedicated pages: ${pageList}. Write standalone, non-redundant copy: the About page carries the detailed company story, the Services page needs per-service detail, and each subpage needs a distinct header and its own SEO. Do not repeat the hero's wording on other pages.`,
+  };
 }
 
 function factsSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment | null {
@@ -201,6 +217,7 @@ export function userSegments(ctx: BriefContext, blocks: ResolvedBlock[], section
   const label = ctx.vertical.label;
   const segments: Array<PromptSegment | null> = [
     { blockId: null, label: 'Vertical', text: `Industry vertical: ${label}.` },
+    siteStructureSegment(ctx),
     factsSegment(ctx, blocks),
     websiteSegment(blocks),
     clientWordsSegment(blocks),
@@ -218,7 +235,7 @@ export function compileBriefSegments(
   blocks: ResolvedBlock[],
   sections: Section[],
 ): { system: PromptSegment[]; user: PromptSegment[] } {
-  return { system: systemSegments(blocks), user: userSegments(ctx, blocks, sections) };
+  return { system: systemSegments(ctx, blocks), user: userSegments(ctx, blocks, sections) };
 }
 
 export function compileBriefPrompt(

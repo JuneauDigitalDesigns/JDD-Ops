@@ -12,22 +12,26 @@ export const CONTENT: SiteContent = {
     email:       "hello@yourwellnesspractice.com",
     address:     "123 Main St, Your City, ST 00000",
     license:     null,
+
+    // Decision 9: warm unbleached ground, warm charcoal ink, shared across every vertical.
+    // Measured 2026-10-06: inkSoft on bg 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1.
+    // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#0E9C8A",
       accentFg: "#FFFFFF",
-      bg:       "#FFFFFF",
-      bgSoft:   "#F0FAF8",
-      ink:      "#12211E",
-      inkSoft:  "#52655F",
-      rule:     "#D2E9E3",
+      bg:       "#FAF7F2",
+      bgSoft:   "#F1EBE2",
+      ink:      "#1A1512",
+      inkSoft:  "#584E45",
+      rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      fontHeading:       "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      fontSans:          "var(--font-instrument), system-ui, sans-serif",
+      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
       headingWeight:     700,
       bodyWeight:        400,
-      headingTracking:   "-0.01em",
-      headingLineHeight: 1.2,
+      headingTracking:   "-0.022em",
+      headingLineHeight: 1.02,
     },
   },
 
@@ -39,42 +43,27 @@ export const CONTENT: SiteContent = {
     { label: "Book",     href: "#cta" },
   ],
 
-  announcement: "Now accepting new clients — book a first visit online.",
+  announcement: "Now accepting new clients, book a first visit online.",
 
   trust: {
     label: "Trusted by the community",
-    logos: [
-      "Licensed Practitioners",
-      "Privacy-First Care",
-      "Insured & Accredited",
-      "5-Star Reviewed",
-      "Community Partner",
-    ],
+    logos: [], // de-clawed — certifications come from onboarding (notableClients)
   },
 
   hero: {
     eyebrow:          "Your City's Whole-Person Wellness Practice",
     headline:         "Feel Supported at Every Step",
     headlineEmphasis: "Every Step",
-    sub:              "Personalized wellness care for your whole life — attentive practitioners, easy scheduling, and a calm, welcoming space.",
-    formLabel:        "Request a first appointment — we'll follow up promptly.",
+    sub:              "Personalized wellness care for your whole life, attentive practitioners, easy scheduling, and a calm, welcoming space.",
+    formLabel:        "Request a first appointment, we'll follow up promptly.",
     placeholder:      "Your email address",
     cta:              "Book a First Visit",
     secondaryCta:     "Call (555) 555-0123",
     trust:            "Licensed practitioners, flexible scheduling, and care plans built around you.",
-    badge:            "New clients welcome",
-    frictionReducers: [
-      "No referral needed",
-      "Flexible scheduling",
-      "Welcoming space",
-      "Care built around you",
-    ],
-    heroBullets: [
-      { value: "Same wk", label: "Appointments" },
-      { value: "1:1",     label: "Personal care" },
-      { value: "4.9",     label: "Average rating" },
-      { value: "100%",    label: "Confidential" },
-    ],
+    // De-clawed: badge, friction reducers and hero stats are unverified claims — client-supplied at onboarding.
+    badge:            null,
+    frictionReducers: [],
+    heroBullets:      [],
   },
 
   about: {
@@ -85,7 +74,7 @@ export const CONTENT: SiteContent = {
       { k: "shield", t: "Licensed & Insured",  d: "Our practitioners are fully licensed, insured, and committed to your privacy." },
       { k: "clock",  t: "Easy Scheduling",     d: "Flexible appointment times and simple online booking that fit your life." },
       { k: "star",   t: "Compassionate Team",  d: "A calm, judgment-free space where you're heard and supported." },
-      { k: "tag",    t: "Transparent Pricing", d: "Clear costs and options up front — no surprises on your bill." },
+      { k: "tag",    t: "Transparent Pricing", d: "Clear costs and options up front, no surprises on your bill." },
     ],
     stats: [
       { n: "Same wk", l: "Appointment availability" },
@@ -132,7 +121,7 @@ export const CONTENT: SiteContent = {
     title:   "Frequently Asked Questions",
     sub:     "Everything you need to know before your first visit.",
     items: [
-      { q: "Do I need a referral to book?", a: "No referral is needed — you can request a first appointment directly through our site or by phone." },
+      { q: "Do I need a referral to book?", a: "No referral is needed, you can request a first appointment directly through our site or by phone." },
       { q: "What happens at a first visit?", a: "We'll talk through your goals and history, answer your questions, and outline a supportive plan together. There's no pressure and no rush." },
       { q: "Do you offer virtual appointments?", a: "Yes. We offer both in-person and virtual visits so you can choose what's most convenient for you." },
       { q: "Is my information kept private?", a: "Absolutely. We follow strict privacy practices and keep your information confidential." },
@@ -146,7 +135,7 @@ export const CONTENT: SiteContent = {
     sub:       "Booking a first visit is simple, and there's no pressure. We're here whenever you're ready to start.",
     cta:       "Book a First Visit",
     secondary: "Call (555) 555-0123",
-    frictionReducers: ["No referral needed", "Flexible scheduling", "Welcoming space"],
+    frictionReducers: [], // de-clawed — client-supplied at onboarding
   },
 
   footer: {
@@ -175,19 +164,14 @@ export const CONTENT: SiteContent = {
 
   seo: {
     title:             "Your Wellness Practice | Whole-Person Wellness Care",
-    description:       "Whole-person wellness practice offering consultations, personalized care plans, and ongoing support. New clients welcome — book online.",
+    description:       "Whole-person wellness practice offering consultations, personalized care plans, and ongoing support. New clients welcome, book online.",
     canonical:         "https://yourwellnesspractice.com",
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },
 
   extensions: {
-    trustBadges: [
-      "Licensed Practitioners",
-      "Privacy-First Care",
-      "Insured & Accredited",
-      "Community Trusted",
-    ],
+    trustBadges: null, // de-clawed — certifications come from onboarding
     reviewBadge: null,
     contactDetails: {
       address: "123 Main St, Your City, ST 00000",

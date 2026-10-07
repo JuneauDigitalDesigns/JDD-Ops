@@ -16,6 +16,12 @@ export const meta = {
     'brand.phoneHref', 'brand.phone', 'images.hero.slides',
   ],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'full-bleed-overlay',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 function Headline({ text, emphasis }: { text: string; emphasis: string | null }) {
@@ -38,7 +44,10 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
   const slide = images.hero.slides?.[0];
 
   return (
-    <section className="relative isolate flex min-h-[100dvh] items-center overflow-hidden bg-ink">
+    <section className="relative isolate flex min-h-[560px] items-center overflow-hidden bg-ink lg:min-h-[640px]">
+      {/* Bounded height, never a viewport unit: the studio's flow-mode preview sizes the iframe
+          to measured content height, so `min-h-[100dvh]` here fed a runaway height loop that
+          rendered the page blank. A fixed min-h renders identically live and in the preview. */}
       {/* Full-bleed background image */}
       {slide?.url ? (
         <img
@@ -57,8 +66,10 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
       ) : (
         <div className="absolute inset-0 -z-10 bg-ink bg-[repeating-linear-gradient(45deg,transparent,transparent_12px,rgba(255,255,255,0.03)_12px,rgba(255,255,255,0.03)_24px)]" />
       )}
-      {/* Legibility wash toward the card side */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-ink/70 via-ink/30 to-transparent" />
+      {/* Legibility scrim. Decision 30(b): research §6 item 1 names "a confident headline over a
+          soft gradient" as the most-cited AI tell, so this is a FLAT plate at a measured opacity
+          rather than a directional feather. It does the same legibility job. */}
+      <div className="absolute inset-0 -z-10 bg-ink/55" />
 
       <div className="mx-auto w-full max-w-6xl px-6 py-20 lg:py-28">
         <motion.div
@@ -97,9 +108,9 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
             </a>
           </div>
 
-          {hero.frictionReducers.length > 0 && (
+          {(hero.frictionReducers ?? []).length > 0 && (
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
-              {hero.frictionReducers.map((s, i) => (
+              {(hero.frictionReducers ?? []).map((s, i) => (
                 <span key={s} className="flex items-center gap-1.5 text-sm text-inkSoft">
                   <CheckCircle size={15} weight="fill" className="text-accent" />
                   <E p={`hero.frictionReducers.${i}`}>{s}</E>

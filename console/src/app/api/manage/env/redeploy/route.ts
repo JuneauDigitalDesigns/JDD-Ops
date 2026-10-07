@@ -38,6 +38,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `${siteSlug} is not a site of ${slug}.` }, { status: 400 });
   }
 
+  // Externally-managed sites (custom builds we only monitor) own their own repo + Vercel env.
+  // A redeploy from here would rebuild them from whatever the console assumes, so refuse it —
+  // the UI hides the button too, this is the backstop for a direct POST.
+  if (ctx.externalManaged) {
+    return NextResponse.json(
+      { error: `${slug} is externally managed — redeploy it from its own repo/Vercel project.` },
+      { status: 409 },
+    );
+  }
+
   if (!loadVercelCredentials()) {
     return NextResponse.json(
       { error: 'VERCEL_TOKEN is not set in jdd-ops/.env.' },

@@ -1,4 +1,9 @@
 import type { Config } from 'tailwindcss';
+import {
+  fontSize as brandFontSize, letterSpacing as brandTracking, spacing as brandSpacing,
+  borderRadius as brandRadius, boxShadow as brandShadow, maxWidth as brandMaxWidth,
+} from '../template/src/styles/tokens';
+import rhythm from '../template/src/styles/rhythm.plugin';
 
 // Token set for the JDD Console. TWO worlds, deliberately:
 //   • CLIENT-BRAND tokens (accent/bg/ink/rule/accent050…) bind to CSS vars set per-route
@@ -15,7 +20,13 @@ import type { Config } from 'tailwindcss';
 // previously had no scale at all, so sizes were re-typed inline in ~23 files. Change the
 // scale here, not in components.
 const config: Config = {
-  content: ['./src/**/*.{ts,tsx}'],
+  content: [
+    './src/**/*.{ts,tsx}',
+    // Template-owned code the console RENDERS (Phase 6 imports
+    // @template/lib/StickyCallBar into PageStudio). Without this glob its Tailwind classes are
+    // never generated in the console build and the preview renders an unstyled bar.
+    '../template/src/lib/**/*.{ts,tsx}',
+  ],
   theme: {
     extend: {
       // Type scale — one notch down from where it was. The old scale sat ~15-20% ABOVE
@@ -25,7 +36,14 @@ const config: Config = {
       // 14px is the FLOOR for body text and it is not negotiable. The density this
       // redesign buys comes from radii, gutters, control heights and chrome — not from
       // shrinking prose. Going to 13px here would trade legibility for a few rows.
+      //
+      // CLIENT-BRAND sizing, shared with the exported template via ../template/src/styles/tokens.
+      // Spread first so the console's own CHROME keys below always win a name collision: the
+      // chrome scale has a 14px body floor that must not be overwritten by a client-site scale.
+      // The two sets use disjoint key names on purpose (display-1/card-title/lead/body/small/fine
+      // vs sm/base/lg/xl/label/kicker/meta), so no collision is expected; the ordering is a guard.
       fontSize: {
+        ...brandFontSize,
         '2xs': ['11.5px', { lineHeight: '1.45' }], // smallest legal size; badges only
         xs: ['12.5px', { lineHeight: '1.5' }],     // secondary
         sm: ['14px', { lineHeight: '1.5' }],       // BASE BODY — the workhorse
@@ -124,34 +142,52 @@ const config: Config = {
         body: ['var(--font-hanken)', 'Hanken Grotesk', 'sans-serif'],
         mono: ['var(--font-dm-mono)', 'DM Mono', 'monospace'],
       },
+      // Spread first, same collision-guard ordering as fontSize above.
       letterSpacing: {
+        ...brandTracking,
         tightest: '-0.04em',
         tightish: '-0.02em',
         wideish: '0.08em',
         widest2: '0.14em',
       },
+      // Console chrome had no spacing scale of its own; this is the client-brand gutter/section
+      // scale, shared with the template via ../template/src/styles/tokens, so the /build preview
+      // resolves the same section bands the export will.
+      spacing: { ...brandSpacing },
       // Elevation ladder — layering is what makes the console read as an app rather
       // than a page. Ascending: raised (cards) → panel (drawers) → overlay (catalog
       // picker) → floating (contextual toolbars pinned over the canvas).
+      // Spread first, same collision-guard ordering as fontSize above.
       boxShadow: {
+        ...brandShadow,
         raised: '0 1px 2px rgba(20,18,12,0.04), 0 4px 12px -4px rgba(20,18,12,0.10)',
         panel: '0 2px 6px rgba(20,18,12,0.05), 0 24px 60px -28px rgba(20,18,12,0.32)',
         overlay: '0 8px 20px rgba(20,18,12,0.10), 0 48px 100px -32px rgba(20,18,12,0.42)',
         floating: '0 2px 8px rgba(20,18,12,0.10), 0 12px 32px -10px rgba(20,18,12,0.28)',
         glow: '0 12px 40px -10px var(--accent-glow)',
       },
+      // Spread first, same collision-guard ordering as fontSize above. `panel` COLLIDES on
+      // purpose: chrome's `panel: '12px'` must win over tokens.ts's `panel: '14px'` because
+      // `rounded-panel` in console chrome has to keep matching `.panel` in globals.css. This is
+      // intentional, verified 2026-10-06; do not "fix" it. Catalog preview components that
+      // genuinely need the template's 14px should use `rounded-[14px]` directly, or prefer
+      // `rounded-control` / `rounded-slab`, which do not collide with chrome.
       borderRadius: {
+        ...brandRadius,
         xl2: '22px',
         // Matches .panel in globals.css. Use for surfaces that should read as the
         // same container class as .panel but can't take the class itself.
         panel: '12px',
       },
+      // Console chrome had no maxWidth scale of its own; shared with the template the same way
+      // spacing is above.
+      maxWidth: { ...brandMaxWidth },
       backgroundImage: {
         'accent-grad': 'var(--accent-grad)',
       },
     },
   },
-  plugins: [],
+  plugins: [rhythm],
 };
 
 export default config;

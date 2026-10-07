@@ -33,6 +33,12 @@ export const meta = {
     'brand.phone', 'brand.phoneHref',
   ],
   sharedDeps: ['@phosphor-icons/react', '@/lib/LeadForm'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'full-bleed-band',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 export default function FinalCtaBanner({ content = CONTENT }: { content?: SiteContent }) {

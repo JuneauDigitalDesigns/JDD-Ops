@@ -12,12 +12,20 @@ export const meta = {
   consumes: ['work.eyebrow', 'work.title', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'soft', 'inverted'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'before-after',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
+// Decision 30(b): AUTHORING_CONTRACT §3's hatch, not a branded gradient slab. A before/after
+// placeholder in particular must read as "no photo yet" rather than as a designed panel.
 function EmptyImage({ label, big }: { label: string; big?: boolean }) {
   return (
-    <div className="relative flex h-full w-full items-center justify-center bg-accent-grad">
-      <span className={`font-heading font-black leading-none text-white/25 ${big ? 'text-7xl' : 'text-4xl'}`}>{label}</span>
+    <div className="relative flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
+      <span className={`font-heading font-black leading-none text-inkSoft/30 ${big ? 'text-7xl' : 'text-4xl'}`}>{label}</span>
     </div>
   );
 }

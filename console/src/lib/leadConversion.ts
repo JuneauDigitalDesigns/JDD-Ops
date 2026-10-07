@@ -3,6 +3,7 @@ import { listClientContexts } from './clients';
 import { intakeQueueConfigured, listPendingIntakes } from './intakeQueue';
 import { patchLead, type QueuedLead } from './leadQueue';
 import { clientRecordsConfigured, ensureClientRecord } from './clientRecord';
+import { slugify } from './slugify';
 
 /**
  * Close the loop between the funnel and the client roster.
@@ -72,15 +73,6 @@ export async function convertLead(
       text: `Converted to client — ${slug}${clientRecordId ? '' : ' (no email on file, record deferred)'}`,
     },
   });
-}
-
-/** Match intake's slugifyBrand exactly, or the two sides won't line up. */
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 60);
 }
 
 /**

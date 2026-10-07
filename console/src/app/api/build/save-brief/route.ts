@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { clientDir } from '@/lib/paths';
 import { loadIntake } from '@/lib/intake';
 import { resolveRepoRoot, rewriteClientSchema } from '@/lib/export';
+import { guardOnboarded } from '@/lib/onboardingGate';
 
 /**
  * Persist the Intake Brief stage's inputs to `_meta.copyBrief` on `clients/{slug}/site.ts`.
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest) {
   if (!existsSync(clientDir(slug))) {
     return NextResponse.json({ error: 'client not found' }, { status: 404 });
   }
+  const locked = await guardOnboarded(slug);
+  if (locked) return locked;
 
   const repoRoot = resolveRepoRoot();
   const file = resolve(clientDir(slug), 'site.ts');

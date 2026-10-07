@@ -95,13 +95,27 @@ export default function DeploymentsSection() {
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
       <SectionHeader
         title="Deployments"
-        lede="Env changes are inert until the site rebuilds — this is where you apply them."
+        lede={
+          ctx.externalManaged
+            ? 'A custom, externally-built site — this is a read-only view of its builds.'
+            : 'Env changes are inert until the site rebuilds — this is where you apply them.'
+        }
         actions={
           <>
             <button type="button" onClick={() => void load()} className="btn btn-sm" title="Refresh">
               <ArrowsClockwise size={13} />
             </button>
-            <button type="button" onClick={redeploy} disabled={deploying} className="btn btn-primary btn-sm">
+            <button
+              type="button"
+              onClick={redeploy}
+              disabled={deploying || ctx.externalManaged}
+              title={
+                ctx.externalManaged
+                  ? 'Externally managed — redeploy from the site’s own Vercel project'
+                  : undefined
+              }
+              className="btn btn-primary btn-sm"
+            >
               {deploying ? (
                 <ArrowsClockwise size={13} className="animate-spin" />
               ) : (
@@ -112,6 +126,17 @@ export default function DeploymentsSection() {
           </>
         }
       />
+
+      {ctx.externalManaged && (
+        <div
+          className="mb-4 flex items-start gap-2 rounded-[10px] border px-3 py-2 text-xs"
+          style={{ borderColor: 'var(--warn)', background: 'var(--warn-glow)', color: 'var(--fg-2)' }}
+        >
+          <Warning size={14} style={{ color: 'var(--warn)' }} className="mt-0.5 shrink-0" />
+          Externally managed site. Deploys are owned by its own repo and Vercel project; the
+          console never redeploys it.
+        </div>
+      )}
 
       {notice && (
         <div

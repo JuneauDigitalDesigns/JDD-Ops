@@ -1,5 +1,8 @@
 import { resolve } from 'node:path';
+import { redirect } from 'next/navigation';
 import type { SiteContent } from '@/data/site';
+import { getClientCached } from '@/lib/clients';
+import { getOnboardingGate } from '@/lib/onboardingGate';
 import { loadIntake, withPlan } from '@/lib/intake';
 import { clientDir } from '@/lib/paths';
 import { readDraft } from '@/lib/draft';
@@ -18,6 +21,11 @@ import BuildWizard from './BuildWizard';
 export const dynamic = 'force-dynamic';
 
 export default async function BuildPage({ params }: { params: { slug: string } }) {
+  // Second layer of the onboarding gate (the tab is dimmed in the layout, but a typed URL
+  // or bookmark still lands here). Unlike the API guard this redirects rather than 403s.
+  const ctx = await getClientCached(params.slug);
+  if (ctx && !(await getOnboardingGate(ctx)).onboarded) redirect(`/c/${params.slug}/manage/overview`);
+
   const intake = await loadIntake(resolve(clientDir(params.slug), 'site.ts'));
   // withPlan stamps _meta.selectedPlan so buildCategories() picks the right lead-capture
   // components. The cast mirrors what /api/build/load-client's consumer always did: the

@@ -547,3 +547,26 @@
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+/* A won lead that hasn't been converted to a client yet. Steady green glow plus a slow ring
+   that breathes outward. The keyframes restate the card's base shadow because an animated
+   box-shadow replaces the inline one for as long as it runs. The global reduced-motion rule
+   above flattens the pulse and leaves the glow. */
+@keyframes leadReadyPulse {
+  0%, 100% {
+    box-shadow: 0 1px 2px rgba(20, 18, 12, 0.04), 0 4px 12px -4px rgba(20, 18, 12, 0.10),
+      0 0 14px -2px rgba(63, 143, 92, 0.42), 0 0 0 0 rgba(63, 143, 92, 0.34);
+  }
+  50% {
+    box-shadow: 0 1px 2px rgba(20, 18, 12, 0.04), 0 4px 12px -4px rgba(20, 18, 12, 0.10),
+      0 0 14px -2px rgba(63, 143, 92, 0.42), 0 0 0 6px rgba(63, 143, 92, 0);
+  }
+}
+.lead-ready { animation: leadReadyPulse 2.6s ease-in-out infinite; }
+
+/* The client card Convert just created, on /clients?new=<slug>. Runs once. */
+@keyframes clientNewHighlight {
+  0%   { box-shadow: 0 0 0 3px var(--ok), 0 0 24px 2px rgba(63, 143, 92, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(63, 143, 92, 0), 0 0 0 0 rgba(63, 143, 92, 0); }
+}
+.client-new-highlight { animation: clientNewHighlight 2.5s ease-out 1; }

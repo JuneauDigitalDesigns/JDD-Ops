@@ -87,16 +87,22 @@ export async function getClientContext(baseSlug: string): Promise<ClientContext 
   const sites = intake.sites.map((site, i) => buildSiteInfo(baseSlug, count, i, site));
   const isEnterprise = plan === 'enterprise' || count > 1;
 
+  // A custom site we only manage (not a JDD-template build). It's already deployed elsewhere, so
+  // it has no local repo/ and deriveStatus would wrongly call it 'needs-build'; report it 'live'
+  // and let the Environment/Deployments sections refuse to push env or redeploy it.
+  const externalManaged = intake.sites.some((s) => Boolean(s?._meta?.externalManaged));
+
   return {
     slug: baseSlug,
     plan,
     brandName: sites[0]?.brandName ?? baseSlug,
     isEnterprise,
     repoBuilt: sites.every((s) => s.repoBuilt),
-    detectedStatus: deriveStatus(plan, sites),
+    detectedStatus: externalManaged ? 'live' : deriveStatus(plan, sites),
     schemaPath: `clients/${baseSlug}/site.ts`,
     hasIntake,
     sites,
+    externalManaged,
   };
 }
 

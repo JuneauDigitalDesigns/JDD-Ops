@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getIntake, markIntakeImported } from '@/lib/intakeQueue';
+import { clientRecordsConfigured, markSlugOnboarded } from '@/lib/clientRecord';
 import { resolveRepoRoot, isValidSlug, writeClientIntake, type IntakeEnvelope } from '@/lib/export';
 
 // Claim a queued intake: write clients/<slug>/site.ts (the INTAKE envelope onboard.js reads)
@@ -34,6 +35,10 @@ export async function POST(req: Request) {
 
     writeClientIntake(repoRoot, slug, item.intake as IntakeEnvelope);
     await markIntakeImported(id);
+    // An intake in the queue is a submitted wizard, which is exactly what the Build/Onboard
+    // gate waits for. This also unlocks a converted-lead shell that gets its real data by
+    // being imported over (overwrite). Best-effort: the import has already succeeded.
+    if (clientRecordsConfigured()) await markSlugOnboarded(slug).catch(() => {});
     return NextResponse.json({ ok: true, slug, plan: item.plan });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to import intake.';

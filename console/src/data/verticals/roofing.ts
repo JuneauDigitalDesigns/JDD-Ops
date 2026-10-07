@@ -12,22 +12,26 @@ export const CONTENT: SiteContent = {
     email:       "owner@yourroofingcompany.com",
     address:     "123 Main St, Your City, ST 00000",
     license:     null,
+
+    // Decision 9: warm unbleached ground, warm charcoal ink, shared across every vertical.
+    // Measured 2026-10-06: inkSoft on bg 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1.
+    // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#475569",
       accentFg: "#FFFFFF",
-      bg:       "#FFFFFF",
-      bgSoft:   "#F6F7F9",
-      ink:      "#0F1923",
-      inkSoft:  "#4A5568",
-      rule:     "#CBD5E1",
+      bg:       "#FAF7F2",
+      bgSoft:   "#F1EBE2",
+      ink:      "#1A1512",
+      inkSoft:  "#584E45",
+      rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      fontHeading:       "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      fontSans:          "var(--font-instrument), system-ui, sans-serif",
+      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
       headingWeight:     700,
       bodyWeight:        400,
-      headingTracking:   "-0.01em",
-      headingLineHeight: 1.2,
+      headingTracking:   "-0.022em",
+      headingLineHeight: 1.02,
     },
   },
 
@@ -39,42 +43,27 @@ export const CONTENT: SiteContent = {
     { label: "Quote",    href: "#cta" },
   ],
 
-  announcement: "Storm damage? We offer free same-day inspections — call now.",
+  announcement: "Storm damage? We offer free same-day inspections, call now.",
 
   trust: {
     label: "Certified by",
-    logos: [
-      "GAF Certified",
-      "Insurance Claims Specialist",
-      "30-Year Warranty",
-      "Licensed & Bonded",
-      "BBB Accredited",
-    ],
+    logos: [], // de-clawed — certifications come from onboarding (notableClients)
   },
 
   hero: {
     eyebrow:          "Your City's Trusted Roofing Contractor",
-    headline:         "Expert Roofing — Done Right",
+    headline:         "Expert Roofing, Done Right",
     headlineEmphasis: "Done Right",
-    sub:              "Roof replacements, storm repairs, and gutter installations — done on time, on budget, and backed by a 30-year workmanship warranty.",
-    formLabel:        "Get a free roof estimate — no obligation.",
+    sub:              "Roof replacements, storm repairs, and gutter installations, done on time, on budget, and backed by a 30-year workmanship warranty.",
+    formLabel:        "Get a free roof estimate, no obligation.",
     placeholder:      "Your email address",
     cta:              "Get a Free Estimate",
     secondaryCta:     "Call (555) 555-0100",
     trust:            "GAF-certified installers with a 30-year workmanship warranty and insurance claims assistance.",
-    badge:            "Free Estimate",
-    frictionReducers: [
-      "Free inspections",
-      "Insurance claims help",
-      "30-year warranty",
-      "Licensed & insured",
-    ],
-    heroBullets: [
-      { value: "500+",   label: "Roofs replaced" },
-      { value: "30 yr",  label: "Workmanship warranty" },
-      { value: "4.9",    label: "Average rating" },
-      { value: "100%",   label: "Satisfaction" },
-    ],
+    // De-clawed: badge, friction reducers and hero stats are unverified claims — client-supplied at onboarding.
+    badge:            null,
+    frictionReducers: [],
+    heroBullets:      [],
   },
 
   about: {
@@ -82,7 +71,7 @@ export const CONTENT: SiteContent = {
     title:   "Roofing You Can Rely On",
     body:    "We've protected homes and businesses in this area for years. From storm damage repairs to full roof replacements, our GAF-certified crew delivers quality work, clear communication, and a warranty that actually means something.",
     pillars: [
-      { k: "shield", t: "Licensed & Bonded",       d: "Fully licensed, bonded, and insured — protecting you and your property on every job." },
+      { k: "shield", t: "Licensed & Bonded",       d: "Fully licensed, bonded, and insured, protecting you and your property on every job." },
       { k: "clock",  t: "Fast Turnaround",          d: "Most residential re-roofs completed in one to two days with minimal disruption." },
       { k: "tag",    t: "Insurance Specialists",    d: "We work directly with insurance adjusters to simplify storm-damage claims." },
       { k: "star",   t: "30-Year Warranty",         d: "GAF-certified installation backed by a 30-year workmanship and materials warranty." },
@@ -122,7 +111,7 @@ export const CONTENT: SiteContent = {
     title:   "Real Reviews from Real Customers",
     items: [
       { q: "After the hailstorm, they were on my roof the next morning for an inspection and handled the entire insurance claim. New roof looks amazing.", a: "David K.", r: "Homeowner", company: null, stars: 5 },
-      { q: "Got three quotes and theirs was competitive, but they were the only ones who could start within the week. Done in a day and a half — spotless cleanup.", a: "Karen M.", r: "Homeowner", company: null, stars: 5 },
+      { q: "Got three quotes and theirs was competitive, but they were the only ones who could start within the week. Done in a day and a half, spotless cleanup.", a: "Karen M.", r: "Homeowner", company: null, stars: 5 },
       { q: "The 30-year warranty was the deciding factor. They explained every step and checked in with us throughout the job. Highly recommended.", a: "Robert S.", r: "Homeowner", company: null, stars: 5 },
     ],
   },
@@ -136,17 +125,17 @@ export const CONTENT: SiteContent = {
       { q: "Does insurance cover roof replacement?", a: "If the damage is from a covered peril (storm, hail, wind), homeowners insurance typically covers replacement minus your deductible. We work with adjusters regularly and can help document your claim." },
       { q: "How do I know if I have storm damage?", a: "Common signs include missing or curling shingles, granule loss in gutters, dents on flashing and gutters, and interior water stains. Our free inspection will identify all damage with photo documentation." },
       { q: "What warranty do you offer?", a: "We offer a 30-year workmanship warranty on all installations plus the manufacturer's materials warranty (up to lifetime on premium shingles). Both warranties are transferable if you sell the home." },
-      { q: "When is the best time to replace a roof?", a: "Spring and fall are ideal — mild temperatures allow for proper shingle adhesion. However, we install year-round and can work within most weather conditions. Summer is our busiest season; book early for the best scheduling." },
+      { q: "When is the best time to replace a roof?", a: "Spring and fall are ideal, mild temperatures allow for proper shingle adhesion. However, we install year-round and can work within most weather conditions. Summer is our busiest season; book early for the best scheduling." },
     ],
   },
 
   finalCta: {
     eyebrow:  "Ready to Protect Your Home?",
     headline: "Get Your Free Roof Inspection Today.",
-    sub:      "No pressure, no obligation — just an honest assessment of your roof's condition and what it will take to fix it.",
+    sub:      "No pressure, no obligation, just an honest assessment of your roof's condition and what it will take to fix it.",
     cta:      "Get a Free Estimate",
     secondary: "Call (555) 555-0100",
-    frictionReducers: ["Free inspections", "Insurance claims help", "30-year warranty"],
+    frictionReducers: [], // de-clawed — client-supplied at onboarding
   },
 
   footer: {
@@ -182,12 +171,7 @@ export const CONTENT: SiteContent = {
   },
 
   extensions: {
-    trustBadges: [
-      "GAF Certified Installer",
-      "Insurance Claims Specialist",
-      "30-Year Workmanship Warranty",
-      "Licensed & Bonded",
-    ],
+    trustBadges: null, // de-clawed — certifications come from onboarding
     reviewBadge: null,
     contactDetails: {
       address: "123 Main St, Your City, ST 00000",

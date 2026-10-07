@@ -2,7 +2,9 @@ import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { opsRoot } from './paths';
-import type { OpsConfig } from './types';
+import type { EnvMode, OpsConfig } from './types';
+import { loadKvCredentials } from './opsSecrets';
+import { kvHostSignal, keyPrefixSignal, type EnvSignal } from './envSignals';
 
 // Reads a SPECIFIC set of non-secret context values from the master env files so the runbook
 // can show operators the real value to copy (a webhook URL, the GitHub org, the GA service
@@ -39,6 +41,51 @@ function serviceAccountEmail(raw: string | undefined): string | undefined {
   }
 }
 
+/**
+ * Classify the environment from hosts and key prefixes only. KV is the host the console
+ * actually resolves (after loadKvCredentials), not just what jdd-ops/.env says, because a
+ * stray override is exactly how this drifted. Unknown signals are ignored for the verdict
+ * (a missing key is not evidence of test), but an all-unknown result reads as `test` so the
+ * production banner never appears without positive evidence.
+ */
+function computeEnvMode(ops: Record<string, string>): {
+  envMode: EnvMode;
+  envSignals: NonNullable<OpsConfig['envSignals']>;
+} {
+  loadKvCredentials();
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const stripeKeys = [
+    process.env.STRIPE_READONLY_KEY ?? ops.STRIPE_READONLY_KEY,
+    process.env.STRIPE_SECRET_KEY ?? ops.STRIPE_SECRET_KEY,
+    process.env.STRIPE_LIVE_SECRET_KEY ?? ops.STRIPE_LIVE_SECRET_KEY,
+  ];
+  const stripeSignals = stripeKeys.map(keyPrefixSignal).filter((s) => s !== 'unknown');
+  // A test key alongside a live one is flagged as a disagreement below (stripeSelfMixed).
+  const stripe: EnvSignal = stripeSignals.includes('test')
+    ? 'test'
+    : stripeSignals.includes('production')
+      ? 'production'
+      : 'unknown';
+
+  const envSignals: NonNullable<OpsConfig['envSignals']> = [
+    { label: 'KV (Upstash)', signal: kvHostSignal(kvUrl) },
+    { label: 'Clerk', signal: keyPrefixSignal(process.env.CLERK_SECRET_KEY ?? ops.CLERK_SECRET_KEY) },
+    { label: 'Stripe', signal: stripe },
+  ];
+  // Stripe keys that disagree among themselves is itself a mixed state.
+  const stripeSelfMixed = stripeSignals.includes('test') && stripeSignals.includes('production');
+
+  const known = envSignals.filter((s) => s.signal !== 'unknown').map((s) => s.signal);
+  let envMode: EnvMode;
+  if (stripeSelfMixed || (known.includes('production') && known.includes('test'))) envMode = 'mixed';
+  else if (known.length > 0 && known.every((s) => s === 'production')) envMode = 'production';
+  else envMode = 'test';
+  if (stripeSelfMixed) {
+    envSignals[2] = { label: 'Stripe (keys disagree)', signal: 'unknown' };
+  }
+  return { envMode, envSignals };
+}
+
 export function readOpsConfig(): OpsConfig {
   const root = opsRoot();
   const ops = parseEnvFile(resolve(root, '.env'));
@@ -62,8 +109,12 @@ export function readOpsConfig(): OpsConfig {
   const signInPath = agency.NEXT_PUBLIC_CLERK_SIGN_IN_URL || '/portal/sign-in';
   const portalSignInUrl = signInPath.startsWith('http') ? signInPath : `${siteUrl}${signInPath}`;
 
+  const { envMode, envSignals } = computeEnvMode(ops);
+
   // Explicit, by-name reads only. No spreading of the env maps into the result.
   return {
+    envMode,
+    envSignals,
     siteUrl,
     retellPostCallWebhookUrl: ops.RETELL_POST_CALL_WEBHOOK_URL || undefined,
     githubOrg: ops.GITHUB_ORG || undefined,

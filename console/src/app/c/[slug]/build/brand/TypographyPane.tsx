@@ -3,7 +3,7 @@
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { getPath } from '@/lib/merge';
-import { FONT_OPTIONS } from '@/lib/fonts';
+import { FONT_PAIRINGS, pairingIdFromStack, typographyFor } from '@/lib/fonts';
 
 // Typography editing. Unlike the palette pane, specimens here ARE warranted: they preview
 // fonts and weights that are *not* currently applied, which the live preview to the left
@@ -40,25 +40,44 @@ function Label({ children }: { children: React.ReactNode }) {
   return <p className="field-label">{children}</p>;
 }
 
-function FontSpecimenList({
-  content, setField, path, label, filter, specimen,
+/**
+ * One list of curated pairings, replacing the two independent font lists (decision 6).
+ *
+ * A pairing is ONE choice that moves all six typography fields together, so the operator cannot
+ * assemble one of the 64 mostly-bad combinations the old two-dropdown registry allowed. The
+ * selected pairing is recovered from the authored `stack` via pairingIdFromStack, so no
+ * `pairingId` field had to be added to @jdd/schema.
+ *
+ * Each specimen renders at the pairing's real DISPLAY treatment (weight and tracking), not just
+ * its family, because the family alone is not what distinguishes these five.
+ */
+function PairingList({
+  content, setField, specimen,
 }: {
-  content: SiteContent; setField: SetField; path: string; label: string;
-  filter: 'sans' | 'heading'; specimen: string;
+  content: SiteContent; setField: SetField; specimen: string;
 }) {
-  const current = str(content, path);
-  const opts = FONT_OPTIONS.filter((o) => o.role === 'both' || o.role === filter);
+  const currentId = pairingIdFromStack(str(content, 'brand.typography.fontSans'));
   return (
     <div>
-      <Label>{label}</Label>
+      <Label>Type pairing</Label>
       <div className="space-y-1.5">
-        {opts.map((o) => {
-          const selected = o.stack === current;
+        {FONT_PAIRINGS.map((p) => {
+          const selected = currentId === p.id;
           return (
             <button
-              key={o.id}
+              key={p.id}
               type="button"
-              onClick={() => setField(path, o.stack)}
+              onClick={() => {
+                // All six fields, each through setField so the whole pairing lands on the undo
+                // stack as one logical change.
+                const t = typographyFor(p.id);
+                setField('brand.typography.fontSans', t.fontSans);
+                setField('brand.typography.fontHeading', t.fontHeading);
+                setField('brand.typography.headingWeight', t.headingWeight);
+                setField('brand.typography.bodyWeight', t.bodyWeight);
+                setField('brand.typography.headingTracking', t.headingTracking);
+                setField('brand.typography.headingLineHeight', t.headingLineHeight);
+              }}
               aria-pressed={selected}
               className={[
                 'block w-full rounded-md border px-2.5 py-2 text-left transition-colors',
@@ -68,14 +87,20 @@ function FontSpecimenList({
               ].join(' ')}
             >
               <span className="font-chromeMono text-2xs uppercase tracking-widest text-uiFg3">
-                {o.label}
+                {p.label}
               </span>
               <span
-                className="mt-0.5 block truncate text-lg leading-tight text-uiFg"
-                style={{ fontFamily: o.stack }}
+                className="mt-0.5 block truncate text-lg text-uiFg"
+                style={{
+                  fontFamily: p.stack,
+                  fontWeight: p.display.weight,
+                  letterSpacing: p.display.tracking,
+                  lineHeight: p.display.lineHeight,
+                }}
               >
                 {specimen}
               </span>
+              <span className="mt-1 block text-2xs leading-snug text-uiFg3">{p.note}</span>
             </button>
           );
         })}
@@ -134,23 +159,24 @@ export default function TypographyPane({
 
   return (
     <div className="space-y-5 px-4 py-4">
-      <FontSpecimenList
-        content={content} setField={setField}
-        path="brand.typography.fontHeading" label="Heading font" filter="heading" specimen={specimen}
-      />
-      <FontSpecimenList
-        content={content} setField={setField}
-        path="brand.typography.fontSans" label="Body font" filter="sans" specimen={specimen}
-      />
+      <PairingList content={content} setField={setField} specimen={specimen} />
 
-      <WeightPicker
-        content={content} setField={setField}
-        path="brand.typography.headingWeight" label="Heading weight" family={headingFont}
-      />
-      <WeightPicker
-        content={content} setField={setField}
-        path="brand.typography.bodyWeight" label="Body weight" family={bodyFont}
-      />
+      <div className="space-y-4 border-t border-uiRule pt-4">
+        <div>
+          <p className="field-label">Overrides</p>
+          <p className="text-2xs leading-snug text-uiFg3">
+            A pairing sets all of these. Change one only if the client asks.
+          </p>
+        </div>
+
+        <WeightPicker
+          content={content} setField={setField}
+          path="brand.typography.headingWeight" label="Heading weight" family={headingFont}
+        />
+        <WeightPicker
+          content={content} setField={setField}
+          path="brand.typography.bodyWeight" label="Body weight" family={bodyFont}
+        />
 
       <div>
         <Label>Heading tracking · {tracking}em</Label>
@@ -172,6 +198,7 @@ export default function TypographyPane({
           onChange={(e) => setField('brand.typography.headingLineHeight', Number(e.target.value))}
           className="w-full accent-uiAccent"
         />
+      </div>
       </div>
 
       {/* A focused specimen — the live preview shows these in context, this shows them

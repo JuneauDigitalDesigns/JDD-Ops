@@ -8,10 +8,10 @@ import type { GoLiveResult } from './types';
  * Keep jdd-ops/.env in step with the agency app for the handful of values whose source of
  * truth is the app, so `audit-billing.js` and the console never read stale IDs.
  *
- * Deliberately a SHORT whitelist. Master credentials (Twilio auth, Retell, Airtable, GitHub,
- * Vercel, Anthropic) live in jdd-ops/.env as their own source and are never overwritten from
- * the agency side. The Stripe SECRET key is also never synced — the console runs on its own
- * restricted read-only key on purpose.
+ * Deliberately a SHORT whitelist. Master credentials (Twilio auth and the A2P messaging
+ * service SID, Retell, Airtable, GitHub, Vercel, Anthropic) live in jdd-ops/.env as their own
+ * source and are never overwritten from the agency side. The Stripe SECRET key is also never
+ * synced — the console runs on its own restricted read-only key on purpose.
  */
 const SYNC_KEYS = [
   'STRIPE_PRICE_STARTER_MONTHLY',
@@ -19,7 +19,6 @@ const SYNC_KEYS = [
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_ENTERPRISE_MONTHLY',
   'OPS_SHARED_SECRET',
-  'TWILIO_MESSAGING_SERVICE_SID',
 ] as const;
 
 /** Mask a value so a diff never prints a secret in full. */

@@ -28,7 +28,7 @@ import SaveBar from './SaveBar';
  * clients: they have Lead delivery vars only, and would otherwise show two empty panels.
  */
 export default function EnvironmentSection() {
-  const { ctx, site: siteInfo } = useManage();
+  const { ctx, site: siteInfo, confirmWrite } = useManage();
   const env = useEnvEditor(ctx.slug, siteInfo.slug);
   const params = useSearchParams();
   const [deploying, setDeploying] = useState(false);
@@ -41,6 +41,14 @@ export default function EnvironmentSection() {
   const deploymentsHref = `/c/${ctx.slug}/manage/deployments${siteParam ? `?site=${encodeURIComponent(siteParam)}` : ''}`;
 
   async function redeploy() {
+    if (
+      !(await confirmWrite({
+        title: 'Redeploy to production',
+        effect: `Triggers a new production build of ${siteInfo.slug} on Vercel with the current env vars.`,
+      }))
+    ) {
+      return;
+    }
     setDeploying(true);
     setDeployed(null);
     try {
@@ -58,6 +66,31 @@ export default function EnvironmentSection() {
     } finally {
       setDeploying(false);
     }
+  }
+
+  if (ctx.externalManaged) {
+    return (
+      <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
+        <SectionHeader
+          title="Environment"
+          lede="This is a custom, externally-built site the console only monitors."
+        />
+        <div
+          className="flex items-start gap-2 rounded-[10px] border p-4 text-xs"
+          style={{ borderColor: 'var(--warn)', background: 'var(--warn-glow)', color: 'var(--fg-2)' }}
+        >
+          <Warning size={16} weight="fill" style={{ color: 'var(--warn)' }} className="mt-0.5 shrink-0" />
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">Externally managed — env is read-only here.</span>
+            <span className="text-fg3">
+              This site owns its own repo and Vercel environment (BigCommerce, Resend, EmailJS,
+              Turnstile, and the like). Edit env and redeploy from the site&apos;s own Vercel
+              project so the console can never overwrite it.
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -177,7 +210,15 @@ export default function EnvironmentSection() {
             <SaveBar
               changedKeys={env.changedKeys}
               saving={env.saving}
-              onSave={() => void env.save()}
+              onSave={() =>
+                void (async () => {
+                  const ok = await confirmWrite({
+                    title: 'Save env and push to Vercel',
+                    effect: `Writes ${env.changedKeys.length} changed key(s) to clients/${ctx.slug}/.env.local and pushes them to the live Vercel project (values are not shown).`,
+                  });
+                  if (ok) await env.save();
+                })()
+              }
               onRevertAll={env.revertAll}
             />
           )}

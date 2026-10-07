@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, SLUG_RE } from '@/lib/manageSites';
 import { getPendingOnboardRecord, pendingKvConfigured } from '@/lib/pendingKv';
+import { getOnboardingGate } from '@/lib/onboardingGate';
 
 /**
  * /c/{slug} has no screen of its own — the shell is always showing one of the four tools.
@@ -33,6 +34,11 @@ export default async function ClientIndex({ params }: { params: { slug: string }
     if (pending) redirect(`/c/${params.slug}/manage/overview`);
     notFound();
   }
+
+  // A client still waiting on agency-site onboarding has nothing to build or provision, so it
+  // lands where the welcome email lives. Same target the pending-onboarding branch uses.
+  const gate = await getOnboardingGate(ctx);
+  if (!gate.onboarded) redirect(`/c/${params.slug}/manage/overview`);
 
   if (isManageable(ctx)) redirect(`/c/${params.slug}/manage`);
   if (!ctx.hasIntake || ctx.detectedStatus === 'needs-build') redirect(`/c/${params.slug}/build`);

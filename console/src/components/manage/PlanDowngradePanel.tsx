@@ -11,6 +11,7 @@ import {
   X,
   XCircle,
 } from '@phosphor-icons/react';
+import { useManage } from './ManageContext';
 import type { PlanDowngradePreview } from '@/lib/planDowngrade';
 import type { StepResult } from '@/lib/teardownOps';
 
@@ -44,6 +45,7 @@ export default function PlanDowngradePanel({
   /** Called after a successful downgrade so the caller can refresh server state. */
   onDone: () => void;
 }) {
+  const { confirmWrite } = useManage();
   const [preview, setPreview] = useState<PlanDowngradePreview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,15 @@ export default function PlanDowngradePanel({
 
   async function execute() {
     if (!preview) return;
+    if (
+      !(await confirmWrite({
+        title: 'Downgrade plan to starter',
+        effect: `Releases the voice agent, phone number and Airtable base for ${slug} and updates the live portal account. Not reversible.`,
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setConfirming(false);
     setRunning(true);
     try {

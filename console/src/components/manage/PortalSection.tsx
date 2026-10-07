@@ -37,7 +37,7 @@ interface AttachResult {
 }
 
 export default function PortalSection() {
-  const { ctx } = useManage();
+  const { ctx, confirmWrite } = useManage();
   const [state, setState] = useState<PortalState | null>(null);
   const [email, setEmail] = useState('');
   const [dryRun, setDryRun] = useState(true);
@@ -72,6 +72,15 @@ export default function PortalSection() {
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   async function attach() {
+    if (
+      !dryRun &&
+      !(await confirmWrite({
+        title: 'Attach portal account',
+        effect: `Writes the portal account record for ${email.trim()} to the live KV store, linking it to this client's site.`,
+      }))
+    ) {
+      return;
+    }
     setRunning(true);
     setResult(null);
     try {

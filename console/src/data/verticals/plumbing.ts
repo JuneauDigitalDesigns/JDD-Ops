@@ -12,22 +12,26 @@ export const CONTENT: SiteContent = {
     email:       "owner@yourplumbingcompany.com",
     address:     "123 Main St, Your City, ST 00000",
     license:     null,
+
+    // Decision 9: warm unbleached ground, warm charcoal ink, shared across every vertical.
+    // Measured 2026-10-06: inkSoft on bg 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1.
+    // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#1E6FA8",
       accentFg: "#FFFFFF",
-      bg:       "#FFFFFF",
-      bgSoft:   "#F0F6FB",
-      ink:      "#0A1929",
-      inkSoft:  "#3D5166",
-      rule:     "#C3D9EC",
+      bg:       "#FAF7F2",
+      bgSoft:   "#F1EBE2",
+      ink:      "#1A1512",
+      inkSoft:  "#584E45",
+      rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      fontHeading:       "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      fontSans:          "var(--font-instrument), system-ui, sans-serif",
+      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
       headingWeight:     700,
       bodyWeight:        400,
-      headingTracking:   "-0.01em",
-      headingLineHeight: 1.2,
+      headingTracking:   "-0.022em",
+      headingLineHeight: 1.02,
     },
   },
 
@@ -39,53 +43,38 @@ export const CONTENT: SiteContent = {
     { label: "Book",     href: "#cta" },
   ],
 
-  announcement: "Same-day plumbing service available — call now and we'll be there today.",
+  announcement: "Same-day plumbing service available, call now and we'll be there today.",
 
   trust: {
     label: "Trusted by homeowners",
-    logos: [
-      "Licensed & Bonded",
-      "Upfront Pricing",
-      "Background Checked",
-      "24/7 Emergency",
-      "BBB Accredited",
-    ],
+    logos: [], // de-clawed — certifications come from onboarding (notableClients)
   },
 
   hero: {
     eyebrow:          "Your City's Trusted Plumbing Pros",
     headline:         "Fast, Reliable Plumbing Service",
     headlineEmphasis: "Reliable",
-    sub:              "Leaks, clogs, water heaters, and emergencies — fixed right the first time by licensed plumbers who show up when they say they will.",
-    formLabel:        "Book same-day service — we respond within the hour.",
+    sub:              "Leaks, clogs, water heaters, and emergencies, fixed right the first time by licensed plumbers who show up when they say they will.",
+    formLabel:        "Book same-day service, we respond within the hour.",
     placeholder:      "Your email address",
     cta:              "Book Same-Day Service",
     secondaryCta:     "Call (555) 555-0100",
     trust:            "Licensed and background-checked plumbers with upfront pricing and a satisfaction guarantee.",
-    badge:            "Same-Day Service",
-    frictionReducers: [
-      "Upfront pricing",
-      "Same-day availability",
-      "Licensed & bonded",
-      "Satisfaction guarantee",
-    ],
-    heroBullets: [
-      { value: "24/7",   label: "Emergency line" },
-      { value: "Same Day", label: "Service available" },
-      { value: "4.9",    label: "Average rating" },
-      { value: "100%",   label: "Satisfaction" },
-    ],
+    // De-clawed: badge, friction reducers and hero stats are unverified claims — client-supplied at onboarding.
+    badge:            null,
+    frictionReducers: [],
+    heroBullets:      [],
   },
 
   about: {
     eyebrow: "Who We Are",
     title:   "Licensed Plumbers You Can Count On",
-    body:    "No upsells, no surprises — just fast, professional plumbing from licensed technicians who respect your home and your time. We give you the price upfront, show up when promised, and don't leave until the job is done right.",
+    body:    "No upsells, no surprises, just fast, professional plumbing from licensed technicians who respect your home and your time. We give you the price upfront, show up when promised, and don't leave until the job is done right.",
     pillars: [
       { k: "shield", t: "Licensed & Bonded",    d: "Every plumber is licensed, bonded, and background-checked for your peace of mind." },
-      { k: "clock",  t: "Same-Day Service",      d: "We keep vans stocked and ready — most calls are addressed same-day." },
+      { k: "clock",  t: "Same-Day Service",      d: "We keep vans stocked and ready, most calls are addressed same-day." },
       { k: "tag",    t: "Upfront Pricing",       d: "You get the full price before any work begins. No hourly surprises on the invoice." },
-      { k: "star",   t: "Satisfaction Guarantee", d: "If you're not satisfied, we come back and make it right — at no additional charge." },
+      { k: "star",   t: "Satisfaction Guarantee", d: "If you're not satisfied, we come back and make it right, at no additional charge." },
     ],
     stats: [
       { n: "24/7",    l: "Emergency support" },
@@ -101,10 +90,10 @@ export const CONTENT: SiteContent = {
     sub:     "From a dripping faucet to a full bathroom remodel, our licensed plumbers handle it all.",
     items: [
       { n: "01", t: "Leak Detection & Repair",  d: "Pinpoint and fix leaks in pipes, fixtures, and fittings quickly to prevent water damage.", tag: "Repairs" },
-      { n: "02", t: "Drain Clearing",           d: "Clogged drains cleared with professional equipment — not just chemicals. Works the first time.", tag: "Drains" },
+      { n: "02", t: "Drain Clearing",           d: "Clogged drains cleared with professional equipment, not just chemicals. Works the first time.", tag: "Drains" },
       { n: "03", t: "Water Heater Services",    d: "Installation, repair, and replacement of tank and tankless water heaters. Same-day service available.", tag: "Water Heater" },
       { n: "04", t: "Pipe Installation",        d: "New pipes, repiping, and fixture installation for remodels and additions of any size.", tag: "Installation" },
-      { n: "05", t: "Emergency Plumbing",       d: "Burst pipes, sewer backups, and flooding — we respond 24/7 because plumbing emergencies don't wait.", tag: "Emergency" },
+      { n: "05", t: "Emergency Plumbing",       d: "Burst pipes, sewer backups, and flooding, we respond 24/7 because plumbing emergencies don't wait.", tag: "Emergency" },
       { n: "06", t: "Bathroom & Kitchen Remodel", d: "Plumbing rough-in and finish work for full remodels, additions, and fixture upgrades.", tag: "Remodel" },
     ],
   },
@@ -132,21 +121,21 @@ export const CONTENT: SiteContent = {
     title:   "Frequently Asked Questions",
     sub:     "Everything you need to know before booking.",
     items: [
-      { q: "Can you really come the same day?", a: "In most cases, yes. We keep vans stocked and dispatchers available during business hours. For true emergencies — burst pipes, no hot water — we're available 24/7 and treat those as priority dispatches." },
+      { q: "Can you really come the same day?", a: "In most cases, yes. We keep vans stocked and dispatchers available during business hours. For true emergencies, burst pipes, no hot water, we're available 24/7 and treat those as priority dispatches." },
       { q: "How do you find a leak without tearing up walls?", a: "We use pressure testing, acoustic leak detection, and thermal imaging to pinpoint leaks non-invasively. In most cases, we can locate the leak precisely before opening any wall, minimizing repair work." },
       { q: "How long does a water heater last?", a: "Tank water heaters typically last 8–12 years; tankless models last 15–20 years with proper maintenance. If yours is over 10 years old or you're seeing rust or inconsistent temperatures, it may be time to replace it." },
-      { q: "Do you charge extra for emergency calls?", a: "Our after-hours rate is listed on our website and communicated before we dispatch — no surprise fees. For genuine emergencies, we believe getting help fast is more important than debating pricing at 2am." },
-      { q: "Should I attempt plumbing repairs myself?", a: "Minor things like replacing a toilet flapper or a supply line are manageable DIY tasks. Anything involving drain lines, water main shut-offs, or pipe connections is best left to a licensed plumber — mistakes can cause serious water damage." },
+      { q: "Do you charge extra for emergency calls?", a: "Our after-hours rate is listed on our website and communicated before we dispatch, no surprise fees. For genuine emergencies, we believe getting help fast is more important than debating pricing at 2am." },
+      { q: "Should I attempt plumbing repairs myself?", a: "Minor things like replacing a toilet flapper or a supply line are manageable DIY tasks. Anything involving drain lines, water main shut-offs, or pipe connections is best left to a licensed plumber, mistakes can cause serious water damage." },
     ],
   },
 
   finalCta: {
     eyebrow:  "Plumbing Problem?",
-    headline: "Plumbing Problem? Call Now — Same Day.",
+    headline: "Plumbing Problem? Call Now, Same Day.",
     sub:      "We're dispatching licensed plumbers across the area today. Get the price upfront, job done right, guaranteed.",
     cta:      "Book Same-Day Service",
     secondary: "Call (555) 555-0100",
-    frictionReducers: ["Upfront pricing", "Same-day availability", "Satisfaction guaranteed"],
+    frictionReducers: [], // de-clawed — client-supplied at onboarding
   },
 
   footer: {
@@ -182,12 +171,7 @@ export const CONTENT: SiteContent = {
   },
 
   extensions: {
-    trustBadges: [
-      "Licensed & Bonded",
-      "Upfront Pricing",
-      "Background-Checked Technicians",
-      "Satisfaction Guarantee",
-    ],
+    trustBadges: null, // de-clawed — certifications come from onboarding
     reviewBadge: null,
     contactDetails: {
       address: "123 Main St, Your City, ST 00000",

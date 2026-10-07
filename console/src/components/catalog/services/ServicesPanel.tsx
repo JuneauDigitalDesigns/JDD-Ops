@@ -18,6 +18,12 @@ export const meta = {
   label: 'Services / Bento',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'dense-mosaic',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 /** Deterministic mosaic spans; grid-flow-dense backfills any holes so it never gaps. */
@@ -80,7 +86,8 @@ export default function ServicesPanel({ content = CONTENT }: { content?: SiteCon
                     className="absolute inset-0 -z-10 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 )}
-                <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink/90 via-ink/45 to-ink/10" />
+                {/* Flat scrim, not a feather (decision 30b). Same reasoning as HeroOverlap. */}
+                <div className="absolute inset-0 -z-10 bg-ink/60" />
 
                 {/* Heavy numeral index */}
                 <span aria-hidden className="absolute left-6 top-5 font-heading text-3xl font-black leading-none text-bg/35">

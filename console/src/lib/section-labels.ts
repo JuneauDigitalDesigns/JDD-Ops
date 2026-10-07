@@ -13,7 +13,7 @@ import type { Section } from '@/lib/copy-schema';
 export const SECTION_LABELS: Partial<Record<Section, string>> = {
   brand: 'Brand', announcement: 'Announcement', trust: 'Trust', hero: 'Hero', about: 'About',
   services: 'Services', work: 'Work', testimonials: 'Testimonials', faq: 'FAQ',
-  finalCta: 'Final CTA', footer: 'Footer', seo: 'SEO',
+  finalCta: 'Final CTA', footer: 'Footer', seo: 'SEO', subpages: 'Page headers',
 };
 
 export const labelFor = (s: Section) =>

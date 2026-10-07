@@ -5,6 +5,7 @@ import { CheckCircle, Rocket, CircleNotch, X, Warning } from '@phosphor-icons/re
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { CategoryEntry } from './categories';
 import type { Selections, SkinSelections } from './page-order';
+import type { SiteComposition } from '@/lib/pages';
 import type { VerticalId } from '@/lib/verticals';
 import type { SiteContent } from '@/data/site';
 import { defaultSkin, supportsSkin } from '@/lib/skins';
@@ -23,12 +24,15 @@ type Status =
   | { kind: 'error'; message: string; detail?: string; steps: string[] };
 
 export default function LaunchDialog({
-  categories, selections, skins, order, vertical, effective, lockedSlug, onClose,
+  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose,
 }: {
   categories: CategoryEntry[];
   selections: Selections;
   skins: SkinSelections;
   order: string[];
+  /** When set, the site is exported as a multi-page composition; selections drive only the
+   *  dialog's summary. */
+  composition?: SiteComposition;
   vertical: VerticalId;
   effective: SiteContent;
   lockedSlug?: string;
@@ -97,6 +101,7 @@ export default function LaunchDialog({
           selections: exportEntries.map((e) => ({
             categoryId: e.categoryId, name: e.name, label: e.label, skin: e.exportSkin,
           })),
+          composition,
           vertical,
           content: effective,
         }),
@@ -280,7 +285,9 @@ export default function LaunchDialog({
 
         <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-rule px-6 py-4">
           <span className="text-sm text-fg3">
-            {bodyEntries.length} section{bodyEntries.length === 1 ? '' : 's'}{seoEntry ? ' + SEO' : ''}
+            {composition
+              ? `${composition.pages.length} page${composition.pages.length === 1 ? '' : 's'}`
+              : `${bodyEntries.length} section${bodyEntries.length === 1 ? '' : 's'}${seoEntry ? ' + SEO' : ''}`}
           </span>
           <button type="button" onClick={handleExport} disabled={!canExport} className="btn btn-primary">
             {busy ? <CircleNotch size={17} className="animate-spin" /> : <Rocket size={17} />}

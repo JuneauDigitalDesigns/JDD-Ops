@@ -1,5 +1,6 @@
 import 'server-only';
 import { Redis } from '@upstash/redis';
+import { loadKvCredentials } from './opsSecrets';
 import {
   accountKey,
   accountByUserKey,
@@ -26,6 +27,7 @@ let _redis: Redis | null = null;
 
 /** True when KV creds are present; lets routes degrade gracefully instead of throwing. */
 export function accountStoreConfigured(): boolean {
+  loadKvCredentials();
   return Boolean(
     (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) &&
       (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN),
@@ -33,6 +35,7 @@ export function accountStoreConfigured(): boolean {
 }
 
 function getRedis(): Redis {
+  loadKvCredentials();
   if (!_redis) {
     const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;

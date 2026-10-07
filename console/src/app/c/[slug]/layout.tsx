@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, unmanageableReason, SLUG_RE } from '@/lib/manageSites';
 import { findLatestArchiveForSlug } from '@/lib/archive';
+import { getOnboardingGate } from '@/lib/onboardingGate';
 import {
   buildPendingClientContext,
   getPendingOnboardRecord,
@@ -86,11 +87,19 @@ export default async function ClientLayout({
   // false for the synthetic context (its one site has an empty env), and Manage → Overview
   // is the only place the reminder card lives. Deriving it here would leave the tab dead
   // and the client unreachable all over again.
+  //
+  // A converted lead's placeholder folder is a third case: it has a real site.ts but nothing
+  // in it worth building yet, so Build and Onboard wait on the client's agency-site onboarding
+  // (lib/onboardingGate). Manage is the one tool that stays open, because that is where the
+  // welcome email is sent from.
+  const gate = pending ? null : await getOnboardingGate(ctx);
+  const locked = gate !== null && !gate.onboarded;
+
   const tools = pending
     ? {
         build: {
           enabled: false,
-          reason: 'Waiting on the client’s onboarding wizard — there’s no site.ts to build from yet.',
+          reason: 'Waiting on the client’s onboarding wizard. There’s no site.ts to build from yet.',
         },
         onboard: {
           enabled: false,
@@ -103,12 +112,19 @@ export default async function ClientLayout({
         },
       }
     : {
-        build: { enabled: true, reason: null },
-        onboard: {
-          enabled: ctx.hasIntake,
-          reason: ctx.hasIntake ? null : 'No readable site.ts yet — build or import an intake first.',
-        },
-        manage: { enabled: isManageable(ctx), reason: unmanageableReason(ctx) },
+        build: { enabled: !locked, reason: locked ? gate!.reason : null },
+        onboard: locked
+          ? { enabled: false, reason: gate!.reason }
+          : {
+              enabled: ctx.hasIntake,
+              reason: ctx.hasIntake ? null : 'No readable site.ts yet. Build or import an intake first.',
+            },
+        // A locked client is force-enabled, like the pending branch above: isManageable() is
+        // false for an unprovisioned folder, and the welcome-email card is the only way to
+        // move this client forward.
+        manage: locked
+          ? { enabled: true, reason: null }
+          : { enabled: isManageable(ctx), reason: unmanageableReason(ctx) },
         // Gated on provisioning rather than on a subscription, deliberately. An UNBILLED
         // live client is exactly who this tab exists to surface, so requiring a
         // subscription to open it would hide the most expensive case in the roster.
@@ -116,7 +132,7 @@ export default async function ClientLayout({
           enabled: accountReady,
           reason: accountReady
             ? null
-            : 'Opens once this client is provisioned — there’s no billing or usage history before then.',
+            : 'Opens once this client is provisioned. There’s no billing or usage history before then.',
         },
       };
 

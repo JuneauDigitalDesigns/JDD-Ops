@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { severityRank, type Finding, type ReconcileResult, type Severity } from '@jdd/schema';
+import { severityRank, type Finding, type ReconcileResult, type Severity, type TicketStatus } from '@jdd/schema';
 import { listClientContexts } from '@/lib/clients';
 import { reconcileStoreConfigured, getReconcileResults } from '@/lib/reconcileStore';
 import { clientRecordsConfigured, listClientRecords } from '@/lib/clientRecord';
 import { leadQueueConfigured, listLeads, listDemoCalls } from '@/lib/leadQueue';
+import { ticketQueueConfigured, listTickets } from '@/lib/ticketStore';
+import { needsAttention } from '@/lib/ticket-meta';
 import type { SiteMoney } from '@/lib/reconcile';
 import { loadStripeKey } from '@/lib/opsSecrets';
 import { accountStoreConfigured, getAccount } from '@/lib/accountStore';
@@ -58,6 +60,16 @@ export interface BriefingPayload {
     callToLeadPct: number | null;
   };
   stages: Record<string, number>;
+  /**
+   * Support tickets needing an operator, surfaced prominently on the briefing because they are
+   * day-to-day critical work. `needsAttention` is the open + waiting_on_client set, newest
+   * first, capped; the counts are the full totals behind it.
+   */
+  tickets: {
+    needsAttention: { id: string; subject: string; siteSlug: string; status: TicketStatus; createdAt: number }[];
+    openCount: number;
+    waitingCount: number;
+  };
   clientCount: number;
   /** Clients with no cached sweep — their state is unknown, not healthy. */
   staleSlugs: string[];
@@ -329,12 +341,30 @@ export async function GET() {
       : null;
   }
 
+  // ── Tickets ────────────────────────────────────────────────────────────────
+  // The prominent operator surface. listTickets is already newest-first, so the capped slice
+  // keeps that ordering. Omitted entirely (zeros, empty list) when the queue isn't configured —
+  // the UI hides the panel rather than claiming an all-clear it didn't actually check.
+  const tickets: BriefingPayload['tickets'] = { needsAttention: [], openCount: 0, waitingCount: 0 };
+  if (ticketQueueConfigured()) {
+    const all = await listTickets().catch(() => []);
+    for (const t of all) {
+      if (t.status === 'open') tickets.openCount++;
+      else if (t.status === 'waiting_on_client') tickets.waitingCount++;
+    }
+    tickets.needsAttention = all
+      .filter((t) => needsAttention(t.status))
+      .slice(0, 8)
+      .map((t) => ({ id: t.id, subject: t.subject, siteSlug: t.siteSlug, status: t.status, createdAt: t.createdAt }));
+  }
+
   const payload: BriefingPayload = {
     issues,
     counts,
     money,
     funnel,
     stages,
+    tickets,
     clientCount: clients.length,
     staleSlugs,
     stale,

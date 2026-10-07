@@ -7,12 +7,14 @@ import {
   CheckCircle,
   CurrencyDollar,
   Funnel as FunnelIcon,
+  Lifebuoy,
   SpinnerGap,
   Users,
   WarningCircle,
 } from '@phosphor-icons/react';
 import { severityRank, type FindingArea, type Severity } from '@jdd/schema';
 import { relativeTime } from '@/lib/relativeTime';
+import { TICKET_COLOR, TICKET_LABEL } from '@/lib/ticket-meta';
 import type { BriefingPayload } from '@/app/api/briefing/route';
 import PageHeader from '@/components/shell/PageHeader';
 import RefreshButton from '@/components/shell/RefreshButton';
@@ -329,6 +331,8 @@ export default function BriefingView() {
           <WarnBanner message={warning} onRetry={load} onDismiss={() => setWarning(null)} busy={sweeping} />
         )}
 
+        <TicketsPanel data={data} />
+
         {nothingWrong ? (
           <>
             <div className="panel flex items-center gap-2 p-4">
@@ -427,6 +431,65 @@ export default function BriefingView() {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * The prominent support surface.
+ *
+ * Tickets are day-to-day critical work, so this sits at the TOP of the briefing — above the
+ * triage/calm split — with an accent treatment so it reads as "do this", not rail state. It is
+ * the only way into /tickets, the same way the funnel panel is the only way into /leads.
+ *
+ * Renders only when something needs a reply. An empty queue means nothing to surface; it stays
+ * quiet rather than taking a prominent slot to say "0" (and the queue being unconfigured can't
+ * fake an all-clear — the payload returns an empty list, so this returns null).
+ */
+function TicketsPanel({ data }: { data: BriefingPayload }) {
+  const { needsAttention, openCount, waitingCount } = data.tickets;
+  if (needsAttention.length === 0) return null;
+  return (
+    <section
+      className="panel flex flex-col gap-2 p-5"
+      style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/tickets" className="group -m-1 flex items-center gap-2 rounded-md p-1">
+          <Lifebuoy size={18} weight="fill" style={{ color: 'var(--accent)' }} />
+          <h2 className="font-display text-lg font-semibold tracking-tightish text-fg transition-colors group-hover:text-accent">
+            Tickets
+          </h2>
+        </Link>
+        <span className="meta shrink-0 whitespace-nowrap">
+          {openCount} open · {waitingCount} waiting
+        </span>
+      </div>
+      <div className="flex flex-col">
+        {needsAttention.map((t, i) => (
+          <Link
+            key={t.id}
+            href={`/tickets?open=${encodeURIComponent(t.id)}`}
+            className={`flex items-center gap-2.5 rounded-md px-1 py-2 transition-colors hover:bg-[var(--surface)]${
+              i > 0 ? ' border-t' : ''
+            }`}
+            style={i > 0 ? { borderColor: 'var(--rule)' } : undefined}
+          >
+            <span
+              className="h-[7px] w-[7px] shrink-0 rounded-full"
+              style={{ background: TICKET_COLOR[t.status], boxShadow: `0 0 6px ${TICKET_COLOR[t.status]}` }}
+            />
+            <span className="min-w-0 flex-1 truncate text-[13px]" style={{ color: 'var(--fg-1)' }}>
+              {t.subject}
+            </span>
+            <span className="meta shrink-0">{t.siteSlug}</span>
+            <span className="meta shrink-0">{TICKET_LABEL[t.status]}</span>
+            <span className="meta shrink-0" title={new Date(t.createdAt).toISOString()}>
+              {relativeTime(t.createdAt)}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

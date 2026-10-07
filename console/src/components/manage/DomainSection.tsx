@@ -37,7 +37,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 export default function DomainSection() {
-  const { ctx, site, domains, refreshDomains } = useManage();
+  const { ctx, site, domains, refreshDomains, confirmWrite } = useManage();
   const [http, setHttp] = useState<{ loading: boolean; status: number | null; ok: boolean }>({
     loading: false,
     status: null,
@@ -71,6 +71,14 @@ export default function DomainSection() {
   async function addDomain() {
     const domain = input.trim();
     if (!domain) return;
+    if (
+      !(await confirmWrite({
+        title: 'Attach domain',
+        effect: `Adds ${domain} to the live Vercel project for ${site.slug}.`,
+      }))
+    ) {
+      return;
+    }
     setAdding(true);
     setAddError(null);
     try {
@@ -94,6 +102,14 @@ export default function DomainSection() {
 
   async function setCanonical() {
     if (!domains.liveUrl) return;
+    if (
+      !(await confirmWrite({
+        title: 'Set canonical URL',
+        effect: `Writes ${domains.liveUrl} as the canonical URL in the site content for ${site.slug}.`,
+      }))
+    ) {
+      return;
+    }
     setCanonicalBusy(true);
     setCanonicalResult(null);
     try {

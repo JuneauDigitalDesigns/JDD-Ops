@@ -30,7 +30,7 @@ import PhaseMeter from '@/components/PhaseMeter';
  * because a full meter reading "12/12" is stale trivia on a site that shipped months ago.
  */
 export default function ClientCard({
-  ctx, clientState, config, health, lastTouched, attention, onSelect,
+  ctx, clientState, config, health, lastTouched, attention, onSelect, highlight,
 }: {
   ctx: ClientContext;
   clientState: ClientState | undefined;
@@ -39,6 +39,8 @@ export default function ClientCard({
   lastTouched?: string;
   attention?: AttentionItem;
   onSelect: () => void;
+  /** Just created from a converted lead: ring it briefly so it is findable in a full grid. */
+  highlight?: boolean;
 }) {
   const phases = useMemo(() => buildRunbook(ctx, config), [ctx, config]);
   const nodes = useMemo(() => flatten(phases), [phases]);
@@ -68,6 +70,7 @@ export default function ClientCard({
 
   return (
     <div
+      id={`client-card-${ctx.slug}`}
       role="button"
       tabIndex={0}
       onClick={onSelect}
@@ -77,7 +80,7 @@ export default function ClientCard({
           onSelect();
         }
       }}
-      className="panel group relative flex cursor-pointer flex-col overflow-hidden p-0 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-accent hover:shadow-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-uiAccent"
+      className={`panel group relative flex cursor-pointer flex-col overflow-hidden p-0 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-accent hover:shadow-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-uiAccent${highlight ? ' client-new-highlight' : ''}`}
     >
       {/* The client's own colour. Also the attention signal when something is wrong — one
           band doing both jobs, because a card can only have one most-important fact. */}
@@ -93,6 +96,17 @@ export default function ClientCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {/* The permanent test client (a `_`-prefixed folder) is hidden by default and only
+              shown via the "Show test client" toggle. When it IS shown, badge it so it can't be
+              mistaken for a real client. */}
+          {ctx.slug.startsWith('_') && (
+            <span
+              className="rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide"
+              style={{ background: 'var(--warn-glow)', color: 'var(--warn)' }}
+            >
+              Test
+            </span>
+          )}
           <span className="meta">{PLAN_LABEL[ctx.plan]}</span>
           <span aria-hidden className="text-fg3">·</span>
           <span className="text-xs font-medium" style={{ color: STATUS_COLOR[status] }}>

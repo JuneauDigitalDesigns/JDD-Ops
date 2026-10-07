@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import { getClientCached } from '@/lib/clients';
 import { isManageable, SLUG_RE } from '@/lib/manageSites';
 import { getPendingOnboardRecord, buildPendingClientContext, pendingKvConfigured } from '@/lib/pendingKv';
+import { getOnboardingGate } from '@/lib/onboardingGate';
+import { readOpsConfig } from '@/lib/opsConfig';
+import EnvBanner from '@/components/manage/EnvBanner';
 import { ManageProvider } from '@/components/manage/ManageContext';
 import ManageNavChrome from '@/components/manage/ManageNavChrome';
 import ManageRail from '@/components/manage/ManageRail';
@@ -42,7 +45,16 @@ export default async function ManageLayout({
   if (!SLUG_RE.test(params.slug)) notFound();
 
   let ctx = await getClientCached(params.slug);
-  if (!ctx || ctx.sites.length === 0 || !isManageable(ctx)) {
+
+  // A converted lead's placeholder folder isn't manageable (no .env.local, nothing provisioned)
+  // and would 404 below. It still belongs here: this is where its welcome email is sent from.
+  // Marked on a COPY of the cached context, since that object is shared by the request.
+  if (ctx && ctx.sites.length > 0 && !isManageable(ctx)) {
+    const gate = await getOnboardingGate(ctx);
+    if (!gate.onboarded) ctx = { ...ctx, awaitingOnboarding: { email: gate.email } };
+  }
+
+  if (!ctx || ctx.sites.length === 0 || (!isManageable(ctx) && !ctx.awaitingOnboarding)) {
     // Disk lookup failed — check KV for a pending-onboarding client (paid, wizard not yet done).
     if (!pendingKvConfigured()) notFound();
     try {
@@ -54,9 +66,12 @@ export default async function ManageLayout({
     }
   }
 
+  const { envMode, envSignals } = readOpsConfig();
+
   return (
     <div className="manage-chrome flex h-full min-h-0 flex-col overflow-hidden">
-      <ManageProvider ctx={ctx}>
+      <ManageProvider ctx={ctx} envMode={envMode ?? 'test'}>
+        <EnvBanner envMode={envMode} envSignals={envSignals} />
         <ManageNavChrome />
         <div className="flex min-h-0 flex-1">
           <ManageRail />

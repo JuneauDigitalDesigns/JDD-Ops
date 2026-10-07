@@ -8,6 +8,7 @@ import {
 import type { SiteContent } from '@/data/site';
 import { defaultSkin, type SkinId } from '@/lib/skins';
 import type { Selections, SkinSelections, StudioReverts } from './page-order';
+import type { SiteComposition } from '@/lib/pages';
 import {
   buildCommitMessage, describeComposition, diffComposition, diffContent, resolveRevert,
   type CompositionChange, type ContentChange, type DeployDiff,
@@ -99,13 +100,16 @@ const GROUP_ORDER: ContentChange['kind'][] = ['copy', 'color', 'image', 'number'
 const IDLE_TIMEOUT_MS = 90_000;
 
 export default function DeployDialog({
-  slug, brandName, selections, skins, order, effective, exportEntries, vertical, reverts, onClose,
+  slug, brandName, selections, skins, order, composition, effective, exportEntries, vertical, reverts, onClose,
 }: {
   slug: string;
   brandName: string;
   selections: Selections;
   skins: SkinSelections;
   order: string[];
+  /** When set, the deploy exports a multi-page composition; exportEntries/selections drive the
+   *  diff summary only. */
+  composition?: SiteComposition;
   effective: SiteContent;
   /** The same entry shape LaunchDialog posts, so the export route sees one format. */
   exportEntries: { categoryId: string; name: string; label?: string; skin?: string }[];
@@ -247,6 +251,7 @@ export default function DeployDialog({
             slug,
             overwrite: true, // the repo exists; this is an update, not a first export
             selections: exportEntries,
+            composition,
             vertical,
             content: effective,
             deploy: true,

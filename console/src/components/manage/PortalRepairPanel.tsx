@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useManage } from './ManageContext';
 import { ArrowsClockwise, CheckCircle, Flask, MagnifyingGlass, Play, XCircle } from '@phosphor-icons/react';
 
 /**
@@ -84,6 +85,7 @@ export default function PortalRepairPanel({
   site: RepairSite;
   onWritten: () => void | Promise<void>;
 }) {
+  const { confirmWrite } = useManage();
   // `undefined` = untouched (preserve). `null` = cleared. string = set.
   const [edits, setEdits] = useState<Partial<Record<TextField | 'plan' | 'status', string | null>>>({});
   const [dryRun, setDryRun] = useState(true);
@@ -134,6 +136,15 @@ export default function PortalRepairPanel({
   }
 
   async function submit() {
+    if (
+      !dryRun &&
+      !(await confirmWrite({
+        title: 'Repair portal account',
+        effect: `Writes ${Object.keys(edits).length || 'the'} field change(s) on the portal account for ${email} in the live KV store.`,
+      }))
+    ) {
+      return;
+    }
     setRunning(true);
     setResult(null);
     try {

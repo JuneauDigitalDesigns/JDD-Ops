@@ -21,7 +21,9 @@ import {
 } from './page-order';
 import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
-import StudioStep from './StudioStep';
+import PageStudio from './PageStudio';
+import { defaultCompositionFor, pageFromType, applyTemplate, PAGE_TEMPLATES } from './page-templates';
+import { liftLegacyToComposition, ensureSectionIds, type SiteComposition, type PageTypeId } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
@@ -68,6 +70,9 @@ type WizardBundle = {
   brief: CopyBrief;
   /** The model picked on the Prompt stage's run controls. */
   copyModel: string;
+  /** The multi-page composition (chrome + pages). Lifted from legacy selections/order for
+   *  bundles that predate it. */
+  siteComposition: SiteComposition;
 };
 
 /**
@@ -115,6 +120,7 @@ function freshBundle(seed: SiteContent | null): WizardBundle {
     intakeStage: 'brief',
     brief: (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief(),
     copyModel: DEFAULT_MODEL_ID,
+    siteComposition: defaultCompositionFor(),
   };
 }
 
@@ -156,9 +162,6 @@ export default function BuildWizard({
   const [stepIndex, setStepIndex] = useState(composition ? STEPS.length - 1 : 0);
   const [dir, setDir] = useState(1);
   const step: StepId = STEPS[stepIndex].id;
-  // A one-shot "scroll Studio to this section" request, set by the Intake review modal's
-  // "Edit in Studio" jump and consumed once by StudioStep on entry.
-  const [focusSection, setFocusSection] = useState<string | null>(null);
 
   // ── Content layer ───────────────────────────────────────────────────────────
   const [vertical, setVertical] = useState<VerticalId>(DEFAULT_VERTICAL);
@@ -179,6 +182,9 @@ export default function BuildWizard({
   const [selections, setSelections] = useState<Selections>({});
   const [skins, setSkins] = useState<SkinSelections>({});
   const [order, setOrder] = useState<string[]>([]);
+  // The multi-page composition drives the new PageStudio. selections/skins/order are kept as the
+  // legacy layer the deploy-diff reverts still write to and the history/persist still track.
+  const [siteComposition, setSiteComposition] = useState<SiteComposition>(defaultCompositionFor());
   // A one-shot position request from select(…, atIndex), consumed by the reconcile effect.
   // A ref rather than state: it must not itself trigger a render, and it is always read in
   // the same tick the selection it describes is reconciled.
@@ -252,7 +258,7 @@ export default function BuildWizard({
     if (!hydrated.current) return;
     const bundle: WizardBundle = {
       vertical, imported, generated, edits, selections, skins, order,
-      intakeStage, brief, copyModel,
+      intakeStage, brief, copyModel, siteComposition,
     };
     try {
       window.localStorage.setItem(bundleKey(slug), JSON.stringify(bundle));
@@ -271,7 +277,7 @@ export default function BuildWizard({
     }, 700);
   }, [
     slug, vertical, imported, generated, edits, selections, skins, order,
-    intakeStage, brief, copyModel,
+    intakeStage, brief, copyModel, siteComposition,
   ]);
 
   // Persist the brief durably to clients/{slug}/site.ts (_meta.copyBrief) — separate from the
@@ -306,15 +312,16 @@ export default function BuildWizard({
   const intakeHistory = useHistory({ vertical, imported, generated, edits }, applyIntakeSnapshot);
 
   const applyStudioSnapshot = useCallback(
-    (s: { edits: Record<string, unknown>; selections: Selections; skins: SkinSelections; order: string[] }) => {
+    (s: { edits: Record<string, unknown>; selections: Selections; skins: SkinSelections; order: string[]; siteComposition: SiteComposition }) => {
       setEdits(s.edits);
       setSelections(s.selections);
       setSkins(s.skins);
       setOrder(s.order);
+      setSiteComposition(s.siteComposition);
     },
     [],
   );
-  const studioHistory = useHistory({ edits, selections, skins, order }, applyStudioSnapshot);
+  const studioHistory = useHistory({ edits, selections, skins, order, siteComposition }, applyStudioSnapshot);
 
   // Stable per-stack checkpoint fns (the hook memoizes these; the returned object is fresh
   // each render but its members are stable, so downstream callbacks stay referentially stable).
@@ -396,6 +403,17 @@ export default function BuildWizard({
     // either way the brief the operator built last time should still be there.
     setBrief(b.brief ?? (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief());
     setCopyModel(b.copyModel ?? DEFAULT_MODEL_ID);
+    // Prefer a saved composition; otherwise lift the legacy selections/order (existing clients),
+    // otherwise the default 4-page site. ensureSectionIds backfills stable ids on any composition
+    // that predates them (older bundles, legacy lifts) so per-section styling can key off them.
+    setSiteComposition(
+      ensureSectionIds(
+        b.siteComposition ??
+          (b.selections || b.order
+            ? liftLegacyToComposition({ selections: b.selections ?? {}, skins: b.skins, order: b.order ?? [] })
+            : defaultCompositionFor()),
+      ),
+    );
     // `seed` is read for the durable-brief fallback, so it belongs in the deps — an empty
     // array here would pin this callback to the first client's intake.
   }, [seed]);
@@ -442,7 +460,9 @@ export default function BuildWizard({
   }, [studioCheckpoint]);
   const resetStyles = useCallback(() => {
     studioCheckpoint();
-    setEdits((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('overrides.'))));
+    setEdits((e) => Object.fromEntries(
+      Object.entries(e).filter(([k]) => !k.startsWith('overrides.') && !k.startsWith('sectionStyles.')),
+    ));
   }, [studioCheckpoint]);
   // Replace the whole working copy from the JSON editor: the pasted object becomes the
   // imported baseline and per-field edits/generated are cleared so it's authoritative.
@@ -453,20 +473,86 @@ export default function BuildWizard({
     setEdits({});
   }, [intakeCheckpoint]);
 
-  // ── Builder setters ──────────────────────────────────────────────────────
-  const select = useCallback((categoryId: string, componentName: string, atIndex?: number) => {
+  // ── Page composition setters (multi-page studio) ─────────────────────────
+  const selectTemplate = useCallback((route: string, templateId: string) => {
+    const tmpl = PAGE_TEMPLATES.find((t) => t.id === templateId);
+    if (!tmpl) return;
     studioCheckpoint();
-    // Parked for the reconcile effect above — order is derived from selections, so the
-    // position can only be applied once reconcileOrder has placed the new id.
-    pendingInsert.current = atIndex === undefined ? null : { id: categoryId, at: atIndex };
-    setSelections((prev) => ({ ...prev, [categoryId]: componentName }));
-    setSkins((prev) => {
-      const current = prev[categoryId];
-      return current && isValidSkin(componentName, current)
+    setSiteComposition((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) => (p.route === route ? applyTemplate(p, tmpl) : p)),
+    }));
+  }, [studioCheckpoint]);
+  const addPage = useCallback((pageType: PageTypeId) => {
+    studioCheckpoint();
+    setSiteComposition((prev) =>
+      prev.pages.some((p) => p.pageType === pageType)
         ? prev
-        : { ...prev, [categoryId]: defaultSkin(componentName) };
+        : { ...prev, pages: [...prev.pages, pageFromType(pageType)] },
+    );
+  }, [studioCheckpoint]);
+  const removePage = useCallback((route: string) => {
+    if (route === '') return; // home is never removable
+    studioCheckpoint();
+    setSiteComposition((prev) => ({ ...prev, pages: prev.pages.filter((p) => p.route !== route) }));
+  }, [studioCheckpoint]);
+  const renameLabel = useCallback((route: string, label: string) => {
+    studioCheckpoint();
+    setSiteComposition((prev) => ({ ...prev, pages: prev.pages.map((p) => (p.route === route ? { ...p, label } : p)) }));
+  }, [studioCheckpoint]);
+  const toggleNav = useCallback((route: string) => {
+    studioCheckpoint();
+    setSiteComposition((prev) => ({ ...prev, pages: prev.pages.map((p) => (p.route === route ? { ...p, navVisible: !p.navVisible } : p)) }));
+  }, [studioCheckpoint]);
+  /**
+   * Swap a chrome slot's (nav/footer/seo) variant and/or skin. One function covers both the
+   * Site style panel's "pick a different variant" (skin omitted → carries the old skin forward
+   * only if still valid for the new variant) and its "change this skin" pill (name unchanged).
+   */
+  const setChrome = useCallback((categoryId: 'nav' | 'footer' | 'seo', name: string, skin?: SkinId) => {
+    studioCheckpoint();
+    setSiteComposition((prev) => {
+      const current = prev.chrome[categoryId];
+      const nextSkin = skin !== undefined
+        ? (isValidSkin(name, skin) ? skin : undefined)
+        : (current.name === name ? current.skin : (current.skin && isValidSkin(name, current.skin) ? current.skin : undefined));
+      return { ...prev, chrome: { ...prev.chrome, [categoryId]: { categoryId, name, skin: nextSkin } } };
     });
   }, [studioCheckpoint]);
+  /** Change the skin of a section already placed on a page, without touching its variant. Keyed by
+   *  section id (two sections of one category can coexist on a page); falls back to categoryId for
+   *  any legacy section that predates ids. */
+  const setSectionSkin = useCallback((route: string, sectionId: string, skin: SkinId) => {
+    studioCheckpoint();
+    setSiteComposition((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) =>
+        p.route === route
+          ? { ...p, sections: p.sections.map((s) => ((s.id ?? s.categoryId) === sectionId ? { ...s, skin } : s)) }
+          : p,
+      ),
+    }));
+  }, [studioCheckpoint]);
+  /** Swap a placed section's VARIANT in place (e.g. ServicesGrid → ServicesPanel), resetting its
+   *  skin to the new variant's default. Keyed by section id. */
+  const setSectionVariant = useCallback((route: string, sectionId: string, name: string) => {
+    studioCheckpoint();
+    setSiteComposition((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p) =>
+        p.route === route
+          ? {
+              ...p,
+              sections: p.sections.map((s) =>
+                (s.id ?? s.categoryId) === sectionId ? { ...s, name, skin: defaultSkin(name) } : s,
+              ),
+            }
+          : p,
+      ),
+    }));
+  }, [studioCheckpoint]);
+
+  // ── Builder setters (legacy layer used by deploy-diff reverts) ───────────
   const selectSkin = useCallback((categoryId: string, skin: SkinId) => {
     studioCheckpoint();
     setSkins((prev) => ({ ...prev, [categoryId]: skin }));
@@ -534,16 +620,6 @@ export default function BuildWizard({
       ]),
     );
   }, [studioCheckpoint]);
-
-  const reorder = useCallback((activeId: string, overId: string) => {
-    // Guard the no-op reorder before checkpointing so an idle drop doesn't add an undo step.
-    // Indices read from `order` (== the committed list; no concurrent mutation mid-drag).
-    const oldIndex = order.indexOf(activeId);
-    const newIndex = order.indexOf(overId);
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
-    studioCheckpoint();
-    setOrder((prev) => enforcePins(arrayMove(prev, oldIndex, newIndex)));
-  }, [order, studioCheckpoint]);
 
   // deselect/selectSkin already do exactly what a revert of an added section / changed skin
   // needs, checkpoint included — reuse them rather than writing near-duplicates.
@@ -763,18 +839,20 @@ export default function BuildWizard({
 
             {step === 'studio' && (
               <div className="h-full">
-                <StudioStep
-                  categories={categories}
+                <PageStudio
+                  composition={siteComposition}
                   effective={effective}
-                  selections={selections}
-                  skins={skins}
-                  order={order}
+                  categories={categories}
                   vertical={vertical}
                   slug={slug}
-                  onSelect={select}
-                  onSelectSkin={selectSkin}
-                  onDeselect={deselect}
-                  onReorder={reorder}
+                  onSelectTemplate={selectTemplate}
+                  onAddPage={addPage}
+                  onRemovePage={removePage}
+                  onRenameLabel={renameLabel}
+                  onToggleNav={toggleNav}
+                  onSetChrome={setChrome}
+                  onSetSectionSkin={setSectionSkin}
+                  onSetSectionVariant={setSectionVariant}
                   setField={setField}
                   onResetEdits={resetEdits}
                   onResetStyles={resetStyles}
@@ -782,8 +860,6 @@ export default function BuildWizard({
                   onRedo={studioHistory.redo}
                   canUndo={studioHistory.canUndo}
                   canRedo={studioHistory.canRedo}
-                  focusSection={focusSection}
-                  onFocusHandled={() => setFocusSection(null)}
                   // A composition read back from disk means this client is already live,
                   // so the studio's primary action becomes Deploy rather than Launch.
                   alreadyDeployed={Boolean(composition)}

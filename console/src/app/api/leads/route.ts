@@ -111,6 +111,12 @@ interface PatchBody {
   email?: string | null;
   trade?: string | null;
   planInterest?: string | null;
+  /**
+   * A notes save that should not write a "Notes updated" line. The call script autosaves while
+   * you type, and one trail entry per debounce tick would bury everything else in Activity. It
+   * is a request flag only: it is never stored and never reaches patchLead.
+   */
+  silent?: boolean;
 }
 
 export async function PATCH(req: Request) {
@@ -181,7 +187,7 @@ export async function PATCH(req: Request) {
           ? `Marked Lost — ${body.lostReason.trim()}`
           : `Moved to ${LEAD_LABEL[body.stage]}`,
     });
-  } else if (body.notes !== undefined) {
+  } else if (body.notes !== undefined && body.silent !== true) {
     activities.push({ kind: 'note', text: 'Notes updated' });
   }
 

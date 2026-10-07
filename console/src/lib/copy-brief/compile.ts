@@ -76,9 +76,9 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
     case 'hero':
       return `- hero: eyebrow, headline, headlineEmphasis (an EXACT substring of headline to accent, or omit), sub (one sentence), cta (action + outcome), secondaryCta, formLabel, trust (one credibility sentence), badge (short), frictionReducers (exactly ${counts.heroFriction} short bullets), heroBullets (exactly ${counts.heroBullets} of {value, label}).`;
     case 'about':
-      return `- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}, and exactly ${counts.stats} stats {n = short value, l = label}.`;
+      return `- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}, and exactly ${counts.stats} stats {n = short value, l = label}. Also write story: 3–4 paragraphs of real company background for the dedicated About page, grounded in the facts (invent no history).`;
     case 'services':
-      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars, tag = short category}.`;
+      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars, tag = short category, detail = 2–3 sentence expansion shown when the card opens on the Services page}.`;
     case 'work':
       return '- work: eyebrow, title, sub; include projects ONLY if real projects/case studies are grounded in the notes.';
     case 'testimonials':
@@ -94,6 +94,18 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
     default:
       return null;
   }
+}
+
+/**
+ * The instruction for the `subpages` generation section — one header + per-page SEO for each
+ * non-home route. Built where the routes are known (resolve.ts's resolveSections), since
+ * sectionInstructionLine has no route context. Returns '' when there are no subpages, so a
+ * single-page build contributes no subpages line.
+ */
+export function subpagesInstruction(subpages: { route: string; pageType: string; label: string }[]): string {
+  if (!subpages.length) return '';
+  const routes = subpages.map((p) => p.route).join(', ');
+  return `- subpages: exactly one item per route (${routes}), each { route, eyebrow, title, sub, ctaLabel + ctaHref (optional), seoTitle ≤ 60 chars, seoDescription ≤ 155 chars }. Every page's header and SEO must be DISTINCT and specific to that page — never a copy of the hero or of another page. About introduces the company; Services frames the offering; Contact invites the visitor to get in touch.`;
 }
 
 /** Build the SectionCounts a base SiteContent implies — shared by buildCopyUserMessage and

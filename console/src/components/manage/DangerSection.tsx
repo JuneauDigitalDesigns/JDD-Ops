@@ -32,7 +32,7 @@ import type { ArchiveRecord } from '@/lib/archive';
 export default function DangerSection() {
   // Deliberately just `ctx`, not `site` — unlike every other section, teardown acts on
   // ALL of a client's sites at once, not the one selected via ?site=.
-  const { ctx } = useManage();
+  const { ctx, confirmWrite } = useManage();
   const router = useRouter();
 
   const [plan, setPlan] = useState<TeardownPlan | null>(null);
@@ -85,6 +85,15 @@ export default function DangerSection() {
 
   async function runTeardown() {
     if (!plan) return;
+    if (
+      !(await confirmWrite({
+        title: 'Tear down this client',
+        effect: `Permanently deletes every provisioned resource for ${ctx.slug} (Vercel, GitHub, Retell, Twilio, Airtable, Clerk, KV records). This cannot be undone.`,
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setConfirming(false);
     await start({
       slug: ctx.slug,

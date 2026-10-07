@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { clientDir } from '@/lib/paths';
 import { writeDraft } from '@/lib/draft';
+import { guardOnboarded } from '@/lib/onboardingGate';
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as { slug?: unknown; bundle?: unknown };
@@ -14,6 +15,8 @@ export async function POST(req: NextRequest) {
   if (!existsSync(clientDir(slug))) {
     return NextResponse.json({ error: 'client not found' }, { status: 404 });
   }
+  const locked = await guardOnboarded(slug);
+  if (locked) return locked;
 
   writeDraft(slug, bundle);
   return NextResponse.json({ ok: true });

@@ -22,7 +22,7 @@ import SectionHeader from './SectionHeader';
  * neither.
  */
 export default function VoiceAgentSection() {
-  const { ctx, site } = useManage();
+  const { ctx, site, confirmWrite } = useManage();
   const [prompt, setPrompt] = useState('');
   const [original, setOriginal] = useState('');
   const [meta, setMeta] = useState<{ exists: boolean; agentId: string | null; llmId: string | null } | null>(null);
@@ -86,6 +86,16 @@ export default function VoiceAgentSection() {
   const dirty = prompt !== original;
 
   async function submit(push: boolean) {
+    // Only a push reaches the live Retell LLM; a plain save just writes agent-prompt.txt.
+    if (
+      push &&
+      !(await confirmWrite({
+        title: 'Push prompt to the live voice agent',
+        effect: `Replaces the live Retell LLM prompt for ${site.slug}. Callers hear the new prompt immediately.`,
+      }))
+    ) {
+      return;
+    }
     setBusy(push ? 'push' : 'save');
     setResult(null);
     try {

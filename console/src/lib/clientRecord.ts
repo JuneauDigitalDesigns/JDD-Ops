@@ -1,5 +1,6 @@
 import 'server-only';
 import { Redis } from '@upstash/redis';
+import { loadKvCredentials } from './opsSecrets';
 import { randomUUID } from 'node:crypto';
 import {
   clientKey,
@@ -34,6 +35,7 @@ let _redis: Redis | null = null;
 
 /** True when KV creds are present; lets routes degrade instead of throwing. */
 export function clientRecordsConfigured(): boolean {
+  loadKvCredentials();
   return Boolean(
     (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) &&
       (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN),
@@ -41,6 +43,7 @@ export function clientRecordsConfigured(): boolean {
 }
 
 function getRedis(): Redis {
+  loadKvCredentials();
   if (!_redis) {
     const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -108,6 +111,29 @@ export async function listClientRecords(): Promise<ClientRecord[]> {
     out.push(items[i] as ClientRecord);
   }
   return out;
+}
+
+// ── Onboarding fact ─────────────────────────────────────────────────────────
+
+/**
+ * `jdd:client:onboarded:{slug}` — "this client has onboarded via the agency site".
+ *
+ * Console-owned, deliberately NOT a field on ClientRecord: that schema is shared with the
+ * agency site and onboard.js, and this is a fact only the console's Build/Onboard gate reads.
+ * Written in two places: the intake import (an intake in the queue IS a submitted wizard), and
+ * the gate itself, the first time the portal account shows a site past `pending-onboarding`.
+ * Once true it stays true, so a later change to the account can't re-lock a client mid-build.
+ *
+ * No TTL: a lapse would silently re-lock a client.
+ */
+const onboardedKey = (slug: string) => `jdd:client:onboarded:${slug}`;
+
+export async function isSlugOnboarded(slug: string): Promise<boolean> {
+  return Boolean(await getRedis().get(onboardedKey(slug)));
+}
+
+export async function markSlugOnboarded(slug: string): Promise<void> {
+  await getRedis().set(onboardedKey(slug), 1);
 }
 
 // ── Writes ──────────────────────────────────────────────────────────────────
@@ -222,6 +248,10 @@ export async function deleteClientRecord(id: string): Promise<boolean> {
   await redis.del(clientKey(id));
   await redis.zrem(CLIENT_INDEX_KEY, id).catch(() => {});
   await redis.del(clientByEmailKey(rec.email)).catch(() => {});
-  if (rec.slug) await redis.del(clientBySlugKey(rec.slug)).catch(() => {});
+  if (rec.slug) {
+    await redis.del(clientBySlugKey(rec.slug)).catch(() => {});
+    // A recreated slug must start locked again, not inherit the old client's unlock.
+    await redis.del(onboardedKey(rec.slug)).catch(() => {});
+  }
   return true;
 }

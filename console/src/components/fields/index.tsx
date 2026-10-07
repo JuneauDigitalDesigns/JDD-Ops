@@ -11,7 +11,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { SiteContent } from '@/data/site';
 import { getPath } from '@/lib/merge';
-import { FONT_OPTIONS } from '@/lib/fonts';
+import { FONT_PAIRINGS, pairingIdFromStack, typographyFor } from '@/lib/fonts';
 
 // Shared form primitives for the studio's structured editors (BrandDrawer + the wizard's
 // intake step). Every control writes through setField(path, value) into the same `edits`
@@ -139,25 +139,50 @@ export function Color({
   );
 }
 
-// In-font font picker: each option renders in its own typeface.
-export function FontSelect({
-  content, setField, path, label, filter,
+/**
+ * In-font PAIRING picker: each option renders in its own typeface (decision 6).
+ *
+ * There is no `filter` prop any more. The old version filtered a loose font list by a
+ * `role: 'sans' | 'heading'` axis so a caller could pick heading and body independently; decision
+ * 7 makes display and body the SAME family, so the role axis no longer exists. Selecting a pairing
+ * writes all six typography fields, which is what makes it one choice rather than six.
+ *
+ * The "System (current)" escape option is retained deliberately: an existing client whose authored
+ * stack matches no pairing (a plain system stack, or one from the retired FONT_OPTIONS registry)
+ * must not be silently reassigned just because someone opened the drawer.
+ */
+export function PairingSelect({
+  content, setField, label,
 }: {
-  content: SiteContent; setField: SetField; path: string; label: string; filter: 'sans' | 'heading';
+  content: SiteContent; setField: SetField; label: string;
 }) {
-  const current = str(content, path);
-  const opts = FONT_OPTIONS.filter((o) => o.role === 'both' || o.role === filter);
-  const known = opts.some((o) => o.stack === current);
+  const current = str(content, 'brand.typography.fontSans');
+  const currentId = pairingIdFromStack(current);
   return (
     <label className="block">
       <span className={LABEL_CLS}>{label}</span>
-      <select value={known ? current : ''} onChange={(e) => setField(path, e.target.value)} className={INPUT_CLS}>
-        {!known && <option value="">System (current)</option>}
-        {opts.map((o) => (
-          <option key={o.id} value={o.stack} style={{ fontFamily: o.stack }}>{o.label}</option>
+      <select
+        value={currentId ?? ''}
+        onChange={(e) => {
+          if (!e.target.value) return;   // the escape option is not a destination
+          const t = typographyFor(e.target.value);
+          setField('brand.typography.fontSans', t.fontSans);
+          setField('brand.typography.fontHeading', t.fontHeading);
+          setField('brand.typography.headingWeight', t.headingWeight);
+          setField('brand.typography.bodyWeight', t.bodyWeight);
+          setField('brand.typography.headingTracking', t.headingTracking);
+          setField('brand.typography.headingLineHeight', t.headingLineHeight);
+        }}
+        className={INPUT_CLS}
+      >
+        {!currentId && <option value="">System (current)</option>}
+        {FONT_PAIRINGS.map((p) => (
+          <option key={p.id} value={p.id} style={{ fontFamily: p.stack }}>{p.label}</option>
         ))}
       </select>
-      {known && <p className="mt-1 text-lg text-uiFg2" style={{ fontFamily: current }}>The quick brown fox</p>}
+      {currentId && (
+        <p className="mt-1 text-lg text-uiFg2" style={{ fontFamily: current }}>The quick brown fox</p>
+      )}
     </label>
   );
 }

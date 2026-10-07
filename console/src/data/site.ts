@@ -31,22 +31,25 @@ export const CONTENT: SiteContent = {
     address:     "318 Glacier Ave, Juneau, AK 99801",
     license:     "AK-GC-2019-04817",
 
+    // Decision 9: warm unbleached ground, warm charcoal ink. Measured 2026-10-06:
+    // inkSoft on bg is 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1. `accentFg` stays absent
+    // here on purpose; the derivation in @jdd/ui supplies it.
     palette: {
       accent:  "#1E6FBF",
-      bg:      "#FFFFFF",
-      bgSoft:  "#F0F5FB",
-      ink:     "#0F1B2D",
-      inkSoft: "#4A5568",
-      rule:    "#CBD5E1",
+      bg:      "#FAF7F2",
+      bgSoft:  "#F1EBE2",
+      ink:     "#1A1512",
+      inkSoft: "#584E45",
+      rule:    "#DFD6C9",
     },
 
     typography: {
-      fontSans:          "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      fontHeading:       "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      fontSans:          "var(--font-instrument), system-ui, sans-serif",
+      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
       headingWeight:     700,
       bodyWeight:        400,
-      headingTracking:   "-0.01em",
-      headingLineHeight: 1.2,
+      headingTracking:   "-0.022em",
+      headingLineHeight: 1.02,
     },
   },
 
@@ -61,7 +64,7 @@ export const CONTENT: SiteContent = {
   ],
 
   // ── Announce bar ──────────────────────────────────────────────────────────
-  announcement: "Now booking summer AC tune-ups — schedule before June 1 and save $40!",
+  announcement: "Now booking summer AC tune-ups, schedule before June 1 and save $40!",
 
   // ── Trust logos ───────────────────────────────────────────────────────────
   trust: {
@@ -82,13 +85,13 @@ export const CONTENT: SiteContent = {
     eyebrow:          "Juneau's #1 Rated Home Services",
     headline:         "Comfort You Can Count On",
     headlineEmphasis: "Count On",
-    sub:              "HVAC, plumbing, and emergency repairs — done right the first time by technicians you can trust.",
-    formLabel:        "Get a free estimate — we'll reach out same day.",
+    sub:              "HVAC, plumbing, and emergency repairs, done right the first time by technicians you can trust.",
+    formLabel:        "Get a free estimate, we'll reach out same day.",
     placeholder:      "Your email address",
     cta:              "Book a Free Estimate",
     secondaryCta:     "Call (907) 555-0142",
     trust:            "We're the only Juneau contractor offering same-day HVAC diagnostics with a price-lock guarantee.",
-    badge:            "4.9 / 5 — 300+ reviews",
+    badge:            "4.9 / 5, 300+ reviews",
     frictionReducers: [
       "No hidden fees",
       "Same-day availability",
@@ -113,7 +116,7 @@ export const CONTENT: SiteContent = {
 
     pillars: [
       { k: "shield", t: "Licensed & Insured",    d: "Every technician is fully licensed, bonded, and covered so you have zero liability." },
-      { k: "clock",  t: "Same-Day Service",       d: "We keep trucks staged around Juneau to respond within hours — not days." },
+      { k: "clock",  t: "Same-Day Service",       d: "We keep trucks staged around Juneau to respond within hours, not days." },
       { k: "tag",    t: "Price-Lock Guarantee",   d: "The quote we give you is the price you pay. No invoice surprises." },
       { k: "star",   t: "4.9-Star Rated",         d: "Over 300 verified reviews across Google and Facebook from real Juneau customers." },
     ],
@@ -136,7 +139,7 @@ export const CONTENT: SiteContent = {
       {
         n: "01",
         t: "HVAC Installation & Replacement",
-        d: "We install and replace all major HVAC brands. Mini-splits, ducted systems, and heat pumps — sized right for Alaska's climate.",
+        d: "We install and replace all major HVAC brands. Mini-splits, ducted systems, and heat pumps, sized right for Alaska's climate.",
         tag: "Heating & Cooling",
         image: {
           url: "https://picsum.photos/seed/peak-hvac/800/600",
@@ -177,7 +180,7 @@ export const CONTENT: SiteContent = {
 
     projects: [
       {
-        t:       "Bergmann Apartment Complex — Full HVAC Retrofit",
+        t:       "Bergmann Apartment Complex: Full HVAC Retrofit",
         loc:     "Downtown Juneau, AK",
         yr:      "2025",
         scope:   "Commercial retrofit",
@@ -201,7 +204,7 @@ export const CONTENT: SiteContent = {
         },
       },
       {
-        t:       "Juneau School District — Boiler Replacement",
+        t:       "Juneau School District: Boiler Replacement",
         loc:     "Juneau, AK",
         yr:      "2024",
         scope:   "Commercial mechanical",
@@ -222,14 +225,14 @@ export const CONTENT: SiteContent = {
 
     items: [
       {
-        q:       "They showed up two hours after I called — on a Saturday — and had my furnace running before dinner. Incredibly professional and honest about pricing.",
+        q:       "They showed up two hours after I called, on a Saturday, and had my furnace running before dinner. Incredibly professional and honest about pricing.",
         a:       "Mike R.",
         r:       "Homeowner",
         company: "Mendenhall Valley",
         stars:   5,
       },
       {
-        q:       "We've used Peak for all three of our rental properties for five years. Never a bad experience. The price-lock guarantee is real — what they quote is what we pay.",
+        q:       "We've used Peak for all three of our rental properties for five years. Never a bad experience. The price-lock guarantee is real, what they quote is what we pay.",
         a:       "Sandra T.",
         r:       "Property Manager",
         company: "Bergmann Properties",
@@ -254,7 +257,7 @@ export const CONTENT: SiteContent = {
     items: [
       {
         q: "Do you offer free estimates?",
-        a: "Yes — all diagnostic visits and project estimates are free with no obligation to book.",
+        a: "Yes, all diagnostic visits and project estimates are free with no obligation to book.",
       },
       {
         q: "How quickly can you respond to an emergency?",
@@ -275,7 +278,7 @@ export const CONTENT: SiteContent = {
   finalCta: {
     eyebrow:  "Ready to Get Comfortable?",
     headline: "Book Your Free Estimate Today",
-    sub:      "No pressure, no obligation — just an honest assessment of what your home needs and what it'll cost.",
+    sub:      "No pressure, no obligation, just an honest assessment of what your home needs and what it'll cost.",
     cta:      "Book a Free Estimate",
     secondary: "Call (907) 555-0142",
     frictionReducers: [

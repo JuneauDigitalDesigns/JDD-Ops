@@ -95,17 +95,26 @@ export const CONTENT: SiteContent = {
     email: "hello@example.com",
     address: "123 Main St, Juneau, AK 99801",
     license: null,
+    // The STANDALONE-TEMPLATE seed, kept in step with globals.css's :root (which Phase 2 moved
+    // for the same reason). An export overwrites this file with the client's own content, so
+    // these values never reach a client site; they are what `cd template && npm run dev` shows,
+    // which is the only way to judge the palette and the pairing outside the console.
+    // Decision 9: warm unbleached ground, warm charcoal ink. Decision 11: a sophisticated tone of
+    // the expected HVAC blue coding rather than a saturated primary.
     palette: {
-      accent: "#1E6FBF",
-      bg: "#FFFFFF",
-      bgSoft: "#F0F5FB",
-      ink: "#0F1B2D",
-      inkSoft: "#4A5568",
-      rule: "#CBD5E1",
+      accent: "#1F5C7A",
+      bg: "#FAF7F2",
+      bgSoft: "#F1EBE2",
+      ink: "#1A1512",
+      inkSoft: "#584E45",
+      rule: "#DFD6C9",
     },
+    // Decision 6/7: the `instrument` pairing. A system stack here would mean `fontVarsFor`
+    // attaches no class and the standalone template renders in the OS font, which makes the
+    // pairing impossible to evaluate locally.
     typography: {
-      fontSans: "-apple-system, BlinkMacSystemFont, sans-serif",
-      fontHeading: "-apple-system, BlinkMacSystemFont, sans-serif",
+      fontSans: "var(--font-instrument), system-ui, sans-serif",
+      fontHeading: "var(--font-instrument), system-ui, sans-serif",
       headingWeight: 700,
       bodyWeight: 400,
     },

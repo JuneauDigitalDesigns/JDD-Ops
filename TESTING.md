@@ -7,6 +7,12 @@ Three layers, cheapest first.
 Fastest sanity check. Confirms plan-tier branching, slug derivation, file
 paths, and env-var plumbing without spending Twilio inventory or Retell quota.
 
+> **Note:** the `_e2e-starter` / `_e2e-growth` / `_e2e-enterprise` fixtures now live in
+> `clients/.archive/` (moved out of `clients/` so the console roster isn't half test data).
+> Move the one you want back to `clients/` before running the commands below, e.g.
+> `mv clients/.archive/_e2e-starter clients/_e2e-starter`. The permanent `_e2e_test_growth`
+> ("Your HVAC Co.") test client stays in `clients/`.
+
 ```
 cd jdd-ops
 node onboard.js --schema clients/_e2e-starter/site.ts    --dry-run

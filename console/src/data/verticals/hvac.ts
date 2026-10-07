@@ -12,22 +12,26 @@ export const CONTENT: SiteContent = {
     email:       "owner@yourhvaccompany.com",
     address:     "123 Main St, Your City, ST 00000",
     license:     null,
+
+    // Decision 9: warm unbleached ground, warm charcoal ink, shared across every vertical.
+    // Measured 2026-10-06: inkSoft on bg 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1.
+    // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#E05C2A",
       accentFg: "#FFFFFF",
-      bg:       "#FFFFFF",
-      bgSoft:   "#FFF6F2",
-      ink:      "#1C1009",
-      inkSoft:  "#6B5344",
-      rule:     "#E8D5C8",
+      bg:       "#FAF7F2",
+      bgSoft:   "#F1EBE2",
+      ink:      "#1A1512",
+      inkSoft:  "#584E45",
+      rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      fontHeading:       "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      fontSans:          "var(--font-instrument), system-ui, sans-serif",
+      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
       headingWeight:     700,
       bodyWeight:        400,
-      headingTracking:   "-0.01em",
-      headingLineHeight: 1.2,
+      headingTracking:   "-0.022em",
+      headingLineHeight: 1.02,
     },
   },
 
@@ -39,42 +43,30 @@ export const CONTENT: SiteContent = {
     { label: "Book",     href: "#cta" },
   ],
 
-  announcement: "24/7 emergency HVAC service — call us any time, day or night!",
+  announcement: "24/7 emergency HVAC service, call us any time, day or night!",
 
   trust: {
+    // De-clawed: certifications/logos are trust CLAIMS and must come from the client
+    // (onboarding notableClients → trust.logos). An empty list omits the band honestly.
     label: "Certified by",
-    logos: [
-      "NATE Certified",
-      "EPA 608 Certified",
-      "Energy Star Partner",
-      "BBB Accredited",
-      "Licensed & Insured",
-    ],
+    logos: [],
   },
 
   hero: {
     eyebrow:          "Your City's Trusted HVAC Experts",
     headline:         "Heating & Cooling You Can Count On",
     headlineEmphasis: "Count On",
-    sub:              "Fast, reliable HVAC service — from emergency repairs to full system replacements. Licensed technicians, upfront pricing.",
-    formLabel:        "Get a free estimate — we respond same day.",
+    sub:              "Fast, reliable HVAC service, from emergency repairs to full system replacements. Licensed technicians, upfront pricing.",
+    formLabel:        "Get a free estimate, we respond same day.",
     placeholder:      "Your email address",
     cta:              "Book a Free Estimate",
     secondaryCta:     "Call (555) 555-0100",
     trust:            "NATE-certified technicians with same-day diagnostics and a price-lock guarantee.",
-    badge:            "24/7 Emergency Service",
-    frictionReducers: [
-      "No hidden fees",
-      "Same-day availability",
-      "Licensed & insured",
-      "Price-lock guarantee",
-    ],
-    heroBullets: [
-      { value: "24/7",  label: "Emergency line" },
-      { value: "1 hr",  label: "Response time" },
-      { value: "4.9",   label: "Average rating" },
-      { value: "100%",  label: "Satisfaction" },
-    ],
+    // De-clawed: badge, friction reducers and hero stats are unverified CLAIMS. They stay empty
+    // until the client supplies them at onboarding (Phase 3) — components omit empty ones.
+    badge:            null,
+    frictionReducers: [],
+    heroBullets:      [],
   },
 
   about: {
@@ -83,8 +75,8 @@ export const CONTENT: SiteContent = {
     body:    "We keep homes and businesses comfortable year-round. From emergency furnace repairs on the coldest night of the year to full AC installations before summer, our NATE-certified technicians show up fast and fix it right the first time.",
     pillars: [
       { k: "shield", t: "Licensed & Insured",  d: "Every technician is fully licensed, bonded, and covered so you have zero liability." },
-      { k: "clock",  t: "Same-Day Service",     d: "We keep trucks staged locally to respond within hours — not days." },
-      { k: "tag",    t: "Upfront Pricing",      d: "We quote before we work. No invoice surprises — ever." },
+      { k: "clock",  t: "Same-Day Service",     d: "We keep trucks staged locally to respond within hours, not days." },
+      { k: "tag",    t: "Upfront Pricing",      d: "We quote before we work. No invoice surprises, ever." },
       { k: "star",   t: "NATE Certified",       d: "All technicians hold current NATE certification, the gold standard in HVAC." },
     ],
     stats: [
@@ -101,11 +93,11 @@ export const CONTENT: SiteContent = {
     sub:     "From annual tune-ups to emergency replacements, we handle every HVAC need under one roof.",
     items: [
       { n: "01", t: "Furnace Repair & Replacement", d: "Fast diagnosis and repair of all furnace makes and models. Emergency same-day service available.", tag: "Heating" },
-      { n: "02", t: "AC Installation & Service",    d: "Central air, mini-splits, and heat pumps — sized right for your home and budget.", tag: "Cooling" },
+      { n: "02", t: "AC Installation & Service",    d: "Central air, mini-splits, and heat pumps, sized right for your home and budget.", tag: "Cooling" },
       { n: "03", t: "Maintenance Plans",             d: "Annual tune-up programs that keep your system running efficiently and your warranty valid.", tag: "Maintenance" },
       { n: "04", t: "Duct Cleaning & Sealing",       d: "Improve air quality and reduce energy waste with professional duct cleaning and sealing.", tag: "Air Quality" },
       { n: "05", t: "Heat Pump Installation",        d: "Energy-efficient heating and cooling in one system. We install all major brands.", tag: "Heat Pump" },
-      { n: "06", t: "24/7 Emergency Service",        d: "HVAC emergencies don't wait for business hours. Neither do we — call anytime.", tag: "Emergency" },
+      { n: "06", t: "24/7 Emergency Service",        d: "HVAC emergencies don't wait for business hours. Neither do we, call anytime.", tag: "Emergency" },
     ],
   },
 
@@ -132,11 +124,11 @@ export const CONTENT: SiteContent = {
     title:   "Frequently Asked Questions",
     sub:     "Everything you need to know before booking.",
     items: [
-      { q: "How often should I service my HVAC system?", a: "We recommend a tune-up twice a year — once before heating season and once before cooling season. Regular maintenance extends equipment life and keeps your warranty valid." },
+      { q: "How often should I service my HVAC system?", a: "We recommend a tune-up twice a year, once before heating season and once before cooling season. Regular maintenance extends equipment life and keeps your warranty valid." },
       { q: "What's the difference between R-410A and R-32 refrigerant?", a: "R-32 is the newer, more eco-friendly refrigerant with a lower global warming potential. New systems use R-32; if you have an older R-410A system we'll walk you through your options." },
       { q: "When should I repair vs. replace my system?", a: "If the repair cost exceeds 50% of a new system's cost, or your equipment is over 15 years old, replacement usually makes more financial sense. We'll give you an honest recommendation either way." },
       { q: "How can I improve my home's energy efficiency?", a: "Regular filter changes (every 1–3 months), sealing duct leaks, adding a programmable thermostat, and annual tune-ups are the highest-impact steps. We offer a free energy audit with any service call." },
-      { q: "Do you offer maintenance plans?", a: "Yes — our plan covers two tune-ups per year, priority scheduling, discounts on parts and labor, and a no-breakdown guarantee for covered components." },
+      { q: "Do you offer maintenance plans?", a: "Yes, our plan covers two tune-ups per year, priority scheduling, discounts on parts and labor, and a no-breakdown guarantee for covered components." },
     ],
   },
 
@@ -146,7 +138,7 @@ export const CONTENT: SiteContent = {
     sub:      "Whether it's a breakdown at 2am or you're planning a new system, we're here to help. Get a free estimate with no obligation.",
     cta:      "Book a Free Estimate",
     secondary: "Call (555) 555-0100",
-    frictionReducers: ["Free estimates", "Same-day availability", "No hidden fees"],
+    frictionReducers: [], // de-clawed — client-supplied at onboarding
   },
 
   footer: {
@@ -182,12 +174,8 @@ export const CONTENT: SiteContent = {
   },
 
   extensions: {
-    trustBadges: [
-      "NATE Certified Technicians",
-      "EPA 608 Certified",
-      "Energy Star Partner",
-      "BBB Accredited",
-    ],
+    // De-clawed: certifications are client CLAIMS (onboarding `certifications` → trustBadges).
+    trustBadges: null,
     reviewBadge: null,
     contactDetails: {
       address: "123 Main St, Your City, ST 00000",

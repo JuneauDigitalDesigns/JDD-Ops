@@ -36,6 +36,12 @@ export const meta = {
   ],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
   skins: ['default', 'inverted'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'asymmetric-split',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 /** Splits the headline so the emphasised phrase can carry the accent, without animation. */
@@ -163,11 +169,18 @@ export default function HeroSplit({
               className="relative h-[240px] w-full rounded-lg object-cover sm:h-[320px] lg:h-[440px]"
             />
           ) : (
+            // Decision 30(b): a placeholder should read as a placeholder, not as a branded
+            // gradient slab. AUTHORING_CONTRACT §3's mandated 45-degree hatch, which is
+            // hard-stopped and therefore a technical fill rather than a feather.
             <div
               role="img"
               aria-label={`${brand.name} placeholder image`}
-              className="relative h-[240px] w-full rounded-lg bg-accent-grad sm:h-[320px] lg:h-[440px]"
-            />
+              className="relative flex h-[240px] w-full items-center justify-center rounded-lg bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)] sm:h-[320px] lg:h-[440px]"
+            >
+              <span className="font-sans text-fine uppercase tracking-wide text-inkSoft">
+                {brand.name}
+              </span>
+            </div>
           )}
         </div>
       </div>

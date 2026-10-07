@@ -18,6 +18,12 @@ export const meta = {
   label: 'Testimonials / Carousel',
   consumes: ['testimonials.eyebrow', 'testimonials.title', 'testimonials.items'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'snap-carousel',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 function StarRow({ count }: { count: number }) {
@@ -76,7 +82,7 @@ export default function TestimonialsCarousel({ content = CONTENT }: { content?: 
           className="no-scrollbar mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-6 pb-2"
         >
           {items.map((t, i) => {
-            const initial = t.a.charAt(0).toUpperCase();
+            const initial = (t.a ?? '').charAt(0).toUpperCase() || '★';
             return (
               <motion.article
                 key={i}

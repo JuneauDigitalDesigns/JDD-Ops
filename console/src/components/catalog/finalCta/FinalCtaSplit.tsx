@@ -19,6 +19,12 @@ export const meta = {
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.secondary', 'finalCta.frictionReducers', 'brand.phoneHref'],
   sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'soft'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'overlap-split',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 
@@ -40,9 +46,13 @@ export default function FinalCtaSplit({
   return (
     <section id="cta" className={`px-6 py-24 ${s.section}`}>
       <div className="mx-auto grid max-w-5xl gap-0 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        {/* Copy panel — branded gradient, always-readable white */}
+        {/* Copy panel: a flat accent fill with the DERIVED on-accent foreground.
+            Two decision-30(b) fixes on one line. The gradient went (research §6 item 3 names
+            gradients as an AI tell), and `text-white` became `text-accentFg`: hard-coded white on
+            an authored accent is the exact shipped defect palette-contrast.test.mjs exists to
+            catch, since #ffffff on #e08b29 is 2.66:1 against a 4.5 bar. */}
         <motion.div
-          className="relative z-0 overflow-hidden rounded-3xl bg-accent-grad p-10 text-white lg:py-14"
+          className="relative z-0 overflow-hidden rounded-3xl bg-accent p-10 text-accentFg lg:py-14"
           initial={still ? false : { opacity: 0, x: -16 }}
           whileInView={still ? undefined : { opacity: 1, x: 0 }}
           viewport={viewportOnce}
@@ -54,13 +64,13 @@ export default function FinalCtaSplit({
             style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)', backgroundSize: '22px 22px' }}
           />
           <h2 className="relative mt-4 font-heading text-4xl font-bold leading-[0.95] tracking-[-0.03em] md:text-5xl"><E p="finalCta.headline">{finalCta.headline}</E></h2>
-          <p className="relative mt-4 max-w-md leading-relaxed text-white/85"><E p="finalCta.sub">{finalCta.sub}</E></p>
+          <p className="relative mt-4 max-w-md leading-relaxed text-accentFg"><E p="finalCta.sub">{finalCta.sub}</E></p>
 
-          {finalCta.frictionReducers.length > 0 && (
+          {(finalCta.frictionReducers ?? []).length > 0 && (
             <ul className="relative mt-7 space-y-2">
-              {finalCta.frictionReducers.map((r, i) => (
-                <li key={r} className="flex items-center gap-2 text-sm text-white/90">
-                  <CheckCircle size={16} weight="fill" className="text-white" />
+              {(finalCta.frictionReducers ?? []).map((r, i) => (
+                <li key={r} className="flex items-center gap-2 text-sm text-accentFg">
+                  <CheckCircle size={16} weight="fill" className="text-accentFg" />
                   <E p={`finalCta.frictionReducers.${i}`}>{r}</E>
                 </li>
               ))}
@@ -68,7 +78,7 @@ export default function FinalCtaSplit({
           )}
 
           {finalCta.secondary && (
-            <a href={brand.phoneHref} className="relative mt-7 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/80">
+            <a href={brand.phoneHref} className="relative mt-7 inline-flex items-center gap-2 text-sm font-semibold text-accentFg hover:opacity-80">
               <PhoneCall size={16} weight="bold" />
               <E p="finalCta.secondary">{finalCta.secondary}</E>
             </a>

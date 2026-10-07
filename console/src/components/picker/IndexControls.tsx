@@ -1,6 +1,6 @@
 'use client';
 
-import { Flask, MagnifyingGlass, Plus, Warning } from '@phosphor-icons/react';
+import { Flask, MagnifyingGlass, Warning } from '@phosphor-icons/react';
 import type { Plan } from '@/lib/types';
 
 export type SortKey = 'touched' | 'name' | 'status' | 'health';
@@ -22,8 +22,8 @@ const PLANS: Plan[] = ['starter', 'growth', 'enterprise'];
  * rest disappear. (This used to defer to the /pipeline board for stage filtering; that board is
  * gone, and the reasoning stands on its own without it.)
  *
- * Fixtures live here rather than in the console bar. They ARE a filter — include the
- * `_`-prefixed test folders or don't — and a filter that changes what this grid shows belongs
+ * The test-client toggle lives here rather than in the console bar. It IS a filter — show the
+ * `_`-prefixed test client or don't — and a filter that changes what this grid shows belongs
  * with the other filters, not in chrome shared with every other route.
  */
 export default function IndexControls({
@@ -34,7 +34,6 @@ export default function IndexControls({
   attentionCount,
   showFixtures, onToggleFixtures,
   shown, total,
-  onNew,
 }: {
   query: string;
   onQuery: (v: string) => void;
@@ -49,15 +48,10 @@ export default function IndexControls({
   onToggleFixtures: () => void;
   shown: number;
   total: number;
-  onNew: () => void;
 }) {
   return (
     <div className="mb-6 flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={onNew} className="btn shrink-0">
-          <Plus size={14} weight="bold" /> New client
-        </button>
-
         <div className="relative min-w-[220px] flex-1">
           <MagnifyingGlass
             size={14}
@@ -146,13 +140,15 @@ export default function IndexControls({
           {attentionCount > 0 ? ` · ${attentionCount}` : ''}
         </button>
 
-        {/* Off by default: clients/ holds a handful of `_e2e*` folders the provisioning tests
-            run against, and a front door that is half test data is not a front door. */}
+        {/* Off by default: the only `_`-prefixed folder left in clients/ is the permanent test
+            client (_e2e_test_growth, "Your HVAC Co."), kept so there is always something safe to
+            view and change in production. A front door that shows test data is not a front door,
+            so it stays hidden until you ask for it here. */}
         <button
           type="button"
           onClick={onToggleFixtures}
           aria-pressed={showFixtures}
-          title="Include the _e2e test fixtures alongside real clients"
+          title="Show the hidden test client (Your HVAC Co.)"
           className="btn btn-xs"
           style={
             showFixtures
@@ -160,7 +156,7 @@ export default function IndexControls({
               : { color: 'var(--fg-3)' }
           }
         >
-          <Flask size={12} weight="fill" /> Fixtures
+          <Flask size={12} weight="fill" /> Show test client
         </button>
 
         <span className="meta ml-auto text-fg3">

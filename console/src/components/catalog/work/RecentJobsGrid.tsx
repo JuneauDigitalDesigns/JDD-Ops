@@ -12,6 +12,12 @@ export const meta = {
   consumes: ['work.eyebrow', 'work.title', 'work.sub', 'work.projects', 'work.hidden'],
   sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'inverted'],
+  /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
+  archetype: 'card-grid',
+  /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
+   *  a count-up). Decision 26 budgets these per PAGE, not per section: at most two on a page,
+   *  enforced by console/test/page-rhythm.test.mjs. Micro-reveals are free and do not count. */
+  signature: false,
 } as const;
 
 export default function RecentJobsGrid({
@@ -59,8 +65,9 @@ export default function RecentJobsGrid({
                   <img src={p.image.url} alt={p.image.alt} loading="lazy" width={i === 0 ? 1200 : 1600} height={i === 0 ? 1600 : 1200}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
-                  <div className="relative flex h-full w-full items-center justify-center bg-accent-grad">
-                    <span className="font-heading text-5xl font-black leading-none text-white/25">{String(i + 1).padStart(2, '0')}</span>
+                  // Decision 30(b): the contract §3 hatch, not a branded gradient slab.
+                  <div className="relative flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
+                    <span className="font-heading text-5xl font-black leading-none text-inkSoft/30">{String(i + 1).padStart(2, '0')}</span>
                   </div>
                 )}
               </div>

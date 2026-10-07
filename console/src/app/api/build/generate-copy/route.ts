@@ -33,6 +33,9 @@ interface Body {
   brief?: CopyBrief;
   sections?: Section[];
   model?: string;
+  /** Non-home pages of a multi-page build. Enables the `subpages` section (per-route header +
+   *  SEO) and page-aware prompting; omit/empty for a single-page site. */
+  subpages?: { route: string; pageType: string; label: string }[];
 }
 
 const REFUSAL = '__refusal__';
@@ -54,8 +57,15 @@ export async function POST(req: Request) {
 
   const modelId = body.model && isValidModelId(body.model) ? body.model : DEFAULT_MODEL_ID;
 
+  // Non-home pages, when this is a multi-page build. Drives the `subpages` section and the
+  // page-aware prompt; without them we must never ask the model for subpage copy.
+  const subpages = Array.isArray(body.subpages) ? body.subpages : [];
+
   const requested = Array.isArray(body.sections) ? body.sections.filter((s): s is Section => ALL_SECTIONS.includes(s)) : [];
-  const sections = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
+  const requestedOrAll = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
+  // `subpages` is only generable when the build actually has subpages — drop it otherwise,
+  // whether it arrived via an explicit sections list or the "all sections" default.
+  const sections = subpages.length ? requestedOrAll : requestedOrAll.filter((s) => s !== 'subpages');
   const chunks = chunkSections(sections);
   const wantedSet = new Set<Section>(['brand', ...sections]);
 
@@ -68,7 +78,7 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey: key });
   const imported = body.imported ?? null;
 
-  const ctx = { vertical, effective: base, imported, brief, tickedSections: sections };
+  const ctx = { vertical, effective: base, imported, brief, tickedSections: sections, subpages };
   const blocks = resolveBrief(ctx);
 
   const encoder = new TextEncoder();

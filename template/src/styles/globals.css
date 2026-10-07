@@ -3,15 +3,22 @@
 @tailwind utilities;
 
 /* Defaults so the template renders before layout.tsx applies brand vars (and as a
-   fallback). layout.tsx overrides these per client from CONTENT.brand. */
+   fallback). layout.tsx overrides these per client from CONTENT.brand.
+
+   Decision 9: warm unbleached ground, warm charcoal ink. Decision 11: the accent is a
+   sophisticated tone of the expected HVAC blue coding, not a saturated primary. This block is
+   the pre-hydration fallback and the standalone-template palette, so it is the one palette no
+   TypeScript import can reach and the first thing a visitor sees on every client site.
+   Measured 2026-10-06: accent as text is 6.85:1 on bg and 6.17:1 on bg-soft; accent-fg on
+   accent is 6.91:1; ink on bg is 16.94:1. */
 :root {
-  --accent: #1e6fbf;
-  --accent-fg: #ffffff;
-  --bg: #ffffff;
-  --bg-soft: #f0f5fb;
-  --ink: #0f1b2d;
-  --ink-soft: #4a5568;
-  --rule: #cbd5e1;
+  --accent: #1F5C7A;
+  --accent-fg: #FBF8F4;
+  --bg: #FAF7F2;
+  --bg-soft: #F1EBE2;
+  --ink: #1A1512;
+  --ink-soft: #584E45;
+  --rule: #DFD6C9;
   --font-sans: -apple-system, BlinkMacSystemFont, sans-serif;
   --font-heading: -apple-system, BlinkMacSystemFont, sans-serif;
   --heading-weight: 700;

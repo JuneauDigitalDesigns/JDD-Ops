@@ -1,6 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { Redis } from '@upstash/redis';
+import { loadKvCredentials } from './opsSecrets';
 
 /**
  * Console-side reader for the cancel-request and featured-request indexes written
@@ -19,6 +20,7 @@ import { Redis } from '@upstash/redis';
 let _redis: Redis | null = null;
 
 function getRedis(): Redis {
+  loadKvCredentials();
   if (!_redis) {
     const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -33,6 +35,7 @@ function getRedis(): Redis {
 }
 
 export function cancelKvConfigured(): boolean {
+  loadKvCredentials();
   return Boolean(
     (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) &&
       (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN),

@@ -11,6 +11,7 @@ import { LEAD_SOURCE_SHORT } from '@/lib/lead-meta';
 import type { DemoCall, PlanInterest, QueuedLead } from '@/lib/leadTypes';
 import { absoluteTime, relativeTime } from '@/lib/relativeTime';
 import { SOURCE_ICON } from './LeadCard';
+import ConvertDialog from './ConvertDialog';
 
 const PLAN_LABEL: Record<string, string> = {
   starter: 'Starter',
@@ -155,7 +156,7 @@ function PlanPills({
 }
 
 export default function LeadModal({
-  lead, call, siteUrl, onClose, onPatch, onDelete, startEditing,
+  lead, call, siteUrl, onClose, onPatch, onDelete, onConverted, onOpenScript, startEditing,
 }: {
   lead: QueuedLead;
   call: DemoCall | null;
@@ -163,6 +164,10 @@ export default function LeadModal({
   onClose: () => void;
   onPatch: (patch: ModalPatch) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  /** Called with the new client's slug once Convert succeeds. The board owns navigation. */
+  onConverted?: (slug: string) => void;
+  /** Opens the call script over this lead. The overlay is owned by LeadsView. */
+  onOpenScript: () => void;
   /** Set by the board when this lead was just created by hand, so typing can start immediately. */
   startEditing?: 'businessName';
 }) {
@@ -174,25 +179,48 @@ export default function LeadModal({
   const [lostDraft, setLostDraft] = useState(lead.lostReason ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeBlocked, setCloseBlocked] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [busy, setBusy] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const notesDirtyRef = useRef(false);
 
   const notesDirty = notes !== (lead.notes ?? '');
   notesDirtyRef.current = notesDirty;
+  // Read from the document-level Escape handler below, which closes over a stale render.
+  const convertingRef = useRef(false);
+  convertingRef.current = converting;
 
   // Sync when a different lead is opened
   useEffect(() => {
     setNotes(lead.notes ?? '');
+    syncedNotes.current = lead.notes ?? '';
     setLostDraft(lead.lostReason ?? '');
     setLostInput(false);
     setConfirmDelete(false);
     setCloseBlocked(false);
+    setConverting(false);
   }, [lead.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The call script writes `lead.notes` while this modal stays mounted underneath it. Pick that
+  // up, but never over the top of an edit made here.
+  //
+  // "Edited here" is judged against the value this box was last synced FROM, not against
+  // `lead.notes`: by the time this effect runs `lead.notes` is already the new value, so
+  // `notesDirty` (derived from it during render) reads true for an untouched box and would
+  // block every sync.
+  const syncedNotes = useRef(lead.notes ?? '');
+  useEffect(() => {
+    const next = lead.notes ?? '';
+    if (notes === syncedNotes.current) setNotes(next);
+    syncedNotes.current = next;
+  }, [lead.notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') tryClose();
+      if (e.key !== 'Escape') return;
+      // With the convert dialog open, Escape belongs to it, not to the modal underneath.
+      if (convertingRef.current) { setConverting(false); return; }
+      tryClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -235,6 +263,10 @@ export default function LeadModal({
 
   const fromCall = lead.source === 'call';
   const isLost = lead.stage === 'lost';
+  const isWon = lead.stage === 'won';
+  // Same test the card uses to stop glowing. Both halves of the link count: a lead converted
+  // before clientRecordId existed only has the slug.
+  const converted = Boolean(lead.clientRecordId || lead.convertedSlug);
   const SourceIcon = SOURCE_ICON[lead.source] ?? EnvelopeSimple;
   // A hand-created lead starts with these blank. Everything that would render an empty control
   // hides until there is something to render.
@@ -345,6 +377,17 @@ export default function LeadModal({
               {/* Actions. The two phone controls stay out of the way until there is a number
                   to dial — an empty primary button is a worse answer than no button. */}
               <div className="flex flex-wrap items-center gap-2">
+                {isWon && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    disabled={converted}
+                    title={converted ? 'Already converted' : 'Create a client from this lead'}
+                    onClick={() => setConverting(true)}
+                  >
+                    Convert to Client
+                  </button>
+                )}
                 {hasPhone && (
                   <>
                     <a
@@ -358,6 +401,9 @@ export default function LeadModal({
                     </button>
                   </>
                 )}
+                <button type="button" onClick={onOpenScript} className="btn btn-sm btn-accent">
+                  <Phone size={13} /> Call script
+                </button>
                 <button
                   type="button"
                   onClick={copySignup}
@@ -568,6 +614,17 @@ export default function LeadModal({
             </div>
           </div>
         </div>
+
+        {converting && !converted && (
+          <ConvertDialog
+            lead={lead}
+            onClose={() => setConverting(false)}
+            onConverted={(slug) => {
+              setConverting(false);
+              onConverted?.(slug);
+            }}
+          />
+        )}
 
         {/* ── Unsaved notes guard ── */}
         {closeBlocked && (

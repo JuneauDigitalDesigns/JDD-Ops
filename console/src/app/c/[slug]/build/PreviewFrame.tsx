@@ -14,7 +14,7 @@ import { createPortal } from 'react-dom';
 import type { Brand } from '@/data/site';
 import { paletteVars, typographyVars } from '@/lib/palette';
 
-type Mode = 'scaled' | 'fluid';
+type Mode = 'scaled' | 'fluid' | 'flow';
 
 /** Copy the `--foo` custom properties from a CSSProperties bag onto a real DOM element. */
 function applyVars(el: HTMLElement, vars: CSSProperties) {
@@ -43,7 +43,7 @@ export default function PreviewFrame({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const moRef = useRef<MutationObserver | null>(null);
 
-  const [visible, setVisible] = useState(mode === 'fluid'); // fluid mounts immediately
+  const [visible, setVisible] = useState(mode !== 'scaled'); // fluid + flow mount immediately; scaled lazy-mounts
   const [mountEl, setMountEl] = useState<HTMLElement | null>(null);
   const [contentH, setContentH] = useState(0);
   const [containerW, setContainerW] = useState(0);
@@ -150,9 +150,9 @@ export default function PreviewFrame({
     applyVars(docEl, typographyVars(brand));
   }, [mountEl, brand]);
 
-  // Measure rendered content height for scaled mode (re-run on resize + late image/font loads).
+  // Measure rendered content height for scaled + flow modes (re-run on resize + late image/font loads).
   useEffect(() => {
-    if (mode !== 'scaled' || !mountEl) return;
+    if (mode === 'fluid' || !mountEl) return;
     const measure = () => setContentH(mountEl.scrollHeight);
     const ro = new ResizeObserver(measure);
     ro.observe(mountEl);
@@ -178,13 +178,15 @@ export default function PreviewFrame({
           transformOrigin: 'top left',
           transform: `scale(${scale})`,
         }
+      : mode === 'flow'
+      ? { width: '100%', height: h, border: 0, display: 'block' }
       : { width: '100%', height: '100%', border: 0, display: 'block' };
 
   const outerStyle: CSSProperties = {
     position: 'relative',
     overflow: 'hidden',
     width: '100%',
-    ...(mode === 'scaled' ? { height: h * scale } : { height: '100%' }),
+    ...(mode === 'scaled' ? { height: h * scale } : mode === 'flow' ? { height: h } : { height: '100%' }),
   };
 
   return (

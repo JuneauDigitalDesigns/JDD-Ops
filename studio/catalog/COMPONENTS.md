@@ -1,43 +1,10 @@
-# Component backlog
+# Component backlog (superseded)
 
-The master list of catalog components to build (in later sessions). Read
-`AUTHORING_CONTRACT.md` in this folder **before** building any of them — it defines
-the rules every component must follow to drop in cleanly and survive `onboard.js`.
+The live catalog is `console/src/components/catalog/**`, registered per
+`design/PLAN-template-fidelity-v2.md` §0.5. The authoring rules are in
+`AUTHORING_CONTRACT.md` in this folder. The archetype vocabulary and per-category coverage
+targets are in `console/DESIGN-LANGUAGE.md`. The build-out plan is
+`console/design/PLAN-template-fidelity-v2.md`.
 
-Each component is one self-contained `.tsx` at
-`console/src/components/catalog/<category>/{Category}{Variant}.tsx`,
-with a default export named identically to the file and a `meta` named export.
-The console app renders all of them; selected variants export via the
-File System Access API into any folder you choose. Target: **2 variants per
-category** for v1.
-
-| Category | Schema consumed | Variants to build | Status |
-|---|---|---|---|
-| Nav | `brand.name`, `brand.short`, `brand.phone`, `brand.phoneHref` | `NavMinimal`, `NavCentered` | ☑ ☑ |
-| Hero | `brand.name`, `brand.long`, `brand.tagline`, `brand.phone`, `seo.description` | `HeroSplit`, `HeroCentered` | ☑ ☑ |
-| Services | `services.items[] {n,t,d,tag}` | `ServicesGrid`, `ServicesAccordion` | ☑ ☑ |
-| FAQ | `faq.items[] {q,a}` | `FaqAccordion`, `FaqTwoColumn` | ☑ ☑ |
-| Testimonials | `testimonials?.items[] {q,a,r,company,stars}` (optional) | `TestimonialsCarousel`, `TestimonialsGrid` | ☑ ☑ |
-| Contact / CTA | `brand.phone`, `brand.phoneHref`, `brand.email`, `brand.address` → POSTs `/api/contact` | `ContactSplit`, `CtaBanner` | ☑ ☑ |
-| Footer | `brand.name`, `brand.long`, `brand.license`, `brand.established`, `brand.address`, `brand.phone`, `brand.email` | `FooterColumns`, `FooterMinimal` | ☑ ☑ |
-| SEO head | `seo {title,description,canonical}` + `brand` (JSON-LD) | `SeoDefault`, `SeoLocalBusiness` | ☑ ☑ |
-
-**v1 status:** all 16 components shipped at `console/src/components/catalog/<category>/`.
-The console Next.js app renders every variant and lets you select one per
-category for export. `cd console && npm run build` is the build-correctness
-gate; the template itself is back to its blank-base form.
-
-## Notes per category
-
-- **Testimonials** is optional in the schema. Both variants MUST return `null` when
-  `CONTENT.testimonials` is absent or `items` is empty.
-- **Footer** `license` and `established` are nullable — render conditionally.
-- **SEO** variants feed Next `metadata` (export `generateMetadata`) rather than
-  rendering visible markup; `SeoLocalBusiness` adds JSON-LD from `brand` + `seo`.
-- **Contact** variants POST form data to `/api/contact`; do not add new env vars.
-
-## Maps to page slots
-
-`template/src/app/page.tsx` has SLOTs in this order: nav → hero → services → faq →
-testimonials → contact → footer. SEO is wired through `layout.tsx` /
-`generateMetadata`, not a visible slot.
+This file described a 16-component v1 and an export flow that no longer exists. Kept as a stub
+so its path does not 404 from older notes.

@@ -43,7 +43,7 @@ export interface RawSite {
     palette?: Record<string, string>;
   };
   seo?: { canonical?: string };
-  _meta?: { missing_fields?: string[]; missingFields?: string[]; selectedPlan?: Plan; copyBrief?: unknown };
+  _meta?: { missing_fields?: string[]; missingFields?: string[]; selectedPlan?: Plan; copyBrief?: unknown; externalManaged?: boolean };
   [k: string]: unknown;
 }
 

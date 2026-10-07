@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import NavMinimal, { meta as navMinimalMeta } from '@/components/catalog/nav/NavMinimal';
+import PageHeaderSimple, { meta as pageHeaderSimpleMeta } from '@/components/catalog/pageHeader/PageHeaderSimple';
 import HeroSplit, { meta as heroSplitMeta } from '@/components/catalog/hero/HeroSplit';
 import HeroFormFocus, { meta as heroFormMeta } from '@/components/catalog/hero/HeroFormFocus';
 import HeroOverlap, { meta as heroOverlapMeta } from '@/components/catalog/hero/HeroOverlap';
@@ -48,7 +49,7 @@ export type VariantEntry = {
 };
 
 export type CategoryEntry = {
-  id: 'nav' | 'hero' | 'trust' | 'about' | 'services' | 'work' | 'testimonials' | 'faq' | 'finalCta' | 'contact' | 'footer' | 'seo';
+  id: 'nav' | 'pageHeader' | 'hero' | 'trust' | 'about' | 'services' | 'work' | 'testimonials' | 'faq' | 'finalCta' | 'contact' | 'footer' | 'seo';
   label: string;
   iconName: 'Compass' | 'Sun' | 'SealCheck' | 'Users' | 'ListChecks' | 'Briefcase' | 'Star' | 'Question' | 'Megaphone' | 'Phone' | 'Article' | 'Code';
   variants: VariantEntry[];
@@ -79,6 +80,26 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'NavMinimal',         id: navMinimalMeta.id,      label: navMinimalMeta.label,      skins: skinsFor('NavMinimal'),      render: (skin) => <NavMinimal content={effective} skin={skin} /> },
         { name: 'NavEmergencyBar',    id: navEmergencyMeta.id,    label: navEmergencyMeta.label,    skins: skinsFor('NavEmergencyBar'), render: (skin) => <NavEmergencyBar content={effective} skin={skin} /> },
+      ],
+    },
+    {
+      id: 'pageHeader',
+      label: 'Page header',
+      iconName: 'Article',
+      // The catalog browser renders a placeholder header; the real per-route copy
+      // (SiteContent.subpages[route].header) is supplied by compose-page.ts at render time.
+      variants: [
+        {
+          name: 'PageHeaderSimple',
+          id: pageHeaderSimpleMeta.id,
+          label: pageHeaderSimpleMeta.label,
+          skins: skinsFor('PageHeaderSimple'),
+          render: () => (
+            <PageHeaderSimple
+              data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }}
+            />
+          ),
+        },
       ],
     },
     {

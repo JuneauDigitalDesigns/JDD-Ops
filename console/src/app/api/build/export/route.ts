@@ -14,9 +14,12 @@ import {
   resolveUploads,
   validateEntries,
   wirePage,
+  wirePages,
+  collectSectionRefs,
   verifyCatalogImports,
   type Entry,
 } from '@/lib/export';
+import { navLinksFor, type SiteComposition } from '@/lib/pages';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
@@ -24,6 +27,7 @@ import { resolveVerticalIds } from '@/lib/verticals-registry';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
 import { loadGithubToken } from '@/lib/opsSecrets';
 import { deleteDraft } from '@/lib/draft';
+import { lockedReason } from '@/lib/onboardingGate';
 
 /** npm install and next build are both legitimately slow; past this they are stuck, not slow. */
 const NPM_TIMEOUT_MS = 10 * 60_000;
@@ -77,6 +81,9 @@ type Body = {
   slug?: string;
   overwrite?: boolean;
   selections?: Entry[];
+  /** Multi-page composition. When present, the site is exported as N page files (wirePages);
+   *  otherwise the legacy single-page path (selections → wirePage) runs unchanged. */
+  composition?: SiteComposition;
   vertical?: string;
   content?: unknown;
   /** Also commit + push, so Vercel's GitHub integration redeploys the live site. */
@@ -105,6 +112,10 @@ export async function POST(req: Request) {
   const slug = (body.slug ?? '').trim();
   const overwrite = Boolean(body.overwrite);
   const selections = Array.isArray(body.selections) ? body.selections : [];
+  // Multi-page export path when a composition is supplied; else the legacy single-page path.
+  const composition = body.composition && typeof body.composition === 'object' && Array.isArray(body.composition.pages)
+    ? body.composition
+    : null;
   const vertical = typeof body.vertical === 'string' && VALID_VERTICALS.has(body.vertical)
     ? (body.vertical as VerticalId)
     : null;
@@ -138,8 +149,17 @@ export async function POST(req: Request) {
         if (!isValidSlug(slug)) {
           throw new Error('Client name may only contain letters, numbers, hyphens and underscores.');
         }
-        const entries = validateEntries(selections);
+        // Onboarding gate, third layer. Thrown so the catch below reports it on the stream
+        // like any other failure. An export of a placeholder folder would scaffold a repo
+        // from preset content and, with `deploy`, push it.
+        const lockedMsg = await lockedReason(slug);
+        if (lockedMsg) throw new Error(lockedMsg);
+        const entries = validateEntries(composition ? collectSectionRefs(composition) : selections);
         const repoRoot = resolveRepoRoot();
+
+        // Multi-page: the site nav becomes route links generated from the composition (Home,
+        // Services, …), not the single-page anchor links. Generated routing, not client copy.
+        if (composition && content) content.nav = navLinksFor(composition);
 
         // 1. Copy (or reuse) the template repo.
         const existed = repoExists(repoRoot, slug);
@@ -238,9 +258,14 @@ export async function POST(req: Request) {
           return;
         }
 
-        // 3. Wire imports + slots into page.tsx.
-        step('Wiring the components into the homepage and setting up imports…');
-        wirePage(repoRoot, slug, entries);
+        // 3. Wire the components into the page file(s).
+        if (composition) {
+          step(`Wiring ${composition.pages.length} page(s) and setting up routing…`);
+          wirePages(repoRoot, slug, composition, content?.sectionStyles ?? {});
+        } else {
+          step('Wiring the components into the homepage and setting up imports…');
+          wirePage(repoRoot, slug, entries);
+        }
 
         const repoDir = repoDirFor(repoRoot, slug);
 

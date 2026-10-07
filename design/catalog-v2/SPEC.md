@@ -115,6 +115,22 @@ Below the fold, CSS entrance reveals are fine. Hover, focus and press states eve
 stats (`AboutFeature`) · auto-advancing carousels (`TestimonialsMarquee`,
 `TestimonialsRotator`) · the infinite `TrustMarquee`.
 
+### §9 amendment, 2026-10-05 (decision 18)
+
+The "Cut entirely" list above bans count-up stats. Decision 18 of
+`console/design/DECISIONS-template-fidelity-v2.md` reverses that for ONE case: a dedicated stats
+band is now a first-class section category and it DOES count up. The reasoning for the original
+cut was that `AboutFeature`'s count-up fired above the fold and competed with LCP; a stats band
+sits mid-page, below the fold, so that reasoning does not apply to it.
+
+Scope of the amendment, which is narrow on purpose:
+  • `stats/StatsBand.tsx` may count up. It is the only component that may.
+  • It must gate on `stillFor(skin, reduce)` and render the final value immediately when still.
+  • Everything else in §9 stands, including the autoplay ban: `testimonials/TestimonialsMarquee`
+    is drag and scroll driven, with no `setInterval`.
+  • Nothing above the fold animates on load. That rule is measured (see `PERF.md`) and is not
+    amended.
+
 ## 10. Images
 
 Every in-flow `<img>` carries `width`/`height` matching its wrapper's ratio. This is

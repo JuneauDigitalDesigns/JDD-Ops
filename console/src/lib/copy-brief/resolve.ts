@@ -10,7 +10,7 @@ import type { SiteContent } from '@/data/site';
 import { getPath } from '@/lib/merge';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
-import { countsFor, sectionInstructionLine } from './compile';
+import { countsFor, sectionInstructionLine, subpagesInstruction } from './compile';
 import { COPY_FACT_PATHS } from './facts';
 import type {
   BriefContext,
@@ -223,14 +223,20 @@ function resolveStructure(ctx: BriefContext): StructureBlock {
 
 function resolveSections(ctx: BriefContext): SectionsBlock {
   const counts = countsFor(ctx.effective);
-  const sectionIds = ALL_SECTIONS.filter((s) => s !== 'brand');
+  const subpages = ctx.subpages ?? [];
+  // `subpages` is only a real section on a multi-page build — a single-page build never offers
+  // or generates it, so drop it from the section list when there are no subpages.
+  const sectionIds = ALL_SECTIONS.filter((s) => s !== 'brand' && (s !== 'subpages' || subpages.length > 0));
   const ticked = new Set(ctx.tickedSections);
   const entries: SectionEntry[] = sectionIds.map((section) => {
-    const defaultText = sectionInstructionLine(section, {
-      pillars: counts.pillars, stats: counts.stats, services: counts.services,
-      testimonials: counts.testimonials, faq: counts.faq, heroBullets: counts.heroBullets,
-      heroFriction: counts.heroFriction, ctaFriction: counts.ctaFriction,
-    }) ?? '';
+    // The subpages instruction needs the routes, which sectionInstructionLine has no access to.
+    const defaultText = section === 'subpages'
+      ? subpagesInstruction(subpages)
+      : sectionInstructionLine(section, {
+          pillars: counts.pillars, stats: counts.stats, services: counts.services,
+          testimonials: counts.testimonials, faq: counts.faq, heroBullets: counts.heroBullets,
+          heroFriction: counts.heroFriction, ctaFriction: counts.ctaFriction,
+        }) ?? '';
     const override = stringOverride(ctx, 'sections', section);
     return {
       section, label: labelFor(section), ticked: ticked.has(section),
