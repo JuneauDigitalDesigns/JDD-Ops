@@ -565,3 +565,68 @@ versioning. Measured 2026-10-07:
    pins. That reconciliation belongs to whoever owns the tickets feature, not to the fidelity
    plan, but the fidelity executor must not mistake the red check-schema for their own regression.
 3. `@jdd/ui` is UNAFFECTED and correct: both consumers pinned and installed at v1.0.3.
+
+---
+
+## Phase 5, APPROVED at the user gate 2026-10-07. No `@jdd/ui` tag, no `.tsx`.
+
+All four deliverables authored directly to the plan spec (the user chose this over running the
+interactive design-template skill, because that skill's Q&A would relitigate the settled 56
+decisions, and the plan says its own contents win on conflict):
+
+- `VERTICAL-LANGUAGE-hvac.md`: four axes. Proposed HVAC accent `#16556A` (deep petrol teal-blue)
+  replacing the saturated Tier A orange `#E05C2A`, per decision 11. Measured on the warm set:
+  `--accent-text` 7.73 on bg / 6.97 on bgSoft, white `--accent-fg` 8.26 on the fill, `--urgent`
+  unaffected at 6.15 / 5.54 and a clearly different hue (no red collision). `pairingId:instrument`,
+  `grade:house`, `ratioBias:wide`, `homeTemplateId:home-standard` (forward ref, Phase 9 creates it),
+  `proofSkin:soft`. User APPROVED the accent and this doc.
+- `photography.md`: tension stated, 9-shot checklist, 7 schema slots mapped, 5 ratios, two-pass
+  grade with the tint dropped (decision 55), subjects. All 7 curated Unsplash ids re-verified 200
+  on 2026-10-07. Honest note: the set reuses 4 verified HVAC photos across slots (the current
+  working design); did not invent ids that cannot be visually confirmed.
+- `mockups-sections.html`: 14 plan specimens plus a grade before/after, dual-width via container
+  queries with the token scale pinned to clamp endpoints per frame. The three editorial-index uses
+  (2, 8, 14), the two stacked-panels (3, 9) and the two figure specimens (11, 12) are drawn as
+  structurally distinct, which is gate question 3.
+- `mockups-hvac-subpages.html`: 4 page-header archetypes + the two full-page rhythm specimens
+  (service-standard, service-proof), each band tagged with its rh-* class, exactly one inverted
+  per page (decision 12).
+
+**ADDENDUM specimen H, HeroFormFocus, added 2026-10-07 at the user's request.** The plan's 14
+specimens deliberately omit the heroes because they are already built (Phase 0-4) and omit the home
+page because it is Phase 9, so the above-the-fold home hero with its lead-capture form, the single
+most important conversion element alongside the sticky call bar, was shown nowhere. Added it to
+`mockups-sections.html` as specimen H: phone primary (accent button, digits + assurance, SPEC §4),
+capture form secondary (ink-outline), trust in the hero at every breakpoint (SPEC §7), hero image
+eager/high (SPEC §10), nothing animating on load (SPEC §9). This is a deviation from the plan's
+specimen list, recorded here per the handoff rule.
+
+**onboard.js lead wiring, verified 2026-10-07 against `lib/site-routes/contact.route.ts` (the route
+onboard.js writes into every client repo):**
+- The route reads `LEAD_DELIVERY_MODE`. `callback` (growth/enterprise) parses `data.phone` to E.164
+  and calls Retell `create-phone-call`; `email` (starter) builds a lead email from whatever fields
+  are posted and sends via Resend to `LEAD_TO_EMAIL`, with the lead's email as reply-to. Returns 502
+  on Resend/Retell failure, never a silent success. Both tiers are supported for the hero form shape.
+- **Two constraints the hero form must honor for the wiring to work:** (1) the callback path reads
+  `data.phone` literally, so the submitted field MUST be named `phone`; (2) starter email needs
+  `RESEND_API_KEY` + `LEAD_TO_EMAIL` set by onboard.js and a VERIFIED Resend FROM domain (the known
+  403 pitfall is the API-key account, not DNS; see MEMORY "Resend account binding").
+- **Known gap (SPEC "Known gaps"):** the shared `leadMode`-aware `LeadForm` island (starter=email
+  field, growth=phone field) is specified but NOT yet built into the hero/contact/finalCta
+  components. That is a Phase 6 dependency before a starter client's hero form is correct. The
+  callback path a growth client uses works today.
+
+**Verification run 2026-10-07, all green:** `console npm test` 182/181/1; `console npm run build`
+EXIT 0 (one transient next/font Google-Fonts fetch failure on the first attempt, the documented
+Phase 3 null-deref, cleared on retry); `template npm run build` EXIT 0; all five files present; both
+HTML self-contained (only fonts + unsplash); zero em-dashes in the four deliverables; all seven
+curated photo URLs 200.
+
+**USER GATE PASSED 2026-10-07.** The user answered the three questions: does it look expensive =
+yes (Tier B), does it still convert = yes (architecture intact), is each specimen a different
+structure = yes (all distinct). Phase 5 is approved. The shared foundation (Phases 0 to 5) is
+settled. Phase 6 may begin.
+
+Fields Phase 13 intake must add, collected from the `[from intake]` brackets used: service city,
+license number, year established, years-local, review count, review source, warranty term, named
+service-area towns. Review count, review source and warranty term are beyond decision 29's list.

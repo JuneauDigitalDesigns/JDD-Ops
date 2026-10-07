@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HVAC foundation mockups, sections (Phase 5, Deliverable 1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────────────────────────────────────────────────
+   TOKEN LAYER, copied from Phase 1 (template/src/styles/tokens.ts) and Phase 2.
+   The vw-based clamps in tokens.ts key off the VIEWPORT, which cannot show a true
+   390 vs 1280 size difference when both frames live in one window. So each frame
+   overrides the fluid tokens to the clamp ENDPOINTS: .m to the min (what 390 gets),
+   .d to the max (what >=1000 gets). Fixed steps (card-title, body, small, fine) are
+   the same at both widths, as the real tokens are.
+
+   The HVAC accent #16556A and its derived tokens are from VERTICAL-LANGUAGE-hvac.md.
+   --accent-text equals the accent because the accent already clears AA on bg (7.73)
+   and bgSoft (6.97), so the derivation returns it unchanged.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root{
+  --accent:#16556A; --accent-fg:#FFFFFF; --accent-text:#16556A; --urgent:#B3251A;
+  --bg:#FAF7F2; --bg-soft:#F1EBE2; --ink:#1A1512; --ink-soft:#584E45; --rule:#DFD6C9;
+  --ink-panel:#1A1512; --on-ink:#FBF8F4;
+  --font:'Instrument Sans', system-ui, sans-serif;
+  /* desktop / max endpoints (>=1000px) */
+  --display-1:3.625rem; --display-2:2.625rem; --display-3:1.75rem;
+  --card-title:1.3125rem; --lead:1.3125rem;
+  --body:1.0625rem; --small:.9375rem; --fine:.8125rem;
+  --radius-control:8px; --radius-panel:14px;
+  --shadow-slab:0 1px 2px rgba(28,16,9,.05), 0 14px 30px -12px rgba(28,16,9,.22);
+  --rh-tight:2.75rem; --rh-normal:5rem; --rh-loose:8rem; --gutter:2rem;
+  /* Instrument display treatment (Phase 3): the family caps at 700, and 700 at
+     -0.022em reads as heavy as an 800 at a looser track. SPEC §3's blanket 800 is
+     superseded for this pairing, per FONT_PAIRINGS and the Phase 3 NOTES. */
+  --display-weight:700; --display-track:-0.022em; --display-lh:1.02;
+}
+/* 390 frame: fluid tokens drop to their mobile minima. */
+.frame.m{
+  --display-1:2.25rem; --display-2:2rem; --display-3:1.5rem; --lead:1.1875rem;
+  --rh-tight:1.75rem; --rh-normal:3rem; --rh-loose:4.5rem; --gutter:1.25rem;
+}
+
+*{box-sizing:border-box;}
+html{ -webkit-text-size-adjust:100%; }
+body{
+  margin:0; background:#2a2521; color:var(--ink);
+  font-family:var(--font); font-size:var(--body); line-height:1.55;
+}
+h1,h2,h3,p{margin:0;}
+img{display:block; max-width:100%;}
+a{color:inherit;}
+
+/* focus (SPEC §11): one global rule, incl. inside inverted sections. */
+:where(a,button,input,[tabindex]):focus-visible{
+  outline:3px solid var(--accent-text); outline-offset:3px;
+}
+.inverted :where(a,button,input):focus-visible{ outline-color:#9fd0e0; }
+
+/* ── page chrome of the mockup doc itself (not part of any specimen) ── */
+.docbar{
+  position:sticky; top:0; z-index:50; background:#17130f; color:#e9e2d8;
+  padding:.6rem var(--gutter); display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;
+  border-bottom:1px solid #3a332c; font-size:.8125rem;
+}
+.docbar strong{color:#fff; margin-right:.5rem;}
+.docbar a{color:#b9cdd4; text-decoration:none; padding:.2rem .5rem; border:1px solid #3a332c; border-radius:6px;}
+.docbar a:hover{background:#221c17; color:#fff;}
+.specimen{ padding:2.4rem var(--gutter) 1rem; }
+.specimen > .caption{
+  max-width:60rem; margin:0 auto 1.1rem; color:#e9e2d8;
+}
+.caption h2{ font-size:1.35rem; font-weight:700; letter-spacing:-0.01em; color:#fff;}
+.caption .meta{ font-size:.78rem; color:#a79f93; margin-top:.25rem; font-variant-numeric:tabular-nums;}
+.caption .meta code{ color:#cfc6b8; }
+.caption .settle{ font-size:.9rem; color:#cabfae; margin-top:.5rem; max-width:52rem;}
+.widths{ display:flex; gap:1.25rem; align-items:flex-start; overflow-x:auto; padding-bottom:1rem; justify-content:center; }
+.frame{
+  flex:0 0 auto; background:var(--bg); color:var(--ink);
+  border:1px solid #000; border-radius:10px; overflow:hidden;
+  container-type:inline-size; box-shadow:0 20px 40px -24px rgba(0,0,0,.6);
+}
+.frame.m{ width:390px; }
+.frame.d{ width:1280px; max-width:calc(100vw - 2*var(--gutter) - 390px - 1.25rem); }
+.frame .wlabel{
+  font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:#8a8478;
+  background:#f4efe8; padding:.3rem .6rem; border-bottom:1px solid var(--rule);
+  position:sticky; top:0;
+}
+@media (max-width:1400px){ .widths{ flex-direction:column; align-items:center; } .frame.d{ max-width:min(1280px, calc(100vw - 2*var(--gutter))); } }
+
+/* ───────────────────────── shared specimen vocabulary ───────────────────────── */
+.sec{ padding:var(--rh-normal) var(--gutter); }
+.sec.soft{ background:var(--bg-soft); }
+.sec.inverted{ background:var(--ink-panel); color:var(--on-ink); }
+.wrap{ max-width:72rem; margin:0 auto; }
+.display-1{ font-size:var(--display-1); font-weight:var(--display-weight); letter-spacing:var(--display-track); line-height:var(--display-lh); }
+.display-2{ font-size:var(--display-2); font-weight:var(--display-weight); letter-spacing:var(--display-track); line-height:1.05; }
+.display-3{ font-size:var(--display-3); font-weight:600; letter-spacing:-0.01em; line-height:1.15; }
+.card-title{ font-size:var(--card-title); font-weight:600; letter-spacing:-0.01em; }
+.lead{ font-size:var(--lead); color:var(--ink-soft); line-height:1.5; }
+.small{ font-size:var(--small); }
+.fine{ font-size:var(--fine); }
+.inkSoft{ color:var(--ink-soft); }
+.rule{ height:1px; background:var(--rule); border:0; }
+/* a neutral supporting line that REPLACES the old accent eyebrow (decision 10 + SPEC §3) */
+.kicker{ font-size:var(--small); font-weight:600; color:var(--ink-soft); }
+.inverted .kicker{ color:#c9bdb0; }
+
+/* buttons (SPEC §5): solid, 8px, weight 700 (instrument), 18px 22px, full-width mobile. */
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--font); font-weight:700; font-size:var(--body); border-radius:var(--radius-control);
+  padding:18px 22px; width:100%; border:2px solid transparent; cursor:pointer; text-decoration:none; }
+.btn-primary{ background:var(--accent); color:var(--accent-fg); }
+.btn-secondary{ background:transparent; color:var(--ink); border-color:var(--ink); }
+.btn-secondary:hover{ background:var(--ink); color:var(--on-ink); }
+@container (min-width:700px){ .btn{ width:auto; } }
+
+/* phone button (SPEC §4): shows the DIGITS at lead weight 700, assurance line under. */
+.phone{ display:inline-flex; flex-direction:column; gap:.1rem; text-decoration:none; }
+.phone .digits{ font-size:var(--lead); font-weight:700; letter-spacing:-0.01em; color:var(--ink); }
+.phone .assure{ font-size:var(--fine); color:var(--ink-soft); }
+.inverted .phone .digits{ color:var(--on-ink); } .inverted .phone .assure{ color:#c9bdb0; }
+
+/* review aggregate + proof grid (SPEC §7) */
+.stars{ color:var(--ink); font-weight:700; }
+.proof{ display:grid; grid-template-columns:1fr 1fr; gap:.4rem .9rem; }
+.proof li{ display:flex; gap:.5rem; align-items:flex-start; font-size:var(--small); list-style:none; }
+.proof .ic{ width:22px; height:22px; flex:0 0 22px; border:1px solid var(--rule); border-radius:6px; display:grid; place-items:center; font-size:12px; color:var(--ink-soft); background:var(--bg); }
+
+/* availability badge, the ONE place urgent is allowed */
+.badge-urgent{ display:inline-flex; align-items:center; gap:.4rem; font-size:var(--fine); font-weight:700;
+  color:var(--urgent); border:1px solid var(--urgent); border-radius:999px; padding:.25rem .6rem; }
+
+/* image with enforced ratio + house grade approximation (CSS filter is only an
+   approximation of Phase 11's sharp pipeline: modulate sat .88 bri 1.02 + linear 1.04,-6). */
+.ph{ background:#d9cfc1; overflow:hidden; }
+.graded img{ filter:saturate(.88) brightness(1.02) contrast(1.04); }
+.r-hero{ aspect-ratio:16/10; } .r-about{ aspect-ratio:4/5; } .r-service{ aspect-ratio:3/2; }
+.r-work{ aspect-ratio:3/2; } .r-avatar{ aspect-ratio:1/1; border-radius:999px; }
+.cover{ width:100%; height:100%; object-fit:cover; }
+
+.mlabel{ font-size:.68rem; letter-spacing:.06em; text-transform:uppercase; color:#b39; display:none; }
+.rh-tag{ font-size:.66rem; letter-spacing:.05em; text-transform:uppercase; color:#8a8478; border:1px dashed var(--rule); border-radius:4px; padding:.1rem .35rem; }
+
+/* hero form-led split (ADDENDUM specimen H) */
+.hero{ display:grid; gap:1.2rem; }
+@container (min-width:1000px){ .hero{ grid-template-columns:1.1fr .9fr; gap:2rem; align-items:start; } }
+.hero .formcard{ background:var(--bg); border:1px solid var(--rule); border-radius:var(--radius-panel); padding:1.2rem; box-shadow:var(--shadow-slab); }
+.hero .field{ display:grid; gap:.3rem; margin-bottom:.7rem; }
+.hero .field label{ font-size:var(--fine); font-weight:600; color:var(--ink-soft); }
+.hero .field input{ font-family:var(--font); font-size:var(--body); padding:12px 14px; border:1px solid var(--rule); border-radius:var(--radius-control); background:var(--bg); color:var(--ink); width:100%; }
+.callprimary{ display:inline-flex; align-items:center; background:var(--accent); color:var(--accent-fg); border-radius:var(--radius-control); padding:14px 20px; text-decoration:none; }
+.callprimary .d{ font-size:var(--lead); font-weight:700; letter-spacing:-0.01em; }
+.callprimary .a{ font-size:var(--fine); }
+
+/* 1. STICKY CALL BAR */
+.callbar{ position:sticky; bottom:0; background:var(--bg); border-top:1px solid var(--rule);
+  box-shadow:0 -10px 24px -16px rgba(28,16,9,.5); display:flex; align-items:center; gap:.75rem;
+  padding:.6rem var(--gutter); min-height:56px; }
+.callbar .cta{ margin-left:auto; }
+.callbar .call{ display:flex; flex-direction:column; }
+.callbar .call .digits{ font-size:var(--lead); font-weight:700; letter-spacing:-0.01em; }
+.callbar .call .assure{ font-size:var(--fine); color:var(--ink-soft); }
+.callbar .btn{ width:auto; padding:12px 18px; min-height:44px; }
+
+/* editorial-index (specimens 2, 8, 14), numbered rows on hairline rules. Numerals NEUTRAL. */
+.eindex .row{ display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:baseline;
+  padding:1.1rem 0; border-top:1px solid var(--rule); }
+.eindex .row:last-child{ border-bottom:1px solid var(--rule); }
+.eindex .num{ font-feature-settings:"tnum"; font-size:1rem; font-weight:700; color:var(--ink-soft); width:2.4ch; }
+.eindex .ttl{ font-size:var(--display-3); font-weight:600; letter-spacing:-0.01em; }
+.eindex .dsc{ color:var(--ink-soft); font-size:var(--small); margin-top:.2rem; }
+.eindex .reveal{ display:none; }
+@container (min-width:1000px){
+  .eindex .row{ grid-template-columns:auto minmax(0,1fr) 34%; }
+  .eindex .reveal{ display:block; align-self:stretch; min-height:7.5rem; }
+}
+
+/* stacked-panels (specimens 3, 9), full-width horizontal panels, height variation = hierarchy. */
+.spanels .panel{ border-top:1px solid var(--rule); padding:1.4rem 0; display:grid; gap:.3rem; }
+.spanels .panel.lg{ padding:2.4rem 0; }
+.spanels .panel:last-child{ border-bottom:1px solid var(--rule); }
+
+/* feature-rail (specimen 4) */
+.frail{ display:grid; gap:1rem; }
+@container (min-width:1000px){ .frail{ grid-template-columns:62% 1fr; align-items:start; } }
+.frail .rail{ display:grid; gap:.5rem; }
+.frail .rail .item{ padding:.8rem 1rem; border:1px solid var(--rule); border-radius:var(--radius-control); background:var(--bg); }
+.frail .rail .item.active{ border-color:var(--ink); border-width:2px; }
+
+/* horizontal-pin (specimen 5) + reduced-motion fallback rail */
+.pinwrap{ display:grid; gap:.8rem; }
+.pin-track{ display:flex; gap:1rem; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:.6rem; }
+.pin-track .card{ flex:0 0 78%; scroll-snap-align:start; }
+@container (min-width:1000px){ .pin-track .card{ flex-basis:34%; } }
+
+/* marquee (specimen 6), drag/scroll, NO autoplay; visible affordance */
+.marq{ display:flex; gap:1rem; overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:.8rem; cursor:grab; }
+.marq .q{ flex:0 0 80%; scroll-snap-align:start; border:1px solid var(--rule); border-radius:var(--radius-panel); padding:1.2rem; background:var(--bg); }
+@container (min-width:1000px){ .marq .q{ flex-basis:30%; } }
+.marq-aff{ display:flex; align-items:center; gap:.5rem; font-size:var(--fine); color:var(--ink-soft); margin-top:.4rem; }
+.marq-aff .track{ flex:1; height:3px; background:var(--rule); border-radius:2px; position:relative; }
+.marq-aff .track::after{ content:""; position:absolute; left:0; top:0; height:100%; width:32%; background:var(--ink-soft); border-radius:2px; }
+
+/* hero-first-grid (specimen 7) */
+.hfg{ display:grid; gap:.8rem; grid-template-columns:1fr; }
+@container (min-width:1000px){ .hfg{ grid-template-columns:repeat(3,1fr); grid-auto-rows:1fr; }
+  .hfg .cell:first-child{ grid-column:span 2; grid-row:span 2; } }
+.hfg .cell .ph{ aspect-ratio:3/2; border-radius:var(--radius-control); }
+
+/* inline-strip (specimen 10), 4 claims in ONE band, not 4 equal cards (decision 30a) */
+.strip{ display:grid; gap:1rem 1.6rem; }
+@container (min-width:700px){ .strip{ grid-template-columns:repeat(2,1fr); } }
+@container (min-width:1000px){ .strip{ grid-template-columns:auto 1px 1fr 1px 1fr 1px 1fr; align-items:center; } }
+.strip .claim{ display:grid; gap:.15rem; }
+.strip .claim .n{ font-size:var(--display-3); font-weight:700; letter-spacing:-0.01em; }
+.strip .vr{ display:none; } @container (min-width:1000px){ .strip .vr{ display:block; align-self:stretch; width:1px; background:var(--rule); } }
+.strip .lead-claim .k{ font-size:var(--small); color:var(--ink-soft); }
+
+/* count-up-centerpiece (specimen 11), big NEUTRAL figures, centred */
+.statsband{ display:grid; gap:1.4rem; text-align:center; }
+@container (min-width:700px){ .statsband{ grid-template-columns:repeat(4,1fr); } }
+.statsband .fig{ font-size:clamp(2.5rem,5vw,3.75rem); font-weight:700; letter-spacing:-0.02em; color:var(--ink); line-height:1; }
+.statsband .lbl{ font-size:var(--small); color:var(--ink-soft); margin-top:.4rem; }
+
+/* numbered-ledger (specimen 12), figures as ledger ROWS on rules, left aligned */
+.ledger .lrow{ display:grid; grid-template-columns:auto 1fr auto; gap:1rem; align-items:baseline;
+  padding:.9rem 0; border-top:1px solid var(--rule); }
+.ledger .lrow:last-child{ border-bottom:1px solid var(--rule); }
+.ledger .lnum{ font-feature-settings:"tnum"; color:var(--ink-soft); font-weight:700; width:2.4ch; }
+.ledger .lfig{ font-size:var(--display-3); font-weight:700; letter-spacing:-0.01em; font-variant-numeric:tabular-nums; }
+
+/* sticky-swap (specimen 13) */
+.sswap{ display:grid; gap:1rem; }
+@container (min-width:1000px){ .sswap{ grid-template-columns:40% 1fr; gap:2rem; align-items:start; }
+  .sswap .stick{ position:sticky; top:1rem; } }
+
+/* faq editorial-index (specimen 14) uses .eindex but no reveal column */
+.faqx .reveal{ display:none !important; }
+.faqx .row{ grid-template-columns:auto 1fr !important; }
+.faqx .ans{ color:var(--ink-soft); font-size:var(--small); margin-top:.35rem; max-width:48ch; }
+
+/* grade before/after strip */
+.grade2{ display:flex; gap:1rem; flex-wrap:wrap; }
+.grade2 figure{ margin:0; width:260px; }
+.grade2 figcaption{ font-size:var(--fine); color:#cabfae; margin-top:.3rem; }
+</style>
+</head>
+<body>
+
+<nav class="docbar">
+  <strong>Phase 5 · sections</strong>
+  <a href="#grade">grade</a>
+  <a href="#hhero">H hero+form</a>
+  <a href="#s1">1 call bar</a>
+  <a href="#s2">2 ServicesShowcase</a>
+  <a href="#s3">3 ServicesSpotlight</a>
+  <a href="#s4">4 WorkSpotlight</a>
+  <a href="#s5">5 WorkMasonry</a>
+  <a href="#s6">6 Marquee</a>
+  <a href="#s7">7 RecentJobsGrid</a>
+  <a href="#s8">8 DiffIndex</a>
+  <a href="#s9">9 DiffPanels</a>
+  <a href="#s10">10 DiffRail</a>
+  <a href="#s11">11 StatsBand</a>
+  <a href="#s12">12 StatsLedger</a>
+  <a href="#s13">13 AboutSticky</a>
+  <a href="#s14">14 FaqIndex</a>
+</nav>
+
+<!-- GRADE before/after (Deliverable 3 asks this live in the mockup file) -->
+<section class="specimen" id="grade">
+  <div class="caption">
+    <h2>House grade, before and after</h2>
+    <div class="meta">recipe: <code>modulate(sat .88, bri 1.02)</code> then <code>linear(1.04, -6)</code> · no tint (decision 55) · CSS filter here is an approximation of Phase 11's sharp pipeline</div>
+    <div class="settle">The grade is the mechanism decision 15 relies on to make mixed stock cohere. It cannot be judged in prose. Left is raw Unsplash; right is the house grade.</div>
+  </div>
+  <div class="grade2">
+    <figure><div class="ph r-hero"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=800&q=80" width="800" height="500" alt="HVAC technician servicing an outdoor system, ungraded"></div><figcaption>raw</figcaption></figure>
+    <figure class="graded"><div class="ph r-hero"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=800&q=80" width="800" height="500" alt="HVAC technician servicing an outdoor system, house grade"></div><figcaption>house grade</figcaption></figure>
+  </div>
+</section>
+
+<!-- H · HeroFormFocus (ADDENDUM to the plan's 14 specimens, added 2026-10-07 at user request) -->
+<section class="specimen" id="hhero">
+  <div class="caption">
+    <h2>H · HeroFormFocus (home hero, form-led)</h2>
+    <div class="meta">archetype <code>form-led-split</code> · <code>hero/HeroFormFocus.tsx</code> (already built, re-drawn in the new language) · Phase 5 ADDENDUM</div>
+    <div class="settle">The above-the-fold conversion moment. Phone is the PRIMARY action (SPEC §4: an accent button showing the digits plus an assurance line), the capture form is SECONDARY styling (ink-outline submit). Trust sits in the hero at every breakpoint (SPEC §7: stars, review count, locality, and the four-item proof grid). Nothing animates on load (SPEC §9). The hero image is eager and high priority (SPEC §10).</div>
+    <div class="settle" style="color:#b7c7cd"><strong>Lead wiring, verified against onboard.js lib/site-routes/contact.route.ts:</strong> the form posts to <code>/api/contact</code>. For this HVAC preset (plan growth) that is <code>LEAD_DELIVERY_MODE=callback</code>, so the route reads <code>data.phone</code> and calls Retell <code>create-phone-call</code> to dial the lead back; the field MUST be named <code>phone</code>. For a starter client the same form switches (leadMode=email) to collect <code>email</code>, and the route sends a Resend email to <code>LEAD_TO_EMAIL</code> with the lead's email as reply-to. Fields capped at 6 (research §3). Dependency: the shared leadMode-aware LeadForm island is Phase 6, not built yet.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <section class="sec" style="padding-block:var(--rh-tight)"><div class="wrap">
+        <div class="ph graded r-hero" style="border-radius:var(--radius-panel)"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=600&q=80" width="600" height="375" fetchpriority="high" loading="eager" alt="HVAC technician servicing an outdoor system (topical stock)"></div>
+        <span class="badge-urgent" style="margin-top:.9rem">● Open now, 24/7 emergency</span>
+        <h1 class="display-1" style="margin-top:.5rem">AC Repair &amp; Heating in [city, from intake]</h1>
+        <p class="small" style="margin-top:.5rem"><span class="stars">★★★★★</span> 4.9, [## reviews, from intake], [city, from intake]</p>
+        <a class="callprimary" href="tel:+15555550100" style="margin-top:.9rem"><span><span class="d">(555) 555-0100</span><br><span class="a">A person answers 24/7</span></span></a>
+        <ul class="proof" style="margin-top:.9rem; padding:0; list-style:none">
+          <li><span class="ic">✓</span><span>Licensed [# from intake] &amp; insured</span></li>
+          <li><span class="ic">✓</span><span>Same-day service</span></li>
+          <li><span class="ic">✓</span><span>Up-front flat pricing</span></li>
+          <li><span class="ic">✓</span><span>Workmanship warranty</span></li>
+        </ul>
+        <form class="formcard" style="margin-top:1rem" onsubmit="return false">
+          <p class="card-title">Prefer a callback?</p>
+          <p class="small inkSoft" style="margin:.2rem 0 .8rem">Leave your number and we call you right back.</p>
+          <div class="field"><label for="hm-name">Name</label><input id="hm-name" name="name" type="text" autocomplete="name"></div>
+          <div class="field"><label for="hm-phone">Phone</label><input id="hm-phone" name="phone" type="tel" autocomplete="tel"></div>
+          <button class="btn btn-secondary" type="submit">Request a callback</button>
+        </form>
+      </div></section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="sec" style="padding-block:var(--rh-normal)"><div class="wrap">
+        <div class="hero">
+          <div>
+            <span class="badge-urgent">● Open now, 24/7 emergency</span>
+            <h1 class="display-1" style="margin-top:.6rem; max-width:16ch">AC Repair &amp; Heating in [city, from intake]</h1>
+            <p class="lead" style="margin-top:.6rem; max-width:48ch">Same-day diagnostics, honest up-front pricing, every major brand. A person answers the phone, day or night.</p>
+            <p class="small" style="margin-top:.8rem"><span class="stars">★★★★★</span> 4.9, [## reviews, from intake], serving [city, from intake]</p>
+            <a class="callprimary" href="tel:+15555550100" style="margin-top:1rem"><span><span class="d">(555) 555-0100</span><br><span class="a">A person answers 24/7, average under 30 seconds</span></span></a>
+            <ul class="proof" style="margin-top:1.1rem; padding:0; list-style:none; max-width:34rem">
+              <li><span class="ic">✓</span><span>Licensed [# from intake] &amp; fully insured</span></li>
+              <li><span class="ic">✓</span><span>Same-day service on most repairs</span></li>
+              <li><span class="ic">✓</span><span>Up-front, flat pricing approved first</span></li>
+              <li><span class="ic">✓</span><span>Workmanship warranty in writing</span></li>
+            </ul>
+          </div>
+          <form class="formcard" onsubmit="return false">
+            <div class="ph graded r-hero" style="border-radius:var(--radius-control); margin-bottom:.9rem"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=600&q=80" width="600" height="375" fetchpriority="high" loading="eager" alt="HVAC technician servicing an outdoor system (topical stock)"></div>
+            <p class="card-title">Prefer a callback?</p>
+            <p class="small inkSoft" style="margin:.2rem 0 .9rem">Leave your name and number and we call you right back, usually within minutes.</p>
+            <div class="field"><label for="hd-name">Name</label><input id="hd-name" name="name" type="text" autocomplete="name"></div>
+            <div class="field"><label for="hd-phone">Phone</label><input id="hd-phone" name="phone" type="tel" autocomplete="tel"></div>
+            <button class="btn btn-secondary" type="submit" style="width:100%">Request a callback</button>
+            <p class="fine inkSoft" style="margin-top:.6rem">Posts <code>{ name, phone }</code> to <code>/api/contact</code>. No obligation.</p>
+          </form>
+        </div>
+      </div></section>
+    </div>
+  </div>
+</section>
+
+<!-- 1 · STICKY CALL BAR -->
+<section class="specimen" id="s1">
+  <div class="caption">
+    <h2>1 · Sticky call bar</h2>
+    <div class="meta">archetype <code>n/a</code> · builds <code>template/src/lib/StickyCallBar.tsx</code> · Phase 6</div>
+    <div class="settle">Decision 27: the most design-attended element on the site. Settles the digits at lead/700 (SPEC §4: digits, not the word "Call"), the assurance line at fine under it, the 56px min tap target, the upward slab shadow, the availability badge reading urgent, and how it sits over the footer's last row.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec inverted" style="padding-block:var(--rh-tight)"><div class="wrap"><p class="kicker">footer</p><p class="display-3" style="color:var(--on-ink)">Your HVAC Co.</p><p class="small" style="color:#c9bdb0; margin-top:.4rem">Licensed and insured. Serving [service area, from intake].</p></div></div>
+      <div class="callbar">
+        <a class="phone call" href="tel:+15555550100"><span class="digits">(555) 555-0100</span><span class="assure">A person answers 24/7</span></a>
+        <a class="btn btn-primary cta" href="#quote" style="width:auto;padding:12px 18px">Get a quote</a>
+      </div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec inverted" style="padding-block:var(--rh-tight)"><div class="wrap" style="display:flex;justify-content:space-between;align-items:center;gap:1rem"><div><p class="kicker">footer</p><p class="display-3" style="color:var(--on-ink)">Your HVAC Co.</p></div><p class="small" style="color:#c9bdb0">Licensed and insured. Serving [service area, from intake].</p></div></div>
+      <div class="callbar">
+        <span class="badge-urgent">● Open now · 24/7</span>
+        <a class="phone call" href="tel:+15555550100"><span class="digits">(555) 555-0100</span><span class="assure">A person answers 24/7, average under 30 seconds</span></a>
+        <a class="btn btn-primary cta" href="#quote" style="width:auto;padding:12px 18px">Get a free quote</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 · ServicesShowcase (editorial-index) -->
+<section class="specimen" id="s2">
+  <div class="caption">
+    <h2>2 · ServicesShowcase</h2>
+    <div class="meta">archetype <code>editorial-index</code> · builds <code>services/ServicesShowcase.tsx</code> · Phase 7</div>
+    <div class="settle">Numbered rows on hairline rules. Settles: numeral size and that numerals are NEUTRAL ink, not accent (decision 10); the rule weight; the hover image reveal geometry (desktop only); row height at 390 where there is no room for a reveal.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">Heating and cooling, done once and done right</h2>
+        <p class="lead" style="margin-top:.6rem">The full list. Tap any service for detail.</p>
+        <div class="eindex" style="margin-top:1.4rem">
+          <div class="row"><span class="num">01</span><div><div class="ttl">AC repair and installation</div><div class="dsc">Same-day diagnostics, up-front pricing, every major brand.</div></div></div>
+          <div class="row"><span class="num">02</span><div><div class="ttl">Furnace and heating</div><div class="dsc">Repair, replacement and safety inspection before the cold.</div></div></div>
+          <div class="row"><span class="num">03</span><div><div class="ttl">Heat pumps</div><div class="dsc">High-efficiency systems sized to your home, not a catalogue.</div></div></div>
+          <div class="row"><span class="num">04</span><div><div class="ttl">Maintenance plans</div><div class="dsc">Two visits a year, priority scheduling, no overtime charges.</div></div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2" style="max-width:20ch">Heating and cooling, done once and done right</h2>
+        <p class="lead" style="margin-top:.6rem">The full list. Hover a row to preview the work.</p>
+        <div class="eindex" style="margin-top:1.8rem">
+          <div class="row"><span class="num">01</span><div><div class="ttl">AC repair and installation</div><div class="dsc">Same-day diagnostics, up-front pricing, every major brand.</div></div><div class="reveal ph graded r-service"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="AC service call (topical stock)"></div></div>
+          <div class="row"><span class="num">02</span><div><div class="ttl">Furnace and heating</div><div class="dsc">Repair, replacement and safety inspection before the cold.</div></div><div class="reveal ph graded r-service"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="Furnace work (topical stock)"></div></div>
+          <div class="row"><span class="num">03</span><div><div class="ttl">Heat pumps</div><div class="dsc">High-efficiency systems sized to your home, not a catalogue.</div></div><div class="reveal ph graded r-service"><img class="cover" src="https://images.unsplash.com/photo-1698479603408-1a66a6d9e80f?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="Heat pump install (topical stock)"></div></div>
+          <div class="row"><span class="num">04</span><div><div class="ttl">Maintenance plans</div><div class="dsc">Two visits a year, priority scheduling, no overtime charges.</div></div><div class="reveal ph graded r-service"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="Maintenance visit (topical stock)"></div></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · ServicesSpotlight (stacked-panels) -->
+<section class="specimen" id="s3">
+  <div class="caption">
+    <h2>3 · ServicesSpotlight</h2>
+    <div class="meta">archetype <code>stacked-panels</code> · builds <code>services/ServicesSpotlight.tsx</code> · Phase 7</div>
+    <div class="settle">Full-width horizontal panels, one column. NO cursor glow (decision 28 cuts it, and it was this component's whole identity before). Settles how hierarchy comes from panel height variation plus display-3 against card-title, with no decoration doing that job.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">What we are known for</h2>
+        <div class="spanels" style="margin-top:1.2rem">
+          <div class="panel lg"><div class="display-3">Emergency AC and heat</div><p class="inkSoft small">No heat at 11pm is not a next-day problem. We run a real after-hours line and a person answers it.</p></div>
+          <div class="panel"><div class="card-title">System replacement</div><p class="inkSoft small">Honest sizing and a written quote before anything is pulled out.</p></div>
+          <div class="panel"><div class="card-title">Indoor air quality</div><p class="inkSoft small">Filtration and duct sealing for homes that never feel even.</p></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">What we are known for</h2>
+        <div class="spanels" style="margin-top:1.6rem">
+          <div class="panel lg" style="grid-template-columns:1fr 32%;display:grid;gap:1.5rem;align-items:center"><div><div class="display-3">Emergency AC and heat</div><p class="inkSoft">No heat at 11pm is not a next-day problem. We run a real after-hours line, a person answers it, and the truck is stocked for the common failures so most calls are fixed on the first visit.</p></div><div class="ph graded r-service" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="Emergency HVAC call (topical stock)"></div></div>
+          <div class="panel"><div class="card-title">System replacement</div><p class="inkSoft">Honest sizing and a written quote before anything is pulled out.</p></div>
+          <div class="panel"><div class="card-title">Indoor air quality</div><p class="inkSoft">Filtration and duct sealing for homes that never feel even.</p></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · WorkSpotlight (feature-rail) -->
+<section class="specimen" id="s4">
+  <div class="caption">
+    <h2>4 · WorkSpotlight</h2>
+    <div class="meta">archetype <code>feature-rail</code> · builds <code>work/WorkSpotlight.tsx</code> · Phase 7</div>
+    <div class="settle">Large feature panel plus a rail. Settles the feature-to-rail ratio, the active-item cue (INK, not accent), and the 390 fallback where a side rail cannot exist (it becomes a stacked list above the feature).</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">Recent work</h2>
+        <div class="rail" style="display:grid;gap:.5rem;margin:1rem 0">
+          <div class="item active" style="padding:.8rem 1rem;border:2px solid var(--ink);border-radius:var(--radius-control)"><strong>Full system replacement</strong><div class="fine inkSoft">Riverside · 2024</div></div>
+          <div class="item" style="padding:.8rem 1rem;border:1px solid var(--rule);border-radius:var(--radius-control)">Emergency furnace repair <span class="fine inkSoft">· Fontana</span></div>
+          <div class="item" style="padding:.8rem 1rem;border:1px solid var(--rule);border-radius:var(--radius-control)">Ductwork overhaul <span class="fine inkSoft">· Ontario</span></div>
+        </div>
+        <div class="ph graded r-work" style="border-radius:var(--radius-panel)"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=700&q=80" width="700" height="467" alt="Completed HVAC changeout (topical stock)"></div>
+        <p class="small inkSoft" style="margin-top:.6rem">3-ton heat pump changeout, complete in one day.</p>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">Recent work</h2>
+        <div class="frail" style="margin-top:1.4rem">
+          <div><div class="ph graded r-work" style="border-radius:var(--radius-panel)"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=900&q=80" width="900" height="600" alt="Completed HVAC changeout (topical stock)"></div><p class="card-title" style="margin-top:.8rem">Full system replacement, Riverside</p><p class="inkSoft">3-ton heat pump changeout, complete in one day, with the old unit hauled away and the thermostat re-taught before we left.</p></div>
+          <div class="rail">
+            <div class="item active"><strong>Full system replacement</strong><div class="fine inkSoft">Riverside · 2024</div></div>
+            <div class="item">Emergency furnace repair<div class="fine inkSoft">Fontana · 2024</div></div>
+            <div class="item">Ductwork overhaul<div class="fine inkSoft">Ontario · 2023</div></div>
+            <div class="item">Heat pump upgrade<div class="fine inkSoft">Rancho Cucamonga · 2023</div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · WorkMasonry (horizontal-pin) -->
+<section class="specimen" id="s5">
+  <div class="caption">
+    <h2>5 · WorkMasonry</h2>
+    <div class="meta">archetype <code>horizontal-pin</code> · builds <code>work/WorkMasonry.tsx</code> · Phase 7 · the ONLY <code>signature:true</code> in wave 1</div>
+    <div class="settle">Settles how many cards are visible mid-pin, the scroll-to-translate ratio, and critically the reduced-motion fallback, which is an overflow-x-auto scroll-snap rail. Both drawn: the 390 frame shows the fallback rail (also the still state); the 1280 shows the pinned set.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390 · reduced-motion / still = scroll-snap rail</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">On the job</h2>
+        <p class="small inkSoft" style="margin:.4rem 0 1rem">Swipe through recent calls.</p>
+        <div class="pin-track">
+          <div class="card"><div class="ph graded r-work" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=500&q=80" width="500" height="333" alt="AC service (topical stock)"></div><p class="small" style="margin-top:.4rem">Full system replacement</p></div>
+          <div class="card"><div class="ph graded r-work" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=500&q=80" width="500" height="333" alt="AC install (topical stock)"></div><p class="small" style="margin-top:.4rem">Ductwork overhaul</p></div>
+          <div class="card"><div class="ph graded r-work" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1698479603408-1a66a6d9e80f?auto=format&fit=crop&w=500&q=80" width="500" height="333" alt="Heat pump (topical stock)"></div><p class="small" style="margin-top:.4rem">Heat pump upgrade</p></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280 · pinned (mid-pin: ~3 cards visible)</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">On the job</h2>
+        <p class="small inkSoft" style="margin:.4rem 0 1rem">Scrolls horizontally while the section is pinned. Reduced-motion collapses this to the swipe rail at left.</p>
+        <div class="pin-track">
+          <div class="card"><div class="ph graded r-work" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="AC service (topical stock)"></div><p class="small" style="margin-top:.4rem">Full system replacement · Riverside</p></div>
+          <div class="card"><div class="ph graded r-work" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="Ductwork (topical stock)"></div><p class="small" style="margin-top:.4rem">Ductwork overhaul · Ontario</p></div>
+          <div class="card"><div class="ph graded r-work" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1698479603408-1a66a6d9e80f?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="Heat pump (topical stock)"></div><p class="small" style="margin-top:.4rem">Heat pump upgrade · Rancho Cucamonga</p></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · TestimonialsMarquee (marquee) -->
+<section class="specimen" id="s6">
+  <div class="caption">
+    <h2>6 · TestimonialsMarquee</h2>
+    <div class="meta">archetype <code>marquee</code> · builds <code>testimonials/TestimonialsMarquee.tsx</code> · Phase 7</div>
+    <div class="settle">Drag and scroll driven, NO autoplay (SPEC §9 survives decision 21). Settles the visible scroll affordance, because a rail with no affordance that also does not autoplay looks broken. The affordance is the scrollbar-style progress track under the row.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">What neighbors say</h2>
+        <div class="marq" style="margin-top:1rem">
+          <div class="q"><p>"They came out the same afternoon our AC died in July and had us cool again by dinner."</p><p class="small inkSoft" style="margin-top:.6rem">Jennifer T. · Riverside</p></div>
+          <div class="q"><p>"Honest about what needed fixing and what did not. Rare."</p><p class="small inkSoft" style="margin-top:.6rem">Frank C. · Fontana</p></div>
+        </div>
+        <div class="marq-aff"><span>drag</span><span class="track"></span></div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">What neighbors say</h2>
+        <div class="marq" style="margin-top:1.2rem">
+          <div class="q"><p>"They came out the same afternoon our AC died in July and had us cool again by dinner. The tech explained the repair instead of just handing me a bill."</p><p class="small inkSoft" style="margin-top:.6rem">Jennifer T. · Riverside</p></div>
+          <div class="q"><p>"Honest about what needed fixing and what did not. Rare in this trade."</p><p class="small inkSoft" style="margin-top:.6rem">Frank C. · Fontana</p></div>
+          <div class="q"><p>"Quoted a fair price for a new furnace and stuck to it to the dollar."</p><p class="small inkSoft" style="margin-top:.6rem">Susan H. · Ontario</p></div>
+        </div>
+        <div class="marq-aff"><span>drag or scroll</span><span class="track"></span><span>1 / 3</span></div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · RecentJobsGrid recomposed (hero-first-grid) -->
+<section class="specimen" id="s7">
+  <div class="caption">
+    <h2>7 · RecentJobsGrid, recomposed</h2>
+    <div class="meta">archetype <code>hero-first-grid</code> · builds <code>work/RecentJobsGrid.tsx</code> · Phase 7</div>
+    <div class="settle">Settles the first cell spanning two rows and two columns, how it degrades to one column at 390, and what happens with four jobs versus nine (here: five, so the big cell plus four small, the grid simply reflowing).</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">Recent jobs</h2>
+        <div class="hfg" style="margin-top:1rem">
+          <div class="cell"><div class="ph graded" style="aspect-ratio:3/2;border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="System changeout (topical stock)"></div><p class="small" style="margin-top:.35rem">Full system replacement · Riverside</p></div>
+          <div class="cell"><div class="ph graded" style="aspect-ratio:3/2;border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Furnace repair (topical stock)"></div><p class="fine" style="margin-top:.3rem">Furnace repair · Fontana</p></div>
+          <div class="cell"><div class="ph graded" style="aspect-ratio:3/2;border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Ductwork (topical stock)"></div><p class="fine" style="margin-top:.3rem">Ductwork · Ontario</p></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">Recent jobs</h2>
+        <div class="hfg" style="margin-top:1.4rem">
+          <div class="cell"><div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=900&q=80" width="900" height="600" alt="System changeout (topical stock)"></div><p class="card-title" style="margin-top:.5rem">Full system replacement · Riverside</p></div>
+          <div class="cell"><div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Furnace repair (topical stock)"></div><p class="fine" style="margin-top:.3rem">Furnace repair · Fontana</p></div>
+          <div class="cell"><div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Ductwork (topical stock)"></div><p class="fine" style="margin-top:.3rem">Ductwork · Ontario</p></div>
+          <div class="cell"><div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1698479603408-1a66a6d9e80f?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Heat pump (topical stock)"></div><p class="fine" style="margin-top:.3rem">Heat pump · Rancho Cucamonga</p></div>
+          <div class="cell"><div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Maintenance (topical stock)"></div><p class="fine" style="margin-top:.3rem">Maintenance · Chino</p></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · DifferentiatorsIndex (editorial-index, DIFFERENT from 2) -->
+<section class="specimen" id="s8">
+  <div class="caption">
+    <h2>8 · DifferentiatorsIndex</h2>
+    <div class="meta">archetype <code>editorial-index</code> · builds <code>differentiators/DifferentiatorsIndex.tsx</code> · Phase 8 · reads <code>about.pillars</code></div>
+    <div class="settle">Shares an archetype with specimen 2 and must read as a DIFFERENT structure: no image-reveal column, a short claim+evidence pair per row instead of a service title+description, and a two-up grid of rows on desktop rather than a single tall column. The sameness is the risk (gate question 3); the fix is here.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">Why homeowners call us back</h2>
+        <div class="eindex faqx" style="margin-top:1.2rem">
+          <div class="row"><span class="num">01</span><div><div class="card-title">Fully insured, license [# from intake]</div><p class="ans">Posted on every truck and on the quote, not buried in the footer.</p></div></div>
+          <div class="row"><span class="num">02</span><div><div class="card-title">A person answers, 24/7</div><p class="ans">Average answer time under 30 seconds, no phone tree.</p></div></div>
+          <div class="row"><span class="num">03</span><div><div class="card-title">Up-front, flat pricing</div><p class="ans">You approve the number before any work starts. No overtime surprises.</p></div></div>
+          <div class="row"><span class="num">04</span><div><div class="card-title">[Years, from intake] years local</div><p class="ans">Same owner, same crew, serving [service area, from intake].</p></div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2" style="max-width:18ch">Why homeowners call us back</h2>
+        <div class="eindex faqx" style="margin-top:1.6rem;display:grid;grid-template-columns:1fr 1fr;gap:0 3rem">
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">01</span><div><div class="card-title">Fully insured, license [# from intake]</div><p class="ans">Posted on every truck and on the quote, not buried in the footer.</p></div></div>
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">02</span><div><div class="card-title">A person answers, 24/7</div><p class="ans">Average answer time under 30 seconds, no phone tree.</p></div></div>
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">03</span><div><div class="card-title">Up-front, flat pricing</div><p class="ans">You approve the number before any work starts.</p></div></div>
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">04</span><div><div class="card-title">[Years, from intake] years local</div><p class="ans">Same owner, same crew, serving [service area, from intake].</p></div></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 · DifferentiatorsPanels (stacked-panels, DIFFERENT from 3) -->
+<section class="specimen" id="s9">
+  <div class="caption">
+    <h2>9 · DifferentiatorsPanels</h2>
+    <div class="meta">archetype <code>stacked-panels</code> · builds <code>differentiators/DifferentiatorsPanels.tsx</code> · Phase 8</div>
+    <div class="settle">Shares <code>stacked-panels</code> with specimen 3 and must differ: here every panel is the SAME height (a claim ledger, not a hierarchy of features), the lead element is the claim phrase at display-3 with the evidence as a quiet right-aligned stat, and there is no image. Equal height is the deliberate contrast to specimen 3's height-variation hierarchy.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">The difference, stated plainly</h2>
+        <div class="spanels" style="margin-top:1.2rem">
+          <div class="panel" style="display:flex;justify-content:space-between;gap:1rem;align-items:baseline"><span class="display-3">Same-day service</span><span class="small inkSoft">most calls</span></div>
+          <div class="panel" style="display:flex;justify-content:space-between;gap:1rem;align-items:baseline"><span class="display-3">Under 30s answer</span><span class="small inkSoft">live, 24/7</span></div>
+          <div class="panel" style="display:flex;justify-content:space-between;gap:1rem;align-items:baseline"><span class="display-3">Flat quoted price</span><span class="small inkSoft">approved first</span></div>
+          <div class="panel" style="display:flex;justify-content:space-between;gap:1rem;align-items:baseline"><span class="display-3">Workmanship warranty</span><span class="small inkSoft">[term, intake]</span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec soft"><div class="wrap">
+        <h2 class="display-2">The difference, stated plainly</h2>
+        <div class="spanels" style="margin-top:1.6rem">
+          <div class="panel" style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:baseline"><span class="display-3">Same-day service on most calls</span><span class="small inkSoft">booked before noon</span></div>
+          <div class="panel" style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:baseline"><span class="display-3">A live person answers in under 30 seconds</span><span class="small inkSoft">24/7, no phone tree</span></div>
+          <div class="panel" style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:baseline"><span class="display-3">Flat price, approved before work starts</span><span class="small inkSoft">no overtime surprises</span></div>
+          <div class="panel" style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:baseline"><span class="display-3">Workmanship warranty in writing</span><span class="small inkSoft">[term, from intake]</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · DifferentiatorsRail (inline-strip) -->
+<section class="specimen" id="s10">
+  <div class="caption">
+    <h2>10 · DifferentiatorsRail</h2>
+    <div class="meta">archetype <code>inline-strip</code> · builds <code>differentiators/DifferentiatorsRail.tsx</code> · Phase 8</div>
+    <div class="settle">The high-on-the-page differentiator strip research §3 says recurs in nearly every teardown. Settles how it carries four claims in ONE band without becoming four equal icon cards (decision 30a): a lead label plus three claims divided by vertical hairlines, numerals/figures neutral, no icon tiles.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec" style="padding-block:var(--rh-tight)"><div class="wrap">
+        <div class="strip">
+          <div class="lead-claim"><span class="k">Why us</span></div>
+          <div class="claim"><span class="n">24/7</span><span class="small inkSoft">live answer</span></div>
+          <div class="claim"><span class="n">Same day</span><span class="small inkSoft">most repairs</span></div>
+          <div class="claim"><span class="n">[##] yrs</span><span class="small inkSoft">local, insured</span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec" style="padding-block:var(--rh-tight)"><div class="wrap">
+        <div class="strip">
+          <div class="lead-claim"><span class="k">Why homeowners<br>choose us</span></div>
+          <span class="vr"></span>
+          <div class="claim"><span class="n">24/7</span><span class="small inkSoft">a person answers, under 30s</span></div>
+          <span class="vr"></span>
+          <div class="claim"><span class="n">Same day</span><span class="small inkSoft">on most repairs</span></div>
+          <span class="vr"></span>
+          <div class="claim"><span class="n">[##] years</span><span class="small inkSoft">local, licensed and insured</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 · StatsBand (count-up-centerpiece) -->
+<section class="specimen" id="s11">
+  <div class="caption">
+    <h2>11 · StatsBand</h2>
+    <div class="meta">archetype <code>count-up-centerpiece</code> · builds <code>stats/StatsBand.tsx</code> · Phase 8 · <code>signature:true</code> · reads <code>about.stats</code></div>
+    <div class="settle">Settles the figure size, that figures are NEUTRAL (decision 10), and the still state, which renders the final value immediately. This is the one component §9 lets count up (amendment, decision 18), because it sits below the fold. Centred, four across.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390 · still state = final value</div>
+      <div class="sec soft"><div class="wrap"><div class="statsband">
+        <div><div class="fig">2,500+</div><div class="lbl">systems serviced</div></div>
+        <div><div class="fig">4.9★</div><div class="lbl">[source, from intake] rating</div></div>
+        <div><div class="fig">&lt;30s</div><div class="lbl">average answer time</div></div>
+        <div><div class="fig">[##]</div><div class="lbl">years in [city, intake]</div></div>
+      </div></div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec soft"><div class="wrap"><div class="statsband">
+        <div><div class="fig">2,500+</div><div class="lbl">systems serviced</div></div>
+        <div><div class="fig">4.9★</div><div class="lbl">[source, from intake] rating</div></div>
+        <div><div class="fig">&lt;30s</div><div class="lbl">average answer time</div></div>
+        <div><div class="fig">[##]</div><div class="lbl">years serving [city, from intake]</div></div>
+      </div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 · StatsLedger (numbered-ledger) -->
+<section class="specimen" id="s12">
+  <div class="caption">
+    <h2>12 · StatsLedger</h2>
+    <div class="meta">archetype <code>numbered-ledger</code> · builds <code>stats/StatsLedger.tsx</code> · Phase 8</div>
+    <div class="settle">Settles how figures-as-a-ledger-on-rules differs from specimen 11 STRUCTURALLY, not decoratively: left-aligned rows on hairline rules with the figure at the right, read top to bottom like an account, versus specimen 11's centred four-across band. Same data, opposite structure.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">By the numbers</h2>
+        <div class="ledger" style="margin-top:1rem">
+          <div class="lrow"><span class="lnum">01</span><span>Systems serviced</span><span class="lfig">2,500+</span></div>
+          <div class="lrow"><span class="lnum">02</span><span>Customer rating</span><span class="lfig">4.9★</span></div>
+          <div class="lrow"><span class="lnum">03</span><span>Average answer time</span><span class="lfig">&lt;30s</span></div>
+          <div class="lrow"><span class="lnum">04</span><span>Years in [city, intake]</span><span class="lfig">[##]</span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec"><div class="wrap" style="max-width:48rem">
+        <h2 class="display-2">By the numbers</h2>
+        <div class="ledger" style="margin-top:1.4rem">
+          <div class="lrow"><span class="lnum">01</span><span>Systems serviced since [year, from intake]</span><span class="lfig">2,500+</span></div>
+          <div class="lrow"><span class="lnum">02</span><span>Customer rating, [source, from intake]</span><span class="lfig">4.9★</span></div>
+          <div class="lrow"><span class="lnum">03</span><span>Average answer time, live line</span><span class="lfig">&lt;30s</span></div>
+          <div class="lrow"><span class="lnum">04</span><span>Years serving [city, from intake]</span><span class="lfig">[##]</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 · AboutSticky (sticky-swap) -->
+<section class="specimen" id="s13">
+  <div class="caption">
+    <h2>13 · AboutSticky</h2>
+    <div class="meta">archetype <code>sticky-swap</code> · builds <code>about/AboutSticky.tsx</code> · Phase 8</div>
+    <div class="settle">Settles the sticky panel's offset and its 390 collapse. On desktop the left panel pins while the story paragraphs scroll past; at 390 it is a plain stack, the image first, with no sticky behavior (SPEC §8: desktop may only add room, never meaning).</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390 · collapses to a stack</div>
+      <div class="sec soft"><div class="wrap">
+        <div class="ph graded r-about" style="border-radius:var(--radius-panel);max-width:70%"><img class="cover" src="https://images.unsplash.com/photo-1698479603408-1a66a6d9e80f?auto=format&fit=crop&w=500&q=80" width="500" height="625" alt="The team on the job (topical stock)"></div>
+        <h2 class="display-2" style="margin-top:1rem">Local since [year, from intake]</h2>
+        <p class="inkSoft" style="margin-top:.6rem">We are a family-run shop in [city, from intake]. The owner still runs calls.</p>
+        <p class="inkSoft" style="margin-top:.6rem">Every tech is background-checked and badged, and we clean up before we leave.</p>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280 · left panel pins</div>
+      <div class="sec soft"><div class="wrap">
+        <div class="sswap">
+          <div class="stick"><div class="ph graded r-about" style="border-radius:var(--radius-panel)"><img class="cover" src="https://images.unsplash.com/photo-1698479603408-1a66a6d9e80f?auto=format&fit=crop&w=600&q=80" width="600" height="750" alt="The team on the job (topical stock)"></div></div>
+          <div>
+            <h2 class="display-2">Local since [year, from intake]</h2>
+            <p class="inkSoft" style="margin-top:.8rem">We are a family-run shop in [city, from intake]. The owner still runs calls, which is why the person who quotes your job is often the person who does it.</p>
+            <p class="inkSoft" style="margin-top:.8rem">Every technician is background-checked and badged. We lay down floor protection, we clean up before we leave, and we text you a photo of the finished work.</p>
+            <p class="inkSoft" style="margin-top:.8rem">We service every major brand and we carry the common failure parts on the truck, so most repairs are one visit, not two.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 14 · FaqIndex (editorial-index, third use, third category) -->
+<section class="specimen" id="s14">
+  <div class="caption">
+    <h2>14 · FaqIndex</h2>
+    <div class="meta">archetype <code>editorial-index</code> · builds <code>faq/FaqIndex.tsx</code> · Phase 8</div>
+    <div class="settle">Third use of <code>editorial-index</code>, in a third category. Settles a question index with no media reveal: the row is the question at card-title weight with the answer directly beneath, no numerals competing with specimen 2's service numerals, so the shared archetype reads as a third distinct thing.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <div class="sec"><div class="wrap">
+        <h2 class="display-2">Questions, answered</h2>
+        <div class="eindex faqx" style="margin-top:1.1rem">
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">Do you charge for a diagnostic?</div><p class="ans">The diagnostic fee is flat and is credited to the repair if you book it with us.</p></div></div>
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">How fast can you get here?</div><p class="ans">Most repair calls are same-day. Emergencies are prioritised 24/7.</p></div></div>
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">Do you service my brand?</div><p class="ans">We service every major residential brand and carry common parts on the truck.</p></div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <div class="sec"><div class="wrap" style="max-width:52rem">
+        <h2 class="display-2">Questions, answered</h2>
+        <div class="eindex faqx" style="margin-top:1.4rem">
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">Do you charge for a diagnostic?</div><p class="ans">The diagnostic fee is flat and is credited to the repair if you book it with us. You approve any further work before it starts.</p></div></div>
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">How fast can you get here?</div><p class="ans">Most repair calls are same-day. Emergencies are prioritised 24/7, and a live person answers the phone in under 30 seconds.</p></div></div>
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">Do you service my brand?</div><p class="ans">We service every major residential brand and carry the common failure parts on the truck, so most repairs are finished on the first visit.</p></div></div>
+          <div class="row"><span class="num" aria-hidden="true">·</span><div><div class="card-title">Are you licensed and insured?</div><p class="ans">Yes, license [# from intake], fully insured, posted on the quote and on every truck.</p></div></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HVAC foundation mockups, subpages (Phase 5, Deliverable 2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Same TOKEN LAYER as mockups-sections.html. Fluid tokens overridden to clamp
+   endpoints per frame (.m = mobile min, .d = desktop max). Accent #16556A and
+   derived tokens from VERTICAL-LANGUAGE-hvac.md. */
+:root{
+  --accent:#16556A; --accent-fg:#FFFFFF; --accent-text:#16556A; --urgent:#B3251A;
+  --bg:#FAF7F2; --bg-soft:#F1EBE2; --ink:#1A1512; --ink-soft:#584E45; --rule:#DFD6C9;
+  --ink-panel:#1A1512; --on-ink:#FBF8F4;
+  --font:'Instrument Sans', system-ui, sans-serif;
+  --display-1:3.625rem; --display-2:2.625rem; --display-3:1.75rem;
+  --card-title:1.3125rem; --lead:1.3125rem; --body:1.0625rem; --small:.9375rem; --fine:.8125rem;
+  --radius-control:8px; --radius-panel:14px;
+  --shadow-slab:0 1px 2px rgba(28,16,9,.05), 0 14px 30px -12px rgba(28,16,9,.22);
+  --rh-bleed:0rem; --rh-tight:2.75rem; --rh-normal:5rem; --rh-loose:8rem; --gutter:2rem;
+  --display-weight:700; --display-track:-0.022em; --display-lh:1.02;
+}
+.frame.m{ --display-1:2.25rem; --display-2:2rem; --display-3:1.5rem; --lead:1.1875rem;
+  --rh-tight:1.75rem; --rh-normal:3rem; --rh-loose:4.5rem; --gutter:1.25rem; }
+
+*{box-sizing:border-box;}
+body{ margin:0; background:#2a2521; color:var(--ink); font-family:var(--font); font-size:var(--body); line-height:1.55; }
+h1,h2,h3,p{margin:0;} img{display:block;max-width:100%;} a{color:inherit;}
+:where(a,button,input,[tabindex]):focus-visible{ outline:3px solid var(--accent-text); outline-offset:3px; }
+.inverted :where(a,button,input):focus-visible{ outline-color:#9fd0e0; }
+
+.docbar{ position:sticky; top:0; z-index:50; background:#17130f; color:#e9e2d8; padding:.6rem 2rem;
+  display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; border-bottom:1px solid #3a332c; font-size:.8125rem; }
+.docbar strong{color:#fff; margin-right:.5rem;}
+.docbar a{color:#b9cdd4; text-decoration:none; padding:.2rem .5rem; border:1px solid #3a332c; border-radius:6px;}
+.docbar a:hover{background:#221c17;color:#fff;}
+.specimen{ padding:2.4rem 2rem 1rem; }
+.specimen > .caption{ max-width:60rem; margin:0 auto 1.1rem; color:#e9e2d8; }
+.caption h2{ font-size:1.35rem; font-weight:700; letter-spacing:-0.01em; color:#fff;}
+.caption .meta{ font-size:.78rem; color:#a79f93; margin-top:.25rem;}
+.caption .meta code{ color:#cfc6b8; }
+.caption .settle{ font-size:.9rem; color:#cabfae; margin-top:.5rem; max-width:52rem;}
+.widths{ display:flex; gap:1.25rem; align-items:flex-start; overflow-x:auto; padding-bottom:1rem; justify-content:center; }
+.frame{ flex:0 0 auto; background:var(--bg); color:var(--ink); border:1px solid #000; border-radius:10px; overflow:hidden; container-type:inline-size; box-shadow:0 20px 40px -24px rgba(0,0,0,.6); }
+.frame.m{ width:390px; } .frame.d{ width:1280px; max-width:calc(100vw - 2rem - 390px - 1.25rem); }
+.frame .wlabel{ font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:#8a8478; background:#f4efe8; padding:.3rem .6rem; border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:2;}
+@media (max-width:1400px){ .widths{ flex-direction:column; align-items:center; } .frame.d{ max-width:min(1280px, calc(100vw - 2rem)); } }
+
+.wrap{ max-width:72rem; margin:0 auto; padding-inline:var(--gutter); }
+.display-1{ font-size:var(--display-1); font-weight:var(--display-weight); letter-spacing:var(--display-track); line-height:var(--display-lh); }
+.display-2{ font-size:var(--display-2); font-weight:var(--display-weight); letter-spacing:var(--display-track); line-height:1.05; }
+.display-3{ font-size:var(--display-3); font-weight:600; letter-spacing:-0.01em; line-height:1.15; }
+.card-title{ font-size:var(--card-title); font-weight:600; letter-spacing:-0.01em; }
+.lead{ font-size:var(--lead); color:var(--ink-soft); line-height:1.5; }
+.small{ font-size:var(--small); } .fine{ font-size:var(--fine); } .inkSoft{ color:var(--ink-soft); }
+.kicker{ font-size:var(--small); font-weight:600; color:var(--ink-soft); }
+.inverted .kicker{ color:#c9bdb0; }
+
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5rem; font-family:var(--font); font-weight:700; font-size:var(--body); border-radius:var(--radius-control); padding:18px 22px; width:100%; border:2px solid transparent; text-decoration:none; cursor:pointer;}
+.btn-primary{ background:var(--accent); color:var(--accent-fg);}
+.btn-secondary{ background:transparent; color:var(--ink); border-color:var(--ink);} .btn-secondary:hover{ background:var(--ink); color:var(--on-ink);}
+@container (min-width:700px){ .btn{ width:auto; } }
+.phone{ display:inline-flex; flex-direction:column; text-decoration:none;}
+.phone .digits{ font-size:var(--lead); font-weight:700; letter-spacing:-0.01em;} .phone .assure{ font-size:var(--fine); color:var(--ink-soft);}
+.inverted .phone .digits{color:var(--on-ink);} .inverted .phone .assure{color:#c9bdb0;}
+.badge-urgent{ display:inline-flex; align-items:center; gap:.4rem; font-size:var(--fine); font-weight:700; color:var(--urgent); border:1px solid var(--urgent); border-radius:999px; padding:.25rem .6rem;}
+.ph{ background:#d9cfc1; overflow:hidden;} .graded img{ filter:saturate(.88) brightness(1.02) contrast(1.04);} .cover{ width:100%; height:100%; object-fit:cover;}
+.r-hero{aspect-ratio:16/10;} .r-service{aspect-ratio:3/2;}
+
+/* rhythm utilities + the visible margin tag the plan asks for on specimens 5 and 6 */
+.rh-bleed{ padding-block:var(--rh-bleed);} .rh-tight{ padding-block:var(--rh-tight);} .rh-normal{ padding-block:var(--rh-normal);} .rh-loose{ padding-block:var(--rh-loose);}
+.band{ position:relative;}
+.band.soft{ background:var(--bg-soft);} .band.inverted{ background:var(--ink-panel); color:var(--on-ink);}
+.band > .rh-tag{ position:absolute; top:.4rem; left:.4rem; font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:#b39! important; background:rgba(255,255,255,.7); border:1px dashed #b88; border-radius:4px; padding:.05rem .3rem;}
+.band.inverted > .rh-tag{ background:rgba(0,0,0,.35); color:#e2a; border-color:#a66;}
+
+/* page headers */
+.ph-simple{ border-bottom:1px solid var(--rule); background:var(--bg-soft);}
+.ph-simple .eyebrow{ font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.14em; color:var(--accent-text);}
+.ph-editorial .idx{ font-feature-settings:"tnum"; font-size:var(--small); font-weight:700; color:var(--ink-soft);}
+.ph-overlap{ position:relative; color:var(--on-ink);}
+.ph-overlap .ph{ position:absolute; inset:0;} .ph-overlap .scrim{ position:absolute; inset:0; background:rgba(26,21,18,.55);}
+.ph-overlap .inner{ position:relative; }
+.ph-minimal{ display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap; border-bottom:1px solid var(--rule);}
+
+/* services accordion */
+.acc .ai{ border-top:1px solid var(--rule); padding:1rem 0;} .acc .ai:last-child{ border-bottom:1px solid var(--rule);}
+.acc .q{ display:flex; justify-content:space-between; gap:1rem; align-items:center; font-size:var(--card-title); font-weight:600;}
+.acc .a{ color:var(--ink-soft); font-size:var(--small); margin-top:.5rem; max-width:60ch;}
+/* before/after */
+.ba{ display:grid; gap:.6rem;} @container (min-width:700px){ .ba{ grid-template-columns:1fr 1fr;} }
+.ba figcaption{ font-size:var(--fine); color:var(--ink-soft); margin-top:.3rem;}
+/* faq sticky aside */
+.fsa{ display:grid; gap:1rem;} @container (min-width:1000px){ .fsa{ grid-template-columns:34% 1fr; gap:2rem; align-items:start;} .fsa .stick{ position:sticky; top:1rem;} }
+/* eindex (differentiators index) */
+.eindex .row{ display:grid; grid-template-columns:auto 1fr; gap:1rem; padding:1rem 0; border-top:1px solid var(--rule);} .eindex .row:last-child{ border-bottom:1px solid var(--rule);}
+.eindex .num{ font-feature-settings:"tnum"; font-weight:700; color:var(--ink-soft); width:2.4ch;}
+.eindex .ans{ color:var(--ink-soft); font-size:var(--small); margin-top:.3rem;}
+@container (min-width:1000px){ .eindex.two{ grid-template-columns:1fr 1fr; gap:0 3rem; display:grid;} }
+/* testimonials grid */
+.tg{ display:grid; gap:1rem;} @container (min-width:700px){ .tg{ grid-template-columns:1fr 1fr;} } @container (min-width:1000px){ .tg{ grid-template-columns:repeat(3,1fr);} }
+.tg .q{ border:1px solid var(--rule); border-radius:var(--radius-panel); padding:1.1rem; background:var(--bg);}
+/* service area map+list */
+.sa{ display:grid; gap:1rem;} @container (min-width:1000px){ .sa{ grid-template-columns:1fr 1fr; gap:2rem; align-items:center;} }
+.sa .map{ aspect-ratio:16/10; background:repeating-linear-gradient(45deg,#e9e2d6,#e9e2d6 10px,#e3dace 10px,#e3dace 20px); border-radius:var(--radius-panel); display:grid; place-items:center; color:var(--ink-soft); font-size:var(--small);}
+.sa .towns{ columns:2; font-size:var(--small);} .sa .towns span{ display:block; padding:.15rem 0;}
+/* contact inline strip */
+.cis{ display:grid; gap:1rem;} @container (min-width:1000px){ .cis{ grid-template-columns:1fr auto; align-items:center; gap:2rem;} }
+</style>
+</head>
+<body>
+
+<nav class="docbar">
+  <strong>Phase 5 · subpages</strong>
+  <a href="#h1">1 Simple (baseline)</a>
+  <a href="#h2">2 Editorial</a>
+  <a href="#h3">3 Overlap</a>
+  <a href="#h4">4 Minimal</a>
+  <a href="#p5">5 service-standard page</a>
+  <a href="#p6">6 service-proof page</a>
+  <span style="color:#a79f93">· all headers share {eyebrow, title, sub, cta}</span>
+</nav>
+
+<!-- 1 · PageHeaderSimple (baseline, reproduced honestly from the shipped component) -->
+<section class="specimen" id="h1">
+  <div class="caption">
+    <h2>1 · PageHeaderSimple, as it ships today</h2>
+    <div class="meta">archetype <code>centered-statement</code> · <code>pageHeader/PageHeaderSimple.tsx</code> · the baseline the others differ from</div>
+    <div class="settle">Reproduced honestly from the current component, including its accent uppercase eyebrow at tracking .14em, which decisions 10 and SPEC §3 would now cut. This is here so the three new archetypes have something to differ from, not as an endorsement.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <section class="ph-simple"><div class="wrap" style="padding-block:var(--rh-tight)">
+        <p class="eyebrow">Services</p>
+        <h1 class="display-1" style="margin-top:.5rem">AC Repair in [city, from intake]</h1>
+        <p class="lead" style="margin-top:.6rem">Same-day diagnostics and honest, up-front pricing on every major brand.</p>
+        <a class="btn btn-primary" style="margin-top:1rem" href="#quote">Get a free quote</a>
+      </div></section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="ph-simple"><div class="wrap" style="padding-block:var(--rh-normal)">
+        <p class="eyebrow">Services</p>
+        <h1 class="display-1" style="margin-top:.5rem">AC Repair in [city, from intake]</h1>
+        <p class="lead" style="margin-top:.6rem; max-width:52ch">Same-day diagnostics and honest, up-front pricing on every major brand.</p>
+        <a class="btn btn-primary" style="margin-top:1.2rem" href="#quote">Get a free quote</a>
+      </div></section>
+    </div>
+  </div>
+</section>
+
+<!-- 2 · PageHeaderEditorial (editorial-index) -->
+<section class="specimen" id="h2">
+  <div class="caption">
+    <h2>2 · PageHeaderEditorial</h2>
+    <div class="meta">archetype <code>editorial-index</code> · <code>pageHeader/PageHeaderEditorial.tsx</code></div>
+    <div class="settle">The service named as an indexed entry, with a neutral numeral and a hairline under the title. Eyebrow carried by a neutral kicker, not accent (decision 10). Same data shape as the others.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <section class="ph-editorial"><div class="wrap" style="padding-block:var(--rh-tight)">
+        <div style="display:flex; gap:.6rem; align-items:baseline"><span class="idx">S/02</span><span class="kicker">Services</span></div>
+        <h1 class="display-1" style="margin-top:.5rem">Furnace &amp; Heating in [city]</h1>
+        <hr style="border:0;border-top:1px solid var(--rule); margin:.8rem 0">
+        <p class="lead">Repair, replacement, and a safety inspection before the first cold snap.</p>
+      </div></section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="ph-editorial"><div class="wrap" style="padding-block:var(--rh-normal)">
+        <div style="display:flex; gap:.8rem; align-items:baseline"><span class="idx">S/02</span><span class="kicker">Services</span></div>
+        <h1 class="display-1" style="margin-top:.6rem; max-width:18ch">Furnace &amp; Heating in [city, from intake]</h1>
+        <hr style="border:0;border-top:1px solid var(--rule); margin:1rem 0">
+        <p class="lead" style="max-width:56ch">Repair, replacement, and a safety inspection before the first cold snap, on every major brand.</p>
+      </div></section>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · PageHeaderOverlap (overlap-split) -->
+<section class="specimen" id="h3">
+  <div class="caption">
+    <h2>3 · PageHeaderOverlap</h2>
+    <div class="meta">archetype <code>overlap-split</code> · <code>pageHeader/PageHeaderOverlap.tsx</code></div>
+    <div class="settle">Full-bleed graded photo with a FLAT scrim (decision 30b: no gradient) and the title overlaid. The one header that leads with imagery. Text stays legible on the flat ink scrim, not an opacity trick.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <section class="ph-overlap" style="min-height:300px; display:grid; align-items:end">
+        <div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="AC installation (topical stock)"></div>
+        <div class="scrim"></div>
+        <div class="inner wrap" style="padding-block:var(--rh-tight)">
+          <span class="kicker" style="color:#d9cec0">Services</span>
+          <h1 class="display-1" style="margin-top:.4rem">Heat Pump Installation</h1>
+          <p class="lead" style="color:#e7ded2; margin-top:.4rem">High-efficiency systems, sized to your home.</p>
+        </div>
+      </section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="ph-overlap" style="min-height:420px; display:grid; align-items:end">
+        <div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=1200&q=80" width="1200" height="420" alt="AC installation (topical stock)"></div>
+        <div class="scrim"></div>
+        <div class="inner wrap" style="padding-block:var(--rh-normal)">
+          <span class="kicker" style="color:#d9cec0">Services</span>
+          <h1 class="display-1" style="margin-top:.5rem; max-width:16ch">Heat Pump Installation in [city, from intake]</h1>
+          <p class="lead" style="color:#e7ded2; margin-top:.5rem; max-width:52ch">High-efficiency systems, sized to your home and not to a catalogue.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · PageHeaderMinimal (inline-strip) -->
+<section class="specimen" id="h4">
+  <div class="caption">
+    <h2>4 · PageHeaderMinimal</h2>
+    <div class="meta">archetype <code>inline-strip</code> · <code>pageHeader/PageHeaderMinimal.tsx</code></div>
+    <div class="settle">The lightest header: title and one-line intro on a single baseline-aligned strip, a hairline under, no band fill. For pages that are mostly content (About, Contact) where a tall header would waste the fold.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <section class="ph-minimal"><div class="wrap" style="padding-block:var(--rh-tight)">
+        <h1 class="display-2">Contact us</h1>
+        <p class="small inkSoft" style="margin-top:.3rem">A person answers 24/7. Average under 30 seconds.</p>
+      </div></section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="ph-minimal"><div class="wrap" style="padding-block:var(--rh-tight); display:flex; align-items:baseline; gap:1.2rem; flex-wrap:wrap">
+        <h1 class="display-2">Contact us</h1>
+        <p class="small inkSoft">A person answers 24/7. Average answer time under 30 seconds.</p>
+      </div></section>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · FULL service-standard PAGE -->
+<section class="specimen" id="p5">
+  <div class="caption">
+    <h2>5 · Full page: <code>service-standard</code></h2>
+    <div class="meta">PageHeaderOverlap @rh-bleed · ServicesAccordion @rh-normal · BeforeAfter @rh-loose · FaqStickyAside @rh-normal · FinalCtaBanner @rh-tight</div>
+    <div class="settle">The specimen that settles RHYTHM, which no single section can show. Each band is tagged with its rh-* class in the top-left. Exactly ONE inverted section (the final CTA, decision 12). Spacing is drawn to the real --rh-* values, not eyeballed.</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <!-- header: bleed -->
+      <section class="band ph-overlap" style="min-height:280px; display:grid; align-items:end"><span class="rh-tag">rh-bleed</span>
+        <div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=600&q=80" width="600" height="400" alt="AC service (topical stock)"></div>
+        <div class="scrim"></div>
+        <div class="inner wrap" style="padding-block:var(--rh-tight); color:var(--on-ink)"><span class="kicker" style="color:#d9cec0">Services</span><h1 class="display-1" style="margin-top:.4rem">AC Repair in [city]</h1></div>
+      </section>
+      <!-- services accordion: normal -->
+      <section class="band rh-normal"><span class="rh-tag">rh-normal</span><div class="wrap">
+        <h2 class="display-2">What this service covers</h2>
+        <div class="acc" style="margin-top:1rem">
+          <div class="ai"><div class="q">Diagnostics <span class="inkSoft fine">+</span></div><div class="a">Flat diagnostic fee, credited to the repair.</div></div>
+          <div class="ai"><div class="q">Repair <span class="inkSoft fine">+</span></div></div>
+          <div class="ai"><div class="q">Replacement <span class="inkSoft fine">+</span></div></div>
+        </div>
+      </div></section>
+      <!-- before/after: loose -->
+      <section class="band soft rh-loose"><span class="rh-tag">rh-loose</span><div class="wrap">
+        <h2 class="display-2">Before and after</h2>
+        <div class="ba" style="margin-top:1rem">
+          <figure style="margin:0"><div class="ph graded r-service" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="Old unit (topical stock)"></div><figcaption>Before</figcaption></figure>
+          <figure style="margin:0"><div class="ph graded r-service" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=400&q=80" width="400" height="267" alt="New unit (topical stock)"></div><figcaption>After</figcaption></figure>
+        </div>
+      </div></section>
+      <!-- faq sticky aside: normal -->
+      <section class="band rh-normal"><span class="rh-tag">rh-normal</span><div class="wrap">
+        <h2 class="display-2">Common questions</h2>
+        <div class="acc" style="margin-top:1rem">
+          <div class="ai"><div class="q">How fast can you come?</div><div class="a">Most repairs are same-day; emergencies 24/7.</div></div>
+          <div class="ai"><div class="q">Do you service my brand?</div><div class="a">Every major residential brand.</div></div>
+        </div>
+      </div></section>
+      <!-- final cta banner: tight, INVERTED (the one inverted) -->
+      <section class="band inverted rh-tight"><span class="rh-tag">rh-tight · inverted</span><div class="wrap">
+        <h2 class="display-2" style="color:var(--on-ink)">No cool air? Call now.</h2>
+        <a class="phone" href="tel:+15555550100" style="margin-top:.8rem"><span class="digits">(555) 555-0100</span><span class="assure">A person answers 24/7</span></a>
+        <a class="btn btn-primary" style="margin-top:1rem" href="#quote">Book a visit</a>
+      </div></section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="band ph-overlap" style="min-height:380px; display:grid; align-items:end"><span class="rh-tag">rh-bleed</span>
+        <div class="ph graded"><img class="cover" src="https://images.unsplash.com/photo-1615309662243-70f6df917b59?auto=format&fit=crop&w=1200&q=80" width="1200" height="380" alt="AC service (topical stock)"></div>
+        <div class="scrim"></div>
+        <div class="inner wrap" style="padding-block:var(--rh-normal); color:var(--on-ink)"><span class="kicker" style="color:#d9cec0">Services</span><h1 class="display-1" style="margin-top:.5rem; max-width:16ch">AC Repair in [city, from intake]</h1></div>
+      </section>
+      <section class="band rh-normal"><span class="rh-tag">rh-normal</span><div class="wrap">
+        <h2 class="display-2">What this service covers</h2>
+        <div class="acc" style="margin-top:1.4rem; max-width:60rem">
+          <div class="ai"><div class="q">Diagnostics <span class="inkSoft fine">+</span></div><div class="a">A flat diagnostic fee, credited to the repair if you book it with us. You approve any work before it starts.</div></div>
+          <div class="ai"><div class="q">Repair <span class="inkSoft fine">+</span></div></div>
+          <div class="ai"><div class="q">Replacement and new installs <span class="inkSoft fine">+</span></div></div>
+        </div>
+      </div></section>
+      <section class="band soft rh-loose"><span class="rh-tag">rh-loose</span><div class="wrap">
+        <h2 class="display-2">Before and after</h2>
+        <div class="ba" style="margin-top:1.4rem">
+          <figure style="margin:0"><div class="ph graded r-service" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1614447413576-b346c641c128?auto=format&fit=crop&w=700&q=80" width="700" height="467" alt="Old unit (topical stock)"></div><figcaption>Before, a 15-year-old unit failing in July</figcaption></figure>
+          <figure style="margin:0"><div class="ph graded r-service" style="border-radius:var(--radius-control)"><img class="cover" src="https://images.unsplash.com/photo-1718203862467-c33159fdc504?auto=format&fit=crop&w=700&q=80" width="700" height="467" alt="New unit (topical stock)"></div><figcaption>After, a high-efficiency replacement in one day</figcaption></figure>
+        </div>
+      </div></section>
+      <section class="band rh-normal"><span class="rh-tag">rh-normal</span><div class="wrap">
+        <h2 class="display-2">Common questions</h2>
+        <div class="fsa" style="margin-top:1.4rem">
+          <div class="stick"><p class="lead">Still deciding? These are the questions we hear most before a first visit.</p></div>
+          <div class="acc">
+            <div class="ai"><div class="q">How fast can you come?</div><div class="a">Most repairs are same-day; emergencies are prioritised 24/7 with a live answer in under 30 seconds.</div></div>
+            <div class="ai"><div class="q">Do you service my brand?</div><div class="a">Every major residential brand, with common parts on the truck.</div></div>
+            <div class="ai"><div class="q">Is the quote flat?</div><div class="a">Yes. You approve the number before any work begins.</div></div>
+          </div>
+        </div>
+      </div></section>
+      <section class="band inverted rh-tight"><span class="rh-tag">rh-tight · inverted</span><div class="wrap" style="display:flex; align-items:center; justify-content:space-between; gap:1.5rem; flex-wrap:wrap">
+        <h2 class="display-2" style="color:var(--on-ink)">No cool air? We can be there today.</h2>
+        <div style="display:flex; align-items:center; gap:1.5rem"><a class="phone" href="tel:+15555550100"><span class="digits">(555) 555-0100</span><span class="assure">A person answers 24/7</span></a><a class="btn btn-primary" style="width:auto" href="#quote">Book a visit</a></div>
+      </div></section>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · FULL service-proof PAGE -->
+<section class="specimen" id="p6">
+  <div class="caption">
+    <h2>6 · Full page: <code>service-proof</code></h2>
+    <div class="meta">PageHeaderEditorial @rh-normal · DifferentiatorsIndex @rh-loose · TestimonialsGrid @rh-normal (soft, the proofSkin) · ServiceArea @rh-tight · ContactInlineStrip @rh-tight</div>
+    <div class="settle">The proof-led page. Each band tagged with its rh-* class. Exactly ONE inverted section (the closing contact strip). TestimonialsGrid takes the <code>soft</code> proofSkin from VERTICAL-LANGUAGE-hvac.md. ServiceArea names real towns (decision 32 non-negotiable).</div>
+  </div>
+  <div class="widths">
+    <div class="frame m"><div class="wlabel">390</div>
+      <section class="band ph-editorial rh-normal"><span class="rh-tag">rh-normal</span><div class="wrap">
+        <div style="display:flex; gap:.6rem; align-items:baseline"><span style="font-weight:700;color:var(--ink-soft)" class="small">P/01</span><span class="kicker">Why us</span></div>
+        <h1 class="display-1" style="margin-top:.4rem">Trusted in [city]</h1>
+      </div></section>
+      <section class="band rh-loose"><span class="rh-tag">rh-loose</span><div class="wrap">
+        <h2 class="display-2">Why homeowners call back</h2>
+        <div class="eindex" style="margin-top:1rem">
+          <div class="row"><span class="num">01</span><div><div class="card-title">Insured, license [#]</div><p class="ans">On every truck and quote.</p></div></div>
+          <div class="row"><span class="num">02</span><div><div class="card-title">24/7 live answer</div><p class="ans">Under 30 seconds.</p></div></div>
+          <div class="row"><span class="num">03</span><div><div class="card-title">Flat pricing</div><p class="ans">Approved before work.</p></div></div>
+        </div>
+      </div></section>
+      <section class="band soft rh-normal"><span class="rh-tag">rh-normal · soft (proofSkin)</span><div class="wrap">
+        <h2 class="display-2">Reviews</h2>
+        <div class="tg" style="margin-top:1rem">
+          <div class="q"><p class="stars" style="font-weight:700">★★★★★</p><p style="margin-top:.4rem">"Cool again by dinner."</p><p class="fine inkSoft" style="margin-top:.4rem">Jennifer T. · Riverside</p></div>
+          <div class="q"><p class="stars" style="font-weight:700">★★★★★</p><p style="margin-top:.4rem">"Honest and fair."</p><p class="fine inkSoft" style="margin-top:.4rem">Frank C. · Fontana</p></div>
+        </div>
+      </div></section>
+      <section class="band rh-tight"><span class="rh-tag">rh-tight</span><div class="wrap">
+        <h2 class="display-2">Where we work</h2>
+        <div class="sa" style="margin-top:1rem">
+          <div class="map">Service area map</div>
+          <div class="towns"><span>Riverside</span><span>Fontana</span><span>Ontario</span><span>Chino</span><span>Rancho Cucamonga</span><span>[+ from intake]</span></div>
+        </div>
+      </div></section>
+      <section class="band inverted rh-tight"><span class="rh-tag">rh-tight · inverted</span><div class="wrap">
+        <h2 class="display-2" style="color:var(--on-ink)">Talk to a real person</h2>
+        <a class="phone" href="tel:+15555550100" style="margin-top:.8rem"><span class="digits">(555) 555-0100</span><span class="assure">24/7</span></a>
+      </div></section>
+    </div>
+    <div class="frame d"><div class="wlabel">1280</div>
+      <section class="band ph-editorial rh-normal"><span class="rh-tag">rh-normal</span><div class="wrap">
+        <div style="display:flex; gap:.8rem; align-items:baseline"><span style="font-weight:700;color:var(--ink-soft)" class="small">P/01</span><span class="kicker">Why us</span></div>
+        <h1 class="display-1" style="margin-top:.5rem; max-width:18ch">Trusted across [city, from intake]</h1>
+      </div></section>
+      <section class="band rh-loose"><span class="rh-tag">rh-loose</span><div class="wrap">
+        <h2 class="display-2">Why homeowners call us back</h2>
+        <div class="eindex two" style="margin-top:1.4rem">
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">01</span><div><div class="card-title">Insured, license [# from intake]</div><p class="ans">Posted on every truck and on the quote.</p></div></div>
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">02</span><div><div class="card-title">A live person, 24/7</div><p class="ans">Average answer under 30 seconds.</p></div></div>
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">03</span><div><div class="card-title">Flat, up-front pricing</div><p class="ans">Approved before any work starts.</p></div></div>
+          <div class="row" style="border-top:1px solid var(--rule)"><span class="num">04</span><div><div class="card-title">[##] years local</div><p class="ans">Same owner, same crew.</p></div></div>
+        </div>
+      </div></section>
+      <section class="band soft rh-normal"><span class="rh-tag">rh-normal · soft (proofSkin)</span><div class="wrap">
+        <h2 class="display-2">What neighbors say</h2>
+        <div class="tg" style="margin-top:1.4rem">
+          <div class="q"><p class="stars" style="font-weight:700">★★★★★</p><p style="margin-top:.5rem">"Same afternoon our AC died in July, cool again by dinner."</p><p class="fine inkSoft" style="margin-top:.5rem">Jennifer T. · Riverside</p></div>
+          <div class="q"><p class="stars" style="font-weight:700">★★★★★</p><p style="margin-top:.5rem">"Honest about what needed fixing and what did not."</p><p class="fine inkSoft" style="margin-top:.5rem">Frank C. · Fontana</p></div>
+          <div class="q"><p class="stars" style="font-weight:700">★★★★★</p><p style="margin-top:.5rem">"Fair quote for a new furnace, held to the dollar."</p><p class="fine inkSoft" style="margin-top:.5rem">Susan H. · Ontario</p></div>
+        </div>
+      </div></section>
+      <section class="band rh-tight"><span class="rh-tag">rh-tight</span><div class="wrap">
+        <h2 class="display-2">Where we work</h2>
+        <div class="sa" style="margin-top:1.4rem">
+          <div class="map">Service area map</div>
+          <div class="towns"><span>Riverside</span><span>Fontana</span><span>Ontario</span><span>Chino</span><span>Rancho Cucamonga</span><span>Mira Loma</span><span>Jurupa Valley</span><span>[+ from intake]</span></div>
+        </div>
+      </div></section>
+      <section class="band inverted rh-tight"><span class="rh-tag">rh-tight · inverted</span><div class="wrap cis">
+        <div><h2 class="display-2" style="color:var(--on-ink)">Talk to a real person, not a phone tree</h2><p class="small" style="color:#c9bdb0; margin-top:.4rem">Licensed and insured. Serving [service area, from intake].</p></div>
+        <div style="display:flex; align-items:center; gap:1.2rem"><a class="phone" href="tel:+15555550100"><span class="digits">(555) 555-0100</span><span class="assure">A person answers 24/7</span></a><a class="btn btn-primary" style="width:auto" href="#quote">Get a quote</a></div>
+      </div></section>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
