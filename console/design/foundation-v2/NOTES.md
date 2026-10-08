@@ -1076,3 +1076,67 @@ the uniform warm-neutral (not sepia) grade, folded into the standing browser rev
 
 **Phase 11 is COMPLETE.** Next: Phase 12 (the HVAC vertical language `VERTICAL_LANGUAGES`, the
 conversion non-negotiables checklist, and the locally-built reference site; no `@jdd/ui` tag).
+
+## Phase 12, 12a + 12b COMPLETE 2026-10-08; 12c is a PENDING USER GATE. No `@jdd/ui` tag, no schema change.
+
+The per-vertical layer made typed, thin and enforced, plus the conversion checklist. 12c (the
+locally-built reference site) is decision 31 + 43's human review and is handed to the user.
+
+**12a — `console/src/data/vertical-language.ts` (NEW, client-safe):** `VerticalLanguage` = exactly
+four axes (`pairingId`, `palette`, `photography`, `rhythm`), `VERTICAL_LANGUAGES` populated for
+**hvac only**, transcribed from `VERTICAL-LANGUAGE-hvac.md`: `pairingId:'instrument'`, the Phase 2
+warm set plus the decision-11 HVAC accent `#16556A`/`#FFFFFF`, the six photography subjects,
+`grade:'house'`, `ratioBias:'wide'`, `homeTemplateId:'home-standard'`, `proofSkin:'soft'`.
+`languageFor(id)` falls back to hvac. Only type-only imports (`SkinId`, `VerticalId`), so it is pure
+at runtime and node-testable.
+- **`verticals.ts` `presetFor` now COMPOSES the language** onto the preset (new object, preset never
+  mutated): `languageFor(id).palette` overrides `brand.palette` (coercing the language's
+  `accentFg: string|null` to the schema's `string|undefined`) and `typographyFor(lang.pairingId)`
+  replaces `brand.typography`. This is where the `#16556A` accent and the single-pairing typography
+  actually land. CAVEAT surfaced: the export route's bare-vertical branch still writes
+  `VERTICAL_PRESETS[vertical]` DIRECTLY (not through presetFor), so a no-content export of a raw
+  preset would ship the legacy `verticals/hvac.ts` accent `#E05C2A` until that file is updated or the
+  branch routes through presetFor. The real path (studio content branch) seeds from presetFor and is
+  composed, so the reference site and every studio-built client get `#16556A`. Left as-is: 12a's
+  listed scope is verticals.ts + the new file + the test; hvac.ts palette edits are not in scope.
+- **`vertical-language.test.mjs` (NEW), the §0.6 enforcement (5 tests):** every pairingId is in
+  FONT_PAIRINGS; every homeTemplateId is a real `pageType:'home'` template; no vertical references a
+  template outside PAGE_TEMPLATES; every palette clears the Phase 2 warmth + contrast asserts (reuses
+  `test/helpers/contrast.mjs`'s real @jdd/ui derivation); and `Object.keys(VERTICAL_LANGUAGES.hvac)`
+  is exactly the four axes (a fifth field fails here).
+- **`VERTICAL-LANGUAGE-hvac.md`:** added a "Vertical rotation note" recording decision 46's untested
+  health bet where the health-cycle runner will read it first.
+
+**12b — `console/design/CONVERSION-NON-NEGOTIABLES.md` (NEW):** the six non-negotiables (tap-to-call,
+sticky call bar, named service area, review aggregate above the fold, license displayed, form of six
+fields or fewer) each with how to check and the owner file(s). Decision 32 is honoured: it is a
+HAND-CHECK with no new build-time enforcement machinery, and the doc says why a green check would be
+worse than an honest manual walk. Added a `callout` to `go-live-content.ts`'s Preflight gate step
+pointing at the file so it surfaces in the operator's go-live flow.
+
+**Gate (12a/12b), 2026-10-08:** `console npm test` **196/196** (0 fail, +5 vertical-language);
+`console npm run build` EXIT 0. (`template npm run build` unaffected and not re-run; no @jdd/ui or
+schema change this sub-step.)
+
+**12c — the reference site: a PENDING USER GATE (decisions 31 + 43), NOT a deploy.** The real gate
+for the whole upgrade: a person looks at the locally-built `_e2e_test_growth` HVAC site and judges
+"does it look expensive, and does it still convert." It cannot be discharged from a terminal. The
+runbook handed to the user:
+1. `cd console && npm run dev` (port 3040, NOT `--turbo`, §0.2 rule 5).
+2. `http://localhost:3040/?fixtures=1` (the query toggle beats `CONSOLE_INCLUDE_FIXTURES=0`; do NOT
+   flip that env flag), open `_e2e_test_growth`, select the HVAC vertical, apply `home-standard`,
+   "Generate a page for each service", generate + review the copy (Phase 10's gate), then Launch.
+3. `cd clients/_e2e_test_growth/repo && npm run build` (this is the plan's build gate) then
+   `npm start`, open `http://localhost:3000` in a REAL browser.
+4. Hand-walk `CONVERSION-NON-NEGOTIABLES.md` at 390px and 1440px.
+
+**The logged 43-vs-31 tension the user should know before trusting the review:** decision 43 declines
+a deploy, so this first fidelity review happens in a DESKTOP browser at a 390px viewport, where
+non-negotiables **1 (tap-to-call) and 2 (sticky mobile bar)** cannot be fully verified (touch
+targets, the `tel:` handoff, and real scroll/motion only exist on a phone; also §0.4's hidden preview
+pane freezes motion). Review against `npm start` at `localhost:3000`, never the console preview pane.
+If the local review feels untrustworthy, that is the signal to revisit decision 43 and ask for a
+deploy on a real device, which is the user's call. Decision 36 remains absolute: Atlantic and Air
+Service are `externalManaged` and untouched.
+
+Phase 12's executor work (12a + 12b) is done and committed; **12c awaits the user.**

@@ -1,4 +1,6 @@
 import type { SiteContent } from '@/data/site';
+import { languageFor } from '@/data/vertical-language';
+import { typographyFor } from '@/lib/fonts';
 import { CONTENT as hvacContent } from '@/data/verticals/hvac';
 import { CONTENT as roofingContent } from '@/data/verticals/roofing';
 import { CONTENT as plumbingContent } from '@/data/verticals/plumbing';
@@ -47,11 +49,25 @@ export const VERTICAL_PRESETS: Record<string, SiteContent> = {
 };
 
 /**
- * The preset SiteContent for a vertical id, falling back to the default when the id is
- * unknown. Now that VerticalId is a plain string, `VERTICAL_PRESETS[id]` alone can return
- * undefined for an id this client bundle has never heard of (a custom vertical, before that
- * UI exists) — this is the guarded version callers should use instead.
+ * The preset SiteContent for a vertical id, falling back to the default when the id is unknown.
+ *
+ * COMPOSES the vertical's design language (decision 35) onto the preset so the two can never
+ * disagree: `languageFor(id).palette` overrides the preset's brand.palette and
+ * `typographyFor(language.pairingId)` replaces brand.typography. A new object is returned (the
+ * imported preset modules are never mutated). This is where the HVAC accent decision (#16556A) and
+ * the single-pairing typography actually land; the raw verticals/<id>.ts files carry the legacy
+ * values until their own cycle. Guarded for a custom vertical id the bundle has never heard of, and
+ * client-safe (both imports are node:fs-free).
  */
 export function presetFor(id: VerticalId): SiteContent {
-  return VERTICAL_PRESETS[id] ?? VERTICAL_PRESETS[DEFAULT_VERTICAL_ID];
+  const preset = VERTICAL_PRESETS[id] ?? VERTICAL_PRESETS[DEFAULT_VERTICAL_ID];
+  const lang = languageFor(id);
+  return {
+    ...preset,
+    brand: {
+      ...preset.brand,
+      palette: { ...preset.brand.palette, ...lang.palette, accentFg: lang.palette.accentFg ?? undefined },
+      typography: typographyFor(lang.pairingId),
+    },
+  };
 }

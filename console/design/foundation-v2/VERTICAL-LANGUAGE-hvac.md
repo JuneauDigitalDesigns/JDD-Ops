@@ -132,3 +132,21 @@ Quoting §0.6's escalation rule, which a future vertical cycle will read when it
 >    (Phase 7 or 8), not in the vertical's phase.
 > 4. **Escalate to the user** before doing step 3. The user decides whether the foundation gets
 >    widened. This is a planning decision, not an implementation one.
+
+---
+
+## Vertical rotation note (read this first when you run a later vertical's cycle)
+
+Five verticals remain after HVAC: roofing, plumbing, lawn-care, car-detailing, and **health**. Each
+is its own cycle (decision 37): a Phase 5 mockup repeat, a `VERTICAL_LANGUAGES` entry, a
+`console/src/data/verticals/<id>.ts` palette, and an `image-placeholders.ts` curation. No new
+components; if one seems needed, escalate per §0.6 above.
+
+**Health and Wellness reuses this system as-is, with no separate research pass (decision 46), and
+that is an UNTESTED BET.** Every palette, photography-direction and proof decision in
+`RESEARCH-local-service-visual-design.md` was measured against home-service TRADES, never against
+health or wellness, whose trust vocabulary (credentials, privacy, bedside manner, regulatory
+language) and photography register are genuinely different. **If the health vertical's first build
+looks wrong, the cause is decision 46, not the shared foundation.** Do not respond by widening
+`VerticalLanguage`, adding a health-only component, or re-opening the token layer. Escalate per §0.6
+and let the user decide whether health gets its own research pass.

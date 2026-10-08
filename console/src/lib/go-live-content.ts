@@ -317,6 +317,12 @@ export function buildGoLive(): Phase[] {
               tone: 'info',
               body: 'It reads the local env files (the agency .env.local and jdd-ops/.env). After env-sync those mirror the Vercel source; if you set a value only in the Vercel dashboard, pull it locally (vercel env pull) before trusting a green result.',
             },
+            {
+              t: 'callout',
+              tone: 'info',
+              title: 'Also hand-check the conversion non-negotiables',
+              body: 'Preflight checks services, not conversion. Before launching a built client site, walk the six items in console/design/CONVERSION-NON-NEGOTIABLES.md against the site at a 390px viewport and 1440px (tap-to-call, sticky call bar, named service area, review aggregate above the fold, license shown, form of six fields or fewer). Decision 32 keeps this a manual walk on purpose, so no green check here can stand in for it.',
+            },
           ],
         },
         {
