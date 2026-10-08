@@ -27,5 +27,17 @@ a deployed preview on a real device (a decision for the user, per decision 43).
 | 5 | **License displayed** | `brand.license` is non-null and the nav or the footer renders it, so the credential is visible without hunting. | intake, `nav/*`, `footer/*` |
 | 6 | **Form at six fields or fewer** | The lead form asks for no more than six fields. `LeadForm` ships two (name, phone) plus one optional message; anything more is friction the research names as a drop-off cause. | `packages/ui/src/LeadForm.tsx` |
 
+## Also at export: the navbar must link to the new pages (multi-page sites)
+
+Not one of the six conversion non-negotiables, but an export-correctness check that belongs in the
+same hand-walk. When a client site has more than one page (the default build is four: Home,
+Services, About, Contact), the exported navbar must link to each of those pages, not behave like a
+single-page anchor bar. The export regenerates `CONTENT.nav` from the composition's nav-visible
+pages (see plan §9e), so after building the site, **click every navbar link and confirm each loads
+its page** (`/services`, `/about`, `/contact`). Per-service pages (`services/<slug>`) are
+intentionally NOT in the top nav; confirm they are instead reachable from the services section. If a
+nav link is a `#anchor` instead of a route on a multi-page site, the nav regeneration did not run
+(check that the export sent both `composition` and `content`).
+
 When an item fails, the fix is in the owner file(s), not here: this document records the standard,
 not the implementation.

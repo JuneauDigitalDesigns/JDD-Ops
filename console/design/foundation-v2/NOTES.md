@@ -1128,7 +1128,11 @@ runbook handed to the user:
    "Generate a page for each service", generate + review the copy (Phase 10's gate), then Launch.
 3. `cd clients/_e2e_test_growth/repo && npm run build` (this is the plan's build gate) then
    `npm start`, open `http://localhost:3000` in a REAL browser.
-4. Hand-walk `CONVERSION-NON-NEGOTIABLES.md` at 390px and 1440px.
+4. Hand-walk `CONVERSION-NON-NEGOTIABLES.md` at 390px and 1440px, INCLUDING its new multi-page
+   navigation check: click every navbar link and confirm each loads its page (`/services`, `/about`,
+   `/contact`), and that per-service pages are reached from the services section, not the top nav
+   (plan §9e, added 2026-10-08 at the user's request). Also spot-check
+   `clients/_e2e_test_growth/repo/src/data/site.ts`'s `CONTENT.nav` lists those route links.
 
 **The logged 43-vs-31 tension the user should know before trusting the review:** decision 43 declines
 a deploy, so this first fidelity review happens in a DESKTOP browser at a 390px viewport, where
@@ -1140,3 +1144,25 @@ deploy on a real device, which is the user's call. Decision 36 remains absolute:
 Service are `externalManaged` and untouched.
 
 Phase 12's executor work (12a + 12b) is done and committed; **12c awaits the user.**
+
+## Plan 9e added + a real nav bug fixed, 2026-10-08 (user request, mid-Phase-12)
+
+The user asked to ensure, in the plan, that the EXPORTED navbar links to the new pages when a site
+goes from one page to 4+. Added **§9e** to `PLAN-template-fidelity-v2.md` (a stated, tested
+export-time requirement), with verification bullets in Phase 9d and Phase 12c and a multi-page
+navigation note in `CONVERSION-NON-NEGOTIABLES.md`.
+
+**Investigating it surfaced a real bug, now fixed.** The chain was mostly wired already: the export
+route regenerates `content.nav = navLinksFor(composition)` (route.ts:181) from the nav-visible pages,
+`navLinksFor` is unit-tested, and `nav/NavMinimal.tsx` renders `content.nav`. **But
+`nav/NavEmergencyBar.tsx` declared `consumes: ['...','nav']` and rendered NO nav links** - only the
+brand mark and a "Book now" CTA - so a multi-page client using that nav variant had no links to
+Services/About/Contact. Fixed: NavEmergencyBar now renders `content.nav` (wrapping below the
+brand/CTA at narrow widths, since this variant has no burger menu) whenever it is a multi-page site
+(`nav.length > 1`), keeping the lean single-page bar unchanged. Added a `catalog-invariants`
+guard - every nav component whose `consumes` includes `'nav'` must contain `nav.map(` - which fails
+if any future nav variant reintroduces the bug. Per-service pages stay `navVisible:false` (linked
+from the services section, decision 20), so they are intentionally not in the top nav.
+
+Gate: `console npm test` **197/197** (+1 nav guard); `console npm run build` EXIT 0. This is
+committed with the Phase 12a/12b follow-up.

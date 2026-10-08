@@ -3141,6 +3141,37 @@ when present (`route.ts` lines 116-118, 157, 262), so if both send it, `wirePage
 legacy flattening is cosmetic. **If either sends only `selections`, fix that before Phase 9
 proceeds**. Otherwise an eight-section home page silently exports as five.
 
+### 9e. The navbar must link to the new pages at export (added 2026-10-08, user request)
+
+**Requirement.** When a client moves from a one-page site to a four-plus-page site, the EXPORTED
+navbar must link to the pages the composition added, not stay a single-page anchor bar. Make this an
+explicit, tested guarantee rather than an accidental behaviour, because it is exactly the kind of
+cross-cutting wiring that regresses silently when the export or the nav components are refactored.
+
+**How it is wired today (confirmed 2026-10-08, keep it true):**
+- `console/src/app/api/build/export/route.ts` line 181 regenerates `content.nav =
+  navLinksFor(composition)` on the multi-page path, so the site nav becomes route links derived from
+  the composition's **nav-visible** pages (Home, Services, About, Contact), with hrefs from
+  `navHref(route)` (`/`, `/services`, `/about`, `/contact`) that match the generated
+  `src/app/<route>/page.tsx` files. This is generated ROUTING, not client-authored copy.
+- Per-service pages are deliberately `navVisible: false` (decision 20 / the 9d out-of-scope note):
+  they are reached from the services section, not the top nav, which would otherwise overflow.
+- The nav catalog components render `content.nav`: `nav/NavMinimal.tsx` and `nav/NavEmergencyBar.tsx`
+  destructure `nav` and map it to `<a href={item.href}>` at both desktop and mobile widths.
+- `navLinksFor` is unit-tested (`console/test/multipage-pages.test.mjs`, "emits route links for
+  nav-visible pages, home first").
+
+**Two invariants to hold (a regression in either silently breaks the nav):**
+1. The regeneration runs only on the `composition && content` export path. The studio Launch/Deploy
+   path always sends both; if a future caller sends `composition` without `content`, the nav will
+   not regenerate. Any new export caller must send both, or re-apply `navLinksFor` itself.
+2. Every nav catalog component must keep reading `content.nav`. A nav variant that hardcodes links,
+   or drops back to `#anchor` hrefs for a multi-page site, breaks this even though the export is
+   correct. A catalog-invariants guard (nav components reference `nav`/`content.nav`) is the cheap
+   way to pin it if a future nav variant is added.
+
+Verified end to end in 9d's verification below and hand-checked on the reference site in Phase 12c.
+
 ### Verification
 ```
 cd /c/Users/Xander/Desktop/ops/jdd-ops/console && npm test && npm run build
@@ -3149,10 +3180,12 @@ cd /c/Users/Xander/Desktop/ops/jdd-ops/console && npm test && npm run build
 a scratch client with `home-standard` + generated service pages and confirm: the client repo's
 `npm run build` passes; `clients/<slug>/repo/src/app/services/<slug>/page.tsx` exists for each
 service; each wraps its sections in `rh-*` divs; each subpage's header shows that service's own
-title.
+title; **and `clients/<slug>/repo/src/data/site.ts`'s `CONTENT.nav` lists one route link per
+nav-visible page (`/services`, `/about`, `/contact`), so the exported navbar points at the new
+pages and not at single-page anchors (9e).**
 
-**User looks at:** the console preview of all three home templates, and the generated service
-page files on disk.
+**User looks at:** the console preview of all three home templates, the generated service
+page files on disk, and the exported navbar linking to each new page.
 
 ### Out of scope
 Any new component. A nav dropdown for service pages (`navVisible: false` is the decision).
@@ -3929,7 +3962,9 @@ cd /c/Users/Xander/Desktop/ops/jdd-ops/console && npm test && npm run build
 cd /c/Users/Xander/Desktop/ops/jdd-ops/clients/_e2e_test_growth/repo && npm run build
 ```
 plus a completed hand-check of the six `CONVERSION-NON-NEGOTIABLES.md` items against
-`http://localhost:3000`, with the two you could not fully verify named.
+`http://localhost:3000`, with the two you could not fully verify named, AND the multi-page
+navigation check from that doc: every navbar link loads its page (`/services`, `/about`,
+`/contact`) and per-service pages are reachable from the services section, not the top nav (§9e).
 
 **User looks at:** the locally built and served `_e2e_test_growth` HVAC site at
 `http://localhost:3000`, at a 390px viewport and at 1440px. This is the real gate for the whole

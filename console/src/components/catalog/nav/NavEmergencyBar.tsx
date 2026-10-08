@@ -27,8 +27,14 @@ export default function NavEmergencyBar({
   skin?: SkinId;
 }) {
   const s = skinClasses(skin);
-  const { brand, announcement } = content;
+  const { brand, announcement, nav } = content;
   const msg = announcement ?? '24/7 emergency service. We answer day or night.';
+  // Render the page links whenever this is a multi-page site (more than the lone home link that
+  // navLinksFor emits for a single-page composition). This is what lets a 4+ page client reach
+  // Services/About/Contact from the Emergency-bar nav; a single-page site keeps the lean
+  // brand + CTA bar unchanged. The links wrap below the brand/CTA at narrow widths (this variant
+  // has no burger menu), so they stay reachable at 390px. See plan section 9e.
+  const showLinks = nav.length > 1;
   return (
     <header>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-accent px-6 py-2.5 text-center text-sm font-medium text-accentFg">
@@ -37,8 +43,21 @@ export default function NavEmergencyBar({
           <Phone size={14} weight="fill" /><E p="brand.phone">{brand.phone}</E>
         </a>
       </div>
-      <nav className={`flex items-center justify-between border-b ${s.rule} ${s.section} px-6 py-4`}>
+      <nav className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b ${s.rule} ${s.section} px-6 py-4`} aria-label="Main navigation">
         <span className={`font-heading text-lg font-bold ${s.heading}`}><E p="brand.name">{brand.name}</E></span>
+        {showLinks && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            {nav.map((item, i) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className={`text-[15px] font-semibold ${s.body} transition-colors hover:text-accent`}
+              >
+                <E p={`nav.${i}.label`}>{item.label}</E>
+              </a>
+            ))}
+          </div>
+        )}
         <a href="#cta" className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accentFg transition-transform hover:-translate-y-0.5">Book now</a>
       </nav>
     </header>

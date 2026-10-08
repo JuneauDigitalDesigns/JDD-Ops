@@ -119,6 +119,18 @@ test('every <img> declares width and height', () => {
   assert.deepEqual([...new Set(bad)], []);
 });
 
+test('every nav component that consumes nav renders the page links (plan 9e)', () => {
+  // A nav variant whose meta.consumes includes 'nav' MUST actually render content.nav (nav.map),
+  // or a multi-page client using that variant gets a navbar with no links to its new pages.
+  // NavEmergencyBar shipped exactly this: consumes 'nav' but rendered only brand + a CTA. Pinned
+  // so a future nav variant cannot reintroduce it. See PLAN-template-fidelity-v2.md section 9e.
+  const bad = [];
+  for (const c of ALL.filter((c) => c.category === 'nav')) {
+    if (/consumes:\s*\[[^\]]*['"]nav['"]/.test(c.src) && !/nav\.map\(/.test(c.src)) bad.push(c.rel);
+  }
+  assert.deepEqual(bad, []);
+});
+
 test('no wide-tracked uppercase eyebrows', () => {
   // Cut by SPEC §3. The heading names the section and a plain sentence supports it.
   const bad = ALL.filter((c) => /tracking-\[0\.2/.test(c.src));
