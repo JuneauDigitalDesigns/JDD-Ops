@@ -844,7 +844,7 @@ EXIT 0; `template npm run build` EXIT 0.
 generated service pages, built inside the client repo, confirming each `services/<slug>/page.tsx`
 exists and wraps sections in `rh-*` divs), and the preview look at the three home templates.
 
-## Phase 10, IN PROGRESS: 10a DONE 2026-10-08, 10b/10c/10d REMAIN. No `@jdd/ui` tag.
+## Phase 10, COMPLETE 2026-10-08 (10a 2026-10-08, 10b/10c/10d 2026-10-08). No `@jdd/ui` tag.
 
 Multi-page copy review. Being done in committed sub-increments because it changes the load-bearing
 content gate and must not be left half-wired.
@@ -893,3 +893,99 @@ content gate and must not be left half-wired.
 All wizard files were read this session (CopyWireframe 365L, IntakeStep 337L, copy-primitives 110L,
 copy-schema, copy-brief/mutations + types); copy-primitives exports Eyebrow/Headline/Prose/CtaChip/
 Card/Group/Chips/KV/Stars/hasText/NotSet.
+
+### 10b/10c/10d, as built 2026-10-08. Gate green (test 189/189, both builds EXIT 0).
+
+**Built / changed:**
+- **`console/src/lib/copy-review-groups.ts` (NEW).** A pure, React-free, `@/`-free module holding
+  `HOME_SECTIONS`, `ReviewGroup`/`ReviewPage`, `buildReviewGroups(pages)` and `reviewKeys(groups)`.
+  Extracted rather than inlined in CopyWireframe (as the plan's §10b phrasing assumed) so the
+  renderer AND the gate import ONE grouping definition and can never disagree about "every
+  reviewable key" — the same single-definition rationale copy-schema.ts uses for `verdictKey`. Being
+  pure + relative-importing `./copy-schema`, it is loadable under the node test runner (the suite
+  can't load the `'use client'` .tsx), which is how the new ordering tests run. Group order encodes
+  decision 49 (home, Services, About, Contact, optional-5th pages, then `pageType==='service'`
+  alphabetically by route) via a `PAGE_TYPE_ORDER` map; the Services page group alone carries
+  `['subpages','services']`, every other non-home page `['subpages']`.
+- **`CopyWireframe.tsx`:** `WIREFRAME_ORDER.map` replaced by page groups. New props `pages:
+  ReviewPage[]` and `unreviewed: Set<VerdictKey>`; `verdictFor` is now `(key: VerdictKey) =>`.
+  `SectionVerdict` shape UNCHANGED, as the plan requires. A `ReviewGroupBlock` renders a sticky
+  group header (label, `/route`, and an unreviewed count read straight from the gate's own set so
+  the count and the block can't drift). `SectionBody`/`SectionWireframeCard` gained an optional
+  `route`. Two cases: (10c) a `subpages` case rendering `content.subpages[route]` header
+  (eyebrow/title/sub via the about-case pattern, each `<E p="subpages.${route}.header.${field}">`,
+  mirroring compose-page.tsx:40), the CTA as a `CtaChip` only when BOTH label+href are present
+  (matches apply-generated.ts:176), and per-page SEO as two `KV` rows — every absent field `NotSet`,
+  never fabricated; and (10c) the `services` case now renders each item's `detail` under its `d`
+  (home card) and, when a `route` is passed (the Services page group), a lean detail-only list,
+  both editing the same `services.items.${i}.detail` with independent verdict keys (`services` vs
+  `services:services`), exactly the "one to sanity-check the list, one to review the page" split.
+- **IntakeStep.tsx (10d gate, decision 51 HARD block):** `verdictFor(key: VerdictKey)` resolves via
+  `parseVerdictKey`, keeps the `preRunGenerated` snapshot logic verbatim, and now reads/writes
+  `tickedKeys` (the brief's raw `string[]`, i.e. VerdictKey[]) instead of the Section[] narrowing —
+  the Section[] `tickedSections` is KEPT untouched for the Brief/Prompt pipeline (resolveBrief,
+  PromptStage, RunControls), which must stay home-section-only. `unreviewed` = every review key with
+  model-generated copy behind it (home: `generated[section]`; per-route header:
+  `generated.subpages[route]`) AND still ticked. The Approve-&-continue button is `disabled` while
+  non-empty, with a `title` + an inline "Review flagged copy first" note; `approve()` early-returns
+  too (belt and braces). The Review stage pill shows the count as a badge. Only `onDone()` is gated;
+  the sub-stage Next stays free. The JSON escape hatch is explicitly left ungated with a comment.
+- **BuildWizard.tsx:** derives `intakePages` (non-home pages → `{route,label,pageType}`) from the
+  live `siteComposition` and passes it to IntakeStep. (`normalizeVerdicts` on both read paths was
+  already wired in 10a.)
+- **`test/copy-verdict.test.mjs`:** +3 tests — a per-page verdict round-trip (keeps the slash in
+  `services/ac-repair:subpages`), the decision-49 group ordering, and route-prefixing in
+  `reviewKeys`. Suite 186 → **189**.
+
+**Deviations / judgment calls (none change a settled decision):**
+1. **Extracted `copy-review-groups.ts`** instead of inlining the grouping in CopyWireframe. Reason
+   above (one source of truth for renderer + gate; node-testable). The plan's file table did not
+   list a new file, but every prior phase added shared helpers when a definition had two consumers.
+2. **`pages` is derived from the live composition, not from "the place generate-copy's request gets
+   its subpages array."** That place does not exist: see the finding below. BuildWizard →
+   IntakeStep → CopyWireframe is the honest source, which is exactly the "pages/composition
+   pass-through" the resume package's item-2 line for BuildWizard anticipated.
+3. **`facts.ts` needs no change for `detail`.** The plan asked to "confirm `detail` is covered by
+   facts.ts and add it if not." `facts.ts` is the list of input fact PATHS sent to the model;
+   `detail` is an OUTPUT field. Its grounding (decision 45, never fabricated) is already enforced by
+   the prompt guardrails — `compile.ts:81` defines `detail` as the 2–3 sentence expansion and
+   `compile.ts:24/37` ("invent no facts beyond the notes/details") binds it. Nothing to add.
+4. **Group "unreviewed" count uses the gate's `unreviewed` set, not raw `.ticked`.** A fresh brief
+   defaults every home section to ticked, so counting raw ticks would show "12 unreviewed" on a site
+   where nothing was generated. Counting the gate set (ticked AND has generated copy) makes the
+   badge, the per-group count and the actual block agree. `SectionVerdict`'s shape stays unchanged;
+   the set is passed as its own prop.
+
+**FINDING surfaced (NOT fixed — out of Phase 10 scope): subpage copy is never generated by the
+current Brief flow.** `RunControls.tsx:86` POSTs `{vertical, base, imported, brief, sections, model}`
+with NO `subpages`, so `generate-copy/route.ts:62` always defaults `subpages=[]` and line 68 drops
+the `subpages` section from every run. So `SiteContent.subpages` is only ever populated from
+`imported`/seed, never from a run, and the plan's premise that "subpage headers reach client sites
+unreviewed today" is only true for the OLD pre-rebuild path, not the current one. Consequences, all
+benign for Phase 10: the per-page review surface shows `NotSet` for any client with no seeded
+subpage copy (honest — decision 47 wanted it VISIBLE, and "nothing here yet" is visible); a per-route
+Re-roll ticks a key the generation pipeline ignores (latent until subpage generation is wired); the
+gate never blocks on a per-route key (none ever has generated copy), so it enforces exactly the home
+copy today, per-key-correct and forward-compatible. **Wiring subpage generation (sending
+`body.subpages` from RunControls, derived from the composition) is a separate, out-of-scope change**
+— the Phase 10 file table excludes RunControls and the phase goal is the review surface + gate.
+Phase 11/12 should wire it before the reference site is meant to carry reviewed subpage copy.
+
+**Build-environment note:** no `next dev` was holding `.next` this time (checked via
+`Get-CimInstance Win32_Process`); `rm -rf .next` + clean build on both, exit codes captured to a log
+file (not through `tail`), per the standing lesson.
+
+**Gate, 2026-10-08:** `console npm test` **189/189** (0 fail, 0 skipped); `console npm run build`
+EXIT 0 (console routes confirmed in the summary); `template npm run build` EXIT 0
+(`business-site-template@0.1.0` confirmed in the log header). No `@jdd/ui` and no `@jdd/schema`
+change (`tickedSections` is already `string[]`), so no tag and no re-pin.
+
+**Owed to the user / deferred (not a blocker):** the plan's final export test (a scratch client with
+home + generated service pages, built INSIDE the client repo). Phase 10 changes only console-side
+review UI and edits `content`/`brief` the export path already handles — it adds no new exported code
+path — so the in-repo export test proves nothing new specific to this phase; folded into the same
+export-test review owed from Phases 7–9. Also owed: a real-browser look at the grouped review, the
+gate disabling Approve, and the Review-pill badge, folded into the standing Phase 1–6 browser review.
+
+**Phase 10 is COMPLETE.** The shared foundation plus the full page-structure and copy-review layers
+(Phases 0–10) are settled. Next: Phase 11 (img.ts local-asset branch, cuts `@jdd/ui` v1.0.7).

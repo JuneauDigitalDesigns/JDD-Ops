@@ -7,7 +7,9 @@ import { BUILT_IN_VERTICALS } from '@jdd/schema';
 import type { CopyBrief, CopyBriefBlockId } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, type VerticalId } from '@/lib/verticals';
-import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import { ALL_SECTIONS, parseVerdictKey, type Section, type VerdictKey } from '@/lib/copy-schema';
+import { buildReviewGroups, reviewKeys, type ReviewPage } from '@/lib/copy-review-groups';
+import { labelFor } from '@/lib/section-labels';
 import { missingFields as getMissingFields } from '@/lib/flags';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { resolveBrief } from '@/lib/copy-brief/resolve';
@@ -57,6 +59,7 @@ export default function IntakeStep({
   onBriefChange,
   copyModel,
   onCopyModelChange,
+  pages,
 }: {
   stage: IntakeStageId;
   onStageChange: (s: IntakeStageId) => void;
@@ -75,6 +78,9 @@ export default function IntakeStep({
   onBriefChange: (mutate: (brief: CopyBrief) => CopyBrief) => void;
   copyModel: string;
   onCopyModelChange: (m: string) => void;
+  /** The site's non-home pages (from the live composition) — drives the per-page review groups
+   *  and, with them, the gate. Empty for a single-page site. */
+  pages: ReviewPage[];
 }) {
   const reduce = useReducedMotion();
   const stageIndex = STAGES.findIndex((s) => s.id === stage);
@@ -105,6 +111,14 @@ export default function IntakeStep({
     () => (brief.tickedSections === undefined ? ALL_SECTIONS.filter((s) => s !== 'brand') : (brief.tickedSections as Section[])),
     [brief.tickedSections],
   );
+  // The verdict layer addresses copy per section PER PAGE, so it reads the brief's tickedSections
+  // as the raw VerdictKey[] it actually is (string[] in @jdd/schema) rather than the Section[]
+  // narrowing above, which the Brief/Prompt pipeline needs. A home section's key is its bare id;
+  // a per-route key is `route:section`. The default (no brief yet) ticks every home section.
+  const tickedKeys = useMemo<VerdictKey[]>(
+    () => (brief.tickedSections === undefined ? ALL_SECTIONS.filter((s) => s !== 'brand') : brief.tickedSections),
+    [brief.tickedSections],
+  );
   const blocks = useMemo(
     () => resolveBrief({ vertical: verticalDef, effective, imported, brief, tickedSections }),
     [verticalDef, effective, imported, brief, tickedSections],
@@ -125,26 +139,66 @@ export default function IntakeStep({
     onGenerated(p);
   }, [generated, onGenerated]);
 
-  function verdictFor(section: Section): SectionVerdict {
-    const ticked = tickedSections.includes(section);
+  function verdictFor(key: VerdictKey): SectionVerdict {
+    // The revert machinery keys off the generated overlay's TOP-LEVEL section key (what
+    // onSetGeneratedSection writes); the route only distinguishes which review row this is.
+    const { section } = parseVerdictKey(key);
+    const ticked = tickedKeys.includes(key);
     const priorValue = preRunGenerated ? (preRunGenerated as Record<string, unknown>)[section] : undefined;
     const currentValue = generated ? (generated as Record<string, unknown>)[section] : undefined;
     return {
       ticked,
       canRevert: priorValue !== undefined || currentValue !== undefined,
-      onAccept: () => onBriefChange((b) => setTickedSections(b, tickedSections.filter((s) => s !== section))),
+      onAccept: () => onBriefChange((b) => setTickedSections(b, tickedKeys.filter((k) => k !== key))),
       onReroll: () => {
-        if (!ticked) onBriefChange((b) => setTickedSections(b, [...tickedSections, section]));
+        if (!ticked) onBriefChange((b) => setTickedSections(b, [...tickedKeys, key]));
         go('prompt');
       },
       onRevert: () => onSetGeneratedSection(section, priorValue),
     };
   }
 
+  // ── The copy-review gate (decision 51, a HARD block) ──────────────────────────────────────
+  // A key is "unreviewed" when it has model-generated copy behind it AND is still ticked (ticked
+  // = queued for regeneration = not yet approved; Accept is what removes it). Leaving the Intake
+  // step is blocked while any key is unreviewed, so a model's prose only reaches a client site
+  // after an operator has actually read it. The group counts shown in the review surface use this
+  // exact set, so the UI and the gate never disagree.
+  const reviewGroups = useMemo(() => buildReviewGroups(pages), [pages]);
+  const allKeys = useMemo(() => reviewKeys(reviewGroups), [reviewGroups]);
+  const hasGeneratedBehind = useCallback((key: VerdictKey): boolean => {
+    if (!generated) return false;
+    const { route, section } = parseVerdictKey(key);
+    // A per-route page header's generated copy lives in the route-keyed subpages overlay; every
+    // other key (home sections, and the Services page's shared services.detail) reads the
+    // overlay's top-level section key.
+    if (route && section === 'subpages') {
+      const map = (generated as { subpages?: Record<string, unknown> }).subpages;
+      return Boolean(map && map[route] !== undefined);
+    }
+    return (generated as Record<string, unknown>)[section] !== undefined;
+  }, [generated]);
+  const unreviewed = useMemo<VerdictKey[]>(
+    () => allKeys.filter((k) => hasGeneratedBehind(k) && tickedKeys.includes(k)),
+    [allKeys, hasGeneratedBehind, tickedKeys],
+  );
+  const unreviewedSet = useMemo(() => new Set(unreviewed), [unreviewed]);
+
   function approve() {
+    if (unreviewed.length > 0) return; // the hard block — mirrors the disabled button below
     onBriefChange((b) => ({ ...b, lastRunAt: new Date().toISOString() }));
     onDone();
   }
+
+  // A short, human reason for the gate: first few unreviewed sections, by page.
+  const unreviewedLabel = (key: VerdictKey): string => {
+    const { route, section } = parseVerdictKey(key);
+    const page = route ? (pages.find((p) => p.route === route)?.label ?? route) : 'Home';
+    return `${page} · ${labelFor(section)}`;
+  };
+  const gateReason = unreviewed.length === 0
+    ? undefined
+    : `${unreviewed.length} section${unreviewed.length === 1 ? '' : 's'} still need review: ${unreviewed.slice(0, 3).map(unreviewedLabel).join(', ')}${unreviewed.length > 3 ? '…' : ''}`;
 
   const clientPickedVertical = ((): VerticalId | null => {
     const industry = imported?._meta.industry?.trim().toLowerCase();
@@ -153,6 +207,9 @@ export default function IntakeStep({
   })();
 
   // ── Editable JSON view (the escape hatch, unchanged from the old IntakeReviewStep) ──────
+  // Deliberately NOT subject to the copy-review gate below: this is the operator's own
+  // hand-authored content, not model output, and gating it would make a stuck draft
+  // unrecoverable. Do not "close the loophole" — it is the only way out of a bad gate state.
   const [jsonOpen, setJsonOpen] = useState(false);
   const [jsonText, setJsonText] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -215,6 +272,14 @@ export default function IntakeStep({
                   {state === 'done' ? <Check size={9} weight="bold" /> : i + 1}
                 </span>
                 {s.label}
+                {s.id === 'review' && unreviewed.length > 0 && (
+                  <span
+                    className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-2xs font-semibold text-white"
+                    title={gateReason}
+                  >
+                    {unreviewed.length}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -231,13 +296,28 @@ export default function IntakeStep({
             </button>
           )}
           {stageIndex < STAGES.length - 1 ? (
+            // The sub-stage Next is NEVER gated — Brief → Prompt → Review must stay freely
+            // navigable, since Review is where the reviewing happens. Only the exit to Studio below.
             <button type="button" onClick={() => go(STAGES[stageIndex + 1].id)} className="btn btn-sm btn-primary">
               Next
             </button>
           ) : (
-            <button type="button" onClick={approve} className="btn btn-sm btn-primary">
-              Approve &amp; continue to Studio
-            </button>
+            <>
+              {gateReason && (
+                <span className="max-w-xs truncate text-2xs text-uiInkSoft" title={gateReason}>
+                  Review flagged copy first
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={approve}
+                disabled={unreviewed.length > 0}
+                title={gateReason}
+                className="btn btn-sm btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Approve &amp; continue to Studio
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -293,7 +373,7 @@ export default function IntakeStep({
 
             {stage === 'review' && (
               <div className="no-scrollbar h-full overflow-y-auto px-6 py-6">
-                <CopyWireframe content={effective} setField={setField} verdictFor={verdictFor} />
+                <CopyWireframe content={effective} setField={setField} verdictFor={verdictFor} pages={pages} unreviewed={unreviewedSet} />
               </div>
             )}
           </motion.div>

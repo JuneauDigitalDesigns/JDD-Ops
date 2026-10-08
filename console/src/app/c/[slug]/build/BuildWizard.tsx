@@ -227,6 +227,16 @@ export default function BuildWizard({
   );
   const categories = useMemo(() => buildCategories(previewContent), [previewContent]);
 
+  // The non-home pages the Intake copy review groups by (decision 49). Derived from the live
+  // composition so a client with four service pages gets four groups and one with nine gets nine;
+  // the review surface and its gate read exactly the pages the operator has actually composed.
+  const intakePages = useMemo(
+    () => siteComposition.pages
+      .filter((p) => p.route !== '')
+      .map((p) => ({ route: p.route, label: p.label, pageType: p.pageType })),
+    [siteComposition],
+  );
+
   // Reconcile body order whenever selections change.
   //
   // Order is DERIVED: select() writes `selections`, then this recomputes `order` via
@@ -852,6 +862,7 @@ export default function BuildWizard({
                   onBriefChange={updateBrief}
                   copyModel={copyModel}
                   onCopyModelChange={setCopyModel}
+                  pages={intakePages}
                 />
               </div>
             )}

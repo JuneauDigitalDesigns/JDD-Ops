@@ -1,7 +1,8 @@
 'use client';
 
 import type { SiteContent } from '@/data/site';
-import type { Section } from '@/lib/copy-schema';
+import { type Section, type VerdictKey, verdictKey } from '@/lib/copy-schema';
+import { buildReviewGroups, type ReviewGroup, type ReviewPage } from '@/lib/copy-review-groups';
 import { labelFor } from '@/lib/section-labels';
 import { EditProvider, E } from '@/lib/editable';
 import {
@@ -9,19 +10,16 @@ import {
 } from './copy-primitives';
 
 /**
- * The Review stage's wireframe: every generatable section, in real page order, as neutral
- * grey blocks — a proof the copy hangs together, not a design preview (no client palette, no
- * component skins; Studio is where that happens). Copy is click-to-edit via the same <E>
+ * The Review stage's wireframe: every generatable piece of copy on every page, grouped by page
+ * (decision 49: home, then Services / About / Contact, then one group per service page), as
+ * neutral grey blocks — a proof the copy hangs together, not a design preview (no client palette,
+ * no component skins; Studio is where that happens). Copy is click-to-edit via the same <E>
  * primitive the Studio preview uses, writing straight through setField.
  *
- * Order: brand and seo bookend the page-content sections as "site info" / "metadata" cards
- * — neither has a real position on the page itself, unlike everything between them, which
- * follows page-order.ts's CANONICAL_ORDER (skipping nav/contact, which aren't copy).
+ * Within the home group, brand and seo bookend the page-content sections as "site info" /
+ * "metadata" cards. Each non-home group carries that page's header + SEO (the `subpages` case);
+ * the Services page additionally carries the per-service body prose (services.items[].detail).
  */
-const WIREFRAME_ORDER: Section[] = [
-  'brand', 'announcement', 'hero', 'trust', 'about', 'services', 'work',
-  'testimonials', 'faq', 'finalCta', 'footer', 'seo',
-];
 
 export interface SectionVerdict {
   ticked: boolean;
@@ -32,22 +30,71 @@ export interface SectionVerdict {
 }
 
 export default function CopyWireframe({
-  content, setField, verdictFor,
+  content, setField, verdictFor, pages, unreviewed,
 }: {
   content: SiteContent;
   setField: (path: string, value: unknown) => void;
-  /** One verdict-bar controller per section — built by IntakeStep, which owns the
-   *  ticked/pre-run-snapshot state this needs. */
-  verdictFor: (section: Section) => SectionVerdict;
+  /** One verdict-bar controller per verdict key — built by IntakeStep, which owns the
+   *  ticked/pre-run-snapshot state this needs. Keyed per section per page (decision 50). */
+  verdictFor: (key: VerdictKey) => SectionVerdict;
+  /** The site's non-home pages, from the live composition — drives the per-page groups. */
+  pages: ReviewPage[];
+  /** The gate's own set (ticked AND has generated copy) so the group counts shown here match
+   *  exactly what blocks the Approve button; built once in IntakeStep. */
+  unreviewed: Set<VerdictKey>;
 }) {
+  const groups = buildReviewGroups(pages);
   return (
     <EditProvider setField={setField}>
-      <div className="mx-auto max-w-2xl space-y-6 pb-16">
-        {WIREFRAME_ORDER.map((section) => (
-          <SectionWireframeCard key={section} section={section} content={content} verdict={verdictFor(section)} />
+      <div className="mx-auto max-w-2xl space-y-10 pb-16">
+        {groups.map((g) => (
+          <ReviewGroupBlock
+            key={g.route || 'home'}
+            group={g}
+            content={content}
+            verdictFor={verdictFor}
+            unreviewed={unreviewed}
+          />
         ))}
       </div>
     </EditProvider>
+  );
+}
+
+function ReviewGroupBlock({
+  group, content, verdictFor, unreviewed,
+}: {
+  group: ReviewGroup;
+  content: SiteContent;
+  verdictFor: (key: VerdictKey) => SectionVerdict;
+  unreviewed: Set<VerdictKey>;
+}) {
+  const keys = group.sections.map((s) => verdictKey(s, group.route || undefined));
+  const count = keys.filter((k) => unreviewed.has(k)).length;
+  return (
+    <section className="space-y-6">
+      <div className="sticky top-0 z-10 -mx-1 flex items-center gap-3 border-b border-uiCardRule bg-uiCanvas/90 px-1 py-2 backdrop-blur-sm">
+        <h2 className="font-display text-sm font-semibold text-uiInk">{group.label}</h2>
+        {group.route && <span className="font-chromeMono text-2xs text-uiFg3">/{group.route}</span>}
+        <span className="ml-auto font-chromeMono text-2xs text-uiFg3">
+          {count > 0 ? `${count} unreviewed` : 'all reviewed'}
+        </span>
+      </div>
+      <div className="space-y-6">
+        {group.sections.map((section) => {
+          const key = verdictKey(section, group.route || undefined);
+          return (
+            <SectionWireframeCard
+              key={key}
+              section={section}
+              route={group.route || undefined}
+              content={content}
+              verdict={verdictFor(key)}
+            />
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -88,17 +135,17 @@ function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVe
 }
 
 function SectionWireframeCard({
-  section, content, verdict,
-}: { section: Section; content: SiteContent; verdict: SectionVerdict }) {
+  section, route, content, verdict,
+}: { section: Section; route?: string; content: SiteContent; verdict: SectionVerdict }) {
   return (
     <div className="rounded-xl border border-uiCardRule bg-uiBg p-5 shadow-raised">
       <VerdictBar section={section} verdict={verdict} />
-      <SectionBody section={section} content={content} />
+      <SectionBody section={section} route={route} content={content} />
     </div>
   );
 }
 
-function SectionBody({ section, content }: { section: Section; content: SiteContent }) {
+function SectionBody({ section, route, content }: { section: Section; route?: string; content: SiteContent }) {
   switch (section) {
     case 'brand': {
       const b = content.brand;
@@ -209,6 +256,32 @@ function SectionBody({ section, content }: { section: Section; content: SiteCont
     }
     case 'services': {
       const s = content.services;
+      const items = s.items ?? [];
+      // The per-service body prose (services.items[].detail) is the two-to-three-sentence
+      // expansion shown when a card opens on the Services page. It is generated and reaches
+      // client sites, so it is rendered here (home card) and again, on its own, in the Services
+      // page group below — both edit the same field, one approved independently of the other.
+      const detailBlock = (it: { detail?: string }, i: number) =>
+        hasText(it.detail)
+          ? <p className="mt-2 text-sm leading-relaxed text-uiFg2"><E p={`services.items.${i}.detail`}>{it.detail}</E></p>
+          : <p className="mt-2 text-xs italic text-uiFg3">No service detail generated. The service page will fall back to the short description.</p>;
+
+      // Services PAGE group (decision 48): just the per-service prose that appears on /services.
+      if (route) {
+        return (
+          <div className="space-y-3">
+            {items.length > 0
+              ? items.map((it, i) => (
+                <Card key={i}>
+                  <p className="font-display text-lg font-semibold text-uiInk">{hasText(it.t) ? it.t : <NotSet />}</p>
+                  {detailBlock(it, i)}
+                </Card>
+              ))
+              : <p className="text-sm italic text-uiFg3">No services yet</p>}
+          </div>
+        );
+      }
+
       return (
         <div className="space-y-5">
           <div className="space-y-3">
@@ -217,18 +290,51 @@ function SectionBody({ section, content }: { section: Section; content: SiteCont
             <p className="text-sm leading-relaxed text-uiFg2"><E p="services.sub">{s.sub}</E></p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {s.items?.length > 0
-              ? s.items.map((it, i) => (
+            {items.length > 0
+              ? items.map((it, i) => (
                 <Card key={i}>
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-display text-lg font-semibold text-uiInk">{hasText(it.t) ? <E p={`services.items.${i}.t`}>{it.t}</E> : <NotSet />}</p>
                     {hasText(it.tag) && <span className="badge shrink-0">{it.tag}</span>}
                   </div>
                   <p className="mt-1 text-sm text-uiFg2">{hasText(it.d) ? <E p={`services.items.${i}.d`}>{it.d}</E> : <NotSet />}</p>
+                  {detailBlock(it, i)}
                 </Card>
               ))
               : <p className="text-sm italic text-uiFg3">No services yet</p>}
           </div>
+        </div>
+      );
+    }
+    case 'subpages': {
+      // A non-home page's header (eyebrow/title/sub + optional CTA) and that page's own SEO.
+      // Rendered from SiteContent.subpages[route]; every absent field is NotSet, never a
+      // fabricated placeholder (§0.2 rule 2). Header fields are click-to-edit through the same
+      // subpages.<route>.header.<field> paths compose-page.tsx uses for the live preview.
+      if (!route) return <p className="text-sm italic text-uiFg3">Nothing to review for this section.</p>;
+      const sp = content.subpages?.[route];
+      const h = sp?.header;
+      const cta = h?.cta;
+      return (
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <Eyebrow><E p={`subpages.${route}.header.eyebrow`}>{h?.eyebrow ?? ''}</E></Eyebrow>
+            <p className="font-display text-3xl font-semibold leading-tight text-uiInk">
+              {hasText(h?.title) ? <E p={`subpages.${route}.header.title`} fit>{h!.title}</E> : <NotSet />}
+            </p>
+            <p className="text-sm leading-relaxed text-uiFg2">
+              {hasText(h?.sub) ? <E p={`subpages.${route}.header.sub`}>{h!.sub}</E> : <NotSet />}
+            </p>
+          </div>
+          {cta && hasText(cta.label) && hasText(cta.href) && (
+            <div className="flex flex-wrap gap-2"><CtaChip label={cta.label} primary /></div>
+          )}
+          <Group title="Page SEO">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <KV label="SEO title" value={sp?.seo?.title} />
+              <KV label="SEO description" value={sp?.seo?.description} />
+            </div>
+          </Group>
         </div>
       );
     }
