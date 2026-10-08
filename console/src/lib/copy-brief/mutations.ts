@@ -67,3 +67,20 @@ export function removeCustomField(brief: CopyBrief, id: string): CopyBrief {
 export function emptyCopyBrief(): CopyBrief {
   return { blocks: {}, customFields: [] };
 }
+
+/**
+ * Normalise a brief read from .draft.json or site.ts's _meta.copyBrief. Entries written before the
+ * copy review was per-page are bare section ids. THE SAFE DEFAULT IS TO KEEP THEM AS HOME/SITE-WIDE
+ * KEYS, which is what they meant: before Phase 10 there was no per-route review, so every verdict a
+ * bare id carries was about the home page or site-wide content. Do NOT fan a bare id out across
+ * every route — that would silently mark unreviewed service pages as reviewed, the exact failure
+ * decision 51's gate exists to prevent. A bare section id is already a valid VerdictKey, so the only
+ * transformation here is a dedupe; this is the single hook point if the key shape ever migrates.
+ */
+export function normalizeVerdicts(brief: CopyBrief): CopyBrief {
+  const ticked = brief.tickedSections;
+  if (!ticked || ticked.length === 0) return brief;
+  const seen = new Set<string>();
+  const deduped = ticked.filter((k) => (seen.has(k) ? false : (seen.add(k), true)));
+  return deduped.length === ticked.length ? brief : { ...brief, tickedSections: deduped };
+}

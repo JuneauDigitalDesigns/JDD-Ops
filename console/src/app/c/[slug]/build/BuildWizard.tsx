@@ -10,7 +10,7 @@ import { deepMerge, applyEdits } from '@/lib/merge';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import type { CopyBrief } from '@jdd/schema';
-import { emptyCopyBrief } from '@/lib/copy-brief/mutations';
+import { emptyCopyBrief, normalizeVerdicts } from '@/lib/copy-brief/mutations';
 import { DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import {
   reconcileOrder,
@@ -118,7 +118,7 @@ function freshBundle(seed: SiteContent | null): WizardBundle {
     skins: {},
     order: [],
     intakeStage: 'brief',
-    brief: (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief(),
+    brief: normalizeVerdicts((seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief()),
     copyModel: DEFAULT_MODEL_ID,
     siteComposition: defaultCompositionFor(),
   };
@@ -401,7 +401,7 @@ export default function BuildWizard({
     // rebuild) rather than an empty one — a bundle can be missing the key entirely (an old
     // save predating the Brief stage) or the client's localStorage can simply be gone, and
     // either way the brief the operator built last time should still be there.
-    setBrief(b.brief ?? (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief());
+    setBrief(normalizeVerdicts(b.brief ?? (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief()));
     setCopyModel(b.copyModel ?? DEFAULT_MODEL_ID);
     // Prefer a saved composition; otherwise lift the legacy selections/order (existing clients),
     // otherwise the default 4-page site. ensureSectionIds backfills stable ids on any composition

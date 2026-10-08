@@ -69,6 +69,24 @@ export interface CopyResult {
 
 export type Section = keyof CopyResult;
 
+/** A review verdict addresses ONE section on ONE page instance (decision 50). Home sections and
+ *  site-wide content use the bare section id; anything that exists per route is prefixed with that
+ *  route. A section placed on two pages is approved independently, the way SiteContent.sectionStyles
+ *  keys off the per-instance section id (lib/pages.ts styleKeyFor). Kept as a plain string so no
+ *  @jdd/schema change is needed: CopyBrief.tickedSections is already typed string[]. */
+export type VerdictKey = string; // `${section}` | `${route}:${section}`
+
+export const verdictKey = (section: Section, route?: string): VerdictKey =>
+  route ? `${route}:${section}` : section;
+
+/** Split a key back into its parts. A key with no ':' is a home/site-wide section. */
+export function parseVerdictKey(k: VerdictKey): { route?: string; section: Section } {
+  const i = k.indexOf(':');
+  return i < 0
+    ? { section: k as Section }
+    : { route: k.slice(0, i), section: k.slice(i + 1) as Section };
+}
+
 export const ALL_SECTIONS: Section[] = [
   'brand', 'announcement', 'trust', 'hero', 'about', 'services',
   'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo', 'subpages',
