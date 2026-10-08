@@ -20,7 +20,7 @@ import { EASE } from '@/lib/motion';
  */
 export default function PagesMenu({
   composition, categories, effective, activeRoute,
-  onOpenPage, onAddPage, onRemovePage, onRenameLabel, onToggleNav, onOpenSiteStyle, onClose,
+  onOpenPage, onAddPage, onGenerateServicePages, onRemovePage, onRenameLabel, onToggleNav, onOpenSiteStyle, onClose,
 }: {
   composition: SiteComposition;
   categories: CategoryEntry[];
@@ -28,6 +28,7 @@ export default function PagesMenu({
   activeRoute: string;
   onOpenPage: (route: string) => void;
   onAddPage: (pageType: PageTypeId) => void;
+  onGenerateServicePages: () => void;
   onRemovePage: (route: string) => void;
   onRenameLabel: (route: string, label: string) => void;
   onToggleNav: (route: string) => void;
@@ -172,6 +173,20 @@ export default function PagesMenu({
                 );
               })}
             </div>
+
+            <button
+              type="button"
+              disabled={atCap}
+              onClick={onGenerateServicePages}
+              title={atCap ? `Sites are capped at ${MAX_PAGES} pages` : 'Add one page per service (decision 20)'}
+              className={[
+                'mt-2 flex items-center justify-between rounded-lg border border-dashed px-3 py-2 text-left text-sm transition-colors',
+                atCap ? 'cursor-not-allowed border-rule/50 text-fg3/50' : 'border-rule text-fg2 hover:border-accent hover:text-accent',
+              ].join(' ')}
+            >
+              Generate a page for each service
+              <Plus size={14} />
+            </button>
 
             {canAddOptional && (
               <div className="relative mt-2">

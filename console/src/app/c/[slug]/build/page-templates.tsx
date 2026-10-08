@@ -2,77 +2,214 @@
  * The page-template registry: for each kind of page, one or more ready-made compositions of the
  * existing section catalog. A "page template" is just an ordered list of SectionRef (into the
  * catalog); the Studio's page picker applies one to a page. Non-home templates open with a
- * `pageHeader`; Home stays lean (5 sections) per the locked design decisions.
+ * `pageHeader`; home stays header-less (it uses the hero).
  *
- * Every seed template uses an ADAPTING finalCta (Banner/Split) — those read _meta.selectedPlan
- * at render to pick email vs phone lead capture, so no plan-gating logic is needed here.
+ * Phase 9 (decision 24): every section carries an explicit `rhythm`, decided here at the page
+ * level, never inside a component. Each template keeps at least three distinct rhythms with no
+ * three consecutive repeats (decision 30d), at most one inverted section (decision 12), and at
+ * most two signature components (decision 26) — all enforced by console/test/page-rhythm.test.mjs.
  */
-import type { PageInstance, PageTemplate, PageTypeId, SiteComposition } from '@/lib/pages';
+import type { PageInstance, PageTemplate, PageTypeId, SectionRhythm, SiteComposition } from '@/lib/pages';
 import { newSectionId } from '@/lib/pages';
 import type { SkinId } from '@/lib/skins';
 
-const S = (categoryId: string, name: string, skin?: SkinId) => (skin ? { categoryId, name, skin } : { categoryId, name });
+const S = (categoryId: string, name: string, rhythm?: SectionRhythm, skin?: SkinId) => ({
+  categoryId,
+  name,
+  ...(rhythm ? { rhythm } : {}),
+  ...(skin ? { skin } : {}),
+});
 
 export const PAGE_TEMPLATES: PageTemplate[] = [
+  // ── Home (header-less; researched order hero > differentiators > services > areas > proof > work > faq > contact) ──
   {
     id: 'home-standard', pageType: 'home', label: 'Home — Standard',
-    sections: [S('hero', 'HeroSplit'), S('trust', 'TrustBadges'), S('services', 'ServicesGrid'), S('testimonials', 'TestimonialsGrid'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('hero', 'HeroSplit', 'bleed'),
+      S('differentiators', 'DifferentiatorsIndex', 'normal'),
+      S('services', 'ServicesGrid', 'loose'),
+      S('trust', 'ServiceArea', 'tight'),
+      S('testimonials', 'TestimonialsGrid', 'normal'),
+      S('work', 'RecentJobsGrid', 'bleed'),
+      S('faq', 'FaqAccordion', 'loose'),
+      S('finalCta', 'FinalCtaBanner', 'tight', 'inverted'),
+    ],
   },
   {
     id: 'home-bold', pageType: 'home', label: 'Home — Bold',
-    sections: [S('hero', 'HeroOverlap'), S('trust', 'TrustReviewsAggregate'), S('services', 'ServicesPanel'), S('testimonials', 'TestimonialsCarousel'), S('finalCta', 'FinalCtaSplit')],
+    sections: [
+      S('hero', 'HeroOverlap', 'bleed'),
+      S('stats', 'StatsBand', 'tight', 'inverted'),
+      S('differentiators', 'DifferentiatorsPanels', 'loose'),
+      S('services', 'ServicesShowcase', 'normal'),
+      S('trust', 'TrustReviewsAggregate', 'tight'),
+      S('work', 'WorkSpotlight', 'bleed'),
+      S('testimonials', 'TestimonialsMarquee', 'normal'),
+      S('finalCta', 'FinalCtaSplit', 'loose'),
+    ],
   },
+  {
+    id: 'home-quiet', pageType: 'home', label: 'Home — Quiet',
+    sections: [
+      S('hero', 'HeroFormFocus', 'normal'),
+      S('trust', 'TrustBadges', 'tight'),
+      S('differentiators', 'DifferentiatorsRail', 'text'),
+      S('services', 'ServicesSpotlight', 'loose'),
+      S('testimonials', 'TestimonialsCarousel', 'normal'),
+      S('faq', 'FaqIndex', 'text'),
+      S('contact', 'ContactSplit', 'loose', 'inverted'),
+    ],
+  },
+
+  // ── Services (listing page) — three templates; 2nd/3rd swap the page-header archetype (decision 19) ──
   {
     id: 'services-standard', pageType: 'services', label: 'Services — Standard',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('services', 'ServicesGrid'), S('faq', 'FaqAccordion'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('pageHeader', 'PageHeaderSimple', 'bleed'),
+      S('services', 'ServicesGrid', 'normal'),
+      S('faq', 'FaqAccordion', 'loose'),
+      S('finalCta', 'FinalCtaBanner', 'tight'),
+    ],
   },
   {
-    // Bolder, more scannable: feature panels + sticky-aside FAQ + split CTA. Differs from
-    // services-standard in both variants and order-feel. Skins left at each component's default.
     id: 'services-panel', pageType: 'services', label: 'Services — Panel',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('services', 'ServicesPanel'), S('trust', 'TrustBadges'), S('faq', 'FaqStickyAside'), S('finalCta', 'FinalCtaSplit')],
+    sections: [
+      S('pageHeader', 'PageHeaderOverlap', 'bleed'),
+      S('services', 'ServicesPanel', 'normal'),
+      S('trust', 'TrustBadges', 'loose'),
+      S('faq', 'FaqStickyAside', 'tight'),
+      S('finalCta', 'FinalCtaSplit', 'normal'),
+    ],
   },
+  {
+    id: 'services-showcase', pageType: 'services', label: 'Services — Showcase',
+    sections: [
+      S('pageHeader', 'PageHeaderEditorial', 'bleed'),
+      S('services', 'ServicesShowcase', 'normal'),
+      S('differentiators', 'DifferentiatorsIndex', 'loose'),
+      S('faq', 'FaqIndex', 'tight'),
+      S('finalCta', 'FinalCtaSimple', 'normal'),
+    ],
+  },
+
+  // ── About — three templates ──
   {
     id: 'about-standard', pageType: 'about', label: 'About — Standard',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('about', 'AboutStory'), S('trust', 'ServiceArea'), S('testimonials', 'TestimonialsGrid'), S('finalCta', 'FinalCtaSplit')],
+    sections: [
+      S('pageHeader', 'PageHeaderSimple', 'bleed'),
+      S('about', 'AboutStory', 'normal'),
+      S('trust', 'ServiceArea', 'loose'),
+      S('testimonials', 'TestimonialsGrid', 'tight'),
+      S('finalCta', 'FinalCtaSplit', 'normal'),
+    ],
   },
   {
-    // Proof-forward: the testimonial carousel moves ABOVE the trust band, and trust badges replace
-    // the service-area block. Carousel + banner CTA distinguish it from about-standard.
     id: 'about-proof', pageType: 'about', label: 'About — Proof',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('about', 'AboutStory'), S('testimonials', 'TestimonialsCarousel'), S('trust', 'TrustBadges'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('pageHeader', 'PageHeaderEditorial', 'bleed'),
+      S('about', 'AboutStory', 'normal'),
+      S('testimonials', 'TestimonialsCarousel', 'loose'),
+      S('trust', 'TrustBadges', 'tight'),
+      S('finalCta', 'FinalCtaBanner', 'normal'),
+    ],
   },
+  {
+    id: 'about-sticky', pageType: 'about', label: 'About — Sticky',
+    sections: [
+      S('pageHeader', 'PageHeaderMinimal', 'bleed'),
+      S('about', 'AboutSticky', 'normal'),
+      S('stats', 'StatsBand', 'loose'),
+      S('testimonials', 'TestimonialsMarquee', 'tight'),
+      S('finalCta', 'FinalCtaBanner', 'normal'),
+    ],
+  },
+
+  // ── Contact — three templates ──
   {
     id: 'contact-standard', pageType: 'contact', label: 'Contact — Standard',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('contact', 'ContactSplit'), S('faq', 'FaqStickyAside'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('pageHeader', 'PageHeaderSimple', 'bleed'),
+      S('contact', 'ContactSplit', 'normal'),
+      S('faq', 'FaqStickyAside', 'loose'),
+      S('finalCta', 'FinalCtaBanner', 'tight'),
+    ],
   },
   {
-    // Contact-first with coverage: an overlap contact card + a service-area statement, lean CTA.
-    // Drops the FAQ that contact-standard carries.
     id: 'contact-overlap', pageType: 'contact', label: 'Contact — Coverage',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('contact', 'ContactCardOverlap'), S('trust', 'ServiceArea'), S('finalCta', 'FinalCtaSimple')],
+    sections: [
+      S('pageHeader', 'PageHeaderMinimal', 'bleed'),
+      S('contact', 'ContactCardOverlap', 'normal'),
+      S('trust', 'ServiceArea', 'loose'),
+      S('finalCta', 'FinalCtaSimple', 'tight'),
+    ],
   },
-  // Optional 5th-page candidates — one template each for v1.
+  {
+    id: 'contact-direct', pageType: 'contact', label: 'Contact — Direct',
+    sections: [
+      S('pageHeader', 'PageHeaderOverlap', 'bleed'),
+      S('contact', 'ContactInlineStrip', 'normal'),
+      S('faq', 'FaqIndex', 'loose'),
+      S('finalCta', 'FinalCtaSplit', 'tight'),
+    ],
+  },
+
+  // ── Optional 5th-page candidates — one template each ──
   {
     id: 'reviews-standard', pageType: 'reviews', label: 'Reviews — Standard',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('testimonials', 'TestimonialsGrid'), S('trust', 'TrustReviewsAggregate'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('pageHeader', 'PageHeaderSimple', 'bleed'),
+      S('testimonials', 'TestimonialsGrid', 'normal'),
+      S('trust', 'TrustReviewsAggregate', 'loose'),
+      S('finalCta', 'FinalCtaBanner', 'tight'),
+    ],
   },
   {
     id: 'gallery-standard', pageType: 'gallery', label: 'Gallery — Standard',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('work', 'BeforeAfter'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('pageHeader', 'PageHeaderSimple', 'bleed'),
+      S('work', 'BeforeAfter', 'normal'),
+      S('finalCta', 'FinalCtaBanner', 'loose'),
+    ],
   },
   {
     id: 'areas-standard', pageType: 'areas', label: 'Service Areas — Standard',
-    sections: [S('pageHeader', 'PageHeaderSimple'), S('trust', 'ServiceArea'), S('finalCta', 'FinalCtaBanner')],
+    sections: [
+      S('pageHeader', 'PageHeaderSimple', 'bleed'),
+      S('trust', 'ServiceArea', 'normal'),
+      S('finalCta', 'FinalCtaBanner', 'loose'),
+    ],
+  },
+
+  // ── Per-service pages (decision 20); generated, not operator-added. ──
+  {
+    id: 'service-standard', pageType: 'service', label: 'Service — Standard',
+    sections: [
+      S('pageHeader', 'PageHeaderOverlap', 'bleed'),
+      S('services', 'ServicesAccordion', 'normal'),
+      S('work', 'BeforeAfter', 'loose'),
+      S('faq', 'FaqStickyAside', 'normal'),
+      S('finalCta', 'FinalCtaBanner', 'tight'),
+    ],
+  },
+  {
+    id: 'service-proof', pageType: 'service', label: 'Service — Proof',
+    sections: [
+      S('pageHeader', 'PageHeaderEditorial', 'normal'),
+      S('differentiators', 'DifferentiatorsIndex', 'loose'),
+      S('testimonials', 'TestimonialsGrid', 'normal'),
+      S('trust', 'ServiceArea', 'tight'),
+      S('contact', 'ContactInlineStrip', 'tight'),
+    ],
   },
 ];
 
-/** Templates available for a given page type (one or more; home + core pages have two). */
+/** Templates available for a given page type (one or more). */
 export function templatesFor(pageType: PageTypeId): PageTemplate[] {
   return PAGE_TEMPLATES.filter((t) => t.pageType === pageType);
 }
 
-/** Route + default nav label per page type. */
+/** Route + default nav label per page type. `service` has no fixed route or label: those are
+ *  per-instance, derived from the service item (see servicePageFrom). */
 const PAGE_META: Record<PageTypeId, { route: string; label: string }> = {
   home:     { route: '',         label: 'Home' },
   services: { route: 'services', label: 'Services' },
@@ -81,6 +218,7 @@ const PAGE_META: Record<PageTypeId, { route: string; label: string }> = {
   reviews:  { route: 'reviews',  label: 'Reviews' },
   gallery:  { route: 'gallery',  label: 'Gallery' },
   areas:    { route: 'areas',    label: 'Service Areas' },
+  service:  { route: '',         label: 'Service' },
 };
 
 export function pageMetaFor(pageType: PageTypeId): { route: string; label: string } {
@@ -96,6 +234,11 @@ export const CORE_ADD_PAGE_TYPES: PageTypeId[] = ['services', 'about', 'contact'
 
 /** Build a fresh PageInstance for a page type, seeded from its first (default) template. */
 export function pageFromType(pageType: PageTypeId): PageInstance {
+  if (pageType === 'service') {
+    // Service pages are per-instance (route + header come from the service item); there is no
+    // single default route to seed from here.
+    throw new Error("Use servicePageFrom(item, route) for 'service' pages, not pageFromType.");
+  }
   const tmpl = templatesFor(pageType)[0];
   const meta = PAGE_META[pageType];
   return {
@@ -104,6 +247,21 @@ export function pageFromType(pageType: PageTypeId): PageInstance {
     label: meta.label,
     templateId: tmpl.id,
     navVisible: true,
+    sections: tmpl.sections.map((s) => ({ ...s, id: newSectionId() })),
+  };
+}
+
+/** Build a per-service PageInstance (decision 20). `route` is `services/<slug>` (from
+ *  servicePageRoutes); the nav label is the service's own title; navVisible is false (linked from
+ *  the services section, not the top nav). Header copy is filled at export from the service item. */
+export function servicePageFrom(item: { t: string }, route: string): PageInstance {
+  const tmpl = templatesFor('service')[0];
+  return {
+    route,
+    pageType: 'service',
+    label: item.t,
+    templateId: tmpl.id,
+    navVisible: false,
     sections: tmpl.sections.map((s) => ({ ...s, id: newSectionId() })),
   };
 }

@@ -1,7 +1,7 @@
 // PAGE-LEVEL invariants. Everything here is a property of a WHOLE PAGE, which is why it cannot
 // live in catalog-invariants.test.mjs: a component cannot see the page it is placed on, and that
 // is exactly why decision 24 puts rhythm at the template level rather than inside components.
-import { test, skip } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -48,10 +48,8 @@ test('at most two signature motion moments per page (decision 26)', () => {
   }
 });
 
-// UN-SKIP THIS IN PHASE 9, which is the phase that adds `rhythm` to SectionRef and sets it on
-// every template. It is written now, and skipped, so that phase has a test to turn on rather than
-// a test to invent, and so the rule is reviewable before anything is built against it.
-skip('section rhythm is never uniform (decision 30d)', () => {
+// Un-skipped in Phase 9, which added `rhythm` to SectionRef and set it on every template.
+test('section rhythm is never uniform (decision 30d)', () => {
   for (const t of PAGE_TEMPLATES) {
     const rhythms = t.sections.map((s) => s.rhythm);
     assert.ok(rhythms.every(Boolean), `${t.id}: every section needs an explicit rhythm`);

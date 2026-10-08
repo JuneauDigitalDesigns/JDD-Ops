@@ -11,17 +11,27 @@
  */
 import type { NavItem } from '@jdd/schema';
 import type { SkinId } from '@/lib/skins';
+import { slugify } from '@/lib/slugify';
+
+/** Where a section sits in the page's vertical rhythm. Decided by the PAGE TEMPLATE, never by the
+ *  component (decision 24), which is what makes decision 30d's non-uniform-padding ban enforceable
+ *  at the only level that can see a whole page. Classes come from template/src/styles/rhythm.plugin.ts. */
+export type SectionRhythm = 'bleed' | 'tight' | 'normal' | 'loose' | 'text';
+
+/** The rh-* utility class for a rhythm, or '' when unset (a legacy section carries no rhythm). */
+export const rhythmClass = (r?: SectionRhythm): string => (r ? `rh-${r}` : '');
 
 /** One placed section inside a page — a reference into the existing section catalog.
  *  `id` is a stable, per-instance identity minted when the section is placed (applyTemplate /
  *  pageFromType / add-section). It keys SiteContent.sectionStyles for body sections so per-section
  *  styling survives reordering; chrome (nav/footer) keys off the slot name instead (see styleKeyFor). */
-export type SectionRef = { id?: string; categoryId: string; name: string; skin?: SkinId };
+export type SectionRef = { id?: string; categoryId: string; name: string; skin?: SkinId; rhythm?: SectionRhythm };
 
 /** The stable identity of a kind of page. Drives defaults, nav label, and route. */
 export type PageTypeId =
   | 'home' | 'services' | 'about' | 'contact'   // the four defaults
-  | 'reviews' | 'gallery' | 'areas';            // optional-5th candidates
+  | 'reviews' | 'gallery' | 'areas'             // optional-5th candidates
+  | 'service';                                  // one generated page per service item (decision 20)
 
 /** A page template = an ordered list of BODY sections (nav/footer/seo are chrome, not here).
  *  Every non-home template MUST begin with a `pageHeader` section. */
@@ -52,8 +62,9 @@ export type SiteComposition = {
 
 // 1, not 3: a legacy single-page client lifts to a one-page composition and must stay valid
 // (single-page sites are still shippable). The default is 4 pages; the operator can add up to MAX.
+// 16 = 4 core + up to 3 optional + up to 9 generated service pages (decision 20).
 export const MIN_PAGES = 1;
-export const MAX_PAGES = 7;
+export const MAX_PAGES = 16;
 
 /** Reserved route slugs a custom page may not use (they collide with Next internals). */
 const RESERVED_ROUTES = new Set(['api', '_next', 'images']);
@@ -100,9 +111,19 @@ export function navLinksFor(comp: SiteComposition): NavItem[] {
   return comp.pages.filter((p) => p.navVisible).map((p) => ({ label: p.label, href: navHref(p.route) }));
 }
 
-/** True for a syntactically valid custom route slug (lowercase URL segment, not reserved). */
+/** True for a syntactically valid route slug: one lowercase URL segment, or two for a nested
+ *  service route like `services/ac-repair` (decision 20). The reserved check is against the FIRST
+ *  segment, since that is what collides with a Next internal directory. */
 export function isValidRoute(route: string): boolean {
-  return /^[a-z0-9-]+$/.test(route) && !RESERVED_ROUTES.has(route);
+  if (!/^[a-z0-9-]+(\/[a-z0-9-]+)?$/.test(route)) return false;
+  return !RESERVED_ROUTES.has(route.split('/')[0]);
+}
+
+/** One route per service (decision 20): `services/<slug of item.t>`. navVisible is false on these
+ *  (they are linked from the services section, not the top nav, which would otherwise overflow);
+ *  header copy is derived from the client's own service item, never invented. */
+export function servicePageRoutes(items: { t: string }[]): string[] {
+  return items.map((it) => `services/${slugify(it.t)}`);
 }
 
 /**
@@ -134,6 +155,18 @@ export function validateComposition(comp: SiteComposition): SiteComposition {
       if (hasHeader) throw new Error('The home page must not contain a page header (it uses the hero).');
     } else {
       if (!firstIsHeader) throw new Error(`Page "${page.route}" must open with a page header.`);
+    }
+
+    // Decision 30d: a page whose sections ALL carry one rhythm is uniform padding, the AI-sameness
+    // tell. Only enforced once rhythms are set, so a legacy page (no rhythms) is not rejected.
+    const rhythms = page.sections.map((s) => s.rhythm);
+    if (page.sections.length > 1 && rhythms.every(Boolean) && new Set(rhythms).size === 1) {
+      throw new Error(`Page "${page.route || '(home)'}" uses a uniform section rhythm; decision 30d bans it.`);
+    }
+    // Decision 12: one dark anchor section per page, maximum.
+    const inverted = page.sections.filter((s) => s.skin === 'inverted').length;
+    if (inverted > 1) {
+      throw new Error(`Page "${page.route || '(home)'}" has ${inverted} inverted sections; decision 12 allows one.`);
     }
   }
   return comp;

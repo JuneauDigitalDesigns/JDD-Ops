@@ -14,7 +14,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { routePath, styleKeyFor, type SiteComposition } from '@/lib/pages';
+import { routePath, styleKeyFor, rhythmClass, type SectionRhythm, type SiteComposition } from '@/lib/pages';
 import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
@@ -607,11 +607,15 @@ export function wirePages(
 
     /** Emit one section element, wrapped in a sectionVars div only when it carries a style.
      *  Unstyled → a single 6-space-indented line, identical to the pre-styling output. */
-    const emit = (inner: string, ref: { id?: string; categoryId: string; name: string }): string[] => {
+    const emit = (inner: string, ref: { id?: string; categoryId: string; name: string; rhythm?: SectionRhythm }): string[] => {
       const k = styledKeyOf(ref);
-      if (!k) return [`      ${inner}`];
+      const rc = rhythmClass(ref.rhythm);
+      // Byte-identical to the pre-rhythm output when a ref carries neither a style nor a rhythm.
+      if (!k && !rc) return [`      ${inner}`];
+      const cls = rc ? ` className="${rc}"` : '';
+      const sty = k ? ` style={sectionVars(CONTENT.brand, CONTENT.sectionStyles?.[${JSON.stringify(k)}])}` : '';
       return [
-        `      <div style={sectionVars(CONTENT.brand, CONTENT.sectionStyles?.[${JSON.stringify(k)}])}>`,
+        `      <div${cls}${sty}>`,
         `        ${inner}`,
         `      </div>`,
       ];

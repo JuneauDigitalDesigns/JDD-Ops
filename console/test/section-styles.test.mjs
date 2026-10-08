@@ -2,6 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ensureSectionIds, styleKeyFor, newSectionId } from '../src/lib/pages.ts';
 import { defaultCompositionFor, applyTemplate, pageFromType, templatesFor, PAGE_TEMPLATES } from '../src/app/c/[slug]/build/page-templates.tsx';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // NOTE: wirePages' generated-code output (the sectionVars wrapper) is verified by tsc + an actual
 // client export/build rather than here — export.ts transitively imports `server-only`, which the
@@ -52,28 +57,28 @@ test('default composition sections all carry stable ids', () => {
   }
 });
 
-test('core non-home pages each have a second template', () => {
+test('core non-home pages each have three templates (Phase 9 added a third per core type)', () => {
   for (const [pt, expectId] of [['services', 'services-panel'], ['about', 'about-proof'], ['contact', 'contact-overlap']]) {
     const list = templatesFor(pt);
-    assert.equal(list.length, 2, `${pt} has two templates`);
+    assert.equal(list.length, 3, `${pt} has three templates`);
     assert.ok(list.some((t) => t.id === expectId), `${pt} includes ${expectId}`);
   }
-  // Home stays at two; optional 5th pages stay at one.
-  assert.equal(templatesFor('home').length, 2);
+  // Home now has three (standard/bold/quiet); per-service pages have two; optional 5th pages one.
+  assert.equal(templatesFor('home').length, 3);
+  assert.equal(templatesFor('service').length, 2);
   assert.equal(templatesFor('reviews').length, 1);
   assert.equal(templatesFor('gallery').length, 1);
   assert.equal(templatesFor('areas').length, 1);
 });
 
-test('every template section references a real catalog component (no new components)', () => {
-  const CATALOG_NAMES = new Set([
-    'NavMinimal','NavEmergencyBar','PageHeaderSimple','HeroSplit','HeroFormFocus','HeroOverlap',
-    'TrustBadges','TrustReviewsAggregate','ServiceArea','AboutFeature','AboutStory',
-    'ServicesGrid','ServicesAccordion','ServicesPanel','RecentJobsGrid','BeforeAfter',
-    'FaqAccordion','FaqStickyAside','TestimonialsGrid','TestimonialsCarousel',
-    'FinalCtaBanner','FinalCtaSimple','FinalCtaSplit','ContactSplit','ContactCardOverlap',
-    'ContactInlineStrip','FooterColumns','FooterMinimal','SeoDefault','SeoLocalBusiness',
-  ]);
+test('every template section references a real catalog component', () => {
+  // Derived from the real CATALOG in export.ts (read, not imported: export.ts pulls server-only)
+  // so this cannot go stale as the catalog grows, which is exactly what the old hardcoded snapshot
+  // did when waves 1 and 2 landed.
+  const exportSrc = readFileSync(path.join(ROOT, 'src/lib/export.ts'), 'utf8');
+  const block = /export const CATALOG[^{]*\{([\s\S]*?)\n\};/.exec(exportSrc)[1];
+  const CATALOG_NAMES = new Set([...block.matchAll(/'([A-Za-z0-9]+)'/g)].map((m) => m[1]));
+  assert.ok(CATALOG_NAMES.size > 30, 'parsed the catalog name set');
   for (const t of PAGE_TEMPLATES) {
     for (const s of t.sections) {
       assert.ok(CATALOG_NAMES.has(s.name), `${t.id} references unknown component ${s.name}`);

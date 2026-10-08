@@ -784,3 +784,62 @@ about-page ordering there.
 differentiators + stats, built inside the client repo, to prove the new BODY_SLOTS ids wire through
 wirePages), and the picker/side-by-side visual review. Phase 9 places all Phase-7/8 components into
 PAGE_TEMPLATES and sets rhythm (un-skips page-rhythm test 3).
+
+## Phase 9, COMPLETE 2026-10-07 (one piece deferred, below). No `@jdd/ui` tag.
+
+Page structure: encoded rhythm, the researched home order, and per-service pages. Build gate green,
+and page-rhythm test 3 is now LIVE (183/183, 0 skipped).
+
+**9a, rhythm as a field (decision 24):**
+- `pages.ts`: `SectionRhythm = 'bleed'|'tight'|'normal'|'loose'|'text'`, `rhythmClass()`, and
+  `rhythm?` on `SectionRef`. `validateComposition` gained two throws: a uniform-rhythm page
+  (decision 30d, only once rhythms are set so legacy pages are untouched) and a >1-inverted page
+  (decision 12).
+- `export.ts` `wirePages` `emit()`: a ref with a rhythm now gets `className="rh-*"` on its wrapper,
+  and a ref with a rhythm but no style still gets a wrapper div; byte-identical output when a ref
+  has neither (legacy pages unchanged).
+- `PageStudio.tsx` `SectionShell`: the inner div carries `rhythmClass(ref.rhythm)` so preview and
+  export agree.
+- `page-rhythm.test.mjs`: test 3 un-skipped.
+
+**9b, templates:** `S()` helper is now `S(categoryId, name, rhythm?, skin?)`. Three home templates
+(standard/bold/quiet) in the researched order, each with one inverted section, <=2 signature, >=3
+distinct rhythms and no 3 consecutive repeats. Rhythms added to all nine non-home templates; the
+2nd template of each core type swaps the page-header archetype (decision 19); a third template was
+added per core type (services-showcase, about-sticky, contact-direct) using wave-1/2 components.
+Two `section-styles.test.mjs` tests updated to match: the core-template count is now 3 (was asserted
+2), and the "real catalog component" check now DERIVES its name set from the real CATALOG in
+export.ts (read, not imported) instead of a hardcoded pre-waves snapshot, so it cannot go stale
+again.
+
+**9c, one page per service (decision 20):**
+- `pages.ts`: `PageTypeId` gained `'service'`; `isValidRoute` widened to one optional slash
+  (`services/ac-repair`) with the reserved check on the first segment; `MAX_PAGES` 7 -> 16;
+  `servicePageRoutes(items)` -> `services/<slug(item.t)>`.
+- `page-templates.tsx`: two `service` templates (service-standard, service-proof); `servicePageFrom
+  (item, route)` (navVisible false, label = item.t); `pageFromType('service')` throws and points at
+  it; `PAGE_META.service` added.
+- Generation UI: `BuildWizard.generateServicePages` (idempotent, skips existing routes, respects
+  MAX_PAGES) wired through `PageStudio` to a new PagesMenu button "Generate a page for each service".
+
+**9d hazard:** confirmed both LaunchDialog and DeployDialog carry `composition`, so the exporter
+runs `wirePages` (not the legacy flattening) and an 8-section home page exports as 8, not 5.
+
+**DEFERRED (one 9c piece):** the export route does not enrich `content.subpages[route].header` for
+service routes to `{eyebrow: item.tag, title: item.t, sub: item.d, cta: null}`. There is no existing
+subpages-fill step in `api/build/export/route.ts` to extend (the plan's line-162 reference is stale),
+and a service page already renders a working header via wirePages' `fallbackHeaderLiteral(page.label)`
+where label is the service's own title. So service pages build with a correct title header; the
+richer eyebrow/sub enrichment is the one outstanding piece. Not a blocker.
+
+**Residual caveat (from Phase 8):** CANONICAL_ORDER dropped `about`; multi-page `about` pages are
+managed via addPage/composition (not reconcileOrder), so the home/subpage flows are fine, but a
+LEGACY single-page client with an about-category section could order oddly on re-export. No live
+client is on that path; verify if one surfaces.
+
+**Build gate 2026-10-07:** `console npm test` 183/183 (0 fail, 0 skipped); `console npm run build`
+EXIT 0; `template npm run build` EXIT 0.
+
+**Owed to the user (deferred):** the plan's export test (a scratch client with home-standard +
+generated service pages, built inside the client repo, confirming each `services/<slug>/page.tsx`
+exists and wraps sections in `rh-*` divs), and the preview look at the three home templates.

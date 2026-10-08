@@ -22,8 +22,8 @@ import {
 import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import PageStudio from './PageStudio';
-import { defaultCompositionFor, pageFromType, applyTemplate, PAGE_TEMPLATES } from './page-templates';
-import { liftLegacyToComposition, ensureSectionIds, type SiteComposition, type PageTypeId } from '@/lib/pages';
+import { defaultCompositionFor, pageFromType, servicePageFrom, applyTemplate, PAGE_TEMPLATES } from './page-templates';
+import { liftLegacyToComposition, ensureSectionIds, servicePageRoutes, MAX_PAGES, type SiteComposition, type PageTypeId } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
@@ -496,6 +496,25 @@ export default function BuildWizard({
     studioCheckpoint();
     setSiteComposition((prev) => ({ ...prev, pages: prev.pages.filter((p) => p.route !== route) }));
   }, [studioCheckpoint]);
+  /** One page per service (decision 20). Appends a service page for each services.items entry whose
+   *  route is not already present. Idempotent; respects MAX_PAGES. Header copy is filled at export
+   *  from the service item, never invented here. */
+  const generateServicePages = useCallback(() => {
+    const items = effective.services?.items ?? [];
+    if (!items.length) return;
+    const routes = servicePageRoutes(items);
+    studioCheckpoint();
+    setSiteComposition((prev) => {
+      const existing = new Set(prev.pages.map((p) => p.route));
+      const additions = items
+        .map((item, i) => ({ item, route: routes[i] }))
+        .filter(({ route }) => !existing.has(route))
+        .map(({ item, route }) => servicePageFrom(item, route));
+      if (!additions.length) return prev;
+      const room = Math.max(0, MAX_PAGES - prev.pages.length);
+      return { ...prev, pages: [...prev.pages, ...additions.slice(0, room)] };
+    });
+  }, [effective, studioCheckpoint]);
   const renameLabel = useCallback((route: string, label: string) => {
     studioCheckpoint();
     setSiteComposition((prev) => ({ ...prev, pages: prev.pages.map((p) => (p.route === route ? { ...p, label } : p)) }));
@@ -847,6 +866,7 @@ export default function BuildWizard({
                   slug={slug}
                   onSelectTemplate={selectTemplate}
                   onAddPage={addPage}
+                  onGenerateServicePages={generateServicePages}
                   onRemovePage={removePage}
                   onRenameLabel={renameLabel}
                   onToggleNav={toggleNav}

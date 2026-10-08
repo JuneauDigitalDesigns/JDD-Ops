@@ -10,8 +10,8 @@ import type { SiteContent } from '@/data/site';
 import type { VerticalId } from '@/lib/verticals';
 import type { StudioReverts } from './page-order';
 import type { CategoryEntry } from './categories';
-import type { PageInstance, PageTypeId, SectionRef, SiteComposition } from '@/lib/pages';
-import { homeLegacyView, styleKeyFor } from '@/lib/pages';
+import type { PageInstance, PageTypeId, SectionRef, SectionRhythm, SiteComposition } from '@/lib/pages';
+import { homeLegacyView, styleKeyFor, rhythmClass } from '@/lib/pages';
 import { defaultSkin, supportsSkin, type SkinId } from '@/lib/skins';
 import { EditProvider } from '@/lib/editable';
 import { sectionVars } from '@/lib/palette';
@@ -36,7 +36,7 @@ import DeployDialog from './DeployDialog';
  */
 export default function PageStudio({
   composition, effective, categories, vertical, slug,
-  onSelectTemplate, onAddPage, onRemovePage, onRenameLabel, onToggleNav,
+  onSelectTemplate, onAddPage, onGenerateServicePages, onRemovePage, onRenameLabel, onToggleNav,
   onSetChrome, onSetSectionSkin, onSetSectionVariant,
   onResetEdits, onResetStyles, setField,
   onUndo, onRedo, canUndo, canRedo,
@@ -49,6 +49,7 @@ export default function PageStudio({
   slug: string;
   onSelectTemplate: (route: string, templateId: string) => void;
   onAddPage: (pageType: PageTypeId) => void;
+  onGenerateServicePages: () => void;
   onRemovePage: (route: string) => void;
   onRenameLabel: (route: string, label: string) => void;
   onToggleNav: (route: string) => void;
@@ -141,6 +142,7 @@ export default function PageStudio({
         node: (
           <SectionShell
             style={style}
+            rhythm={ref.rhythm}
             isOpen={openKey === sKey}
             onOpen={() => setOpenKey(sKey)}
             onCloseRequest={() => setOpenKey((k) => (k === sKey ? null : k))}
@@ -260,6 +262,7 @@ export default function PageStudio({
             activeRoute={activePage.route}
             onOpenPage={(route) => { setActiveRoute(route); setPagesOpen(false); }}
             onAddPage={(pt) => { onAddPage(pt); setActiveRoute(pageMetaFor(pt).route); setPagesOpen(false); }}
+            onGenerateServicePages={onGenerateServicePages}
             onRemovePage={onRemovePage}
             onRenameLabel={onRenameLabel}
             onToggleNav={onToggleNav}
@@ -329,9 +332,10 @@ const OPEN_DELAY_MS = 3000;
 const CLOSE_GRACE_MS = 1500;
 
 function SectionShell({
-  style, isOpen, onOpen, onCloseRequest, panel, children,
+  style, rhythm, isOpen, onOpen, onCloseRequest, panel, children,
 }: {
   style: CSSProperties;
+  rhythm?: SectionRhythm;
   isOpen: boolean;
   onOpen: () => void;
   onCloseRequest: () => void;
@@ -359,7 +363,7 @@ function SectionShell({
 
   return (
     <div className="relative" onPointerEnter={handleEnter} onPointerLeave={handleLeave}>
-      <div style={style}>{children}</div>
+      <div className={rhythmClass(rhythm)} style={style}>{children}</div>
       {isOpen && panel}
     </div>
   );
