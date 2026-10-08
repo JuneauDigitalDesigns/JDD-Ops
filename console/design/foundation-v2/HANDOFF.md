@@ -71,6 +71,8 @@ A support-tickets feature landed between sessions. Verified 2026-10-07:
 - `@jdd/schema` is now **v1.21.0** (tag pushed). The plan's P4 used v1.20.0 and reserved v1.21.0
   for Phase 13. **That reservation is void: Phase 13 must now cut `v1.22.0`.** Every "v1.21.0" in
   the plan's Phase 13 is now v1.22.0.
+  **SUPERSEDED 2026-10-08:** Phase 11 cut `v1.22.0` (ContentMeta.local_images), so **Phase 13 now
+  cuts `v1.23.0`.**
 - **`npm run check-schema` is RED right now**: console and jdd-ops root pin `v1.20.0`, agency pins
   `v1.21.0`. This is the tickets feature mid-landing, not a fidelity regression. The console's
   installed schema is v1.21.0 while its pin reads v1.20.0 (a shim). Do not "fix" this from inside
@@ -136,4 +138,8 @@ site, both of which are real user gates with real pages. Listed here so they are
 | v1.0.6 | Phase 8 | 7 new SKINS entries | pending |
 | v1.0.7 | Phase 11 | img.ts local-asset branch | pending |
 
-Schema: v1.20.0 CUT (P4). Phase 13 now needs **v1.22.0**, not v1.21.0 (taken by tickets).
+Schema: v1.20.0 CUT (P4), v1.21.0 (tickets), **v1.22.0 CUT (Phase 11, ContentMeta.local_images)**.
+Phase 13 now needs **v1.23.0**.
+
+@jdd/ui: v1.0.3 (P2), v1.0.4 (P6), v1.0.5 (P7), v1.0.6 (P8), **v1.0.7 CUT (Phase 11, img.ts local
+asset branch + responsivePicture)**. No further @jdd/ui tag until a later phase touches its src.

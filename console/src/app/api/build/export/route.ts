@@ -22,6 +22,7 @@ import {
 import { navLinksFor, type SiteComposition } from '@/lib/pages';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
+import { materializeImages } from '@/lib/image-pipeline';
 import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
 import { resolveVerticalIds } from '@/lib/verticals-registry';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
@@ -157,6 +158,24 @@ export async function POST(req: Request) {
         const entries = validateEntries(composition ? collectSectionRefs(composition) : selections);
         const repoRoot = resolveRepoRoot();
 
+        /**
+         * Localize every image into the repo's /public/img and record `_meta.local_images`
+         * (Phase 11). Runs AFTER withPlaceholders so stock is localized too, and BEFORE
+         * writeSiteContent so the written site.ts already points at the local files. Never throws:
+         * a failed fetch leaves that slot hotlinked and is reported. The repo already exists here
+         * (copyTemplate ran above), so /public/img can be written into it.
+         */
+        const materialize = async (c: SiteContent): Promise<SiteContent> => {
+          const mat = await materializeImages(repoRoot, slug, c, step);
+          if (mat.localized.length || mat.failed.length) {
+            step(
+              `Localized ${mat.localized.length} image(s) into /public/img` +
+                (mat.failed.length ? `; ${mat.failed.length} could not be fetched and stay hotlinked.` : '.'),
+            );
+          }
+          return mat.content;
+        };
+
         // Multi-page: the site nav becomes route links generated from the composition (Home,
         // Services, …), not the single-page anchor links. Generated routing, not client copy.
         if (composition && content) content.nav = navLinksFor(composition);
@@ -215,12 +234,12 @@ export async function POST(req: Request) {
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
-          writeSiteContent(repoRoot, slug, withPlaceholders(resolved, vertical, step));
+          writeSiteContent(repoRoot, slug, await materialize(withPlaceholders(resolved, vertical, step)));
         } else if (vertical) {
           writeSiteContent(
             repoRoot,
             slug,
-            withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step),
+            await materialize(withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step)),
           );
         } else {
           copySiteData(repoRoot, slug);

@@ -62,16 +62,19 @@ export const PLACEHOLDER_AVATARS: string[] = [
 // hero / about / services / work so a section shows distinct images.
 export const PREVIEW_PLACEHOLDERS: Record<VerticalId, PreviewImageSet> = {
   hvac: {
+    // Alts rewritten against research section 4's shot list (photography.md section 3): every
+    // string is honest that this is topical stock, not the client's own crew. Ids unchanged -
+    // they are the four verified HVAC photos the entry already shipped, re-confirmed 200.
     heroSlides: [
-      img('1615309662243-70f6df917b59', 'HVAC technician servicing a system'),
-      img('1718203862467-c33159fdc504', 'Air conditioning unit installation'),
+      img('1615309662243-70f6df917b59', 'HVAC technician servicing an outdoor system (topical stock, not the client\'s own crew)'),
+      img('1718203862467-c33159fdc504', 'Air conditioning unit being installed (topical stock, not the client\'s own crew)'),
     ],
-    aboutFeature: img('1698479603408-1a66a6d9e80f', 'HVAC team on the job'),
+    aboutFeature: img('1698479603408-1a66a6d9e80f', 'An HVAC team on the job (topical stock, not the client\'s own team)'),
     serviceImages: [
-      img('1615309662243-70f6df917b59', 'Heating and cooling service'),
-      img('1718203862467-c33159fdc504', 'AC installation'),
-      img('1698479603408-1a66a6d9e80f', 'System maintenance'),
-      img('1614447413576-b346c641c128', 'Ductwork and air quality'),
+      img('1615309662243-70f6df917b59', 'Heating and cooling service call (topical stock)'),
+      img('1718203862467-c33159fdc504', 'Air conditioning installation (topical stock)'),
+      img('1698479603408-1a66a6d9e80f', 'System maintenance visit (topical stock)'),
+      img('1614447413576-b346c641c128', 'Ductwork and indoor air quality (topical stock)'),
     ],
     workProjects: [
       { t: 'Full System Replacement', loc: 'Riverside, CA', yr: '2024', scope: 'Install', size: '3-ton heat pump', caption: 'Complete HVAC changeout', image: img('1614447413576-b346c641c128', 'New HVAC system installed') },
@@ -210,15 +213,24 @@ const KNOWN_PLACEHOLDER_URLS: ReadonlySet<string> = new Set<string>([
 ]);
 
 /**
- * True when the value is stock this module wrote, rather than a real client image.
- * Guards the `_meta.placeholder_images` refill: a slot listed there has since been
- * replaced by the operator if its value is no longer one of ours, and overwriting
- * that would silently destroy a genuine photo.
+ * True when the value is stock THIS MODULE wrote, rather than a real client image.
+ *
+ * Reads PROVENANCE, not the URL string (decision 39). Before Phase 11 every placeholder was a
+ * literal images.unsplash.com URL, so an exact match against KNOWN_PLACEHOLDER_URLS sufficed. The
+ * build-time image pipeline now rewrites every slot to `/img/<hash>`, after which neither
+ * needsPlaceholder() nor a URL match can recognise it, and a stock photo would become permanently
+ * indistinguishable from a client's own - precisely the property decision 13 was chosen to keep.
+ *
+ * `localizedOwn` is built by the caller from `_meta.local_images` (original URL -> '/img/<hash>'):
+ * it is the set of localized bases whose ORIGINAL url was one of ours. A slot is still ours when
+ * its value is a known placeholder URL (not yet localized) OR one of those localized bases.
  */
-function isOwnPlaceholder(v: unknown): boolean {
-  if (typeof v === 'string') return KNOWN_PLACEHOLDER_URLS.has(v);
+function isOwnPlaceholder(v: unknown, localizedOwn: ReadonlySet<string>): boolean {
+  const ours = (x: unknown): x is string =>
+    typeof x === 'string' && (KNOWN_PLACEHOLDER_URLS.has(x) || localizedOwn.has(x));
+  if (typeof v === 'string') return ours(v);
   if (Array.isArray(v)) {
-    return v.length > 0 && v.every((x) => typeof x === 'string' && KNOWN_PLACEHOLDER_URLS.has(x));
+    return v.length > 0 && v.every(ours);
   }
   return false;
 }
@@ -253,14 +265,23 @@ export function fillImagePlaceholders(
   // wrote last time reads as a genuine client photo forever — a vertical change
   // could never refresh it, and `_meta` would drift out of sync with reality.
   const prior = new Set(effective._meta?.placeholder_images ?? []);
+  /** '/img/<hash>' bases whose ORIGINAL url was one of ours. The hash carries no provenance, so
+   *  this mapping (from _meta.local_images) is the only thing that can answer "is this localized
+   *  value still a placeholder we wrote?" after the export pipeline has rewritten the slot. */
+  const localizedOwn = new Set(
+    Object.entries(effective._meta?.local_images ?? {})
+      .filter(([original]) => KNOWN_PLACEHOLDER_URLS.has(original))
+      .map(([, localized]) => localized),
+  );
   const filled: string[] = [];
   /**
    * True when the slot is empty, preset picsum, or stock we wrote on a prior run AND
-   * still holds that stock. The second clause is what lets a vertical change refresh
-   * old photography while a real image the operator has since set always wins.
+   * still holds that stock (literal placeholder URL or its localized '/img/<hash>' form).
+   * The second clause is what lets a vertical change refresh old photography while a real
+   * image the operator has since set always wins.
    */
   const needsFill = (path: string, v: unknown): boolean =>
-    needsPlaceholder(v) || (prior.has(path) && isOwnPlaceholder(v));
+    needsPlaceholder(v) || (prior.has(path) && isOwnPlaceholder(v, localizedOwn));
   const mark = (path: string): void => {
     filled.push(path);
   };

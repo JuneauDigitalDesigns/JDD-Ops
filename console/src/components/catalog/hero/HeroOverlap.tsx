@@ -4,7 +4,7 @@ import { PhoneCall, CheckCircle } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
 import { E, useEditing } from '@/lib/editable';
-import { responsiveImage } from '@/lib/img';
+import { responsiveImage, responsivePicture } from '@/lib/img';
 
 export const meta = {
   id: 'hero-overlap',
@@ -42,6 +42,9 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
   const editing = useEditing();
   const { hero, brand, images } = content;
   const slide = images.hero.slides?.[0];
+  // Full-bleed hero = the LCP image and the only AVIF slot (decision 44). Localized only after
+  // export; in the preview the responsiveImage fallback renders (origin URL, no typed source).
+  const heroPic = slide?.url ? responsivePicture(slide.url, { avif: true }) : null;
 
   return (
     <section className="relative isolate flex min-h-[560px] items-center overflow-hidden bg-ink lg:min-h-[640px]">
@@ -50,19 +53,40 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
           rendered the page blank. A fixed min-h renders identically live and in the preview. */}
       {/* Full-bleed background image */}
       {slide?.url ? (
-        <img
-          {...responsiveImage(slide.url)}
-          alt={slide.alt}
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-          /* Full-bleed hero backdrop, so it is almost always the LCP element. It must
-             compete for bandwidth immediately AND be asked for at the right width. */
-          width={1600}
-          height={900}
-          sizes="100vw"
-          className="absolute inset-0 -z-10 h-full w-full object-cover"
-        />
+        /* Full-bleed hero backdrop, almost always the LCP element: it must compete for bandwidth
+           immediately AND be asked for at the right width. After export it serves AVIF then WebP
+           via a picture element; in the preview it falls back to the responsiveImage markup. */
+        heroPic?.webpSrcSet ? (
+          <picture>
+            {heroPic.avifSrcSet && (
+              <source type="image/avif" srcSet={heroPic.avifSrcSet} sizes="100vw" />
+            )}
+            <source type="image/webp" srcSet={heroPic.webpSrcSet} sizes="100vw" />
+            <img
+              src={heroPic.src}
+              alt={slide.alt}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              width={1600}
+              height={900}
+              sizes="100vw"
+              className="absolute inset-0 -z-10 h-full w-full object-cover"
+            />
+          </picture>
+        ) : (
+          <img
+            {...responsiveImage(slide.url)}
+            alt={slide.alt}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            width={1600}
+            height={900}
+            sizes="100vw"
+            className="absolute inset-0 -z-10 h-full w-full object-cover"
+          />
+        )
       ) : (
         <div className="absolute inset-0 -z-10 bg-ink bg-[repeating-linear-gradient(45deg,transparent,transparent_12px,rgba(255,255,255,0.03)_12px,rgba(255,255,255,0.03)_24px)]" />
       )}

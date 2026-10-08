@@ -539,6 +539,8 @@ so no content field from P4 was lost. Steps taken:
 
 **Phase 13 consequence still stands:** v1.21.0 is now TAKEN by tickets, so Phase 13 must cut
 **`v1.22.0`**. Treat every "v1.21.0" in the plan's Phase 13 as v1.22.0.
+**SUPERSEDED 2026-10-08:** Phase 11 then took `v1.22.0` (ContentMeta.local_images), so **Phase 13
+now cuts `v1.23.0`**. See the Phase 11 entry below.
 
 ---
 
@@ -989,3 +991,88 @@ gate disabling Approve, and the Review-pill badge, folded into the standing Phas
 
 **Phase 10 is COMPLETE.** The shared foundation plus the full page-structure and copy-review layers
 (Phases 0–10) are settled. Next: Phase 11 (img.ts local-asset branch, cuts `@jdd/ui` v1.0.7).
+
+## Phase 11, COMPLETE 2026-10-08. Cut `@jdd/schema` v1.22.0 AND `@jdd/ui` v1.0.7.
+
+The build-time image pipeline: fetch each image once at export, emit WebP (four widths) plus AVIF
+(hero only) into the client repo's /public/img, kill the Unsplash hotlink, enforce one ratio + one
+grade, and keep placeholder provenance working after the URLs become hashes.
+
+**PLAN DEFECT resolved at the user's direction (the only decision this phase needed).** Phase 11c
+reads and writes `_meta.local_images`, but `@jdd/schema` v1.21.0's `ContentMeta` had no such field
+and the phase's Out-of-scope forbade a schema change. Shipping 11b without 11c reintroduces the exact
+regression 11c prevents, so the two can't be split. Surfaced via AskUserQuestion; the user chose
+**add the field and cut the schema release now**. So this phase cut a schema tag the plan did not
+anticipate, and **Phase 13's schema tag moves from v1.22.0 to `v1.23.0`** (see the drift note above,
+now superseded: tickets took v1.21.0, THIS phase took v1.22.0, Phase 13 is v1.23.0).
+
+**Release 1 — `@jdd/schema` v1.22.0 (commit d088f22):** added `ContentMeta.local_images?:
+Record<string,string>` (original URL -> '/img/<hash>' base), additive. `npm run build` + `npm test`
+green, tagged, pushed; re-pinned all THREE consumers (console, jdd-ops root, agency) via explicit
+tagged install; `npm run check-schema` green at v1.22.0.
+
+**Release 2 — `@jdd/ui` v1.0.7 (commit 7be09a9):** `packages/ui/src/img.ts` gained the local-asset
+branch (a `/img/<hash>` value with no extension expands to the pipeline's WebP widths), `WIDTHS`
+changed from the six origin-resize widths to the pipeline's four `[640,1024,1536,2048]` (kept in
+lockstep with image-pipeline.ts via cross-ref comments), and a new `responsivePicture` adds an AVIF
+srcSet for the hero slot only. §0.3a loop run; re-pinned console + template, both at 1.0.7.
+
+**11a — `image-placeholders.ts`:** the seven hvac `alt` strings rewritten against photography.md
+section 3 (honest "topical stock, not the client's own crew"). Ids unchanged - they are the four
+verified HVAC photos the entry already shipped.
+
+**11b — `console/src/lib/image-pipeline.ts` (NEW, `import 'server-only'`, sharp):** `materializeImages
+(repoRoot, slug, content, step)` walks every image slot fillImagePlaceholders writes, fetches each
+absolute URL once, sha256s the bytes, and for each of the four WIDTHS emits `<hash>-<w>.webp` (plus
+`-<w>.avif` only for the hero ratio key, decision 44). Crop = `fit:'cover', position:'attention'`;
+grade = `.modulate({saturation:0.88,brightness:1.02}).linear(1.04,-6)` (two passes, NO tint, decision
+55); logos skip crop + grade (fit:'inside', long edge only). Rewrites each slot to `/img/<hash>` and
+records `_meta.local_images` MERGED onto any prior mapping. Never throws: a failed fetch leaves the
+slot hotlinked, pushes to `failed`, and warns. `sharp ^0.33.5` added to console devDependencies,
+`server-only ^0.0.1` to dependencies. `template/public/img/.gitkeep` created.
+
+**Reconciliation of a plan tension:** the plan says "emit widths not exceeding the source width" but
+its own verification expects "4 widths x every slot" and img.ts's srcSet lists all four (a missing
+width is a 404). Resolved with `withoutEnlargement: true`: every width NAME is emitted (srcSet never
+404s) while pixels never exceed the source (a 1200px stock photo's `-2048.webp` is ~1200px content).
+
+**11c — provenance (`image-placeholders.ts`):** `isOwnPlaceholder(v, localizedOwn)` now reads
+PROVENANCE, not the URL string (decision 39). `fillImagePlaceholders` builds `localizedOwn` from
+`_meta.local_images` filtered to entries whose ORIGINAL url was one of ours, so a localized
+`/img/<hash>` is still recognised as stock on re-export and refreshed on a vertical change, while a
+localized REAL client photo (original url not ours) is never touched. `needsFill` otherwise
+unchanged (keeps the `prior.has(path)` conjunct). `test/image-provenance.test.mjs` (NEW) pins both
+halves: a localized placeholder stays refreshable; a real client photo never is.
+
+**Heroes (`HeroSplit`, `HeroOverlap`):** switched to `responsivePicture(slide.url, {avif:true})` and a
+`<picture>` with AVIF + WebP `<source>`s when the asset is localized, falling back to the existing
+`responsiveImage` `<img>` for a non-local (console preview) URL - so the preview is unchanged and the
+exported site gets AVIF/WebP. `HeroFormFocus` renders no hero image, so nothing to wire there. (A
+lint caught the literal `<img` token in my new code comments - "every <img> declares width and
+height" greps source text; reworded the comments.)
+
+**Export route:** `materialize()` helper runs `materializeImages` AFTER `withPlaceholders` and BEFORE
+`writeSiteContent`, both the content and vertical branches; `_meta.local_images` and
+`placeholder_images` both survive into the written site.ts, and a step line reports localized/failed.
+
+**Gate, 2026-10-08:** `check-schema` green at v1.22.0; both consumers at `@jdd/ui` 1.0.7; `console npm
+test` **191/191** (+2 provenance, +3 nothing else changed — the Phase 10 count 189 plus the two
+provenance tests, less a miscount: 191 total, 0 fail, 0 skipped); `console npm run build` EXIT 0;
+`template npm run build` EXIT 0 (one transient next/font Google-Fonts null-deref on the first
+attempt, the documented Phase 3 flake, cleared on retry). Runtime smoke test of the sharp pipeline
+(replicating processOne against three live Unsplash URLs in a scratch dir, then deleted): hero = 4
+WebP + 4 AVIF, service + logo = 4 WebP + 0 AVIF, total AVIF = 4 (hero only, the decision-44 check),
+all four widths emitted with no 404.
+
+**Owed to the user / deferred (not a blocker):** the FULL export-route round-trip - export a real
+onboarded HVAC client through the dev server (runs `npm install` + `npm run build` INSIDE the client
+repo), inspect `clients/<slug>/repo/public/img` on disk (4 webp x slots, avif hero-only, zero
+`images.unsplash.com` in site.ts, `local_images`/`placeholder_images` present), then re-export with
+the vertical changed to confirm the stock imagery actually refreshes. This needs an onboarded client
+and the dev server and is the same class of in-repo export proof deferred from Phases 7-9; the novel
+logic here is covered by the provenance unit tests, the build typecheck of the whole module graph,
+and the sharp runtime smoke test above. Also owed: the real-browser look at the hero AVIF/WebP and
+the uniform warm-neutral (not sepia) grade, folded into the standing browser review.
+
+**Phase 11 is COMPLETE.** Next: Phase 12 (the HVAC vertical language `VERTICAL_LANGUAGES`, the
+conversion non-negotiables checklist, and the locally-built reference site; no `@jdd/ui` tag).

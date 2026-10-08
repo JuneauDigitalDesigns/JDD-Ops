@@ -21,7 +21,7 @@
 import { PhoneCall, CheckCircle, Star, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { responsiveImage } from '@/lib/img';
+import { responsiveImage, responsivePicture } from '@/lib/img';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
@@ -68,6 +68,10 @@ export default function HeroSplit({
   const s = skinClasses(skin);
   const { hero, brand, images, extensions } = content;
   const slide = images.hero.slides?.[0];
+  // The hero is the LCP image and the one slot the export pipeline emits AVIF for (decision 44).
+  // Non-null only after export localizes the slot to /img/<hash>; in the console preview (an origin
+  // URL) webpSrcSet is undefined and the responsiveImage fallback below renders instead.
+  const heroPic = slide?.url ? responsivePicture(slide.url, { avif: true }) : null;
   const review = extensions.reviewBadge;
 
   return (
@@ -151,23 +155,42 @@ export default function HeroSplit({
         <div className="relative mt-8 pb-5 pr-5 lg:mt-0">
           <div className="absolute bottom-0 left-5 right-0 top-5 rounded-lg bg-accent" aria-hidden="true" />
           {slide?.url ? (
-            <img
-              {...responsiveImage(slide.url)}
-              alt={slide.alt}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              /* `sizes` lives here, not in responsiveImage(), because only this component
-                 knows the rendered box: full bleed minus gutters on phones, and roughly a
-                 520px column once the grid splits at lg. A wrong `sizes` is worse than none,
-                 since the browser trusts it over layout. */
-              sizes="(min-width: 1024px) 520px, 100vw"
-              /* Load-bearing: the only intrinsic ratio available before the bytes land.
-                 Without it this shifted the page by 1400px (CLS 0.193). */
-              width={1600}
-              height={1000}
-              className="relative h-[240px] w-full rounded-lg object-cover sm:h-[320px] lg:h-[440px]"
-            />
+            /* `sizes` is this component's call (only it knows the rendered box: full bleed minus
+               gutters on phones, ~520px once the grid splits at lg); a wrong `sizes` is worse than
+               none. width/height are load-bearing for CLS (without them this shifted 1400px). After
+               export the localized hero serves AVIF then WebP via a picture element; in the preview
+               it falls back to the origin-resize responsiveImage markup. */
+            heroPic?.webpSrcSet ? (
+              <picture>
+                {heroPic.avifSrcSet && (
+                  <source type="image/avif" srcSet={heroPic.avifSrcSet} sizes="(min-width: 1024px) 520px, 100vw" />
+                )}
+                <source type="image/webp" srcSet={heroPic.webpSrcSet} sizes="(min-width: 1024px) 520px, 100vw" />
+                <img
+                  src={heroPic.src}
+                  alt={slide.alt}
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                  sizes="(min-width: 1024px) 520px, 100vw"
+                  width={1600}
+                  height={1000}
+                  className="relative h-[240px] w-full rounded-lg object-cover sm:h-[320px] lg:h-[440px]"
+                />
+              </picture>
+            ) : (
+              <img
+                {...responsiveImage(slide.url)}
+                alt={slide.alt}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                sizes="(min-width: 1024px) 520px, 100vw"
+                width={1600}
+                height={1000}
+                className="relative h-[240px] w-full rounded-lg object-cover sm:h-[320px] lg:h-[440px]"
+              />
+            )
           ) : (
             // Decision 30(b): a placeholder should read as a placeholder, not as a branded
             // gradient slab. AUTHORING_CONTRACT §3's mandated 45-degree hatch, which is
