@@ -843,3 +843,53 @@ EXIT 0; `template npm run build` EXIT 0.
 **Owed to the user (deferred):** the plan's export test (a scratch client with home-standard +
 generated service pages, built inside the client repo, confirming each `services/<slug>/page.tsx`
 exists and wraps sections in `rh-*` divs), and the preview look at the three home templates.
+
+## Phase 10, IN PROGRESS: 10a DONE 2026-10-08, 10b/10c/10d REMAIN. No `@jdd/ui` tag.
+
+Multi-page copy review. Being done in committed sub-increments because it changes the load-bearing
+content gate and must not be left half-wired.
+
+**10a DONE (commit 921a235), green (test 186/186, console build EXIT 0):**
+- `copy-schema.ts`: `VerdictKey` (= `string`), `verdictKey(section, route?)` -> `section` |
+  `route:section`, `parseVerdictKey(k)`. Plain string so no `@jdd/schema` change (tickedSections is
+  already `string[]`).
+- `copy-brief/mutations.ts`: `normalizeVerdicts(brief)` dedupes and KEEPS bare ids as home/site-wide
+  keys (never fans them out to routes — the exact failure decision 51 prevents). Wired into both
+  BuildWizard brief-read paths (freshBundle ~121, applyBundle ~404).
+- `test/copy-verdict.test.mjs`: round-trip + no-fan-out + dedupe.
+
+**10b/10c/10d REMAIN (precise resume spec; files already read, pointers verified):**
+- **10b CopyWireframe.tsx:** replace the flat `WIREFRAME_ORDER.map` with page GROUPS (decision 49
+  order: home first, then Services, About, Contact, then one group per `pageType==='service'` route,
+  services alpha within). Add a `pages: {route,label,pageType}[]` prop (IntakeStep passes it from the
+  same place generate-copy's request gets its subpages array). `HOME_SECTIONS` = the current
+  WIREFRAME_ORDER list. Change `verdictFor`'s type from `(section)` to `(key: VerdictKey)`; keep the
+  `SectionVerdict` SHAPE. Each group: sticky header (label, route, unreviewed count); its cards keyed
+  `verdictKey(section, route || undefined)`. KEEP `SectionBody` cases as-is; pass a `route` down for
+  the two new cases. Per-route `<E p=>` paths use the `subpages.${route}.header.<field>` prefix
+  (mirror compose-page.tsx:40).
+- **10c two new SectionBody cases:** (1) `case 'subpages'` for a non-home group renders
+  `content.subpages?.[route]` header (eyebrow/title/sub via Eyebrow/Headline/Prose, each wrapped in
+  `<E p={`subpages.${route}.header.${field}`}>`), cta as `CtaChip` only when BOTH label+href present
+  (matches apply-generated.ts:176), per-page SEO as two `KV` rows
+  (`subpages.<route>.seo.title`/`.description`), `NotSet` for absent fields (never fabricate).
+  (2) extend `case 'services'`: under each item's `d`, render `it.detail` via
+  `<E p={`services.items.${i}.detail`}>` or an italic "No service detail generated..." fallback
+  (detail already in copy-schema.ts:37/107; confirm facts.ts covers it, decision 45). Also render
+  detail again in the Services page group with its own `verdictKey('services','services')` row.
+- **10d IntakeStep.tsx gate (decision 51, HARD block):** `verdictFor(key)` -> resolve with
+  `parseVerdictKey`, keep the preRunGenerated snapshot logic verbatim. Compute `unreviewed:
+  VerdictKey[]` = every group/section key that HAS generated copy behind it and is still ticked
+  (Accept removes it from tickedSections — existing semantics). Disable the "Approve & continue to
+  Studio" button (line ~238) while `unreviewed.length>0` (title + one-line reason beside it), and
+  make `approve()` (line ~144) early-return if non-empty. Do NOT gate the Brief/Prompt/Review "Next"
+  buttons — only `onDone()`. Add the unreviewed count as a badge on the Review stage pill. Leave the
+  JSON escape hatch (openJson/saveJson) UNGATED (operator's own content; a comment must say so).
+  Derive the `pages` prop from the live composition (route/label/pageType) and pass to CopyWireframe.
+- **Migration test:** already added the no-fan-out case in 10a; add a per-page verdict round-trip
+  assertion when 10b lands.
+- Gate when done: `console npm test && npm run build`, then the plan's export test.
+
+All wizard files were read this session (CopyWireframe 365L, IntakeStep 337L, copy-primitives 110L,
+copy-schema, copy-brief/mutations + types); copy-primitives exports Eyebrow/Headline/Prose/CtaChip/
+Card/Group/Chips/KV/Stars/hasText/NotSet.
