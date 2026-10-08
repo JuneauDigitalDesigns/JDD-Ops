@@ -50,6 +50,17 @@ test('an unrecognised path is passed through unchanged (assumed already valid)',
   assert.deepEqual(mapIntakePath('some.new.field'), { formPath: 'some.new.field', contentPath: 'some.new.field' });
 });
 
+test('the decision-29 specificity fields map to their content paths (Phase 13)', () => {
+  assert.equal(mapIntakePath('ownerName').contentPath, 'extensions.ownerName');
+  assert.equal(mapIntakePath('brandsCarried').contentPath, 'trust.logos');
+  assert.equal(mapIntakePath('responseTime').contentPath, 'extensions.responseTime');
+  // And the content paths buildScaffold actually flags pass straight through, so editing works
+  // whichever shape the flag takes.
+  for (const p of ['extensions.ownerName', 'extensions.responseTime', 'extensions.serviceArea', 'trust.logos']) {
+    assert.equal(mapIntakePath(p).contentPath, p);
+  }
+});
+
 test('mapIntakePaths preserves order and de-duplicates by resolved contentPath', () => {
   const out = mapIntakePaths(['brand.phone', 'branding.logo', 'brand.phone']);
   assert.equal(out.length, 2);

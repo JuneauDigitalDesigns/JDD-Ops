@@ -1166,3 +1166,68 @@ from the services section, decision 20), so they are intentionally not in the to
 
 Gate: `console npm test` **197/197** (+1 nav guard); `console npm run build` EXIT 0. This is
 committed with the Phase 12a/12b follow-up.
+
+## Phase 13, 13a/13b/13c COMPLETE 2026-10-08; 13d (agency form) is a PENDING SEPARATE GATE. Cut `@jdd/schema` v1.23.0.
+
+The documented antidote to looking AI-made is specificity, and the no-inventing rule means it must
+come from intake. Three new fields, cross-repo.
+
+**Tag note:** this phase's schema tag is **v1.23.0**, not the plan's original v1.21.0 - tickets took
+v1.21.0 and Phase 11 took v1.22.0. All "v1.21.0" in the plan's Phase 13 should read v1.23.0.
+
+**13b - `@jdd/schema` v1.23.0 (commit be92940):** `ExtensionsContent` gains `ownerName?`,
+`brandsCarried?: string[]`, `responseTime?` (all optional/nullable, so no existing reader breaks;
+`extensions` is a zod `.passthrough()`, confirmed). `BrandIntakeSubmission` + the `SiteFacts`
+scaffold + `zBrandIntakeSubmission` validator gain the three string fields (the validator mattered:
+the known zod-strips-unknown-keys hazard would have dropped them before buildScaffold). `buildScaffold`
+writes them to `extensions`, feeds `brandsCarried` into `trust.logos` (joined with notableClients,
+where TrustBadges reads it), and flags every unsupplied one of the six (established, license,
+serviceArea, ownerName, brandsCarried→trust.logos, responseTime) into `_meta.missing_fields`.
+established/serviceArea marked asked-again. Built, tested, tagged, pushed; re-pinned all three
+consumers; `check-schema` green at v1.23.0.
+
+**13c - jdd-ops console side:**
+- `intake-path-map.ts`: added `ownerName`/`brandsCarried`/`responseTime` to `FORM_PATH_MAP`
+  (future-proofing a bare-key flag). NOTE: buildScaffold actually flags them as CONTENT paths
+  (`extensions.ownerName`, `trust.logos`, `extensions.responseTime`) - like `brand.established` -
+  which `mapIntakePath` passes through unchanged, so the FORM_PATH_MAP entries are belt-and-braces,
+  not load-bearing. Test extended.
+- `field-labels.ts`: the three added to `LABELS` (hence `KEY_FIELDS`) so they show in the curated
+  "All fields" section.
+- `data/site.ts` + `data/verticals/hvac.ts`: the three `extensions` keys added as `null`, NEVER a
+  sample value. HVAC `trust.label` relabelled `"Certified by"` -> `"Brands we install"` (13a).
+- `copy-brief/facts.ts`: the three added to `COPY_FACT_PATHS` + `FACT_KEY_FOR_PATH` (grounded-only,
+  forbidden to invent).
+- Components (all guarded, AUTHORING_CONTRACT §5): `trust/TrustBadges` now renders `trust.logos` as
+  a labelled brands row (it previously read only trustBadges/reviewBadge, so brands were invisible -
+  a real gap), returning null when all empty; `about/AboutStory` + `about/AboutSticky` render a
+  guarded owner byline (`extensions.ownerName`, middot not em-dash); the StickyCallBar assurance line
+  prefers `extensions.responseTime` -> `hero.trust` in the CONSOLE caller (PageStudio).
+
+**A real type constraint hit and handled:** the TEMPLATE's `layout.tsx` builds against the template's
+FIXED minimal seed `SiteContent`, which has no `extensions` field, so `CONTENT.extensions.responseTime`
+failed `template npm run build`. Reverted that one caller to `assurance={null}` - exactly Phase 6's
+documented limitation for `hero.trust`: a template-splice client site shows digits only until the
+minimal seed schema gains an optional field. The console preview (full type) does pass responseTime.
+The catalog components (TrustBadges/About*) are not in the template build and compile fine in the
+console build and in client repos (full type).
+
+**Gate (13a/b/c), 2026-10-08:** schema `npm test`+`build` green; `check-schema` green at v1.23.0;
+`console npm test` **198/198**; `console npm run build` EXIT 0; `template npm run build` EXIT 0 (after
+the revert above); `node onboard.js --schema clients/_e2e_test_growth/site.ts --dry-run` EXIT 0;
+`juneau-digital-designs npm run build` EXIT 0 on the v1.23.0 re-pin.
+
+**13d - the agency onboarding form: a PENDING SEPARATE GATE (the plan designates it one).** The form
+is `juneau-digital-designs/app/components/onboarding/onboardingpageclient.tsx`, a 1551-line
+multi-step wizard that was deliberately slimmed to ~4 typed inputs (chip-first rebuild). 13d wants
+six inputs added (owner name, license number, year established, named towns, brands carried,
+response-time commitment), each marked as the thing that stops a site reading as generic, then the
+agency build as its own gate. This edits the LIVE customer onboarding form in a repo the planner did
+not inspect, with real UX/copy judgment, so it is handed to the user as its own task rather than done
+speculatively. Until it lands, the three new fields simply stay blank and flagged in the console's
+Intake checklist - the honest default decision 29 intends. The schema and console are ready to
+receive the values the moment the form collects them.
+
+**Phase 13 13a/b/c is COMPLETE and committed.** With 13d, this is the final phase; 13a/b/c close
+every fidelity phase's console/schema work. The template-fidelity upgrade (Phases 0-13, less the
+13d agency-form task and the standing user review gates 12c + the owed real-browser reviews) is done.

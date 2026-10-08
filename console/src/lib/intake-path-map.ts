@@ -38,6 +38,13 @@ const FORM_PATH_MAP: Record<string, string | null> = {
   'existingWebsiteUrl': null,
   'social.linkedin': null,
   'hero.bullets': 'hero.heroBullets',
+  // decision 29 (Phase 13): the three specificity fields. buildScaffold currently flags them as
+  // content paths (extensions.ownerName / trust.logos / extensions.responseTime), which pass
+  // through unchanged like brand.established; these bare-key entries future-proof the translation
+  // if a flag is ever emitted under the intake form's own field name instead.
+  'ownerName': 'extensions.ownerName',
+  'brandsCarried': 'trust.logos',
+  'responseTime': 'extensions.responseTime',
 };
 
 const UNMAPPABLE_NOTES: Record<string, string> = {

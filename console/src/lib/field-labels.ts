@@ -23,6 +23,11 @@ export const LABELS: Record<string, string> = {
   'seo.title': 'SEO title',
   'seo.description': 'SEO description',
   'seo.canonical': 'Canonical URL',
+  // decision 29 (Phase 13): the specificity fields, curated so they show in the intake's
+  // "All fields" section and read legibly when flagged blank.
+  'extensions.ownerName': 'Owner name',
+  'trust.logos': 'Brands carried',
+  'extensions.responseTime': 'Response time',
 };
 
 /** Every curated path, in table order — the "All fields" group. */

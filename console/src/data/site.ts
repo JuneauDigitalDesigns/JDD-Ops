@@ -350,6 +350,10 @@ export const CONTENT: SiteContent = {
     hours:      null,
     bookingUrl: "https://peakhomeservices.com/book",
     portalUrl:  null,
+    // decision 29 (Phase 13): the specificity fields. Collected from intake, never seeded.
+    ownerName: null,
+    brandsCarried: null,
+    responseTime: null,
   },
 
   // ── Images ────────────────────────────────────────────────────────────────

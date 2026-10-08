@@ -23,6 +23,11 @@ export const COPY_FACT_PATHS: string[] = [
   'extensions.hours.all',
   'extensions.trustBadges',
   'trust.logos',
+  // decision 29 (Phase 13): the specificity facts. Grounded-only, like every path above - the
+  // copywriter may USE them and is forbidden to invent them.
+  'extensions.ownerName',
+  'extensions.brandsCarried',
+  'extensions.responseTime',
 ];
 
 /**
@@ -44,4 +49,7 @@ export const FACT_KEY_FOR_PATH: Record<string, string> = {
   'extensions.hours.all': 'hours',
   'extensions.trustBadges': 'certifications',
   'trust.logos': 'notableClients',
+  'extensions.ownerName': 'ownerName',
+  'extensions.brandsCarried': 'brandsCarried',
+  'extensions.responseTime': 'responseTime',
 };

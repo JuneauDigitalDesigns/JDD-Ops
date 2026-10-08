@@ -242,7 +242,9 @@ export default function PageStudio({
                   <StickyCallBar
                     phone={effective.brand.phone}
                     phoneHref={effective.brand.phoneHref}
-                    assurance={effective.hero?.trust || null}
+                    /* decision 29: the client's own responseTime is the assurance line, falling
+                       back to hero.trust when they did not supply one. */
+                    assurance={effective.extensions?.responseTime || effective.hero?.trust || null}
                     badge={effective.announcement || null}
                   />
                 </PreviewFrame>

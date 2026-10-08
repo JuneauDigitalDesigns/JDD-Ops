@@ -59,9 +59,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <SmoothScroll />
         {/* The template seed's SiteContent is the FIXED minimal schema (brand/services/faq/
-            testimonials/seo/_meta), with no hero.trust or announcement field, so assurance and
-            badge are null here. The console Studio passes the real values from its richer content
-            (see PageStudio.tsx). Not inventing a value: a missing field stays null. */}
+            testimonials/seo/_meta) with no `extensions` field, so assurance and badge are null
+            here. The assurance line is meant to carry the decision-29 responseTime (the client's
+            own commitment), which the console Studio DOES pass from its richer content (see
+            PageStudio.tsx). A template-splice client site shows digits only until the template's
+            minimal seed schema gains an optional field to carry it — the same separate decision
+            Phase 6 flagged for hero.trust. Not inventing a value: a missing field stays null. */}
         <StickyCallBar
           phone={CONTENT.brand.phone}
           phoneHref={CONTENT.brand.phoneHref}

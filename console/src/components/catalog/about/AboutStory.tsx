@@ -20,7 +20,7 @@ export const meta = {
   id: 'about-story',
   category: 'about',
   label: 'About / Story',
-  consumes: ['about.title', 'about.body', 'about.pillars'],
+  consumes: ['about.title', 'about.body', 'about.pillars', 'extensions.ownerName'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/icons'],
   skins: ['default', 'soft'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
@@ -40,7 +40,8 @@ export default function AboutStory({
 }) {
   const s = skinClasses(skin);
   const dark = skin === 'inverted' || skin === 'contrast';
-  const { about } = content;
+  const { about, extensions } = content;
+  const ownerName = extensions.ownerName;
 
   return (
     <section id="about" className={`${s.section} py-14 lg:py-20`}>
@@ -52,6 +53,15 @@ export default function AboutStory({
           <p className={`mt-4 text-[17px] leading-relaxed sm:text-[18px] ${s.body}`}>
             <E p="about.body">{about.body}</E>
           </p>
+          {/* Owner byline (decision 29). Guarded: renders only when intake supplied the name,
+              never invented. The name is a real person the client named, which is exactly the
+              specificity that stops the About read as generic. */}
+          {ownerName && ownerName.trim() ? (
+            <p className={`mt-5 text-[15px] font-bold ${s.heading}`}>
+              <E p="extensions.ownerName">{ownerName}</E>
+              <span className={`font-normal ${s.body}`}> · Owner</span>
+            </p>
+          ) : null}
         </div>
 
         {about.pillars.length > 0 && (

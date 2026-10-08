@@ -14,7 +14,7 @@ export const meta = {
   id: 'about-sticky',
   category: 'about',
   label: 'About / Sticky',
-  consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars'],
+  consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars', 'extensions.ownerName'],
   sharedDeps: ['@/lib/skins'],
   skins: ['default', 'soft'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
@@ -33,6 +33,7 @@ export default function AboutSticky({
   const about = content.about;
   if (!about || !about.body) return null;
   const pillars = about.pillars ?? [];
+  const ownerName = content.extensions?.ownerName;
 
   return (
     <section id="about" className={`py-24 ${s.section}`}>
@@ -40,6 +41,13 @@ export default function AboutSticky({
         <div className="lg:sticky lg:top-16">
           {about.eyebrow && <p className={`text-sm font-semibold ${s.body}`}><E p="about.eyebrow">{about.eyebrow}</E></p>}
           <h2 className={`mt-2 font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="about.title">{about.title}</E></h2>
+          {/* Owner byline (decision 29), guarded: renders only when intake supplied the name. */}
+          {ownerName && ownerName.trim() ? (
+            <p className={`mt-3 text-sm font-bold ${s.heading}`}>
+              <E p="extensions.ownerName">{ownerName}</E>
+              <span className={`font-normal ${s.body}`}> · Owner</span>
+            </p>
+          ) : null}
         </div>
         <div>
           <p className={`text-lg leading-relaxed ${s.body}`}><E p="about.body">{about.body}</E></p>

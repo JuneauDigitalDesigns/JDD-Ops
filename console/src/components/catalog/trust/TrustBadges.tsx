@@ -18,7 +18,7 @@ export const meta = {
   id: 'trust-badges',
   category: 'trust',
   label: 'Trust / Badges',
-  consumes: ['extensions.trustBadges', 'extensions.reviewBadge'],
+  consumes: ['extensions.trustBadges', 'extensions.reviewBadge', 'trust.label', 'trust.logos'],
   sharedDeps: ['@phosphor-icons/react'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'inline-strip',
@@ -29,13 +29,16 @@ export const meta = {
 } as const;
 
 export default function TrustBadges({ content = CONTENT }: { content?: SiteContent }) {
-  const { extensions } = content;
+  const { extensions, trust } = content;
   const badges = extensions.trustBadges;
   const review = extensions.reviewBadge;
+  // Brands carried (decision 29) live in trust.logos, fed from the intake's brandsCarried field.
+  // Guarded like everything else here: an empty list shows nothing.
+  const brands = trust.logos;
 
   // Degrade away entirely rather than render an empty shell — a client with no
   // credentials on file should not get a band announcing that (SPEC §7).
-  if (!badges?.length && !review) return null;
+  if (!badges?.length && !review && !brands?.length) return null;
 
   return (
     <section className="bg-inkPanel text-onInk">
@@ -65,6 +68,24 @@ export default function TrustBadges({ content = CONTENT }: { content?: SiteConte
           </a>
         )}
       </div>
+
+      {/* Brands carried (decision 29): a second row, labelled, so "Brands we install: Carrier,
+          Trane" reads as its own trust signal rather than mixing with the certification chips.
+          Guarded — renders only when the client supplied brands. */}
+      {brands?.length ? (
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-2.5 px-5 pb-7 sm:px-6">
+          {trust.label ? (
+            <span className="self-center text-xs font-bold uppercase tracking-widest text-onInk">
+              <E p="trust.label">{trust.label}</E>
+            </span>
+          ) : null}
+          {brands.map((brand, i) => (
+            <span key={brand} className="rounded-lg bg-white/10 px-4 py-2.5 text-[15px] font-bold">
+              <E p={`trust.logos.${i}`}>{brand}</E>
+            </span>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

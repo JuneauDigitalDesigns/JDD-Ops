@@ -46,9 +46,10 @@ export const CONTENT: SiteContent = {
   announcement: "24/7 emergency HVAC service, call us any time, day or night!",
 
   trust: {
-    // De-clawed: certifications/logos are trust CLAIMS and must come from the client
-    // (onboarding notableClients → trust.logos). An empty list omits the band honestly.
-    label: "Certified by",
+    // De-clawed: logos are client CLAIMS and must come from the client (onboarding
+    // notableClients + brandsCarried → trust.logos). An empty list omits the band honestly.
+    // Relabelled for HVAC (decision 29): the brands a shop installs are its strongest trust row.
+    label: "Brands we install",
     logos: [],
   },
 
@@ -196,6 +197,11 @@ export const CONTENT: SiteContent = {
       'Lemon Creek',
       'Thane',
     ],
+    // decision 29 (Phase 13): the specificity fields. Collected from intake, NEVER seeded with a
+    // sample value - a blank is flagged in _meta.missing_fields, not invented.
+    ownerName: null,
+    brandsCarried: null,
+    responseTime: null,
   },
 
   images: {
