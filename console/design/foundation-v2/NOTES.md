@@ -1229,5 +1229,21 @@ Intake checklist - the honest default decision 29 intends. The schema and consol
 receive the values the moment the form collects them.
 
 **Phase 13 13a/b/c is COMPLETE and committed.** With 13d, this is the final phase; 13a/b/c close
-every fidelity phase's console/schema work. The template-fidelity upgrade (Phases 0-13, less the
-13d agency-form task and the standing user review gates 12c + the owed real-browser reviews) is done.
+every fidelity phase's console/schema work.
+
+**13d DONE 2026-10-11 (agency commit ea48459, LOCAL on `feat/portal-support-tickets`, NOT pushed).**
+Added six optional inputs to the onboarding wizard's "Your business" step
+(`juneau-digital-designs/app/components/onboarding/onboardingpageclient.tsx`), grouped as "The
+specifics that make it yours" with copy stating they are what stop a site reading as generic and
+that blanks are never invented: owner's name, year established, license number, response-time
+commitment, towns served, brands carried. Wired through `WizardData` + `makeInitialData` +
+`buildPayload` into the `BrandIntakeSubmission` the console consumes. Enterprise additional sites
+inherit them from the primary (schema scaffold), so no per-site duplication. The agency's
+`@jdd/schema` pin bump to v1.23.0 was committed in the SAME commit. Gate: `agency npm run build`
+EXIT 0. **The commit is local/unpushed on the open PR #21 branch** so it can be relocated before a
+push if the user wants it off the tickets PR. Remaining: the user-visual check (the six fields in
+the live form + the console Intake checklist flagging each blank) folds into the owed review gates.
+
+**The template-fidelity upgrade (Phases 0-13) is now CODE-COMPLETE.** Only user review gates remain:
+12c (the locally-built `_e2e_test_growth` reference site) and the owed real-browser reviews from
+Phases 1-6. No further executor work until those gates run.
