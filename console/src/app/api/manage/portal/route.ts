@@ -74,6 +74,13 @@ export async function GET(req: Request) {
         slug: s.slug,
         name: s.name ?? null,
         plan: s.plan,
+        /**
+         * The activation choice. Surfaced because, since every tier includes a receptionist,
+         * the plan alone no longer tells you whether this site has one: a Starter with
+         * `declined` is web-only (no number, no agent, no call log) and bills for no minutes.
+         * `undefined` means the client predates the activation step, not that they declined.
+         */
+        receptionistMode: s.receptionistMode ?? null,
         status: s.status,
         canonical: s.canonical ?? null,
         airtableBaseId: s.airtableBaseId ?? null,

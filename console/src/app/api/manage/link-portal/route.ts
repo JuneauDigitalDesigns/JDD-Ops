@@ -50,6 +50,14 @@ function siteEntriesFor(ctx: ClientContext): PortalSiteInput[] {
       name: s.brandName,
       canonical: s.canonical,
       airtableBaseId: s.env?.AIRTABLE_BASE_ID ?? null,
+      // Never assert web-only from a console repair. `receptionistDeclined: true` would null a
+      // provisioned agent and Airtable base, and this route runs off disk (ClientContext),
+      // which does not carry the activation choice — that lives in the KV account record. So a
+      // repair must not decide it. `false` goes through buildPortalSiteEntries' non-declined
+      // branch, which preserves (never blanks) the stored agent/base, and because this path
+      // sets no `receptionistMode`, upsertSite's defined-field merge keeps whatever mode is
+      // already stored. The external-client script is where a web-only client is marked declined.
+      receptionistDeclined: false,
     })),
   });
 }

@@ -24,6 +24,8 @@ export interface RepairSite {
   slug: string;
   name: string | null;
   plan: string;
+  /** Activation choice. null = client predates the step (not the same as "declined"). */
+  receptionistMode: 'forwarded' | 'published' | 'declined' | null;
   status: string;
   canonical: string | null;
   airtableBaseId: string | null;

@@ -182,6 +182,27 @@ export default function PortalSection() {
                     />
                     <span className={s.mine ? 'text-fg' : 'text-fg3'}>{s.name ?? s.slug}</span>
                     <span className="font-mono text-fg3">{s.slug}</span>
+                    {/* Receptionist state. A declined Starter is web-only: no number, no agent,
+                        no call log, no metered minutes — worth flagging because the plan badge
+                        alone no longer tells you. A null mode (pre-activation-step client) is
+                        left unlabelled rather than shown as a state it isn't. */}
+                    {s.receptionistMode === 'declined' ? (
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+                        style={{ background: 'var(--warn-bg, rgba(200,140,0,0.15))', color: 'var(--warn)' }}
+                        title="Client declined the AI receptionist. Website only: no number, agent, call log, or metered minutes."
+                      >
+                        Web only
+                      </span>
+                    ) : s.receptionistMode ? (
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-fg3"
+                        style={{ background: 'var(--surface-2, rgba(0,0,0,0.04))' }}
+                        title={`Receptionist active (line ${s.receptionistMode}).`}
+                      >
+                        {s.receptionistMode}
+                      </span>
+                    ) : null}
                     {!s.mine && <span className="text-fg3">· another client</span>}
                     {s.airtableBaseId && (
                       <span className="ml-auto font-mono text-fg3">{s.airtableBaseId}</span>
