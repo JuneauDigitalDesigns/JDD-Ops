@@ -3,20 +3,27 @@
  * jdd-ops/onboard.js — provisioning orchestrator.
  *
  * Usage:
- *   npm run onboard -- --schema clients/{slug}/site.ts [--dry-run]
+ *   npm run onboard -- --schema clients/{slug}/site.ts [--dry-run] [--receptionist forwarded|published|declined]
  *
- * Plan-tier behavior:
- *   - starter    → site only (no voice agent, no Airtable)
- *   - growth     → site + 1 Retell agent + 1 JDD-owned Twilio number + 1 Airtable base
- *   - enterprise → N sites (N from intake.sites.length); each with its own
- *                  Retell agent + Twilio number; shared master Retell account
- *                  (= shared minute pool); shared Airtable base with a
- *                  per-site Site column.
+ * Plan-tier behavior (since the 2026-10-12 reprice, EVERY tier includes the AI receptionist;
+ * tiers differ by capability, not by whether a receptionist exists):
+ *   - starter    → site + 1 Retell agent + 1 JDD-owned Twilio number + 1 Airtable base,
+ *                  with web-form leads delivered by email (LEAD_DELIVERY_MODE=email). The only
+ *                  provisioning difference from growth is that email vs the 60-second callback.
+ *   - growth     → same stack, with outbound callback (LEAD_DELIVERY_MODE=callback).
+ *   - enterprise → N sites (N from intake.sites.length); each with its own Retell agent +
+ *                  Twilio number; shared master Retell account (= shared minute pool); shared
+ *                  Airtable base with a per-site Site column.
+ *
+ * The one exception is WEB-ONLY: a Starter client who declined the receptionist
+ * (receptionistMode === "declined"). That client gets the site and nothing else — no number,
+ * no agent, no Airtable — which is exactly the old Starter path. Web-only is not a plan; it is
+ * `plan: "starter"` + the declined mode, and it is gated on `isWebOnly`, never on the plan.
  *
  * Intake shape (clients/{slug}/site.ts):
- *   - New: `export const INTAKE: Intake = { plan, siteCount, sites: [...] }`
- *   - Legacy: `export const CONTENT: SiteContent = {...}` (auto-wrapped to a
- *     single-site Intake using CONTENT._meta.selectedPlan as the plan).
+ *   - New: `export const INTAKE: Intake = { plan, receptionistMode, siteCount, sites: [...] }`
+ *   - Legacy: `export const CONTENT: SiteContent = {...}` (auto-wrapped to a single-site Intake
+ *     using CONTENT._meta.selectedPlan as the plan; pass --receptionist to supply the mode).
  */
 
 import dotenv from 'dotenv';
@@ -46,7 +53,7 @@ import { createClerkClient } from '@clerk/backend';
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
 // which have no @jdd/schema dependency.
-import { buildPortalSiteEntries, toE164 } from '@jdd/schema';
+import { buildPortalSiteEntries, isWebOnly, toE164 } from '@jdd/schema';
 import {
   attachSiteToAccount,
   detachSiteFromAccount,
@@ -102,7 +109,7 @@ function run(cmd, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const args = { schema: null, dryRun: false, slug: null, linkPortal: false, testPortal: false, email: null };
+  const args = { schema: null, dryRun: false, slug: null, linkPortal: false, testPortal: false, email: null, receptionist: null };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--schema' && argv[i + 1]) {
       args.schema = argv[i + 1];
@@ -119,9 +126,15 @@ function parseArgs(argv) {
     } else if (argv[i] === '--email' && argv[i + 1]) {
       args.email = argv[i + 1];
       i++;
+    } else if (argv[i] === '--receptionist' && argv[i + 1]) {
+      // Operator override for the activation choice, for an intake that predates the field.
+      // Validated below against the three allowed values; a bad value is rejected, never
+      // coerced. Mirrors how --email overrides the portal address.
+      args.receptionist = argv[i + 1];
+      i++;
     } else if (argv[i] === '--help' || argv[i] === '-h') {
       console.log('Usage:');
-      console.log('  npm run onboard -- --schema clients/{slug}/site.ts [--dry-run]');
+      console.log('  npm run onboard -- --schema clients/{slug}/site.ts [--dry-run] [--receptionist forwarded|published|declined]');
       console.log('  npm run onboard -- --slug {slug} --link-portal [--email addr] [--test-portal]');
       process.exit(0);
     }
@@ -220,7 +233,13 @@ async function loadIntake(schemaPath) {
     if (!plan) {
       fail(1, `Legacy CONTENT schema has no _meta.selectedPlan — set it to "starter", "growth", or "enterprise" in ${schemaPath}. Refusing to guess: the wrong guess provisions paid Twilio/Retell resources.`);
     }
-    // No smsAlerts on this path, and that is correct: a legacy CONTENT file predates
+    // receptionistMode is deliberately left unset here. A legacy CONTENT file predates the
+    // activation step, so the schema cannot know whether the client wanted a receptionist.
+    // validateIntake then refuses the run unless the operator supplies --receptionist, which is
+    // the same "refuse to guess" stance as the plan above: assuming a receptionist spends money,
+    // and assuming "declined" withholds a service the client may have paid for.
+    //
+    // No smsAlerts on this path either, and that is correct: a legacy CONTENT file predates
     // consent capture, so there is no record of the owner agreeing to anything. Absent
     // reads as "not consented" downstream and the Twilio module is left out of the clone.
     return { plan, siteCount: 1, sites: [mod.CONTENT] };
@@ -304,12 +323,40 @@ function validateSite(content, label) {
   return { errors, warnings };
 }
 
+/**
+ * Website-only client: Starter with the receptionist declined. Adapts the envelope-level
+ * mode onto the PortalSite shape the canonical `isWebOnly` expects, so there is one definition
+ * of the rule across the agency app, the console and here.
+ */
+function intakeIsWebOnly(intake) {
+  return isWebOnly({ plan: intake.plan, receptionistMode: intake.receptionistMode });
+}
+
 function validateIntake(intake) {
   const errors = [];
   const warnings = [];
   const validPlans = new Set(['starter', 'growth', 'enterprise']);
   if (!validPlans.has(intake.plan)) {
     errors.push(`unknown plan "${intake.plan}" (expected starter|growth|enterprise)`);
+  }
+  // The activation choice must be stated, never inferred. Same reasoning as the plan guard:
+  // the wrong guess spends money. Assuming a receptionist buys a Twilio number and stands up a
+  // Retell agent for a client who declined one; assuming "declined" delivers a bare website to
+  // a client who paid for a receptionist. An intake predating the activation step carries no
+  // mode, so the operator supplies one with --receptionist (resolved before this runs).
+  const validModes = new Set(['forwarded', 'published', 'declined']);
+  if (!validModes.has(intake.receptionistMode)) {
+    errors.push(
+      `receptionistMode is "${intake.receptionistMode ?? '(unset)'}" (expected forwarded|published|declined). ` +
+      `Refusing to guess: the wrong guess provisions, or withholds, paid Twilio/Retell resources. ` +
+      `Pass --receptionist forwarded|published|declined if the intake predates this field.`,
+    );
+  }
+  // Web-only is a Starter-only arrangement. A declined receptionist on growth/enterprise is a
+  // contradiction (those tiers are sold on the receptionist), so catch it rather than silently
+  // skipping provisioning the client paid for.
+  if (intake.receptionistMode === 'declined' && intake.plan !== 'starter') {
+    errors.push(`receptionistMode "declined" is only valid on the starter plan, not "${intake.plan}"`);
   }
   if (!Array.isArray(intake.sites) || intake.sites.length < 1) {
     errors.push('intake.sites must contain at least 1 site');
@@ -538,8 +585,8 @@ function readEnvLocal(clientDir) {
   return out;
 }
 
-function writeClientEnvLocal(clientDir, siteSlug, plan, content) {
-  log(4, `Write .env.local (plan=${plan})`);
+function writeClientEnvLocal(clientDir, siteSlug, plan, content, webOnly) {
+  log(4, `Write .env.local (plan=${plan}${webOnly ? ', website-only' : ''})`);
   if (DRY_RUN) {
     dryLog(`would write ${clientDir}/.env.local (preserving any already-provisioned IDs)`);
     return;
@@ -549,31 +596,43 @@ function writeClientEnvLocal(clientDir, siteSlug, plan, content) {
   // wipe RETELL_AGENT_ID / TWILIO_NUMBER / AIRTABLE_BASE_ID.
   const prev = readEnvLocal(clientDir);
   const keep = (k) => (prev[k] ? prev[k] : '');
-  let body;
-  if (plan === 'starter') {
-    body = `# Auto-generated by onboard.js — edit via the console /manage tab, which also syncs to Vercel. Values here are preserved on re-run.
-LEAD_DELIVERY_MODE=email
-LEAD_TO_EMAIL=${content.brand.email}
-LEAD_BRAND_NAME=${content.brand.name}
-RESEND_API_KEY=${keep('RESEND_API_KEY')}
-RESEND_FROM_EMAIL=leads@juneaudigitaldesigns.com
-VERCEL_PROJECT_NAME=${siteSlug}
-`;
-  } else {
-    body = `# Auto-generated by onboard.js — edit via the console /manage tab, which also syncs to Vercel. Values here are preserved on re-run.
-LEAD_DELIVERY_MODE=callback
-RETELL_AGENT_ID=${keep('RETELL_AGENT_ID')}
-RETELL_LLM_ID=${keep('RETELL_LLM_ID')}
-RETELL_API_KEY=${process.env.RETELL_API_KEY || ''}
-RETELL_SIP_DOMAIN=${process.env.RETELL_SIP_DOMAIN || 'sip.retellai.com'}
-TWILIO_NUMBER=${keep('TWILIO_NUMBER')}
-CLIENT_FORWARD_PHONE=${content.brand.phone}
-CLIENT_FORWARD_RING_SECONDS=${keep('CLIENT_FORWARD_RING_SECONDS') || '15'}
-AIRTABLE_BASE_ID=${keep('AIRTABLE_BASE_ID')}
-RETELL_POST_CALL_WEBHOOK_URL=${keep('RETELL_POST_CALL_WEBHOOK_URL')}
-VERCEL_PROJECT_NAME=${siteSlug}
-`;
+
+  /**
+   * Assembled from two parts rather than copy-pasted templates, because the shapes overlap now.
+   *
+   *  - Lead delivery: Starter (receptionist or web-only) hands web-form leads to the owner by
+   *    email; Growth and Enterprise call them back. This matches syncVercelEnv's
+   *    `LEAD_DELIVERY_MODE` exactly, which is the only intended runtime difference between a
+   *    Starter-with-receptionist and a Growth site.
+   *  - Voice: everything except a web-only client gets the number, agent, forwarding and call
+   *    log. Starter joined this in the 2026-10-12 reprice; only a declined receptionist opts out.
+   */
+  const wantsEmailLeads = plan === 'starter';
+  const wantsVoice = !webOnly;
+  const lines = ['# Auto-generated by onboard.js — edit via the console /manage tab, which also syncs to Vercel. Values here are preserved on re-run.'];
+  lines.push(`LEAD_DELIVERY_MODE=${wantsEmailLeads ? 'email' : 'callback'}`);
+  if (wantsEmailLeads) {
+    lines.push(`LEAD_TO_EMAIL=${content.brand.email}`);
+    lines.push(`LEAD_BRAND_NAME=${content.brand.name}`);
+    lines.push(`RESEND_API_KEY=${keep('RESEND_API_KEY')}`);
+    lines.push('RESEND_FROM_EMAIL=leads@juneaudigitaldesigns.com');
   }
+  if (wantsVoice) {
+    lines.push(`RETELL_AGENT_ID=${keep('RETELL_AGENT_ID')}`);
+    lines.push(`RETELL_LLM_ID=${keep('RETELL_LLM_ID')}`);
+    lines.push(`RETELL_API_KEY=${process.env.RETELL_API_KEY || ''}`);
+    lines.push(`RETELL_SIP_DOMAIN=${process.env.RETELL_SIP_DOMAIN || 'sip.retellai.com'}`);
+    lines.push(`TWILIO_NUMBER=${keep('TWILIO_NUMBER')}`);
+    // Human-first routing: the caller's own line rings first, the agent only picks up on
+    // no-answer. Keep the window under ~20s or the owner's carrier voicemail answers first,
+    // Twilio scores the call answered, and the agent never gets it.
+    lines.push(`CLIENT_FORWARD_PHONE=${content.brand.phone}`);
+    lines.push(`CLIENT_FORWARD_RING_SECONDS=${keep('CLIENT_FORWARD_RING_SECONDS') || '15'}`);
+    lines.push(`AIRTABLE_BASE_ID=${keep('AIRTABLE_BASE_ID')}`);
+    lines.push(`RETELL_POST_CALL_WEBHOOK_URL=${keep('RETELL_POST_CALL_WEBHOOK_URL')}`);
+  }
+  lines.push(`VERCEL_PROJECT_NAME=${siteSlug}`);
+  let body = lines.join('\n') + '\n';
   // Keys onboard.js writes LATER in the run (steps 8–10) and that are absent from the
   // templates above. Without this they are silently dropped on every re-run — and
   // PORTAL_ACCOUNT_EMAIL in particular is what a later `--link-portal --email` reads to know
@@ -1402,7 +1461,7 @@ function resolvePortalIdentity(intake, baseSlug, emailOverride = null) {
  * provisioned — numbers bought, agents created — with no portal record and no obvious way to
  * tell. Attaching as we go means a partial run leaves a partially-correct portal, not an empty one.
  */
-async function attachSiteToPortal({ email, plan, status, siteSlug, content, sharedBaseId, clientDir, preferResolvedHost = false }) {
+async function attachSiteToPortal({ email, plan, receptionistMode, webOnly = false, status, siteSlug, content, sharedBaseId, clientDir, preferResolvedHost = false }) {
   log(10, `Link portal account`);
   if (!email) {
     console.warn(`  ⚠ No email available (brand.email empty and no --email given) — skipping portal link for ${siteSlug}.`);
@@ -1444,17 +1503,26 @@ async function attachSiteToPortal({ email, plan, status, siteSlug, content, shar
       fallbackCanonical: resolvedHost,
       vercelProjectId: await getVercelProjectId(siteSlug),
       retellAgentId: readEnvLocal(clientDir).RETELL_AGENT_ID || null,
+      // Required by buildPortalSiteEntries (v1.24.0): a web-only site gets its Airtable base
+      // and agent asserted null; everyone else keeps theirs. Stating it, never inferring from
+      // the plan, is the whole point of the field.
+      receptionistDeclined: webOnly,
     }],
   });
 
-  // Set on the entry directly as well as via buildPortalSiteEntries, because jdd-ops
-  // pins @jdd/schema to a published tag: until that tag carries the retellAgentId rule
-  // the installed build silently drops it. `upsertSite` merges defined fields rather
-  // than picking known ones, so this survives either version — and the schema-side rule
-  // (starter ⇒ null, unresolved ⇒ omitted) still governs once the tag lands.
+  // Belt-and-braces over buildPortalSiteEntries, kept because `upsertSite` merges defined
+  // fields rather than picking known ones, so it is harmless, and it documents intent at the
+  // write site. **Keyed on web-only, not on plan.** The old `plan === 'starter'` rule nulled
+  // the agent for EVERY Starter site — now that Starter has a receptionist, that would wipe a
+  // paying client's agent on every run. Only a declined receptionist has none to record.
   const agentId = readEnvLocal(clientDir).RETELL_AGENT_ID || null;
-  if (plan === 'starter') entry.retellAgentId = null;
+  if (webOnly) entry.retellAgentId = null;
   else if (agentId) entry.retellAgentId = agentId;
+
+  // Stamp the activation choice on the site record. The portal reads it to decide whether to
+  // show a call-log tab, metering reads it to decide whether to bill minutes, and `isWebOnly`
+  // needs it present (not just absent) to stay true for a declined site on the next read.
+  if (receptionistMode) entry.receptionistMode = receptionistMode;
 
   const account = await attachSiteToAccount(email, entry);
   const n = account.sites.length;
@@ -1714,22 +1782,34 @@ async function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, porta
 
   console.log(`\n${line}`);
   console.log(`  Next:`);
-  if (intake.plan === 'starter') {
+  if (intakeIsWebOnly(intake)) {
+    // Website-only: no number, no agent, leads by email. The old Starter checklist.
     console.log(`    1. Verify lead email at ${intake.sites[0].brand.email} after a test form submission.`);
     console.log(`    2. Verify the deployed Vercel URL renders correctly.`);
     analyticsLines(analytics, 3).forEach((l) => console.log(l));
   } else {
-    console.log(`    1. Checkpoint 1 — review Vercel preview URL(s).`);
-    console.log(`    2. Checkpoint 2 — test-call each Twilio number; tune each agent-prompt.txt.`);
+    // Everyone with a receptionist (Starter included) gets the test-call and prompt-tuning
+    // checkpoints. The one tier difference is lead delivery: Starter reports web-form leads by
+    // email, Growth and Enterprise call them back, so the lead checkpoint is worded per plan.
+    console.log(`    1. Checkpoint 1 — review the Vercel preview URL(s).`);
+    console.log(`    2. Checkpoint 2 — test-call each Twilio number; confirm it rings the owner's`);
+    console.log(`       real phone FIRST and only reaches the agent on no-answer; tune each agent-prompt.txt.`);
     provisioned.forEach((p) => {
       if (p.agentId) {
         const slugForCmd = isMultiSite(intake) ? `${baseSlug}/site-${p.index + 1}` : baseSlug;
         console.log(`         npm run update-prompt -- ${p.agentId} --slug ${slugForCmd}`);
       }
     });
-    console.log(`    3. Checkpoint 3 — submit a test lead per site; confirm the Retell callback fires`);
-    console.log(`       (/api/contact → create-phone-call) + Airtable row if post-call logging is set up.`);
-    analyticsLines(analytics, 4).forEach((l) => console.log(l));
+    console.log(`    3. Checkpoint 3 — make a test call; confirm the post-call text brief arrives and`);
+    console.log(`       the call logs an Airtable row.`);
+    if (intake.plan === 'starter') {
+      console.log(`    4. Verify a web-form submission still emails the lead to ${intake.sites[0].brand.email}`);
+      console.log(`       (Starter delivers form leads by email; the callback is a Growth feature).`);
+    } else {
+      console.log(`    4. Submit a test lead per site; confirm the Retell callback fires`);
+      console.log(`       (/api/contact → create-phone-call).`);
+    }
+    analyticsLines(analytics, 5).forEach((l) => console.log(l));
   }
   console.log('');
 }
@@ -1766,13 +1846,23 @@ function preflight(intake) {
     warnings.push('KV not configured (KV_REST_API_URL / KV_REST_API_TOKEN) — step 10 will NOT link the portal; the client will have no portal access until you re-run --link-portal');
   }
 
-  if (intake.plan === 'starter') {
-    if (!process.env.RESEND_API_KEY) warnings.push('RESEND_API_KEY not set — starter lead emails will not send until configured');
-  } else {
+  const webOnly = intakeIsWebOnly(intake);
+
+  // Email lead delivery. Both Starter variants (receptionist and web-only) hand web-form leads
+  // to the owner by email, so Resend is needed on Starter regardless of the receptionist.
+  if (intake.plan === 'starter' && !process.env.RESEND_API_KEY) {
+    warnings.push('RESEND_API_KEY not set — starter lead emails will not send until configured');
+  }
+
+  // The voice + CRM stack. Needed by every client EXCEPT a web-only one. This is the gate that
+  // matters most: it runs before the paid Twilio purchase, so a Starter-with-receptionist whose
+  // .env is missing a Retell/Twilio credential now fails here for free instead of halfway
+  // through, after a number has been bought. The old code only reached this block for
+  // growth/enterprise, so a misconfigured Starter would have sailed past it.
+  if (!webOnly) {
     if (!process.env.MAKE_API_KEY || !process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID) {
       warnings.push('MAKE_API_KEY / MAKE_POST_CALL_MASTER_SCENARIO_ID not set — step 8c will skip the post-call clone, so calls will not reach Airtable or SMS the owner');
     }
-    // growth / enterprise voice + CRM stack
     need('ANTHROPIC_API_KEY');
     need('RETELL_API_KEY');
     need('RETELL_LLM_ID');
@@ -1813,15 +1903,18 @@ function preflight(intake) {
 }
 
 /**
- * Live A2P readiness check — only when this client actually texts (growth/enterprise with
- * SMS consent on file). The sync preflight already hard-fails if the SID is missing; this
+ * Live A2P readiness check — only when this client actually texts (any tier with a receptionist
+ * and SMS consent on file). The sync preflight already hard-fails if the SID is missing; this
  * goes one step further and asks Twilio whether the Messaging Service has an APPROVED
  * campaign. Adding a number to a service whose campaign is still pending buys a number that
  * silently 30034s on every send, and campaign approval takes days — far better to stop here
  * with a checklist than to provision a client who can't text and not find out for a week.
+ *
+ * Gated on web-only, not on plan: a Starter-with-receptionist sends post-call texts and must be
+ * checked, where the old `plan === 'starter'` skip would have let a textless Starter through.
  */
 async function verifyA2pRegistered(intake) {
-  if (DRY_RUN || intake.plan === 'starter') return;
+  if (DRY_RUN || intakeIsWebOnly(intake)) return;
   const smsWanted = intake.smsAlerts?.consented === true && Boolean(intake.smsAlerts?.phone);
   if (!smsWanted) return;
   const sid = process.env.TWILIO_MESSAGING_SERVICE_SID;
@@ -1869,9 +1962,21 @@ async function main() {
   }
 
   const intake = await loadIntake(args.schema);
+  // Operator override wins over whatever the intake carried (or didn't). Applied before
+  // validation so a --receptionist value is checked against the three allowed modes exactly
+  // like an intake-supplied one; a bad flag value fails validation rather than slipping through.
+  if (args.receptionist) intake.receptionistMode = args.receptionist;
   validateIntake(intake);
   preflight(intake);
   await verifyA2pRegistered(intake);
+
+  // Computed once, from the stated mode. Every per-site decision below keys off this rather
+  // than off the plan, because every tier now has a receptionist and only a declined Starter
+  // does not. `intakeIsWebOnly` reuses the canonical predicate from @jdd/schema.
+  const webOnly = intakeIsWebOnly(intake);
+  console.log(
+    `  Receptionist: ${intake.receptionistMode}${webOnly ? ' (WEBSITE ONLY — no number, no agent)' : ''}`,
+  );
 
   const provisioned = [];
   let sharedBaseId = null;
@@ -1889,14 +1994,17 @@ async function main() {
     const { repoDir, repoUrl } = await createRepoFromLocal(siteSlug, site, clientDir);
     writeClientSchema(repoDir, site);
     writeApiRoutes(repoDir);
-    writeClientEnvLocal(clientDir, siteSlug, intake.plan, site);
+    writeClientEnvLocal(clientDir, siteSlug, intake.plan, site, webOnly);
     buildClientRepo(repoDir);
 
     let agentId = null;
     let twilioNumber = null;
 
-    if (intake.plan === 'starter') {
-      console.log(`\n  Skipping voice provisioning (plan=starter).`);
+    // Keyed on web-only, not on plan: Starter now provisions the full voice stack like Growth
+    // (the only runtime difference is LEAD_DELIVERY_MODE=email, set in syncVercelEnv). The only
+    // client that skips this is one who declined the receptionist.
+    if (webOnly) {
+      console.log(`\n  Skipping voice provisioning (website-only client, receptionist declined).`);
     } else {
       const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug);
       agentId = await createRetellAgent(site, agentPrompt, clientDir);
@@ -1940,6 +2048,8 @@ async function main() {
     await attachSiteToPortal({
       email: portalEmail,
       plan: intake.plan,
+      receptionistMode: intake.receptionistMode,
+      webOnly,
       status: portalStatus,
       siteSlug,
       content: site,

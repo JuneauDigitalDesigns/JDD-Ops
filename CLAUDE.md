@@ -20,20 +20,35 @@ Two files per client:
 
 ## Plan tiers
 
-The intake schema's top-level `plan` field gates which provisioning steps run.
+Since the 2026-10-12 reprice, **every tier includes the AI receptionist.** Tiers differ by
+capability, not by whether a receptionist exists. What now gates the voice stack is NOT the
+plan but `intake.receptionistMode`: a Starter client who declined it is "web-only" and gets the
+site alone. Everyone else gets the full stack.
 
 | Plan       | Site(s) | Voice agent | Twilio number | Airtable base | Lead delivery |
 |------------|---------|-------------|---------------|---------------|---------------|
-| starter    | 1       | —           | —             | —             | Resend email to `brand.email` |
-| growth     | 1       | ✓           | ✓             | ✓ (1)         | Site `/api/contact` → Retell `create-phone-call` |
-| enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Site `/api/contact` → Retell `create-phone-call` |
+| starter    | 1       | ✓           | ✓             | ✓ (1)         | Resend email to `brand.email` (`LEAD_DELIVERY_MODE=email`) |
+| growth     | 1       | ✓           | ✓             | ✓ (1)         | Site `/api/contact` → Retell `create-phone-call` (callback) |
+| enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Site `/api/contact` → Retell `create-phone-call` (callback) |
+| *web-only* | 1       | —           | —             | —             | Resend email to `brand.email` |
 
-Enterprise sites share the master Retell account's minute pool. Per-site
-Twilio numbers route inbound calls through `/api/voice` (human-first) then to
-per-site Retell agents on no-answer.
+**Web-only is not a plan.** It is `plan: "starter"` + `receptionistMode: "declined"`, priced
+identically to Starter, offered only when a client refuses AI on their line. onboard.js gates
+the voice stack on `isWebOnly` (from `@jdd/schema`), never on `plan === 'starter'`. The only
+provisioning difference between a Starter-with-receptionist and a Growth site is
+`LEAD_DELIVERY_MODE`: Starter reports web-form leads by email, Growth calls them back.
 
-Master env prerequisites for Growth/Enterprise provisioning: `TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN` (in addition to `RETELL_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
+**The receptionist mode must be stated, never inferred.** onboard.js refuses to run without it
+(the intake carries it, or pass `--receptionist forwarded|published|declined`), because the
+wrong guess either buys a number for a client who declined or withholds one a client paid for.
+
+Enterprise sites share the master Retell account's minute pool; Starter and Growth are metered
+per site (100 and 350 minutes). Per-site Twilio numbers route inbound calls through `/api/voice`
+(human-first) then to per-site Retell agents on no-answer.
+
+Master env prerequisites for provisioning any client with a receptionist (every tier except
+web-only): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (in addition to `RETELL_API_KEY`,
+`ANTHROPIC_API_KEY`, etc.).
 
 ## Hard rules — never break these
 
@@ -178,7 +193,7 @@ shell at `/manage/{slug}/{section}` (enterprise site selection rides on `?site=`
 | Overview | Health tiles (deploy, domain attached+verified, env drift) + recent activity |
 | Environment | Edit `.env.local` → push to Vercel → redeploy |
 | Deployments | Last 10 builds, redeploy |
-| Voice agent | Edit `agent-prompt.txt`, push to the client's Retell LLM (growth/enterprise) |
+| Voice agent | Edit `agent-prompt.txt`, push to the client's Retell LLM (any client with a receptionist, i.e. every tier except web-only) |
 | Portal | Which account the client signs in with; attach/repair |
 
 Things worth knowing:
@@ -186,8 +201,9 @@ Things worth knowing:
 - **Env drift is never automatic.** Resolving it costs one Vercel request *per key*
   (`listProjectEnv`), so it is an explicit button on the roster and on Overview, and is
   scoped to the viewed site via `?site=`.
-- Curated fields are grouped Call routing / Lead delivery / Integrations; starter clients
-  only have the middle one, and empty groups hide themselves.
+- Curated fields are grouped Call routing / Lead delivery / Integrations; web-only clients
+  (declined receptionist) only have the middle one, and empty groups hide themselves. A
+  Starter client WITH a receptionist now has all three, like Growth.
 - Master credentials are masked, with reveal-on-click via `/api/manage/env/reveal` (one
   named key, disk only — localhost-only assumption; delete that route first if the console
   is ever deployed). `VERCEL_PROJECT_NAME` / `CLERK_USER_ID` / `RETELL_LLM_ID` are

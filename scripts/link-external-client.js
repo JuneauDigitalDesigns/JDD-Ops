@@ -65,19 +65,27 @@ async function main() {
 
   log(`\n${apply ? 'APPLYING' : 'DRY RUN (pass --apply to write)'} — account ${EMAIL}\n`);
 
-  // 1. Portal account: one record, both sites, status live (starter, no call data → no Airtable).
+  // 1. Portal account: one record, both sites, status live.
+  //
+  // `receptionistMode: 'declined'` makes these web-only, which is what they actually are: custom
+  // externally-built sites with no JDD receptionist, no number, no Airtable. This matters since
+  // the 2026-10-12 reprice, when `siteFeature` stopped gating call data on `plan === 'starter'`.
+  // Without the declined mode a live Starter site with no Airtable base resolves to
+  // `connecting` (our drift) rather than `not-on-plan`, and the portal would show these two real
+  // clients a call-log tab that can never load. The declined mode restores `not-on-plan`.
   for (const s of SITES) {
     const site = {
       slug: s.slug,
       name: s.name,
       canonical: s.canonical,
       plan: 'starter',
+      receptionistMode: 'declined',
       status: 'live',
       airtableBaseId: null,
       vercelProjectId: s.vercelProjectId,
       addedAt: Date.now(),
     };
-    log(`  site ${s.slug}: plan=starter status=live vercel=${s.vercelProjectId}`);
+    log(`  site ${s.slug}: plan=starter (web-only, declined) status=live vercel=${s.vercelProjectId}`);
     if (apply) await attachSiteToAccount(EMAIL, site);
   }
 
