@@ -9,7 +9,8 @@
     "start": "next start -p 3040",
     "sync-schema": "node scripts/sync-schema.mjs",
     "check-schema": "node scripts/sync-schema.mjs --check",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:tax": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-tax-estimate.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -25,6 +26,7 @@
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "recharts": "3.8.1",
     "resend": "^6.18.1",
     "stripe": "^22.4.0"
   },
