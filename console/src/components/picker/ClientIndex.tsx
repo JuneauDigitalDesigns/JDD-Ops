@@ -402,6 +402,9 @@ export default function ClientIndex() {
         <Link href="/leads" className="btn btn-xs">
           Leads <ArrowRight size={12} weight="bold" />
         </Link>
+        <Link href="/finances" className="btn btn-xs">
+          Finances <ArrowRight size={12} weight="bold" />
+        </Link>
       </NavSlot>
 
       <RefreshButton onClick={load} busy={refreshing} />
