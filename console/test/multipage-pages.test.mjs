@@ -35,13 +35,18 @@ test('pageFromType seeds an optional page from its template', () => {
 
 test('liftLegacyToComposition builds a single home page from legacy state', () => {
   const c = liftLegacyToComposition({
-    selections: { nav: 'NavMinimal', footer: 'FooterColumns', seo: 'SeoLocalBusiness', hero: 'HeroSplit', services: 'ServicesGrid' },
-    order: ['nav', 'hero', 'services', 'footer'],
+    selections: {
+      nav: 'NavMinimal', footer: 'FooterColumns', seo: 'SeoLocalBusiness',
+      hero: 'HeroSplit', services: 'ServicesGrid', contact: 'ContactSplit',
+    },
+    order: ['nav', 'hero', 'services', 'contact', 'footer'],
   });
   assert.equal(c.pages.length, 1);
   assert.equal(c.pages[0].route, '');
-  assert.deepEqual(c.pages[0].sections.map((s) => s.categoryId), ['hero', 'services']);
+  assert.deepEqual(c.pages[0].sections.map((s) => s.categoryId), ['hero', 'services', 'contact']);
   assert.equal(c.chrome.nav.name, 'NavMinimal');
+  // A lead form (contact) is included deliberately: validateComposition now requires one
+  // somewhere in the composition (see test/lead-mode-invariants.test.mjs).
   assert.doesNotThrow(() => validateComposition(c));
 });
 

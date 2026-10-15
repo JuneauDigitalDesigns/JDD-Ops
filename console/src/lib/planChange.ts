@@ -1,12 +1,12 @@
 import 'server-only';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { resolveRepoRoot, rewriteClientSchema } from './export';
+import { resolveRepoRoot, rewriteClientSchema, repoDirFor } from './export';
 import { withPlan, type RawIntake, type RawSite } from './intake';
 import { accountStoreConfigured, attachSiteToAccount, getAccountEmailByUserId } from './accountStore';
 import { loadVercelCredentials } from './opsSecrets';
 import { loadVercelSync, type Deployment, type SyncResult } from './vercelSync';
-import type { ClientContext, Plan } from './types';
+import type { ClientContext, NeedsReexport, Plan } from './types';
 
 /**
  * The shared half of changing a client's plan tier — everything both the upgrade and the
@@ -156,6 +156,39 @@ export async function pushEnvAndRedeploy(opts: {
       redeploy: { ok: false, error: err instanceof Error ? err.message : 'Redeploy failed.' },
     };
   }
+}
+
+const REEXPORT_FILE = '.studio-reexport.json';
+
+/**
+ * Flag an exported repo as stale after a plan change: writePlanToSchema rewrites
+ * clients/{slug}/site.ts, but the already-generated src/app/**\/page.tsx files are not
+ * regenerated (decision in PLAN-tier-form-wiring-console.md §4 — this is a flag + a tile,
+ * not a re-export pipeline). A sibling of .studio-pages.json (export.ts's route tracker),
+ * kept separate since its shape differs.
+ */
+export function markNeedsReexport(repoRoot: string, slug: string, from: Plan, to: Plan): void {
+  const repoDir = repoDirFor(repoRoot, slug);
+  if (!existsSync(repoDir)) return; // nothing exported yet — no stale build to flag
+  const marker: NeedsReexport = { reason: 'plan-change', from, to, at: new Date().toISOString() };
+  writeFileSync(resolve(repoDir, REEXPORT_FILE), JSON.stringify(marker) + '\n', 'utf8');
+}
+
+/** Read back the stale-export flag for a client's single repo, or null if unflagged/unbuilt. */
+export function readNeedsReexport(repoRoot: string, slug: string): NeedsReexport | null {
+  const file = resolve(repoDirFor(repoRoot, slug), REEXPORT_FILE);
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')) as NeedsReexport;
+  } catch {
+    return null;
+  }
+}
+
+/** Clear the flag once the repo has actually been re-exported. */
+export function clearNeedsReexport(repoRoot: string, slug: string): void {
+  const file = resolve(repoDirFor(repoRoot, slug), REEXPORT_FILE);
+  if (existsSync(file)) rmSync(file, { force: true });
 }
 
 /** brand fields the env templates need. RawSite types `brand` loosely, so read it narrowly. */

@@ -19,7 +19,9 @@ import {
   verifyCatalogImports,
   type Entry,
 } from '@/lib/export';
-import { navLinksFor, type SiteComposition } from '@/lib/pages';
+import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
+import { LEAD_FORM_NAMES } from '@/lib/leadForms';
+import { clearNeedsReexport } from '@/lib/planChange';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { materializeImages } from '@/lib/image-pipeline';
@@ -155,7 +157,14 @@ export async function POST(req: Request) {
         // from preset content and, with `deploy`, push it.
         const lockedMsg = await lockedReason(slug);
         if (lockedMsg) throw new Error(lockedMsg);
+        // Composition path: validateComposition carries the lead-form + Contact-page invariants
+        // (pages.ts) in addition to its existing structural checks. Legacy single-page path has
+        // no SiteComposition to run that against, so the lead-form rule is applied directly below.
+        if (composition) validateComposition(composition);
         const entries = validateEntries(composition ? collectSectionRefs(composition) : selections);
+        if (!composition && !entries.some((e) => LEAD_FORM_NAMES.has(e.name))) {
+          throw new Error('Selected components include no lead-capture form. Add a contact or final-CTA form before exporting.');
+        }
         const repoRoot = resolveRepoRoot();
 
         /**
@@ -500,6 +509,7 @@ export async function POST(req: Request) {
 
         // The repo is now the source of truth; the draft is stale.
         deleteDraft(slug);
+        clearNeedsReexport(repoRoot, slug);
         send({
           type: 'done',
           slug,

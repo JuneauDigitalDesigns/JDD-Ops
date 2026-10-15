@@ -1,6 +1,7 @@
 'use client';
 import { motion, useReducedMotion } from 'framer-motion';
 import { PhoneCall, Envelope, MapPin } from '@phosphor-icons/react';
+import { leadModeFor } from '@jdd/schema';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
@@ -36,7 +37,7 @@ export default function ContactCardOverlap({
   const s = skinClasses(skin);
   const { finalCta, brand, extensions } = content;
   const mapsUrl = extensions.contactDetails?.mapsUrl;
-  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const mode = leadModeFor(content._meta?.selectedPlan ?? 'growth');
 
   return (
     <section id="contact" className={`py-24 ${s.section}`}>

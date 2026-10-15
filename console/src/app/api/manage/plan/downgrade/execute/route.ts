@@ -8,6 +8,7 @@ import { buildPlanDowngradePreview, PlanDowngradeError } from '@/lib/planDowngra
 import { appendAudit } from '@/lib/audit';
 import {
   brandContact,
+  markNeedsReexport,
   mirrorPlanToPortal,
   planEditError,
   pushEnvAndRedeploy,
@@ -116,6 +117,7 @@ export async function POST(req: Request) {
   if (!shape) {
     return NextResponse.json({ error: 'Unrecognized site.ts shape.' }, { status: 422 });
   }
+  markNeedsReexport(repoRoot, slug, 'growth', 'starter');
 
   // ── 3. clients/{slug}/.env.local ──────────────────────────────────────────
   // A growth .env.local has none of the starter lead-email keys, so flipping only
@@ -161,6 +163,7 @@ export async function POST(req: Request) {
       steps: steps.map((s) => ({ resource: s.resource, outcome: s.outcome, message: s.message })),
       wrote: [...written.updated, ...written.added],
       airtableKept: preview.airtable.baseId ?? null,
+      needsReexport: true,
     },
   });
 

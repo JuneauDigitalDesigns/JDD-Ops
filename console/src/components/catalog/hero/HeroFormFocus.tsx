@@ -18,6 +18,7 @@
 // one file and declares no fixed `leadMode`.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CheckCircle, PhoneCall } from '@phosphor-icons/react';
+import { leadModeFor } from '@jdd/schema';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
@@ -64,7 +65,7 @@ export default function HeroFormFocus({
   const s = skinClasses(skin);
   const dark = skin === 'inverted' || skin === 'contrast';
   const { hero, brand } = content;
-  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const mode = leadModeFor(content._meta?.selectedPlan ?? 'growth');
 
   return (
     <section id="top" className={`${s.section} py-10 lg:py-16`}>

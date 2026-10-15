@@ -339,6 +339,29 @@ export default function OverviewSection() {
         </div>
       )}
 
+      {/* writePlanToSchema rewrites site.ts but never regenerates the already-exported
+          src/app/**\/page.tsx files — see lib/planChange.ts markNeedsReexport. The form
+          components adapt on their own at render, but a plan-locked variant like
+          FinalCtaSimple does not, so a stale build can silently drift from the new tier. */}
+      {ctx.needsReexport && (
+        <div
+          className="mb-6 rounded-[12px] border p-5"
+          style={{ borderColor: 'var(--warn)', background: 'var(--surface)' }}
+        >
+          <div className="flex flex-col gap-1">
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+              <Warning size={15} weight="fill" style={{ color: 'var(--warn)', flexShrink: 0 }} />
+              Plan changed, site not re-exported
+            </span>
+            <p className="text-xs text-fg2">
+              Plan changed {ctx.needsReexport.from} → {ctx.needsReexport.to} on{' '}
+              {relativeTime(new Date(ctx.needsReexport.at).getTime())}, but the built repo still
+              reflects the old tier. Re-export in the Build studio to bring it current.
+            </p>
+          </div>
+        </div>
+      )}
+
       {pending && (
         <div
           className="mb-6 rounded-[12px] border p-5"

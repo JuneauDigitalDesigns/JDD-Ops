@@ -15,6 +15,7 @@
 // soft surface. Sections are separated by mass, not lines (SPEC §1).
 // ─────────────────────────────────────────────────────────────────────────────
 import { PhoneCall } from '@phosphor-icons/react';
+import { leadModeFor } from '@jdd/schema';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
@@ -45,7 +46,7 @@ export default function ContactInlineStrip({
   const s = skinClasses(skin);
   const dark = skin === 'inverted' || skin === 'contrast';
   const { finalCta, brand } = content;
-  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const mode = leadModeFor(content._meta?.selectedPlan ?? 'growth');
 
   return (
     <section id="contact" className={`${s.section} py-12 lg:py-14`}>

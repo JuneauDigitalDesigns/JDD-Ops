@@ -12,6 +12,7 @@
 import type { NavItem } from '@jdd/schema';
 import type { SkinId } from '@/lib/skins';
 import { slugify } from '@/lib/slugify';
+import { LEAD_FORM_NAMES } from '@/lib/leadForms';
 
 /** Where a section sits in the page's vertical rhythm. Decided by the PAGE TEMPLATE, never by the
  *  component (decision 24), which is what makes decision 30d's non-uniform-padding ban enforceable
@@ -169,6 +170,18 @@ export function validateComposition(comp: SiteComposition): SiteComposition {
       throw new Error(`Page "${page.route || '(home)'}" has ${inverted} inverted sections; decision 12 allows one.`);
     }
   }
+
+  // A site that captures no leads is a silent revenue hole: require at least one lead form
+  // somewhere, and require the Contact page (when one exists) to be where it lives.
+  const hasAnyForm = pages.some((p) => p.sections.some((s) => LEAD_FORM_NAMES.has(s.name)));
+  if (!hasAnyForm) {
+    throw new Error('Composition has no lead-capture form. Add a contact or final-CTA form before exporting.');
+  }
+  const contactPage = pages.find((p) => p.route === 'contact');
+  if (contactPage && !contactPage.sections.some((s) => LEAD_FORM_NAMES.has(s.name))) {
+    throw new Error('The Contact page has no lead form. Add a contact-* component to it before exporting.');
+  }
+
   return comp;
 }
 

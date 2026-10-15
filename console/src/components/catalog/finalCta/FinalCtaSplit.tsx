@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle, PhoneCall } from '@phosphor-icons/react';
+import { leadModeFor } from '@jdd/schema';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
@@ -40,7 +41,7 @@ export default function FinalCtaSplit({
   const s = skinClasses(skin);
   const { finalCta, brand } = content;
   const dark = skin === 'inverted' || skin === 'contrast';
-  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const mode = leadModeFor(content._meta?.selectedPlan ?? 'growth');
 
 
   return (

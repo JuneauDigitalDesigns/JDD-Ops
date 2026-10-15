@@ -3,7 +3,7 @@
  * jdd-ops/onboard.js — provisioning orchestrator.
  *
  * Usage:
- *   npm run onboard -- --schema clients/{slug}/site.ts [--dry-run] [--receptionist forwarded|published|declined]
+ *   npm run onboard -- --schema clients/{slug}/site.ts [--dry-run] [--receptionist forwarded|published|declined] [--reexport-on-plan-mismatch]
  *
  * Plan-tier behavior (since the 2026-10-12 reprice, EVERY tier includes the AI receptionist;
  * tiers differ by capability, not by whether a receptionist exists):
@@ -37,6 +37,7 @@ import { resolve, basename, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import Anthropic from '@anthropic-ai/sdk';
+import { generateStarterPrompt, generateGrowthPrompt } from './lib/agent-prompt.js';
 import { Octokit } from '@octokit/rest';
 import twilio from 'twilio';
 import {
@@ -53,7 +54,7 @@ import { createClerkClient } from '@clerk/backend';
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
 // which have no @jdd/schema dependency.
-import { buildPortalSiteEntries, isWebOnly, toE164 } from '@jdd/schema';
+import { buildPortalSiteEntries, isWebOnly, leadModeFor, toE164 } from '@jdd/schema';
 import {
   attachSiteToAccount,
   detachSiteFromAccount,
@@ -109,7 +110,16 @@ function run(cmd, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const args = { schema: null, dryRun: false, slug: null, linkPortal: false, testPortal: false, email: null, receptionist: null };
+  const args = {
+    schema: null,
+    dryRun: false,
+    slug: null,
+    linkPortal: false,
+    testPortal: false,
+    email: null,
+    receptionist: null,
+    reexportOnPlanMismatch: false,
+  };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--schema' && argv[i + 1]) {
       args.schema = argv[i + 1];
@@ -132,9 +142,16 @@ function parseArgs(argv) {
       // coerced. Mirrors how --email overrides the portal address.
       args.receptionist = argv[i + 1];
       i++;
+    } else if (argv[i] === '--reexport-on-plan-mismatch') {
+      // §2.2 escape hatch for an INTAKE envelope whose plan disagrees with a site's
+      // _meta.selectedPlan (see validateIntake). Absent, that mismatch hard-fails; present,
+      // onboard re-stamps the mismatched site(s) to the envelope plan and continues. The
+      // "re-export and continue" option must be stated, never the default — matching the
+      // receptionist precedent, a money-spending correction is never assumed.
+      args.reexportOnPlanMismatch = true;
     } else if (argv[i] === '--help' || argv[i] === '-h') {
       console.log('Usage:');
-      console.log('  npm run onboard -- --schema clients/{slug}/site.ts [--dry-run] [--receptionist forwarded|published|declined]');
+      console.log('  npm run onboard -- --schema clients/{slug}/site.ts [--dry-run] [--receptionist forwarded|published|declined] [--reexport-on-plan-mismatch]');
       console.log('  npm run onboard -- --slug {slug} --link-portal [--email addr] [--test-portal]');
       process.exit(0);
     }
@@ -332,7 +349,59 @@ function intakeIsWebOnly(intake) {
   return isWebOnly({ plan: intake.plan, receptionistMode: intake.receptionistMode });
 }
 
-function validateIntake(intake) {
+/**
+ * §2.2 escape hatch: re-stamp `_meta.selectedPlan` to `intake.plan` on each mismatched site,
+ * in place in the schema file on disk, without round-tripping the file through a serializer
+ * (console/src/lib/export.ts's writeSiteContent/writeClientIntake are server-only and would
+ * also rewrite fields this guard has no business touching). Both schema shapes serialize each
+ * site's _meta.selectedPlan as a JSON-quoted `"selectedPlan": "<plan>"` line, in `sites[]`
+ * order (console/src/lib/export.ts:745 JSON.stringifies the whole INTAKE envelope; the legacy
+ * CONTENT shape is single-site and can never reach here mismatched — see §0), so the Nth match
+ * in the file is site[N]. If that count disagrees with intake.sites.length, the file isn't in
+ * the shape this rewrite understands — refuse rather than guess which occurrence is which.
+ *
+ * Returns the set of site indices it actually rewrote; the caller hard-fails any mismatch not
+ * in that set, so a partial match-count failure still aborts instead of silently no-op'ing.
+ */
+function reexportMismatchedSites(schemaPath, intake, mismatches) {
+  const rewritten = new Set();
+  if (DRY_RUN) {
+    for (const m of mismatches) {
+      dryLog(`would rewrite site[${m.index}] _meta.selectedPlan "${m.sitePlan}" -> "${intake.plan}" in ${schemaPath}`);
+      rewritten.add(m.index);
+    }
+    return rewritten;
+  }
+  let src;
+  try {
+    src = readFileSync(schemaPath, 'utf8');
+  } catch {
+    return rewritten;
+  }
+  const re = /"selectedPlan"\s*:\s*"([^"]*)"/g;
+  const matches = [...src.matchAll(re)];
+  if (matches.length !== intake.sites.length) return rewritten;
+
+  const toFix = new Map(mismatches.map((m) => [m.index, m]));
+  let out = '';
+  let last = 0;
+  matches.forEach((m, i) => {
+    out += src.slice(last, m.index);
+    const fix = toFix.get(i);
+    if (fix) {
+      out += m[0].replace(`"${m[1]}"`, `"${intake.plan}"`);
+      rewritten.add(i);
+    } else {
+      out += m[0];
+    }
+    last = m.index + m[0].length;
+  });
+  out += src.slice(last);
+  writeFileSync(schemaPath, out, 'utf8');
+  return rewritten;
+}
+
+function validateIntake(intake, opts = {}) {
   const errors = [];
   const warnings = [];
   const validPlans = new Set(['starter', 'growth', 'enterprise']);
@@ -357,6 +426,43 @@ function validateIntake(intake) {
   // skipping provisioning the client paid for.
   if (intake.receptionistMode === 'declined' && intake.plan !== 'starter') {
     errors.push(`receptionistMode "declined" is only valid on the starter plan, not "${intake.plan}"`);
+  }
+  // Form field-set vs lead-delivery coupling (PLAN-tier-form-wiring §0).
+  // Each site's form reads _meta.selectedPlan to choose email- vs phone-capture; onboard sets
+  // LEAD_DELIVERY_MODE from intake.plan. For a CONTENT schema these are the same field and cannot
+  // disagree (loadIntake derives intake.plan from it directly). For an INTAKE envelope they are
+  // separate, so assert them equal here: a mismatch means the already-built site collects the
+  // wrong field for the route we are about to provision, and every lead is lost silently.
+  if (Array.isArray(intake.sites)) {
+    const mismatches = [];
+    intake.sites.forEach((site, i) => {
+      const sitePlan = site?._meta?.selectedPlan;
+      if (sitePlan && sitePlan !== intake.plan) mismatches.push({ index: i, sitePlan });
+    });
+    if (mismatches.length) {
+      const rewritten = opts.reexportOnPlanMismatch
+        ? reexportMismatchedSites(opts.schemaPath, intake, mismatches)
+        : new Set();
+      for (const m of mismatches) {
+        if (rewritten.has(m.index)) {
+          console.warn(
+            `  ! site[${m.index}] re-exported: _meta.selectedPlan "${m.sitePlan}" -> "${intake.plan}" ` +
+            `(--reexport-on-plan-mismatch)`,
+          );
+          intake.sites[m.index]._meta.selectedPlan = intake.plan;
+        } else {
+          const action = opts.reexportOnPlanMismatch
+            ? 'Automatic re-export failed for this site (schema file did not match the expected shape) — re-export it manually'
+            : 'Re-export the site for the correct plan';
+          errors.push(
+            `site[${m.index}] was built for plan "${m.sitePlan}" but this run provisions "${intake.plan}" ` +
+            `(lead form would be ${leadModeFor(m.sitePlan)}-capture while /api/contact runs ` +
+            `${intake.plan === 'starter' ? 'email' : 'callback'}). ${action} ` +
+            `in the console Build studio, or correct the plan, before provisioning.`,
+          );
+        }
+      }
+    }
   }
   if (!Array.isArray(intake.sites) || intake.sites.length < 1) {
     errors.push('intake.sites must contain at least 1 site');
@@ -678,118 +784,12 @@ function buildClientRepo(repoDir) {
   run('npm run build', { cwd: repoDir });
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Step 6: Generate Retell prompt via Claude
-// ───────────────────────────────────────────────────────────────────────────
-
-async function generateRetellPrompt(content, clientDir, siteSlug) {
-  log(6, `Claude → Retell agent prompt`);
-  if (DRY_RUN) {
-    dryLog(`would call Anthropic Claude (model claude-sonnet-4-6) to generate agent prompt for "${content.brand.name}"`);
-    dryLog(`would write ${clientDir}/agent-prompt.txt`);
-    return '<dry-run prompt>';
-  }
-  requireEnv('ANTHROPIC_API_KEY');
-  const anthropic = new Anthropic();
-
-  const agentContext = {
-    business: {
-      name: content.brand.name,
-      short: content.brand.short,
-      phone: content.brand.phone,
-      email: content.brand.email,
-      address: content.brand.address,
-      license: content.brand.license,
-      tagline: content.brand.tagline,
-    },
-    // Optional persona name; if null the generator picks one and uses it consistently.
-    agentName: content.extensions?.agentName ?? null,
-    // Optional list of towns served; if null the generator falls back to the city + "surrounding area".
-    serviceArea: content.extensions?.serviceArea ?? null,
-    services: (content.services?.items ?? []).map((s) => ({
-      name: s.t,
-      description: s.d,
-      tag: s.tag,
-    })),
-    faq: content.faq?.items ?? [],
-    about: content.about?.body ?? '',
-    pillars: (content.about?.pillars ?? []).map((p) => ({ title: p.t, detail: p.d })),
-    trustBadges: content.extensions?.trustBadges ?? [],
-    // Hours are for answering "what are your hours?" ONLY — never for offering appointments.
-    hours: content.extensions?.hours ?? null,
-  };
-
-  const system = `You write the complete system prompt for a Retell AI voice agent that works the phones for a single local service business. The agent handles inbound calls and returns outbound callbacks placed within ~60 seconds of a website form submission.
-
-Output ONLY the finished agent prompt as a Markdown document with "##" section headers, in this exact order:
-ROLE, CORE SPEAKING RULES, GREETING, IF ASKED WHETHER YOU'RE A REAL PERSON / AN AI, QUALIFICATION, NO SCHEDULING, CONTACT COLLECTION, ANSWERING QUESTIONS, SERVICES, FAQ, WHY CHOOSE, PRICING, CLOSING, EDGE CASES, NEVER.
-No preamble, no explanation, no code fences — just the prompt itself, written as direct second-person instructions to the agent ("You are…", "You never…").
-
-PERSONA
-- Give the agent ONE warm first name and use that same name everywhere (greeting, callbacks, every example). If an agentName is provided in the context, use it exactly. If it is null, choose one natural, friendly first name and never switch names.
-- The agent is honest that it's a virtual assistant if asked, but leads with its first name like a human coordinator and does not announce being an AI unprompted.
-
-ABSOLUTE CONSTRAINTS — bake these in as hard rules and restate the key ones in the NEVER section:
-- The agent NEVER books, schedules, holds, confirms, or commits to any appointment, time window, arrival time, or ETA — not even a tentative or "pending confirmation" one. Its job is to COLLECT the caller's details and tell them a real person from the team will reach out to schedule. If the caller pushes to book, warmly explain that a team member handles scheduling and will follow up shortly. There is NO soft-booking and NO offering of time windows.
-- NEVER quote prices, price ranges, or estimates — prices are always deferred to the team.
-- NEVER invent facts. Answer questions ONLY from the provided business data. For anything not in the data (hours if not provided, license numbers, specific pricing, availability), say you'll have the team follow up.
-- NEVER mention or compare to competitors.
-- NEVER pressure the caller (to book, to give an email, etc.).
-
-CORE SPEAKING RULES (write as direct instructions to the agent) — this is a voice conversation, so:
-- One thought per turn: usually one or two sentences, then stop. Never read a paragraph aloud.
-- One question at a time. Never stack questions. Ask, wait, acknowledge, then ask the next.
-- Acknowledge what the caller said before advancing.
-- Mirror the caller's energy (casual → relaxed; stressed or formal → calm and steady).
-- If interrupted, stop talking immediately and listen.
-- Don't repeat yourself or re-greet, and don't ask for a detail already given.
-- Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
-- Spoken-number formatting: read phone numbers back in natural grouped chunks ("four oh seven… five five five… one two one two"), say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
-
-GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name.
-
-QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time. Have the agent gauge and internally note the urgency as exactly one of: "Immediate service", "Callback requested", or "General inquiry" (this label is used downstream, so use those exact words).
-
-LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
-
-NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
-
-CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), and optionally email (never pressure).
-
-ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
-
-CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up.
-
-EDGE CASES to cover: silence/no response; leaving a short friendly voicemail on outbound; an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
-
-NEVER (consolidated list): sounding robotic or scripted; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
-
-Keep everything warm, specific to this business, and grounded only in the provided data.`;
-
-  const user = `Business context:\n${JSON.stringify(agentContext, null, 2)}\n\nWrite the complete agent system prompt now.`;
-
-  const msg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8000,
-    system,
-    messages: [{ role: 'user', content: user }],
-  });
-
-  const prompt = msg.content[0]?.text?.trim();
-  if (!prompt) fail(6, 'Claude returned an empty prompt');
-
-  const promptPath = resolve(clientDir, 'agent-prompt.txt');
-  writeFileSync(promptPath, prompt, 'utf8');
-  console.log(`  Wrote ${promptPath} (${prompt.length} chars)`);
-  console.log(`  Review this before Checkpoint 2 — you will tune it on a test call`);
-  return prompt;
-}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Step 7: Create Retell agent
 // ───────────────────────────────────────────────────────────────────────────
 
-async function createRetellAgent(content, agentPrompt, clientDir) {
+async function createRetellAgent(content, agentPrompt, clientDir, plan) {
   log(7, `Create Retell AI agent`);
   const existingAgentId = readEnvLocal(clientDir).RETELL_AGENT_ID;
   if (existingAgentId) {
@@ -877,6 +877,19 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
         'How urgent the call is. "Immediate service" for emergencies or safety/comfort-critical issues; "Callback requested" when they want the team to call back about real work; "General inquiry" for questions or non-urgent interest.',
     },
   ];
+
+  // Growth and Enterprise agents handle both inbound and outbound calls. This field
+  // lets the post-call Make scenario populate the Airtable "Call type" column.
+  // Starter agents only handle inbound, so the field is unnecessary and omitted.
+  if (plan !== 'starter') {
+    postCallAnalysisData.push({
+      type: 'enum',
+      name: 'call_source',
+      choices: ['inbound', 'web_form'],
+      description:
+        'How this call originated. Use "inbound" when the customer called in; use "web_form" when this was an outbound callback triggered by a website form submission. Determine from call direction and context.',
+    });
+  }
 
   const res = await fetch('https://api.retellai.com/create-agent', {
     method: 'POST',
@@ -1670,7 +1683,7 @@ async function linkPortal(slug, opts = {}) {
   }
 
   const intake = await loadIntake(schemaPath);
-  validateIntake(intake);
+  validateIntake(intake, { schemaPath });
 
   // sharedBaseId comes from the primary site's .env.local (written at provision time).
   const primaryClientDir = primaryClientDirFor(slug, intake);
@@ -1966,7 +1979,7 @@ async function main() {
   // validation so a --receptionist value is checked against the three allowed modes exactly
   // like an intake-supplied one; a bad flag value fails validation rather than slipping through.
   if (args.receptionist) intake.receptionistMode = args.receptionist;
-  validateIntake(intake);
+  validateIntake(intake, { reexportOnPlanMismatch: args.reexportOnPlanMismatch, schemaPath: args.schema });
   preflight(intake);
   await verifyA2pRegistered(intake);
 
@@ -2006,8 +2019,57 @@ async function main() {
     if (webOnly) {
       console.log(`\n  Skipping voice provisioning (website-only client, receptionist declined).`);
     } else {
-      const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug);
-      agentId = await createRetellAgent(site, agentPrompt, clientDir);
+      // Re-run detection: if an agent already exists AND the plan hasn't changed (same
+      // LEAD_DELIVERY_MODE), reuse the existing agent-prompt.txt rather than burning
+      // an Anthropic token. If the plan changed (e.g. starter → growth upgrade), the
+      // old inbound-only prompt is wrong — regenerate it. First run (no RETELL_AGENT_ID)
+      // always generates.
+      const existingEnv = readEnvLocal(clientDir);
+      const prevMode = existingEnv.LEAD_DELIVERY_MODE;   // 'email'=starter, 'callback'=growth|enterprise
+      const currentMode = intake.plan === 'starter' ? 'email' : 'callback';
+      const isFirstRun = !existingEnv.RETELL_AGENT_ID;
+      const planChanged = !isFirstRun && prevMode && prevMode !== currentMode;
+      const promptPath = resolve(clientDir, 'agent-prompt.txt');
+
+      let agentPrompt;
+      if (isFirstRun || planChanged) {
+        if (planChanged) {
+          log(6, `Plan changed (LEAD_DELIVERY_MODE: ${prevMode} → ${currentMode}) — regenerating agent prompt`);
+        } else {
+          log(6, `Claude → agent prompt`);
+        }
+        if (DRY_RUN) {
+          dryLog(`would generate ${intake.plan === 'starter' ? 'STARTER (inbound-only)' : 'GROWTH (inbound + outbound)'} agent prompt for "${site.brand.name}"`);
+          dryLog(`would write ${promptPath}`);
+          agentPrompt = '<dry-run prompt>';
+        } else {
+          requireEnv('ANTHROPIC_API_KEY');
+          const anthropic = new Anthropic();
+          agentPrompt = intake.plan === 'starter'
+            ? await generateStarterPrompt(site, clientDir, site.brand.short || siteSlug, anthropic)
+            : await generateGrowthPrompt(site, clientDir, site.brand.short || siteSlug, anthropic);
+          console.log(`  Review agent-prompt.txt before Checkpoint 2 — you will tune it on a test call`);
+        }
+      } else {
+        // Same plan, re-run: read prompt from disk.
+        if (existsSync(promptPath)) {
+          agentPrompt = readFileSync(promptPath, 'utf8');
+          log(6, `Reusing existing agent-prompt.txt (same plan, re-run). Edit via /manage Voice agent or: npm run update-prompt -- --regen --slug ${siteSlug}`);
+        } else {
+          log(6, `agent-prompt.txt missing on re-run — regenerating`);
+          if (DRY_RUN) {
+            dryLog(`would regenerate prompt for "${site.brand.name}"`);
+            agentPrompt = '<dry-run prompt>';
+          } else {
+            requireEnv('ANTHROPIC_API_KEY');
+            const anthropic = new Anthropic();
+            agentPrompt = intake.plan === 'starter'
+              ? await generateStarterPrompt(site, clientDir, site.brand.short || siteSlug, anthropic)
+              : await generateGrowthPrompt(site, clientDir, site.brand.short || siteSlug, anthropic);
+          }
+        }
+      }
+      agentId = await createRetellAgent(site, agentPrompt, clientDir, intake.plan);
       twilioNumber = await provisionTwilioNumber(site, siteSlug, clientDir);
 
       // The value written into the Call Log's `Site` column — the provisioning slug, and set

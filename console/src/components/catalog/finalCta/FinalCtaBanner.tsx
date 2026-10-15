@@ -19,6 +19,7 @@
 // are separated by mass now, not by decoration.
 // ─────────────────────────────────────────────────────────────────────────────
 import { PhoneCall, CheckCircle } from '@phosphor-icons/react';
+import { leadModeFor } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
@@ -43,7 +44,7 @@ export const meta = {
 
 export default function FinalCtaBanner({ content = CONTENT }: { content?: SiteContent }) {
   const { finalCta, brand } = content;
-  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const mode = leadModeFor(content._meta?.selectedPlan ?? 'growth');
 
   return (
     <section id="cta" className="bg-inkPanel text-onInk">

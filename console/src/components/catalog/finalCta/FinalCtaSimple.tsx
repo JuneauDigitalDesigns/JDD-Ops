@@ -28,6 +28,10 @@ export const meta = {
 export default function FinalCtaSimple({ content = CONTENT }: { content?: SiteContent }) {
   const reduce = useReducedMotion() ?? false;
   const { finalCta, brand } = content;
+  // On a single-page site #contact resolves on the same page. On a multipage site there is no
+  // home-page #contact section to land on, so the CTA must route to the dedicated Contact page
+  // instead (nav carries '/contact' there — see navLinksFor, pages.ts).
+  const contactHref = content.nav?.some((n) => n.href === '/contact') ? '/contact' : '#contact';
 
   return (
     <section id="cta" className="bg-bgSoft py-28 text-center">
@@ -43,7 +47,7 @@ export default function FinalCtaSimple({ content = CONTENT }: { content?: SiteCo
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
             <a
-              href="#contact"
+              href={contactHref}
               className="group inline-flex items-center gap-2 rounded-sm bg-accent px-8 py-4 font-semibold text-accentFg transition-transform hover:-translate-y-0.5"
               style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.85)' }}
             >

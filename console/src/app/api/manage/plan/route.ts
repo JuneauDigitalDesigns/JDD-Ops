@@ -6,6 +6,7 @@ import { loadRetellApiKey } from '@/lib/opsSecrets';
 import { appendAudit } from '@/lib/audit';
 import {
   brandContact,
+  markNeedsReexport,
   mirrorPlanToPortal,
   planEditError,
   pushEnvAndRedeploy,
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
   if (!shape) {
     return NextResponse.json({ error: 'Unrecognized site.ts shape.' }, { status: 422 });
   }
+  markNeedsReexport(repoRoot, slug, 'starter', 'growth');
 
   // ── 2. clients/{slug}/.env.local ──────────────────────────────────────────
   // Mirrors onboard.js's growth template (writeClientEnvLocal) for the keys that don't
@@ -117,7 +119,7 @@ export async function POST(req: Request) {
     ok: true,
     summary: `Plan starter → growth for ${ctx.brandName}${missing.length ? ` — not provisioned: ${missing.join(', ')}` : ''}`,
     // Key names only, never values — this file is plaintext on disk.
-    detail: { from: 'starter', to: 'growth', shape, wrote: [...written.updated, ...written.added], missing },
+    detail: { from: 'starter', to: 'growth', shape, wrote: [...written.updated, ...written.added], missing, needsReexport: true },
   });
 
   return NextResponse.json({

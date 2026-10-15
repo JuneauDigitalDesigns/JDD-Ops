@@ -124,11 +124,10 @@ export function validateEntries(entries: Entry[]): Entry[] {
 /**
  * Repo paths owned by onboard.js (written from jdd-ops/lib/site-routes/*), NOT by template/.
  *
- * template/ ships stubs of all three so it builds standalone, but the contact stub is a retired
- * architecture — it still branches on `LEAD_DELIVERY_MODE === 'webhook'` and posts to
- * MAKE_WEBHOOK_URL, which nothing sets any more. Copying it over a provisioned client swaps a
- * working Retell callback for a webhook that does not exist and leads vanish silently. That had
- * already happened to the reference client before this guard existed.
+ * template/ ships stubs of all three so it builds standalone, but onboard.js still owns the
+ * live route: it writes these files into every provisioned repo on every run, so a client repo
+ * never runs the template's copy, and an edit here has no effect until the matching file under
+ * jdd-ops/lib/site-routes/ is changed too.
  */
 export const ONBOARD_OWNED = [
   { asset: 'contact.route.ts', dest: 'src/app/api/contact/route.ts' },

@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       const fromNumber = process.env.TWILIO_NUMBER;
       const agentId = process.env.RETELL_AGENT_ID;
       const toNumber = toE164(String((data as { phone?: unknown }).phone ?? ''));
+      const callerName = String((data as { name?: unknown }).name ?? '').trim();
       if (!apiKey || !fromNumber || !agentId) {
         return NextResponse.json({ ok: false, error: 'Callback env not set' }, { status: 500 });
       }
@@ -93,7 +94,15 @@ export async function POST(req: Request) {
       const res = await fetch('https://api.retellai.com/v2/create-phone-call', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_number: fromNumber, to_number: toNumber, override_agent_id: agentId }),
+        body: JSON.stringify({
+          from_number: fromNumber,
+          to_number: toNumber,
+          override_agent_id: agentId,
+          metadata: {
+            ...(callerName ? { caller_name: callerName } : {}),
+            call_source: 'web_form',
+          },
+        }),
       });
       if (!res.ok) {
         console.error('[contact] Retell create-phone-call failed:', res.status, await res.text());

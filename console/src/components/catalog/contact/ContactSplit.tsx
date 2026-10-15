@@ -1,6 +1,7 @@
 'use client';
 import { motion, useReducedMotion } from 'framer-motion';
 import { PhoneCall, Envelope, MapPin, CheckCircle, ArrowRight } from '@phosphor-icons/react';
+import { leadModeFor } from '@jdd/schema';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
@@ -35,7 +36,7 @@ export default function ContactSplit({
   const s = skinClasses(skin);
   const { brand, finalCta, extensions } = content;
   const dark = skin === 'inverted' || skin === 'contrast';
-  const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const mode = leadModeFor(content._meta?.selectedPlan ?? 'growth');
   const mapsUrl = extensions.contactDetails?.mapsUrl;
 
   return (

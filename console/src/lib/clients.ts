@@ -2,8 +2,9 @@ import 'server-only';
 import { cache } from 'react';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { clientsDir, clientDir } from './paths';
+import { clientsDir, clientDir, opsRoot } from './paths';
 import { loadIntake, readEnvLocal, type RawSite } from './intake';
+import { readNeedsReexport } from './planChange';
 import type { ClientContext, ClientStatus, Plan, SiteInfo } from './types';
 
 // Slug + dir conventions mirror onboard.js (single site = baseSlug; enterprise = baseSlug-N
@@ -91,6 +92,8 @@ export async function getClientContext(baseSlug: string): Promise<ClientContext 
   // it has no local repo/ and deriveStatus would wrongly call it 'needs-build'; report it 'live'
   // and let the Environment/Deployments sections refuse to push env or redeploy it.
   const externalManaged = intake.sites.some((s) => Boolean(s?._meta?.externalManaged));
+  // Single-site only (planEditError restricts plan edits to starter<->growth, one site).
+  const needsReexport = !isEnterprise ? readNeedsReexport(opsRoot(), baseSlug) : null;
 
   return {
     slug: baseSlug,
@@ -103,6 +106,7 @@ export async function getClientContext(baseSlug: string): Promise<ClientContext 
     hasIntake,
     sites,
     externalManaged,
+    needsReexport,
   };
 }
 

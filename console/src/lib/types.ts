@@ -59,6 +59,15 @@ export interface PendingOnboardingMeta {
   createdAt: number;
 }
 
+/** Written by lib/planChange.ts markNeedsReexport after a plan change rewrites site.ts but
+ *  leaves the already-exported page.tsx files stale. Cleared on the next successful export. */
+export interface NeedsReexport {
+  reason: 'plan-change';
+  from: Plan;
+  to: Plan;
+  at: string; // ISO timestamp
+}
+
 export interface ClientContext {
   slug: string; // base folder under clients/
   plan: Plan;
@@ -86,6 +95,9 @@ export interface ClientContext {
    * since an externally-deployed site has no local `repo/` to make it look "needs-build".
    */
   externalManaged?: boolean;
+  /** Non-null when a plan change left the exported repo stale (see NeedsReexport). Single-site
+   *  only — enterprise plan edits aren't supported, so this never applies there. */
+  needsReexport?: NeedsReexport | null;
 }
 
 // ── Durable runbook state (runbook/.state/progress.json) ─────────────────────
