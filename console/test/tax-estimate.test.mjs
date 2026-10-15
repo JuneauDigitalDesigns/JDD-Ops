@@ -1,23 +1,14 @@
-/**
- * Unit tests for the tax engine. Zero dependencies — Node's own assert and type-stripping.
- *
- *   npm run test:tax          (from console/)
- *
- * Requires Node 22.6+ for `--experimental-strip-types`. On an older Node, `npx tsx
- * scripts/test-tax-estimate.ts` runs the same file unchanged.
- *
- * This repo had no test runner before this file, and adding one for a single pure module would
- * have meant a dependency tree larger than the thing under test. The tax math is the one part of
- * the Finances feature that silently produces a plausible wrong answer, so it is the one part
- * that gets tests.
- *
- * The expected figures are worked by hand from the primary sources cited in financeTypes.ts, not
- * copied from this implementation's output — otherwise they would only prove the code agrees
- * with itself.
- */
-
+// Unit tests for the tax engine.
+//
+// The expected figures are worked by hand from the primary sources cited in financeTypes.ts, not
+// copied from this implementation's output — otherwise they would only prove the code agrees with
+// itself. The tax math is the one part of the Finances feature that silently produces a plausible
+// wrong answer, so it is the one part that gets tests.
+//
+// Run: npm test   (node's built-in runner, via tsx for the .ts imports — no new dependency)
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TY2026_SETTINGS, type FinanceSettings } from '../src/lib/financeTypes.ts';
+import { TY2026_SETTINGS } from '../src/lib/financeTypes.ts';
 import {
   applyBrackets,
   availableToDraw,
@@ -26,28 +17,13 @@ import {
   reserveStatus,
 } from '../src/lib/taxEstimate.ts';
 
-let passed = 0;
-function test(name: string, fn: () => void) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ✓ ${name}`);
-  } catch (err) {
-    console.error(`  ✗ ${name}`);
-    console.error(err instanceof Error ? `    ${err.message}` : err);
-    process.exitCode = 1;
-  }
-}
-
-const usd = (dollars: number) => Math.round(dollars * 100);
+const usd = (dollars) => Math.round(dollars * 100);
 /** Tolerance of one cent: rounding order can legitimately shift a half-cent. */
-const near = (actual: number, expected: number, label: string) =>
+const near = (actual, expected, label) =>
   assert.ok(
     Math.abs(actual - expected) <= 1,
     `${label}: expected ~${expected} cents, got ${actual} cents`,
   );
-
-console.log('\ntaxEstimate — TY2026, single filer, Florida\n');
 
 /* ── The owner's actual numbers ────────────────────────────────────────────────────────────── */
 // $2,500/mo revenue, $500/mo expenses → $30,000 gross, $6,000 expenses, $24,000 net.
@@ -123,7 +99,7 @@ test('Stripe fees reduce net exactly like logged expenses', () => {
 // test asserts the shape of the contract: the only inputs are income and expenses.
 test('estimateTax exposes no way to deduct a draw', () => {
   const withDraws = estimateTax(
-    { grossCents: usd(30_000), expensesCents: usd(6_000), stripeFeesCents: 0 } as never,
+    { grossCents: usd(30_000), expensesCents: usd(6_000), stripeFeesCents: 0 },
     TY2026_SETTINGS,
   );
   assert.deepEqual(withDraws, base, 'tax result must depend only on income and expenses');
@@ -158,7 +134,7 @@ test('QBI under the $1,000 floor yields no deduction at all', () => {
 });
 test('QBI over the floor gets at least the $400 minimum', () => {
   // Enough net that the standard deduction does not swallow it, so the floor is what binds.
-  const s: FinanceSettings = { ...TY2026_SETTINGS, standardDeductionCents: 0 };
+  const s = { ...TY2026_SETTINGS, standardDeductionCents: 0 };
   const small = estimateTax(
     { grossCents: usd(1_500), expensesCents: 0, stripeFeesCents: 0 },
     s,
@@ -169,7 +145,7 @@ test('QBI over the floor gets at least the $400 minimum', () => {
   );
 });
 test('the QBI floor never drives taxable income negative', () => {
-  const s: FinanceSettings = { ...TY2026_SETTINGS, standardDeductionCents: usd(1_400) };
+  const s = { ...TY2026_SETTINGS, standardDeductionCents: usd(1_400) };
   const e = estimateTax({ grossCents: usd(1_500), expensesCents: 0, stripeFeesCents: 0 }, s);
   assert.ok(e.taxableIncomeCents >= 0);
 });
@@ -248,7 +224,7 @@ test('a brand-new year with no data is all zeroes, not NaN', () => {
 
 /* ── Settings drive the result ────────────────────────────────────────────────────────────── */
 test('editing the standard deduction changes income tax', () => {
-  const s: FinanceSettings = { ...TY2026_SETTINGS, standardDeductionCents: usd(10_000) };
+  const s = { ...TY2026_SETTINGS, standardDeductionCents: usd(10_000) };
   const e = estimateTax(
     { grossCents: usd(30_000), expensesCents: usd(6_000), stripeFeesCents: 0 },
     s,
@@ -260,7 +236,7 @@ test('editing the standard deduction changes income tax', () => {
   assert.equal(e.seTaxCents, base.seTaxCents, 'but must not touch SE tax');
 });
 test('a state income tax rate would be applied if the owner ever left Florida', () => {
-  const s: FinanceSettings = { ...TY2026_SETTINGS, stateIncomeTaxRate: 0.05 };
+  const s = { ...TY2026_SETTINGS, stateIncomeTaxRate: 0.05 };
   const e = estimateTax(
     { grossCents: usd(30_000), expensesCents: usd(6_000), stripeFeesCents: 0 },
     s,
@@ -296,5 +272,3 @@ test('reserve status reads ahead / on-track / behind', () => {
 test('a few cents of drift still counts as on track', () => {
   assert.equal(reserveStatus(usd(3_887.0), usd(3_887.46)).state, 'on-track');
 });
-
-console.log(`\n${passed} passed${process.exitCode ? ', SOME FAILED' : ''}\n`);
