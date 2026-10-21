@@ -20,6 +20,12 @@ import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { findOpsRoot } from '@/lib/opsRoot';
+import {
+  verifyLibImports,
+  verifyUiPins,
+  type LibImportProblem,
+  type UiPinResult,
+} from '@/lib/libExports';
 import { isValidSkin, supportsSkin } from '@/lib/skins';
 import { VERTICAL_PRESETS } from '@/lib/verticals';
 
@@ -360,95 +366,50 @@ export function placeComponents(repoRoot: string, slug: string, entries: Entry[]
  * bites: an export with `overwrite: false` leaves the existing repo's older libs in place, so
  * a repo can be stale even when the template is current.
  *
+ * Most of those libs are now four-line `export *` shims of @jdd/ui, so reading one means
+ * following the star into the package — `readLibExports` does that. The parser that preceded it
+ * stopped at the shim, read it as zero exports, and failed an export of `_e2e_test_starter`
+ * with 47 "the repo's copy does not export" problems against a template that was entirely
+ * correct. Which is why `readLibExports` reports an unfollowable star as "could not check"
+ * instead of as a missing symbol, and why it has a test.
+ *
  * Cheap — a regex over the handful of files just written — so it runs before npm install.
  */
-export interface CatalogImportProblem {
-  message: string;
-  /**
-   * True when `template/` DOES provide the symbol and only this repo is missing it — a
-   * different fix (re-export with overwrite) from genuine template drift.
-   */
-  staleRepo: boolean;
-}
+export type CatalogImportProblem = LibImportProblem;
 
 export function verifyCatalogImports(
   repoRoot: string,
   slug: string,
   written: string[],
 ): CatalogImportProblem[] {
-  const repoDir = repoDirFor(repoRoot, slug);
-  const templateLibDir = resolve(repoRoot, 'template', 'src', 'lib');
-  const exportsByLib = new Map<string, Set<string> | null>();
-  const templateByLib = new Map<string, Set<string> | null>();
+  return verifyLibImports({
+    repoDir: repoDirFor(repoRoot, slug),
+    templateLibDir: resolve(repoRoot, 'template', 'src', 'lib'),
+    // Star re-exports resolve from the CONSOLE's node_modules, not the repo's: this runs BEFORE
+    // the export's npm install, so a freshly copied repo has no node_modules at all. What keeps
+    // that sound is verifyUiPins, which fails the export when the repo's @jdd/ui pin is behind
+    // the template's — the only way the repo's real surface could differ from the console's.
+    // process.cwd() is the console dir during an export, as placeComponents already relies on.
+    nodeModules: resolve(process.cwd(), 'node_modules'),
+    files: written,
+  });
+}
 
-  function readExports(dir: string, lib: string): Set<string> | null {
-    let found: Set<string> | null = null;
-    for (const ext of ['.ts', '.tsx']) {
-      const p = resolve(dir, `${lib}${ext}`);
-      if (!existsSync(p)) continue;
-      const src = readFileSync(p, 'utf8');
-      found = new Set<string>();
-      for (const m of src.matchAll(
-        /^export\s+(?:async\s+)?(?:const|function|type|interface|class|let)\s+(\w+)/gm,
-      )) {
-        found.add(m[1]);
-      }
-      for (const m of src.matchAll(/^export\s*\{([^}]+)\}/gm)) {
-        for (const part of m[1].split(',')) {
-          const name = part.trim().split(/\s+as\s+/).pop();
-          if (name) found.add(name);
-        }
-      }
-      break;
-    }
-    return found;
-  }
-
-  /** Named exports of `repo/src/lib/<lib>`, or null when the file doesn't exist. */
-  function repoExportsOf(lib: string): Set<string> | null {
-    if (!exportsByLib.has(lib)) {
-      exportsByLib.set(lib, readExports(resolve(repoDir, 'src', 'lib'), lib));
-    }
-    return exportsByLib.get(lib)!;
-  }
-
-  /** The same, from `template/` — used only to tell drift apart from a stale repo. */
-  function templateExportsOf(lib: string): Set<string> | null {
-    if (!templateByLib.has(lib)) {
-      templateByLib.set(lib, readExports(templateLibDir, lib));
-    }
-    return templateByLib.get(lib)!;
-  }
-
-  const problems: CatalogImportProblem[] = [];
-  for (const rel of written) {
-    const file = resolve(repoDir, rel);
-    if (!existsSync(file)) continue;
-    const src = readFileSync(file, 'utf8');
-    for (const m of src.matchAll(
-      /import\s*(?:type\s*)?\{([^}]+)\}\s*from\s*'@\/lib\/([\w.]+)'/g,
-    )) {
-      const lib = m[2];
-      const available = repoExportsOf(lib);
-      if (!available) {
-        problems.push({
-          message: `${rel} imports '@/lib/${lib}', which does not exist in the client repo.`,
-          staleRepo: templateExportsOf(lib) !== null,
-        });
-        continue;
-      }
-      for (const part of m[1].split(',')) {
-        const name = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim();
-        if (name && !available.has(name)) {
-          problems.push({
-            message: `${rel} imports '${name}' from '@/lib/${lib}', which the repo's copy does not export.`,
-            staleRepo: templateExportsOf(lib)?.has(name) ?? false,
-          });
-        }
-      }
-    }
-  }
-  return problems;
+/**
+ * The @jdd/ui pin compared across the console, `template/` and one client repo.
+ *
+ * Runs alongside verifyCatalogImports at the same export step, because it covers the half of
+ * the problem the symbol check structurally can't: the symbol check reads the console's
+ * node_modules, while the repo builds against its own pin. `_e2e_test_growth/repo` sat on
+ * v1.0.1 against the template's v1.0.7 — and the one export added across that span,
+ * `responsivePicture`, is imported by HeroSplit, which is placed in that repo.
+ */
+export function verifyUiPinsFor(repoRoot: string, slug: string): UiPinResult {
+  return verifyUiPins({
+    consolePkg: resolve(process.cwd(), 'package.json'),
+    templatePkg: resolve(repoRoot, 'template', 'package.json'),
+    repoPkg: resolve(repoDirFor(repoRoot, slug), 'package.json'),
+  });
 }
 
 /** Stable order with nav pinned first and footer pinned last, others left as-is. */

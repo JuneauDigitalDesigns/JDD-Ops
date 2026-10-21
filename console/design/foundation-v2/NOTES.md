@@ -1247,3 +1247,86 @@ the live form + the console Intake checklist flagging each blank) folds into the
 **The template-fidelity upgrade (Phases 0-13) is now CODE-COMPLETE.** Only user review gates remain:
 12c (the locally-built `_e2e_test_growth` reference site) and the owed real-browser reviews from
 Phases 1-6. No further executor work until those gates run.
+
+---
+
+**Export guard: `verifyCatalogImports` could not read the `export *` shims (fixed 2026-10-20).**
+The shim migration left every `src/lib/*` helper as a four-line `export * from '@jdd/ui/...'` in
+both console/ and template/, and `readExports` in `console/src/lib/export.ts` had no case for
+`export * from`. Every shim therefore read as ZERO exports, and an export of `_e2e_test_starter`
+aborted at step 2b with 47 "the repo's copy does not export" problems against a template that was
+entirely correct. `staleRepo` was computed the same way off template/, so it was permanently false
+and the stale-repo branch unreachable: the error always said "the template is out of date" and
+told the operator to copy exports between two byte-identical shims. Nothing covered the function.
+The shims each carry the comment "and so verifyCatalogImports still finds it" - the migration
+checked that the FILE existed, not that the guard could read it.
+
+Fixed by extracting the parser into `console/src/lib/libExports.ts`, which follows a star
+re-export through the package's own `exports` map (relative hops too, depth-capped, cycle-guarded)
+and reports an unfollowable star as "could not be checked" rather than as missing symbols. The
+symbol-vs-template comparison came back to life with it, so `staleRepo` is real again, and
+`verifyUiPins` adds the pin comparison (repo vs template vs console) that `package.json` not being
+template-owned leaves otherwise unwatched. `console/test/export-guard.test.mjs` is the test that
+should have existed: 23 cases, each one a defect found here. Suite 265/265, tsc clean.
+
+Verified against the real repos, not fixtures: `_e2e_test_starter`'s 28 placed components now
+report 0 problems. `_e2e_test_growth` was bumped @jdd/ui v1.0.1 -> v1.0.7 by hand (no export will
+ever touch package.json) and re-exported WITH overwrite, which refreshed its pre-migration
+`src/lib` to the shims; step 2b passed straight into npm install. A deliberate negative - one repo
+lib re-staled to drop `responsivePicture` - aborted at step 2b before npm install, named the
+symbol, and chose the stale-repo branch correctly.
+
+**Phase 12c is still blocked, on an unrelated @jdd/schema bug.** With the guard fixed, the
+`_e2e_test_growth` build reaches "Compiled successfully" and then fails type-check:
+`AboutStory.tsx:44 - Property 'ownerName' does not exist on type 'ExtensionsContent'`. Cause:
+@jdd/schema v1.24.0 added the decision-29 fields (`ownerName`, `brandsCarried`, `responseTime`) to
+`src/site.ts` but NOT to `src/site-types-source.ts`, the hand-mirrored string that every exported
+client repo inlines as its `src/data/site.ts` types. That file's own header says "Keep the two in
+sync" and nothing enforces it. The export writes `"ownerName": null` as DATA into a file whose
+TYPES do not declare it, so the console compiles and every client repo does not. Fix is in
+jdd-schema: mirror the three fields into SITE_TYPES_SOURCE, tag, bump the pin in console/ (and
+template/, which does not currently depend on @jdd/schema at all). A check-pins-style assertion
+that the two files agree would stop it recurring.
+
+**The @jdd/schema mirror bug is FIXED (jdd-schema v1.25.1, commit 1135800 on branch
+`fix/site-types-source-mirror`, LOCAL and UNPUSHED).** Added `ownerName`, `brandsCarried`,
+`responseTime` (ExtensionsContent) and `local_images` (ContentMeta) to SITE_TYPES_SOURCE, plus
+`test/site-types-mirror.test.mjs`, which compares the interface and field sets of `src/site.ts`
+and SITE_TYPES_SOURCE in both directions so this cannot drift again silently. jdd-schema 250/250.
+
+**Phase 12c's local build gate now PASSES.** `_e2e_test_growth` re-exported through the console
+and reported "Built at clients/_e2e_test_growth/repo": the shared-library check passes, type-check
+passes, `next build` completes. What remains for 12c is the real-browser review of the built site.
+
+RESOLVED PROPERLY: v1.25.1 is pushed (main fast-forwarded to 1135800, annotated tag v1.25.1 on
+GitHub) and `console/package.json` now pins it, with package-lock resolving to commit 1135800. The
+hand-staged node_modules copy used to verify before publishing is gone; the growth re-export and
+build were repeated against the genuinely installed tag and reported "Built at
+clients/_e2e_test_growth/repo". Console 265/265, tsc exit 0.
+
+OPEN: `npm run check-schema` is now RED, because it requires all three @jdd/schema consumers to
+pin the same tag and only the console was bumped: console v1.25.1, jdd-ops v1.24.0 (with 1.25.0
+actually installed - pre-existing drift, not caused by the bump), agency v1.24.0. The hazard the
+check exists for does NOT apply to this particular gap: `git diff v1.24.0 v1.25.1 -- src/zod.ts`
+is empty, so no validated field differs and nothing can be silently stripped. Aligning jdd-ops and
+the agency repo is still wanted to make the gate green again - the agency bump lands on the open
+PR #21 branch, so it is the user's call.
+
+**`_e2e_test_starter` fails later, for an unrelated reason.** Its type-check now passes, then
+`next build` dies in "Collecting page data" with an `unhandledRejection` on Next's own `/_app` and
+`/_document` probes - noise that masks a real throw, since those promises are created eagerly and
+awaited later. Not environmental and not the template: `template/` itself builds clean (exit 0),
+and the starter repo is file-for-file identical to it apart from localized images, the catalog
+components and content. The likely reason it is not worth chasing as a product bug: starter's
+composition is degenerate - `.studio-pages.json` is `[]` and its wired page.tsx contains only
+NavMinimal + FooterColumns with no body sections, left over from the export that aborted at the
+47-false-positive guard on 2026-10-14. Give it a real composition before treating it as a defect.
+
+**All three @jdd/schema consumers aligned on v1.25.1; `check-schema` is GREEN.** console, jdd-ops
+and the agency repo all pin and have installed v1.25.1, each lockfile resolved to commit 1135800.
+Verified after the bump: agency `npm run build` EXIT 0, jdd-ops imports the package and sees both
+`leadModeFor` and all four mirrored fields, console 265/265 + tsc 0, `_e2e_test_growth` re-exported
+and built against the published tag. The pin bumps in jdd-ops/package.json and
+juneau-digital-designs/package.json (+ both lockfiles) are UNCOMMITTED; the agency checkout is on
+`feat/pricing-2026-10`, not the PR #21 branch, and carries two unrelated modified files of its own
+(pricingpageclient.tsx, sms-terms/page.tsx) that predate this work.

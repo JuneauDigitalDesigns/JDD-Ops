@@ -17,6 +17,7 @@ import {
   wirePages,
   collectSectionRefs,
   verifyCatalogImports,
+  verifyUiPinsFor,
   type Entry,
 } from '@/lib/export';
 import { navLinksFor, type SiteComposition } from '@/lib/pages';
@@ -256,23 +257,30 @@ export async function POST(req: Request) {
         //     console lib than the repo carries is a template problem, and saying so plainly
         //     beats making someone read a build log to work it out.
         step('Checking the components against the site’s shared libraries…');
-        const importProblems = verifyCatalogImports(repoRoot, slug, written);
-        if (importProblems.length > 0) {
+        // Two checks, because the shared libs now live in @jdd/ui behind `export *` shims and
+        // each check covers what the other structurally cannot: the symbol check reads the
+        // console's node_modules, while the repo builds against its own @jdd/ui pin.
+        const pins = verifyUiPinsFor(repoRoot, slug);
+        for (const spec of pins.uncomparable) {
+          step(`Note: “${spec}” is not a version tag, so that @jdd/ui pin could not be compared.`);
+        }
+        const libProblems = [...verifyCatalogImports(repoRoot, slug, written), ...pins.problems];
+        if (libProblems.length > 0) {
           // Two different faults wear the same symptom, and they have different fixes:
           // either the template genuinely lacks the symbol, or this repo is just carrying an
           // older copy of the shared libs (which is what `overwrite: false` preserves).
-          const stale = importProblems.every((p) => p.staleRepo);
+          const stale = libProblems.every((p) => p.staleRepo);
           send({
             type: 'error',
             message: stale
               ? 'This client’s repo is running older shared libraries than the template. Nothing was built or pushed.'
               : 'A component needs something the site template doesn’t provide — the template is out of date. Nothing was built or pushed.',
             detail:
-              importProblems.map((p) => p.message).join('\n') +
+              libProblems.map((p) => p.message).join('\n') +
               '\n\n' +
               (stale
-                ? 'Fix: export again with “overwrite” enabled — that refreshes the repo’s src/lib from template/.'
-                : 'Fix: copy the missing export(s) from console/src/lib into template/src/lib, then export again.'),
+                ? 'Fix: bump "@jdd/ui" in the client repo’s package.json to match template/package.json, then export again with “overwrite” enabled (which refreshes the repo’s src/lib from template/). package.json is not template-owned, so the export will not change the pin for you.'
+                : 'Fix: most shared libs are re-export shims of @jdd/ui — add the missing export there, tag it, and bump the "@jdd/ui" pin in both template/package.json and console/package.json. For a lib that is a real file rather than a shim, copy the missing export(s) from console/src/lib into template/src/lib. Then export again.'),
           });
           return;
         }

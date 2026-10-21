@@ -23,5 +23,8 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../template/src/lib/structuredData.ts", "../template/src/lib/StickyCallBar.tsx"],
-  "exclude": ["node_modules"]
+  // lib-fixtures are INPUT to export-guard.test.mjs, not console source: they deliberately
+  // contain an unresolvable star re-export and a re-export cycle, which are the two cases the
+  // parser has to survive. Type-checking them would fail on exactly what they are there to test.
+  "exclude": ["node_modules", "test/helpers/lib-fixtures/**"]
 }
