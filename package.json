@@ -22,6 +22,7 @@
     "backfill-agent-ids": "node scripts/backfill-account-agent-ids.js",
     "backfill-client-records": "node scripts/backfill-client-records.js",
     "teardown": "node scripts/teardown.js",
+    "unlink-external-client": "node scripts/unlink-external-client.js",
     "check-schema": "cd console && npm run check-schema",
     "console": "cd console && npm install && npm run dev",
     "preview": "cd console && npm install && npm run dev",

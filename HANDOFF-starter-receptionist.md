@@ -169,6 +169,16 @@ The cleanest structure is one template assembled from two parts, lead-delivery a
 
 ## 6. Live-client regression you must fix
 
+> **RESOLVED 2026-10-21 — both clients are decoupled from the console; nothing in this section
+> is actionable.** The `receptionistMode: 'declined'` fix described below was applied, and both
+> sites have since been handed to the client. They are gone from the roster (folders moved to
+> `clients/.archive/`) and from KV (all six records removed), so there is no longer a live
+> client for this regression to affect. `scripts/link-external-client.js` has been deleted —
+> recover it from git history if a re-onboard is ever needed. Snapshots: `ops/client-archives/`.
+>
+> Kept for the reasoning, and because the `CONSOLE_INCLUDE_FIXTURES` / **do not purge fixtures**
+> note at the end of the section is still live guidance.
+
 `scripts/link-external-client.js` linked two real, live, off-platform-billed sites as `plan: 'starter'`:
 
 - `atlantic-compressor` (Atlantic Compressor)
