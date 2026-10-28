@@ -280,7 +280,7 @@ One exception worth noting now rather than discovering mid-build:
 
 ### 5.2 Non-negotiable per-component rules
 
-Each of the 60 files must:
+Each of the 48 files must:
 
 1. Export a `meta` with `verticalTemplate: true` — this is what exempts bespoke components from
    the anti-slop heuristics, and every `Hvac*` file carries it.
