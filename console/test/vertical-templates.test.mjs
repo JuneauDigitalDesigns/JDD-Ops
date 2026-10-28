@@ -101,6 +101,28 @@ test('the HVAC home mirrors the Northstar Standard tab (bespoke hero/stats/servi
   }
 });
 
+test('Lawn Care services, about, and contact use the standard sections', () => {
+  const pages = Object.fromEntries(
+    applyVerticalTemplate('lawn-care').pages.map((p) => [p.route, p.sections.map((s) => s.name)]),
+  );
+  assert.deepEqual(pages.services, ['LawnPageHeader', 'LawnServices', 'LawnFaq', 'LawnFinalCta']);
+  assert.deepEqual(pages.about, ['LawnPageHeader', 'LawnAbout', 'LawnTrust', 'LawnReviews', 'LawnFinalCta']);
+  assert.deepEqual(pages.contact, ['LawnPageHeader', 'LawnContact', 'LawnFaq', 'LawnFinalCta']);
+});
+
+test('the Lawn Care home section order exactly matches home-mockups.html #lawn (reviews before FAQ)', () => {
+  const home = applyVerticalTemplate('lawn-care').pages.find((p) => p.route === '');
+  assert.deepEqual(home.sections.map((s) => s.name), [
+    'LawnHero',
+    'LawnStats',
+    'LawnServices',
+    'LawnTrust',
+    'LawnReviews',
+    'LawnFaq',
+    'LawnFinalCta',
+  ]);
+});
+
 test('Roofing services, about, and contact use the standard sections', () => {
   const pages = Object.fromEntries(
     applyVerticalTemplate('roofing').pages.map((p) => [p.route, p.sections.map((s) => s.name)]),

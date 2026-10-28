@@ -140,6 +140,55 @@ function roofingTemplate(): SiteComposition {
   };
 }
 
+/**
+ * Lawn Care — vertical-templates-v1 Phase 6 (design/EXEC-vertical-templates-v1.md), the
+ * "seasonal / organic / airy" thesis from design/vertical-templates-v1/home-mockups.html's
+ * #lawn pane. Home order matches that mockup: reviews before FAQ (like most of this
+ * programme — roofing is the one exception). LawnStats carries the dual stat-band + season-
+ * rail slot (D14); LawnHero carries the frequency-picker-to-contact prefill (D8); LawnFinalCta
+ * carries the client-supplied offer ribbon (D10).
+ */
+function lawnTemplate(): SiteComposition {
+  return {
+    chrome: {
+      nav:    { id: newSectionId(), categoryId: 'nav', name: 'LawnNav' },
+      footer: { id: newSectionId(), categoryId: 'footer', name: 'LawnFooter' },
+      // Chrome SEO is shared, not per-vertical (exactly as hvacTemplate() does it).
+      seo:    { id: newSectionId(), categoryId: 'seo', name: 'SeoLocalBusiness' },
+    },
+    pages: [
+      page('home', 'lawn-care:home', [
+        S('hero', 'LawnHero'),
+        S('stats', 'LawnStats'),
+        S('services', 'LawnServices'),
+        S('trust', 'LawnTrust'),
+        S('testimonials', 'LawnReviews'),
+        S('faq', 'LawnFaq'),
+        S('finalCta', 'LawnFinalCta'),
+      ]),
+      page('services', 'lawn-care:services', [
+        S('pageHeader', 'LawnPageHeader'),
+        S('services', 'LawnServices'),
+        S('faq', 'LawnFaq'),
+        S('finalCta', 'LawnFinalCta'),
+      ]),
+      page('about', 'lawn-care:about', [
+        S('pageHeader', 'LawnPageHeader'),
+        S('about', 'LawnAbout'),
+        S('trust', 'LawnTrust'),
+        S('testimonials', 'LawnReviews'),
+        S('finalCta', 'LawnFinalCta'),
+      ]),
+      page('contact', 'lawn-care:contact', [
+        S('pageHeader', 'LawnPageHeader'),
+        S('contact', 'LawnContact'),
+        S('faq', 'LawnFaq'),
+        S('finalCta', 'LawnFinalCta'),
+      ]),
+    ],
+  };
+}
+
 export type VerticalTemplate = {
   /** Operator-facing name shown on the Studio's single template card. */
   label: string;
@@ -150,6 +199,7 @@ export type VerticalTemplate = {
 export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> = {
   hvac: { label: 'HVAC — Standard', build: hvacTemplate },
   roofing: { label: 'Roofing — Standard', build: roofingTemplate },
+  'lawn-care': { label: 'Lawn Care — Standard', build: lawnTemplate },
 };
 
 /** The template for a vertical, or null when none is built yet. */

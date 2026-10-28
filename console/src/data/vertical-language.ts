@@ -116,6 +116,39 @@ export const VERTICAL_LANGUAGES: Record<string, VerticalLanguage> = {
     },
     rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
   },
+  /**
+   * Lawn Care — vertical-templates-v1 Phase 6. Transcribed from the approved mockup's own CSS
+   * custom properties (design/vertical-templates-v1/home-mockups.html #lawn): warm paper
+   * ground, forest green accent, sun gold for emphasis/ribbon — the only palette in this
+   * programme with no cool grey or navy anywhere. Forest/forest-2/sun are literal hex in the
+   * Lawn* components (not standard palette slots), same as every other vertical's signature
+   * colours. Already passes assertWarm unmodified (warm paper, not pure white).
+   */
+  'lawn-care': {
+    pairingId: 'figtree',
+    palette: {
+      accent: '#2F7A33',
+      accentFg: '#FFFFFF',
+      bg: '#FCFCF8',
+      bgSoft: '#EFF3E9',
+      ink: '#16251A',
+      inkSoft: '#4C5F50',
+      rule: '#D8E2D0',
+    },
+    photography: {
+      subjects: [
+        'a lawn technician mowing a residential front yard',
+        'a crew applying fertilizer or seasonal treatment',
+        'a core aeration machine working across a lawn',
+        'a branded truck and trailer parked on a residential street',
+        'a close-up of healthy, freshly striped turf',
+        'a crew performing fall leaf cleanup',
+      ],
+      grade: 'house',
+      ratioBias: 'wide',
+    },
+    rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
+  },
 };
 
 /** The language for a vertical id, falling back to HVAC when the id has no entry yet (every

@@ -68,28 +68,29 @@ export const CATALOG: Record<string, readonly string[]> = {
   // the Northstar "Home — Standard" mockup (see src/components/CATALOG-LEGACY.md). Fixed designs,
   // no `skin`, composed by VERTICAL_TEMPLATES. The Standard tab defines hero/stat-band/services/
   // service-area/FAQ; testimonials/CTA/footer/nav reuse the existing ("already working") catalog.
-  // `Roofing*` entries are vertical-templates-v1's second bespoke set (design/EXEC-vertical-
-  // templates-v1.md Phase 5), mirrored from design/vertical-templates-v1/home-mockups.html's
-  // #roofing pane. Same contract as Hvac*: fixed designs, no skin, composed by VERTICAL_TEMPLATES.
-  nav:          ['NavMinimal', 'NavEmergencyBar', 'HvacNav', 'RoofingNav'],
+  // `Roofing*` and `Lawn*` are vertical-templates-v1's second and third bespoke sets
+  // (design/EXEC-vertical-templates-v1.md Phases 5-6), mirrored from design/vertical-
+  // templates-v1/home-mockups.html's #roofing and #lawn panes. Same contract as Hvac*: fixed
+  // designs, no skin, composed by VERTICAL_TEMPLATES.
+  nav:          ['NavMinimal', 'NavEmergencyBar', 'HvacNav', 'RoofingNav', 'LawnNav'],
   // v2.2: the lightweight header that opens a non-home page. Reads its copy from
   // SiteContent.subpages[route].header, not a global CONTENT import.
-  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader'],
-  hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap', 'HvacHero', 'RoofingHero'],
-  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust'],
+  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader', 'LawnPageHeader'],
+  hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap', 'HvacHero', 'RoofingHero', 'LawnHero'],
+  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust', 'LawnTrust'],
   // New section category (decision 18). Reads about.pillars; no new schema field.
   differentiators: ['DifferentiatorsIndex', 'DifferentiatorsPanels', 'DifferentiatorsRail'],
-  about:        ['AboutFeature', 'AboutStory', 'AboutSticky', 'HvacAbout', 'RoofingAbout'],
-  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight', 'HvacServices', 'RoofingServices'],
+  about:        ['AboutFeature', 'AboutStory', 'AboutSticky', 'HvacAbout', 'RoofingAbout', 'LawnAbout'],
+  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight', 'HvacServices', 'RoofingServices', 'LawnServices'],
   // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.
   work:         ['RecentJobsGrid', 'BeforeAfter', 'WorkSpotlight', 'WorkMasonry'],
   // New section category (decision 18). Reads about.stats; StatsBand is the one count-up.
-  stats:        ['StatsBand', 'StatsLedger', 'HvacStatBand', 'RoofingStats'],
-  faq:          ['FaqAccordion', 'FaqStickyAside', 'FaqIndex', 'HvacFaq', 'RoofingFaq'],
-  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsMarquee', 'HvacReviews', 'RoofingReviews'],
-  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'HvacFinalCta', 'RoofingFinalCta'],
-  contact:      ['ContactSplit', 'ContactCardOverlap', 'ContactInlineStrip', 'HvacContact', 'RoofingContact'],
-  footer:       ['FooterColumns', 'FooterMinimal', 'HvacFooter', 'RoofingFooter'],
+  stats:        ['StatsBand', 'StatsLedger', 'HvacStatBand', 'RoofingStats', 'LawnStats'],
+  faq:          ['FaqAccordion', 'FaqStickyAside', 'FaqIndex', 'HvacFaq', 'RoofingFaq', 'LawnFaq'],
+  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsMarquee', 'HvacReviews', 'RoofingReviews', 'LawnReviews'],
+  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'HvacFinalCta', 'RoofingFinalCta', 'LawnFinalCta'],
+  contact:      ['ContactSplit', 'ContactCardOverlap', 'ContactInlineStrip', 'HvacContact', 'RoofingContact', 'LawnContact'],
+  footer:       ['FooterColumns', 'FooterMinimal', 'HvacFooter', 'RoofingFooter', 'LawnFooter'],
   seo:          ['SeoDefault', 'SeoLocalBusiness'],
 };
 
@@ -531,7 +532,7 @@ function skinAttr(ref: { name: string; skin?: string }): string {
  * case" from "the general rule", so the comparison just grew into a hardcoded string instead of
  * a set. A set is the version that scales to the remaining three without another rewrite.
  */
-const VERTICAL_NAVS = new Set(['HvacNav', 'RoofingNav']);
+const VERTICAL_NAVS = new Set(['HvacNav', 'RoofingNav', 'LawnNav']);
 
 /** The neutral header baked into a subpage when SiteContent.subpages[route] is absent, so a
  *  page whose header copy hasn't been generated still builds and renders. */
