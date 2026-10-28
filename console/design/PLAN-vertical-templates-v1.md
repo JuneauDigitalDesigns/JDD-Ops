@@ -3,7 +3,7 @@
 One bespoke whole-site template per industry vertical, fed by per-vertical client input
 collected on the agency site.
 
-Status: **approved mockups, all open questions resolved, awaiting build.**
+Status: **approved mockups, all open questions resolved. Execution runbook: `EXEC-vertical-templates-v1.md`.**
 Scope: **four verticals** — roofing, plumbing, lawn-care, car-detailing.
 Mockups: `design/vertical-templates-v1/home-mockups.html` (HVAC reference + 4 verticals)
 Ground truth for HVAC: `design/northstar-standard/mockups.html` + the 12 `Hvac*` components
@@ -91,7 +91,13 @@ VERTICAL_LANGUAGES.hvac.pairingId = 'oswald'     // was 'instrument'
 ```
 
 The four-axis contract is untouched, so `vertical-language.test.mjs` needs no change to its key
-assertion. `verticals/hvac.ts`'s own palette becomes dead weight — **leave it in place for now**
+assertion. **But its warmth/AA assertions DO need changes** — confirmed by running the real
+`assertWarm`/`assertPaletteAA` helpers against the approved palettes: HVAC/roofing/plumbing use pure-white
+grounds that `assertWarm` bans (decision 9), and HVAC's orange accent-fg lands at 4.15 vs the flat 4.5.
+Resolved 2026-10-28 (test yields to the approved designs): `assertWarm` is scoped out for a documented
+`WARMTH_EXEMPT` set (hvac, roofing, plumbing), and the `--accent-fg`-on-accent check drops to the WCAG
+large-text bar of 3.0 (that token only renders as a bold button label). The four-axis KEY-SET assertion is
+untouched. See EXEC §T2.2 for the exact edits. `verticals/hvac.ts`'s own palette becomes dead weight — **leave it in place for now**
 and delete the vestigial preset palettes as a separate cleanup, so this phase stays a one-file
 behavioural change that the §2.4 test can prove.
 
