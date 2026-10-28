@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vertical Standard Templates — Home mockups (HVAC reference + 4 verticals)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800&family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   REVIEW SCAFFOLDING — tab bar + per-pane caption. Not part of any design;
+   stripped when a pane becomes a final.html.
+   ═══════════════════════════════════════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0C1218;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+
+.tabbar{position:sticky;top:0;z-index:200;background:#0C1218;border-bottom:1px solid #1D2733;
+  display:flex;gap:2px;padding:10px 16px 0;overflow-x:auto;font-family:'Inter',system-ui,sans-serif}
+.tabbar button{appearance:none;border:0;cursor:pointer;white-space:nowrap;
+  background:transparent;color:#7E8C9C;font-size:13px;font-weight:600;letter-spacing:.02em;
+  padding:11px 16px;border-radius:9px 9px 0 0;border-bottom:2px solid transparent}
+.tabbar button:hover{color:#C6D2DE;background:#131C26}
+.tabbar button[aria-selected="true"]{color:#fff;background:#18222E;border-bottom-color:#5B8FD0}
+.tabbar button .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+
+.caption{background:#0C1218;color:#9DAAB8;font-family:'Inter',system-ui,sans-serif;font-size:12.5px;
+  line-height:1.6;padding:14px 24px;border-bottom:1px solid #1D2733}
+.caption b{color:#fff}
+.caption .k{color:#5B8FD0;font-weight:700}
+.pane{display:none}
+.pane.on{display:block}
+
+/* Behaviour annotation — REVIEW SCAFFOLDING, not design. Used where the behaviour being
+   reviewed is not visible in a static homepage (a CTA's destination, a pre-filled field on
+   another page). Deliberately ugly so it can never be mistaken for part of the template. */
+.annot{display:block;margin-top:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;line-height:1.55;color:#7E8C9C;background:rgba(91,143,208,.07);
+  border:1px dashed rgba(91,143,208,.45);border-radius:5px;padding:7px 10px}
+.annot b{color:#5B8FD0;font-weight:700}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARED SKELETON — the proven local-services layout. Every pane sets its own
+   token values; the structural rules below are what all six have in common.
+   Section ORDER per pane: nav · hero · stat band · services · service area ·
+   proof · FAQ · final CTA · footer (two panes swap proof/FAQ on purpose).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.site{line-height:1.5}
+.site .wrap{max-width:var(--maxw,1120px);margin:0 auto;padding:0 24px}
+.site .sec{padding:var(--sec,84px) 0}
+.site .sec-sm{padding:var(--secsm,56px) 0}
+.site .display{font-family:var(--fd);font-weight:var(--fdw,700);letter-spacing:var(--fdt,-.01em);
+  line-height:var(--fdlh,1.06);color:var(--ink)}
+.site .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:var(--accent)}
+.site .lede{color:var(--ink-soft);font-size:17px;line-height:1.65;max-width:52ch}
+.site .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font-weight:700;font-size:16px;
+  border-radius:var(--rad-btn,10px);padding:14px 22px;transition:transform .18s ease,box-shadow .18s ease,
+  background .18s ease,border-color .18s ease,color .18s ease}
+.site .btn-primary{background:var(--accent);color:var(--accent-fg)}
+.site .btn-primary:hover{transform:translateY(-2px)}
+.site .btn-ghost{border:2px solid var(--ghost-brd,rgba(0,0,0,.18));color:var(--ink)}
+.site .btn-phone{font-family:var(--fd);font-size:21px;font-weight:var(--fdw,600);letter-spacing:.01em}
+.site svg{flex:none}
+.site h1,.site h2,.site h3{font-family:var(--fd)}
+
+/* nav — one structure, themed per pane */
+.site .nav{position:sticky;top:0;z-index:50;background:var(--nav-bg);border-bottom:1px solid var(--nav-brd);
+  backdrop-filter:blur(10px)}
+.site .nav .inner{display:flex;align-items:center;gap:28px;height:var(--nav-h,74px)}
+.site .logo{display:flex;align-items:center;gap:11px;font-family:var(--fd);font-weight:var(--fdw,600);
+  font-size:22px;color:var(--logo-c,var(--ink));letter-spacing:-.01em}
+.site .logo .mark{width:36px;height:36px;border-radius:var(--rad-mark,10px);background:var(--mark-bg);
+  color:var(--mark-fg,#fff);display:grid;place-items:center}
+.site .logo small{display:block;font-family:var(--fb);font-weight:500;font-size:11px;letter-spacing:.04em;
+  color:var(--logo-sub,var(--ink-soft));margin-top:-3px}
+.site .navlinks{display:flex;gap:4px;margin-left:10px}
+.site .navlinks a{font-size:14.5px;font-weight:600;color:var(--nav-link);padding:8px 13px;border-radius:8px}
+.site .navlinks a[aria-current]{color:var(--accent)}
+.site .navcta{margin-left:auto;display:flex;align-items:center;gap:18px}
+.site .navphone{font-family:var(--fd);font-weight:var(--fdw,600);font-size:19px;color:var(--nav-phone,var(--ink));
+  display:flex;align-items:center;gap:8px}
+.site .navphone svg{color:var(--accent)}
+@media(max-width:900px){.site .navlinks{display:none}.site .navphone span{display:none}}
+
+/* hero — shared scaffolding only; each pane re-treats it */
+.site .hero{position:relative;isolation:isolate;overflow:hidden}
+.site .hero .bgimg{position:absolute;inset:0;background-size:cover;background-position:center}
+.site .hero .scrim{position:absolute;inset:0}
+.site .hero .inner{position:relative}
+
+/* services grid */
+.site .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap,18px);margin-top:40px}
+@media(max-width:920px){.site .svc-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.site .svc-grid{grid-template-columns:1fr}}
+
+/* proof grid */
+.site .quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap,18px);margin-top:40px}
+@media(max-width:920px){.site .quotes{grid-template-columns:1fr}}
+
+/* final-CTA two-up */
+.site .cta-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+@media(max-width:860px){.site .cta-grid{grid-template-columns:1fr;gap:32px}}
+.site .cta-form label{display:block;font-size:12.5px;font-weight:600;margin:14px 0 5px}
+.site .cta-form input{width:100%;padding:12px 14px;font-size:15px;font-family:var(--fb);
+  border:1px solid var(--rule);border-radius:var(--rad-inp,10px);background:var(--bg-soft);color:var(--ink)}
+.site .cta-form input:focus{outline:none;border-color:var(--accent)}
+.site .cta-form .btn-primary{width:100%;margin-top:16px}
+
+/* footer */
+.site footer.ftr{padding:64px 0 32px}
+.site .fgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1.1fr;gap:40px}
+.site .fcol h4{font-family:var(--fb);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:14px}
+.site .fcol a,.site .fcol .ln{display:flex;align-items:flex-start;gap:9px;font-size:14.5px;padding:5px 0}
+.site .fbot{display:flex;justify-content:space-between;gap:16px;margin-top:44px;padding-top:22px;
+  border-top:1px solid var(--f-rule);font-size:13px;flex-wrap:wrap}
+@media(max-width:860px){.site .fgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:540px){.site .fgrid{grid-template-columns:1fr}}
+
+/* ─── 1 · HVAC (REFERENCE — verbatim Northstar Standard) ─────────────────── */
+#hvac{--maxw:1120px;--fd:'Oswald',system-ui,sans-serif;--fb:'Inter',system-ui,sans-serif;
+  --fdw:600;--fdt:-.01em;--fdlh:1.04;
+  --ink:#13293F;--ink-soft:#4C5E74;--ink-faint:#8696A8;--bg:#fff;--bg-soft:#F4F6F8;--bg-tint:#EAF1F8;
+  --accent:#E0602C;--accent-fg:#fff;--rule:#E2E8F0;--navy:#12263F;--navy-2:#0D1D31;--gold:#F6B54A;
+  --steel-1:#8FB2D9;--steel-2:#4A6D96;--steel-3:#1E3A5F;
+  --nav-bg:rgba(255,255,255,.92);--nav-brd:#E2E8F0;--nav-link:#4C5E74;
+  --mark-bg:linear-gradient(145deg,#4A6D96,#1E3A5F);--ghost-brd:rgba(19,41,63,.18);--f-rule:rgba(255,255,255,.14);
+  font-family:var(--fb);color:var(--ink);background:var(--bg)}
+#hvac .btn-primary{box-shadow:0 10px 24px -8px rgba(224,96,44,.5)}
+#hvac .bar{height:4px;width:68px;border-radius:999px;margin-top:0;
+  background:linear-gradient(90deg,var(--steel-1),var(--steel-2) 55%,var(--steel-3))}
+#hvac .band-soft{background:var(--bg-soft)}
+#hvac .band-tint{background:var(--bg-tint)}
+#hvac .band-navy{color:#EAF1F8;background:
+  radial-gradient(1100px 380px at 85% -10%,rgba(143,178,217,.12),transparent 60%),
+  linear-gradient(180deg,var(--navy),var(--navy-2))}
+#hvac .hero{min-height:600px;display:flex;align-items:center;background:var(--navy)}
+#hvac .hero .bgimg{background-image:url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=1600&auto=format&fit=crop')}
+#hvac .hero .scrim{background:
+  linear-gradient(90deg,rgba(10,22,38,.86) 0%,rgba(10,22,38,.60) 45%,rgba(10,22,38,.28) 100%),
+  linear-gradient(180deg,rgba(10,22,38,.2),rgba(10,22,38,.55))}
+#hvac .hero .wrap{position:relative;padding-top:92px;padding-bottom:84px}
+#hvac .hero .inner{max-width:640px;color:#fff}
+#hvac .hero .rating{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;margin-bottom:16px}
+#hvac .hero .stars{color:var(--gold);letter-spacing:2px}
+#hvac .hero h1{font-size:clamp(40px,5.4vw,60px);color:#fff;text-shadow:0 3px 18px rgba(0,0,0,.45)}
+#hvac .hero h1 .em{color:var(--gold)}
+#hvac .hero p{color:#D7E0EA;font-size:19px;line-height:1.6;margin-top:18px;max-width:46ch}
+#hvac .hero .cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px}
+#hvac .hero .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;max-width:520px;margin-top:30px;
+  border-top:1px solid rgba(255,255,255,.18);padding-top:20px}
+#hvac .hero .fr span{display:flex;gap:9px;align-items:center;font-size:14.5px;font-weight:600;color:#EAF1F8}
+#hvac .statband .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+#hvac .stat-tile{background:#fff;border:1px solid var(--rule);border-radius:16px;padding:26px 22px;
+  position:relative;overflow:hidden;box-shadow:0 2px 6px rgba(19,41,63,.07),0 14px 30px -12px rgba(19,41,63,.22)}
+#hvac .stat-tile::before{content:"";position:absolute;left:24px;top:0;width:44px;height:4px;border-radius:0 0 4px 4px;
+  background:linear-gradient(90deg,var(--steel-2),var(--steel-3))}
+#hvac .stat-tile .n{font-family:var(--fd);font-weight:700;font-size:46px;line-height:1;letter-spacing:-.01em}
+#hvac .stat-tile .l{font-size:13.5px;font-weight:600;color:var(--ink-soft);margin-top:8px;line-height:1.3}
+#hvac .svc-card{display:flex;flex-direction:column;background:#fff;border:1px solid var(--rule);border-radius:16px;
+  padding:26px;box-shadow:0 1px 2px rgba(19,41,63,.06);transition:transform .18s,box-shadow .18s}
+#hvac .svc-card:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(19,41,63,.08),0 26px 50px -16px rgba(19,41,63,.3)}
+#hvac .svc-ic{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;margin-bottom:18px;
+  background:linear-gradient(145deg,#EAF1F8,#DCE8F3);color:var(--steel-3);box-shadow:inset 0 0 0 1px rgba(30,58,95,.08)}
+#hvac .svc-card h3{font-size:22px}
+#hvac .svc-card p{color:var(--ink-soft);font-size:15.5px;line-height:1.6;margin-top:10px}
+#hvac .svc-tag{margin-top:auto;padding-top:18px;border-top:1px solid var(--rule);font-size:13px;font-weight:700;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px}
+#hvac .svc-tag::before{content:"";width:18px;height:2px;background:var(--accent);border-radius:2px}
+#hvac .area{position:relative;overflow:hidden}
+#hvac .area .silh{position:absolute;right:-40px;top:50%;transform:translateY(-50%);width:560px;max-width:52%;
+  color:var(--steel-2);opacity:.1}
+#hvac .area .grid{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:center;position:relative}
+#hvac .area h2{font-size:34px;display:flex;align-items:center;gap:12px}
+#hvac .chips{display:flex;flex-wrap:wrap;gap:10px}
+#hvac .chip{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:10px 15px;font-weight:700;
+  font-size:15px;display:flex;align-items:center;gap:7px;box-shadow:0 1px 2px rgba(19,41,63,.06)}
+#hvac .chip svg{color:var(--accent)}
+#hvac .rev-head{text-align:center;max-width:640px;margin:0 auto}
+#hvac .rev-agg{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:22px;flex-wrap:wrap}
+#hvac .rev-agg .score{font-family:var(--fd);font-weight:700;font-size:52px;line-height:1}
+#hvac .rev-agg .bigstars{color:var(--gold);font-size:24px;letter-spacing:3px}
+#hvac .rev-agg .sep{width:1px;height:46px;background:var(--rule)}
+#hvac .rev-agg .src{display:flex;gap:22px;flex-wrap:wrap}
+#hvac .rev-agg .s{display:flex;flex-direction:column;font-weight:700;font-size:14px}
+#hvac .rev-agg .s small{color:var(--ink-faint);font-weight:600;font-size:12px}
+#hvac .qcard{display:flex;flex-direction:column;background:#fff;border:1px solid var(--rule);border-radius:16px;
+  padding:28px;box-shadow:0 1px 2px rgba(19,41,63,.06)}
+#hvac .qcard .qstars{color:var(--gold);letter-spacing:2px;font-size:15px}
+#hvac .qcard .qtext{margin-top:14px;font-size:15.5px;line-height:1.6;flex:1}
+#hvac .qcard .who{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid var(--rule)}
+#hvac .qcard .ava{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#fff;
+  font-family:var(--fd);font-weight:600;font-size:18px;background:linear-gradient(145deg,var(--steel-1),var(--steel-3))}
+#hvac .qcard .n{font-weight:700;font-size:15px}
+#hvac .qcard .r{font-size:13px;color:var(--ink-soft)}
+#hvac .faq{max-width:760px;margin:36px auto 0}
+#hvac .faq details{border:1px solid var(--rule);border-radius:16px;background:#fff;margin-top:12px;overflow:hidden}
+#hvac .faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  gap:16px;padding:22px 24px;font-weight:700;font-size:16.5px}
+#hvac .faq summary::-webkit-details-marker{display:none}
+#hvac .faq .ic{color:var(--accent);transition:transform .3s}
+#hvac .faq details[open] .ic{transform:rotate(45deg)}
+#hvac .faq details[open]{border-color:rgba(224,96,44,.35)}
+#hvac .faq .ans{padding:2px 24px 26px;color:var(--ink-soft);line-height:1.72;font-size:15.5px}
+#hvac .cta-grid h2{font-size:clamp(30px,3.6vw,44px);color:#fff;line-height:1.05}
+#hvac .cta-grid h2 .em{color:var(--gold)}
+#hvac .cta-grid .lede{color:#B9C6D6}
+#hvac .cta-grid .fr{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:22px}
+#hvac .cta-grid .fr span{display:flex;gap:8px;align-items:center;font-size:14.5px;font-weight:600;color:#DDE6EF}
+#hvac .cta-grid .fr svg{color:var(--gold)}
+#hvac .cta-form{background:#fff;border-radius:18px;padding:28px;
+  box-shadow:0 4px 10px rgba(19,41,63,.08),0 26px 50px -16px rgba(19,41,63,.3)}
+#hvac .cta-form .cf-head{font-family:var(--fd);font-weight:600;font-size:22px}
+#hvac .cta-form .cf-sub{font-size:14px;color:var(--ink-soft);margin-top:6px}
+#hvac .cta-form label{color:var(--ink-soft)}
+#hvac .cta-form .cf-fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;
+  color:var(--ink-soft);margin-top:12px}
+#hvac footer.ftr{background:var(--navy-2);color:#B9C6D6}
+#hvac footer.ftr .logo{color:#fff}
+#hvac .fblurb{margin-top:16px;font-size:14.5px;line-height:1.6;max-width:34ch;color:#9fb0c4}
+#hvac .fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+#hvac .fbadge{font-size:12px;color:#9fb0c4;border:1px solid var(--f-rule);border-radius:999px;padding:6px 12px}
+#hvac .fcol h4{color:#8ea3bb}
+#hvac .fcol a,#hvac .fcol .ln{color:#C7D4E2}
+#hvac .fcol .ln svg{color:var(--accent);margin-top:3px}
+#hvac .fbot{color:#8ea3bb}
+@media(max-width:900px){#hvac .statband .grid{grid-template-columns:1fr 1fr}#hvac .area .grid{grid-template-columns:1fr}}
+
+/* ─── 2 · ROOFING — "structural / weatherproof" ──────────────────────────────
+   Thesis: a roof is structure and risk, not comfort. So: hard 4px corners, no
+   soft shadows, hairlines doing the work, a pitched shear on band edges, big
+   outlined index numerals, and hazard amber reserved for urgency. Services
+   become RULED ROWS, not cards — a roofer's offer is a scope list.
+   ─────────────────────────────────────────────────────────────────────────── */
+/* Palette revision 2026-10-28: the blue-grey family is GONE. HVAC owns navy + steel, and at a
+   glance the two templates read as the same company. Roofing's structural dark is now bitumen
+   brown-charcoal over a warm grey ground, so the two verticals share no hue family at all —
+   separation registers before layout does. Clay accent and hazard amber are unchanged. */
+#roofing{--maxw:1160px;--fd:'Archivo',system-ui,sans-serif;--fb:'Archivo',system-ui,sans-serif;
+  --fdw:800;--fdt:-.024em;--fdlh:.98;
+  --ink:#231D1A;--ink-soft:#5B4F48;--ink-faint:#93847C;--bg:#fff;--bg-soft:#F5F2EF;--bg-tint:#EDE6DF;
+  --accent:#B4512A;--accent-fg:#fff;--amber:#E8A33D;--slate:#241E1B;--slate-2:#17110F;
+  --rule:#E2D9D2;--f-rule:rgba(255,255,255,.12);--rad-btn:4px;--rad-mark:4px;--rad-inp:4px;
+  --nav-bg:#fff;--nav-brd:#E2D9D2;--nav-link:#5B4F48;--nav-h:78px;--mark-bg:var(--slate);
+  --ghost-brd:rgba(35,29,26,.2);--sec:88px;
+  font-family:var(--fb);color:var(--ink);background:var(--bg)}
+#roofing .eyebrow{letter-spacing:.2em}
+#roofing .band-soft{background:var(--bg-soft)}
+#roofing .band-tint{background:var(--bg-tint)}
+#roofing .band-slate{background:var(--slate);color:#E0D6CE}
+#roofing .nav{border-bottom:3px solid var(--slate)}
+#roofing .navcta .btn-primary{border-radius:4px}
+/* hero — sky stays legible; the scrim climbs from the bottom instead of the left */
+#roofing .hero{min-height:640px;display:flex;align-items:flex-end;background:var(--slate)}
+#roofing .hero .bgimg{background-image:url('https://picsum.photos/seed/jdd-roofing-hero/1800/1100')}
+#roofing .hero .scrim{background:
+  linear-gradient(180deg,rgba(23,17,15,.28) 0%,rgba(23,17,15,.10) 30%,rgba(23,17,15,.82) 78%,rgba(23,17,15,.95) 100%)}
+#roofing .hero .wrap{position:relative;padding:140px 24px 96px;width:100%}
+#roofing .hero .hgrid{display:grid;grid-template-columns:1fr 330px;gap:48px;align-items:end}
+#roofing .hero .inner{max-width:660px;color:#fff}
+#roofing .hero .kicker{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:700;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--amber);border-left:3px solid var(--amber);padding-left:11px}
+#roofing .hero h1{font-size:clamp(42px,5.8vw,66px);color:#fff;margin-top:20px}
+#roofing .hero h1 .em{color:var(--amber)}
+#roofing .hero p{color:#D6C9C0;font-size:18.5px;line-height:1.6;margin-top:18px;max-width:48ch}
+#roofing .hero .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+#roofing .hero .fr{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+#roofing .hero .fr span{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:#E0D6CE;border:1px solid rgba(255,255,255,.22);padding:7px 12px}
+/* the storm card — the one urgent object on the page */
+#roofing .stormcard{background:#fff;border-top:4px solid var(--amber);padding:24px}
+#roofing .stormcard .t{font-family:var(--fd);font-weight:800;font-size:21px;letter-spacing:-.02em;color:var(--ink)}
+#roofing .stormcard p{font-size:14px;line-height:1.55;color:var(--ink-soft);margin-top:9px}
+/* Storm card capture — an EMAIL form, not a phone number (owner decision 2026-10-28). In the
+   console this is <LeadForm withMessage> so it POSTs to the provisioned /api/contact route;
+   see the lead-mode note in PLAN §10. */
+#roofing .stormcard form{margin-top:16px;padding-top:16px;border-top:1px solid var(--rule)}
+#roofing .stormcard label{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+#roofing .stormcard input{width:100%;padding:12px 13px;border:1px solid var(--rule);border-radius:4px;
+  background:var(--bg-soft);font-size:14.5px;font-family:var(--fb);color:var(--ink)}
+#roofing .stormcard input:focus{outline:none;border-color:var(--accent)}
+#roofing .stormcard .btn-primary{width:100%;margin-top:10px;font-size:15px;padding:13px 18px}
+/* stat band — a dark ledger bar, inline, overlapping the hero edge */
+#roofing .ledger{background:var(--slate-2);margin-top:-1px}
+#roofing .ledger .grid{display:grid;grid-template-columns:repeat(4,1fr);padding:34px 0}
+#roofing .ledger .cell{padding:0 28px;border-left:1px solid rgba(255,255,255,.1)}
+#roofing .ledger .cell:first-child{border-left:0;padding-left:0}
+#roofing .ledger .n{font-family:var(--fd);font-weight:800;font-size:42px;line-height:1;letter-spacing:-.03em;color:var(--amber)}
+#roofing .ledger .l{font-size:12.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#A2938A;margin-top:9px}
+/* services — ruled rows with outlined index numerals, not cards */
+#roofing .svc-head{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end}
+#roofing .svc-rows{margin-top:48px;border-top:1px solid var(--rule)}
+#roofing .svc-row{display:grid;grid-template-columns:96px 1fr 1.25fr 40px;gap:24px;align-items:start;
+  padding:30px 0;border-bottom:1px solid var(--rule);transition:background .18s}
+#roofing .svc-row:hover{background:var(--bg-soft)}
+#roofing .svc-row .ix{font-family:var(--fd);font-weight:800;font-size:40px;line-height:.9;letter-spacing:-.04em;
+  color:transparent;-webkit-text-stroke:1.5px var(--ink-faint)}
+#roofing .svc-row:hover .ix{-webkit-text-stroke:1.5px var(--accent)}
+#roofing .svc-row h3{font-size:23px;font-weight:800;letter-spacing:-.022em}
+#roofing .svc-row .tg{display:block;font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin-top:8px}
+#roofing .svc-row p{color:var(--ink-soft);font-size:15.5px;line-height:1.62;padding-top:4px}
+#roofing .svc-row .chev{color:var(--ink-faint);justify-self:end;padding-top:8px}
+#roofing .svc-row:hover .chev{color:var(--accent)}
+@media(max-width:900px){#roofing .svc-row{grid-template-columns:60px 1fr;gap:16px}
+  #roofing .svc-row p,#roofing .svc-row .chev{display:none}#roofing .svc-head{grid-template-columns:1fr}}
+/* area — a 4-column ruled town index under a pitched-roof watermark */
+#roofing .area{position:relative;overflow:hidden}
+#roofing .area .silh{position:absolute;right:-60px;bottom:-30px;width:520px;max-width:48%;color:var(--slate);opacity:.07}
+#roofing .area .head{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end;position:relative}
+#roofing .area h2{font-size:38px}
+#roofing .towns{display:grid;grid-template-columns:repeat(4,1fr);gap:0 36px;margin-top:40px;position:relative}
+#roofing .towns span{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:600;
+  padding:13px 0;border-bottom:1px solid var(--rule)}
+#roofing .towns span::before{content:"";width:6px;height:6px;background:var(--accent);flex:none}
+@media(max-width:900px){#roofing .towns{grid-template-columns:1fr 1fr}#roofing .area .head{grid-template-columns:1fr}}
+/* proof — dark aggregate panel + two stacked quotes */
+#roofing .rev-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:40px;align-items:start}
+#roofing .agg{background:var(--slate);color:#fff;padding:36px 32px}
+#roofing .agg .score{font-family:var(--fd);font-weight:800;font-size:72px;line-height:.9;letter-spacing:-.04em;color:var(--amber)}
+#roofing .agg .bigstars{color:var(--amber);font-size:21px;letter-spacing:3px;margin-top:12px}
+#roofing .agg .sub{font-size:13.5px;color:#AFA096;margin-top:8px}
+#roofing .agg .srcs{margin-top:26px;padding-top:22px;border-top:1px solid rgba(255,255,255,.14)}
+#roofing .agg .srcs div{display:flex;justify-content:space-between;font-size:13.5px;font-weight:600;padding:7px 0;color:#D6C9C0}
+#roofing .agg .srcs b{color:#fff}
+#roofing .rq{border-left:3px solid var(--accent);padding:4px 0 4px 26px;margin-bottom:28px}
+#roofing .rq:last-child{margin-bottom:0}
+#roofing .rq .qstars{color:var(--amber);letter-spacing:2px;font-size:14px}
+#roofing .rq p{font-family:var(--fd);font-weight:500;font-size:19.5px;line-height:1.5;letter-spacing:-.012em;margin-top:12px}
+#roofing .rq .who{font-size:13.5px;color:var(--ink-soft);margin-top:14px;font-weight:600}
+#roofing .rq .who b{color:var(--ink)}
+@media(max-width:900px){#roofing .rev-grid{grid-template-columns:1fr}}
+/* FAQ — two columns, hairline rows, no cards */
+#roofing .faq2{display:grid;grid-template-columns:1fr 1fr;gap:0 48px;margin-top:40px}
+#roofing .faq2 details{border-bottom:1px solid var(--rule)}
+#roofing .faq2 summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:16px;
+  padding:20px 0;font-weight:700;font-size:16px;letter-spacing:-.01em}
+#roofing .faq2 summary::-webkit-details-marker{display:none}
+#roofing .faq2 .ic{color:var(--accent);transition:transform .3s}
+#roofing .faq2 details[open] .ic{transform:rotate(45deg)}
+#roofing .faq2 .ans{padding:0 0 22px;color:var(--ink-soft);font-size:15px;line-height:1.7;max-width:46ch}
+@media(max-width:860px){#roofing .faq2{grid-template-columns:1fr}}
+/* CTA — photo band, dark scrim, single inline form row */
+#roofing .ctaband{position:relative;overflow:hidden;background:var(--slate-2)}
+#roofing .ctaband .bgimg{position:absolute;inset:0;background-size:cover;background-position:center 35%;
+  background-image:url('https://picsum.photos/seed/jdd-roofing-cta/1800/900')}
+#roofing .ctaband .scrim{position:absolute;inset:0;background:linear-gradient(90deg,rgba(23,17,15,.95),rgba(23,17,15,.72))}
+#roofing .ctaband .wrap{position:relative;padding-top:80px;padding-bottom:80px}
+#roofing .ctaband h2{font-size:clamp(32px,4vw,50px);color:#fff;max-width:20ch}
+#roofing .ctaband h2 .em{color:var(--amber)}
+#roofing .ctaband p{color:#D6C9C0;font-size:17px;line-height:1.6;margin-top:16px;max-width:52ch}
+#roofing .inlineform{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;margin-top:34px;max-width:780px}
+#roofing .inlineform input{padding:15px 16px;border:1px solid rgba(255,255,255,.22);border-radius:4px;
+  background:rgba(255,255,255,.07);color:#fff;font-size:15px;font-family:var(--fb)}
+#roofing .inlineform input::placeholder{color:#A2938A}
+#roofing .inlineform input:focus{outline:none;border-color:var(--amber)}
+#roofing .ctaband .fine{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:18px;font-size:13px;color:#AFA096;font-weight:600}
+@media(max-width:760px){#roofing .inlineform{grid-template-columns:1fr}}
+#roofing footer.ftr{background:var(--slate-2);color:#AFA096}
+#roofing footer.ftr .logo{color:#fff}
+#roofing footer.ftr .mark{background:var(--accent)}
+#roofing .fblurb{margin-top:16px;font-size:14.5px;line-height:1.6;max-width:34ch}
+#roofing .fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+#roofing .fbadge{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:#AFA096;border:1px solid var(--f-rule);padding:6px 11px}
+#roofing .fcol h4{color:var(--amber)}
+#roofing .fcol a,#roofing .fcol .ln{color:#D6C9C0}
+#roofing .fcol .ln svg{color:var(--accent);margin-top:3px}
+
+/* ─── 3 · PLUMBING — "clean / certain / dispatch" ────────────────────────────
+   Thesis: a plumbing emergency is a dispatch problem. The page should feel like
+   a clean, confident service desk — so everything is PILLS and soft blue tints,
+   the hero is a SPLIT panel with the intake form in it (not a photo overlay),
+   and the one dark object on the page is the footer. Soft shadows, 20px radii.
+   ─────────────────────────────────────────────────────────────────────────── */
+#plumbing{--maxw:1160px;--fd:'Schibsted Grotesk',system-ui,sans-serif;--fb:'Schibsted Grotesk',system-ui,sans-serif;
+  --fdw:800;--fdt:-.02em;--fdlh:1.02;
+  --ink:#10212E;--ink-soft:#4C6274;--ink-faint:#8099AC;--bg:#fff;--bg-soft:#EEF4F8;--bg-tint:#DBE9F2;
+  --accent:#1E6FA8;--accent-fg:#fff;--deep:#0E2A3D;--deep-2:#08202F;--chrome:#9FB6C4;
+  --rule:#D7E3EC;--f-rule:rgba(255,255,255,.13);--rad-btn:999px;--rad-mark:999px;--rad-inp:12px;
+  --nav-bg:rgba(255,255,255,.93);--nav-brd:#D7E3EC;--nav-link:#4C6274;--nav-h:76px;
+  --mark-bg:linear-gradient(145deg,#2E8AC6,#1E6FA8);--ghost-brd:rgba(16,33,46,.16);--sec:88px;
+  font-family:var(--fb);color:var(--ink);background:var(--bg)}
+#plumbing .band-soft{background:var(--bg-soft)}
+#plumbing .band-tint{background:var(--bg-tint)}
+#plumbing .btn-primary{box-shadow:0 10px 22px -8px rgba(30,111,168,.55)}
+#plumbing .eyebrow{letter-spacing:.15em}
+/* the live-dispatch pill — the vertical's one piece of "right now" signalling */
+#plumbing .livepill{display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;color:#CFE3F1}
+#plumbing .livepill .pulse{width:8px;height:8px;border-radius:50%;background:#49D18B;box-shadow:0 0 0 4px rgba(73,209,139,.22)}
+/* hero — a split panel, not a photo with a scrim */
+#plumbing .hero{display:grid;grid-template-columns:1.02fr .98fr;min-height:620px;background:var(--deep)}
+#plumbing .hero .pane-l{display:flex;align-items:center;padding:84px 56px 84px 0;position:relative;z-index:2}
+#plumbing .hero .pane-l .in{max-width:560px;margin-left:auto;padding-left:24px;color:#fff;width:100%}
+#plumbing .hero h1{font-size:clamp(38px,4.6vw,56px);color:#fff;margin-top:20px}
+#plumbing .hero h1 .em{color:#6FC4F5}
+#plumbing .hero p{color:#B4CCDC;font-size:18px;line-height:1.6;margin-top:16px;max-width:44ch}
+#plumbing .hero .fr{display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}
+#plumbing .hero .fr span{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;color:#CFE3F1;
+  background:rgba(255,255,255,.08);border-radius:999px;padding:7px 14px}
+#plumbing .hero .pane-r{position:relative;overflow:hidden}
+#plumbing .hero .pane-r .img{position:absolute;inset:0;background-size:cover;background-position:center;
+  background-image:url('https://picsum.photos/seed/jdd-plumbing-hero/1400/1200')}
+#plumbing .hero .pane-r .tint{position:absolute;inset:0;background:linear-gradient(90deg,rgba(14,42,61,.9),rgba(14,42,61,0) 42%)}
+/* the intake card sits in the hero, overlapping the seam */
+#plumbing .intake{position:relative;z-index:3;background:#fff;border-radius:20px;padding:24px;margin-top:30px;
+  max-width:470px;box-shadow:0 10px 24px rgba(8,32,47,.14),0 40px 70px -30px rgba(8,32,47,.5)}
+#plumbing .intake .h{font-family:var(--fd);font-weight:800;font-size:19px;letter-spacing:-.018em;color:var(--ink)}
+#plumbing .intake .s{font-size:13.5px;color:var(--ink-soft);margin-top:5px}
+#plumbing .intake .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+#plumbing .intake input{padding:13px 16px;border:1px solid var(--rule);border-radius:12px;background:var(--bg-soft);
+  font-size:14.5px;font-family:var(--fb);color:var(--ink);width:100%}
+#plumbing .intake input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,111,168,.15)}
+#plumbing .intake .btn-primary{width:100%;margin-top:11px;justify-content:center}
+#plumbing .intake .fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;
+  color:var(--ink-soft);margin-top:11px;font-weight:600}
+@media(max-width:980px){#plumbing .hero{grid-template-columns:1fr}
+  #plumbing .hero .pane-l{padding:72px 24px}#plumbing .hero .pane-l .in{padding-left:0;margin-left:0}
+  #plumbing .hero .pane-r{min-height:300px}}
+/* stat band — inline, hairline-separated, no tiles */
+#plumbing .statrow{display:grid;grid-template-columns:repeat(4,1fr);padding:14px 0}
+#plumbing .statrow .c{padding:8px 30px;border-left:1px solid var(--rule)}
+#plumbing .statrow .c:first-child{border-left:0;padding-left:0}
+#plumbing .statrow .n{font-family:var(--fd);font-weight:800;font-size:40px;line-height:1;letter-spacing:-.03em;color:var(--accent)}
+#plumbing .statrow .l{font-size:13.5px;font-weight:600;color:var(--ink-soft);margin-top:7px;line-height:1.35}
+@media(max-width:900px){#plumbing .statrow{grid-template-columns:1fr 1fr;gap:20px 0}
+  #plumbing .statrow .c:nth-child(3){border-left:0;padding-left:0}}
+/* services — rounded cards, circular icon badge, pill tag floated top-right */
+#plumbing .svc-head{text-align:center;max-width:56ch;margin:0 auto}
+#plumbing .svc-card{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid var(--rule);
+  border-radius:20px;padding:28px;box-shadow:0 2px 4px rgba(16,33,46,.04);transition:transform .2s,box-shadow .2s}
+#plumbing .svc-card:hover{transform:translateY(-4px);box-shadow:0 14px 34px -12px rgba(16,33,46,.26)}
+#plumbing .svc-ic{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;margin-bottom:18px;
+  background:var(--bg-tint);color:var(--accent)}
+#plumbing .svc-card h3{font-size:20.5px;font-weight:800;letter-spacing:-.018em;padding-right:10px}
+#plumbing .svc-card p{color:var(--ink-soft);font-size:15px;line-height:1.62;margin-top:10px}
+#plumbing .svc-pill{position:absolute;top:22px;right:22px;font-size:11px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--accent);background:var(--bg-soft);border-radius:999px;padding:6px 11px}
+/* area — centred pills, with one oversized promise above them */
+#plumbing .area{text-align:center}
+#plumbing .area h2{font-size:clamp(30px,3.6vw,42px)}
+#plumbing .area .big{font-family:var(--fd);font-weight:800;font-size:clamp(46px,7vw,78px);line-height:1;
+  letter-spacing:-.04em;color:var(--accent);margin-top:6px}
+#plumbing .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:34px}
+#plumbing .chip{background:#fff;border:1px solid var(--rule);border-radius:999px;padding:10px 18px;
+  font-weight:700;font-size:14.5px;box-shadow:0 1px 2px rgba(16,33,46,.04)}
+/* proof — quote-mark cards, aggregate inline in the header */
+#plumbing .rev-head{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;flex-wrap:wrap}
+#plumbing .rev-head h2{font-size:38px;max-width:22ch}
+#plumbing .aggbox{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--rule);
+  border-radius:999px;padding:14px 26px;box-shadow:0 2px 4px rgba(16,33,46,.04)}
+#plumbing .aggbox .sc{font-family:var(--fd);font-weight:800;font-size:34px;line-height:1;letter-spacing:-.03em;color:var(--accent)}
+#plumbing .aggbox .st{color:#F0A830;letter-spacing:2px;font-size:14px}
+#plumbing .aggbox .sub{font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-top:2px}
+#plumbing .qcard{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid var(--rule);
+  border-radius:20px;padding:30px 28px 26px;overflow:hidden}
+#plumbing .qcard .qm{position:absolute;top:-16px;right:14px;font-family:var(--fd);font-weight:800;font-size:110px;
+  line-height:1;color:var(--bg-tint);pointer-events:none}
+#plumbing .qcard .qtext{position:relative;font-size:16px;line-height:1.65;flex:1}
+#plumbing .qcard .who{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid var(--rule)}
+#plumbing .qcard .ava{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;
+  font-family:var(--fd);font-weight:800;font-size:16px;background:linear-gradient(145deg,#2E8AC6,#0E2A3D)}
+#plumbing .qcard .n{font-weight:700;font-size:14.5px}
+#plumbing .qcard .r{font-size:13px;color:var(--ink-soft)}
+#plumbing .qcard .qstars{color:#F0A830;letter-spacing:2px;font-size:14px;position:relative}
+/* FAQ — rounded rows, accent left-edge when open */
+#plumbing .faq{max-width:800px;margin:38px auto 0}
+#plumbing .faq details{background:#fff;border:1px solid var(--rule);border-radius:16px;margin-top:11px;
+  overflow:hidden;border-left:3px solid transparent}
+#plumbing .faq details[open]{border-left-color:var(--accent);background:var(--bg-soft)}
+#plumbing .faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  gap:16px;padding:20px 24px;font-weight:700;font-size:16.5px;letter-spacing:-.012em}
+#plumbing .faq summary::-webkit-details-marker{display:none}
+#plumbing .faq .ic{color:var(--accent);transition:transform .3s}
+#plumbing .faq details[open] .ic{transform:rotate(180deg)}
+#plumbing .faq .ans{padding:0 24px 24px;color:var(--ink-soft);font-size:15.5px;line-height:1.72}
+/* CTA — the ACCENT blue band (not a navy one) + white card, pill controls */
+#plumbing .band-cta{color:#EAF4FB;background:
+  radial-gradient(900px 340px at 12% -20%,rgba(255,255,255,.16),transparent 62%),
+  linear-gradient(135deg,#2378B3,#13496D)}
+#plumbing .band-cta h2{font-size:clamp(30px,3.6vw,44px);color:#fff;line-height:1.05}
+#plumbing .band-cta h2 .em{color:#9FDCFF}
+#plumbing .band-cta .lede{color:#C6DEEE}
+#plumbing .band-cta .fr{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:22px}
+#plumbing .band-cta .fr span{display:flex;gap:8px;align-items:center;font-size:14.5px;font-weight:600;color:#DCEDF8}
+#plumbing .cta-form{background:#fff;border-radius:22px;padding:30px;box-shadow:0 30px 60px -24px rgba(8,32,47,.6)}
+#plumbing .cta-form .cf-head{font-family:var(--fd);font-weight:800;font-size:21px;letter-spacing:-.02em;color:var(--ink)}
+#plumbing .cta-form .cf-sub{font-size:13.5px;color:var(--ink-soft);margin-top:6px}
+#plumbing .cta-form label{color:var(--ink-soft)}
+#plumbing .cta-form .cf-fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;
+  color:var(--ink-soft);margin-top:12px;font-weight:600}
+#plumbing footer.ftr{background:var(--deep-2);color:#9FB6C4}
+#plumbing footer.ftr .logo{color:#fff}
+#plumbing .fblurb{margin-top:16px;font-size:14.5px;line-height:1.6;max-width:34ch}
+#plumbing .fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+#plumbing .fbadge{font-size:12px;color:#9FB6C4;border:1px solid var(--f-rule);border-radius:999px;padding:6px 13px}
+#plumbing .fcol h4{color:#7F9AAE}
+#plumbing .fcol a,#plumbing .fcol .ln{color:#C3D7E3}
+#plumbing .fcol .ln svg{color:#6FC4F5;margin-top:3px}
+
+/* ─── 4 · LAWN CARE — "seasonal / organic / airy" ────────────────────────────
+   Thesis: lawn care is a SUBSCRIPTION across a calendar, not an emergency. So
+   the stat slot becomes a four-season strip, the hero carries a plan picker and
+   a price anchor instead of an urgency line, and there is no cool grey or navy
+   anywhere — warm paper ground, forest green, sun gold. Big 24px radii, soft
+   natural shadows, a mow-stripe pattern as the one graphic motif.
+   ─────────────────────────────────────────────────────────────────────────── */
+#lawn{--maxw:1140px;--fd:'Figtree',system-ui,sans-serif;--fb:'Figtree',system-ui,sans-serif;
+  --fdw:800;--fdt:-.02em;--fdlh:1.04;
+  --ink:#16251A;--ink-soft:#4C5F50;--ink-faint:#8A9A8D;--bg:#FCFCF8;--bg-soft:#EFF3E9;--bg-tint:#E2EDDB;
+  --accent:#2F7A33;--accent-fg:#fff;--forest:#1E4028;--forest-2:#14301C;--sun:#E8B33A;
+  --rule:#D8E2D0;--f-rule:rgba(255,255,255,.13);--rad-btn:14px;--rad-mark:14px;--rad-inp:14px;
+  --nav-bg:rgba(252,252,248,.93);--nav-brd:#D8E2D0;--nav-link:#4C5F50;--nav-h:76px;
+  --mark-bg:linear-gradient(145deg,#3E9843,#1E4028);--ghost-brd:rgba(22,37,26,.16);--sec:92px;--gap:22px;
+  font-family:var(--fb);color:var(--ink);background:var(--bg)}
+#lawn .band-soft{background:var(--bg-soft)}
+#lawn .band-tint{background:var(--bg-tint)}
+#lawn .btn-primary{box-shadow:0 10px 22px -9px rgba(47,122,51,.5)}
+#lawn .eyebrow{letter-spacing:.14em}
+#lawn .stripes{background-image:repeating-linear-gradient(90deg,rgba(47,122,51,.055) 0 46px,transparent 46px 92px)}
+/* hero — warm, green-tinted scrim; the plan picker replaces the urgency line */
+#lawn .hero{min-height:620px;display:flex;align-items:center;background:var(--forest)}
+#lawn .hero .bgimg{background-image:url('https://picsum.photos/seed/jdd-lawn-hero/1800/1100')}
+#lawn .hero .scrim{background:
+  linear-gradient(95deg,rgba(14,38,20,.88) 0%,rgba(14,38,20,.58) 46%,rgba(14,38,20,.14) 100%),
+  linear-gradient(180deg,rgba(14,38,20,.1),rgba(14,38,20,.45))}
+#lawn .hero .wrap{position:relative;padding:92px 24px}
+#lawn .hero .inner{max-width:620px;color:#fff}
+#lawn .hero .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(232,179,58,.18);
+  border:1px solid rgba(232,179,58,.42);color:var(--sun);border-radius:999px;padding:7px 15px;
+  font-size:13px;font-weight:700}
+#lawn .hero h1{font-size:clamp(40px,5.2vw,60px);color:#fff;margin-top:18px}
+#lawn .hero h1 .em{color:var(--sun)}
+#lawn .hero p{color:#D3E0D2;font-size:18.5px;line-height:1.62;margin-top:16px;max-width:46ch}
+/* the plan picker — lawn care's signature hero device */
+#lawn .picker{margin-top:28px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  border-radius:20px;padding:18px;max-width:520px;backdrop-filter:blur(6px)}
+#lawn .picker .lbl{font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#B9CDBA}
+#lawn .picker .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
+#lawn .picker .opt{text-align:center;border-radius:13px;padding:12px 8px;font-size:14px;font-weight:700;
+  color:#E3EDE2;border:1.5px solid rgba(255,255,255,.22);cursor:pointer}
+#lawn .picker .opt.on{background:#fff;color:var(--forest);border-color:#fff}
+#lawn .picker .opt small{display:block;font-weight:600;font-size:11.5px;opacity:.72;margin-top:3px}
+#lawn .picker .foot{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:15px;
+  padding-top:14px;border-top:1px solid rgba(255,255,255,.18)}
+#lawn .picker .price{font-family:var(--fd);font-weight:800;font-size:17px;color:#fff;letter-spacing:-.015em}
+#lawn .picker .price small{font-weight:600;font-size:12.5px;color:#B9CDBA;letter-spacing:0}
+/* Stat band — TRUST FIRST (owner decision 2026-10-28). The four-season cards used to own this
+   slot and were too loud for it; a lawn buyer still needs to see the business is established.
+   Lawn's own treatment of the band: warm tiles with the icon ABOVE the numeral — HVAC uses a
+   steel top-notch, roofing a dark ledger bar, detailing a hairline strip. */
+#lawn .statband .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}
+#lawn .stat-tile{background:var(--bg);border:1px solid var(--rule);border-radius:22px;padding:24px 22px;
+  box-shadow:0 1px 2px rgba(22,37,26,.04)}
+#lawn .stat-tile .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background:var(--bg-tint);color:var(--accent);margin-bottom:14px}
+#lawn .stat-tile .n{font-family:var(--fd);font-weight:800;font-size:40px;line-height:1;letter-spacing:-.03em}
+#lawn .stat-tile .l{font-size:13.5px;font-weight:600;color:var(--ink-soft);margin-top:7px;line-height:1.35}
+@media(max-width:920px){#lawn .statband .grid{grid-template-columns:1fr 1fr}}
+
+/* Season rail — DEMOTED from four cards to one slim timeline (~110px, was ~240px). Still
+   adjacent to the hero's frequency picker, which is the same subject, but now reads as
+   supporting detail rather than a headline.
+   CLIENT-SUPPLIED: if the client offers no seasonal programme, the rail is not rendered at
+   all — we do not describe services they don't sell (D5). */
+#lawn .srail{margin-top:30px;padding-top:26px;border-top:1px solid var(--rule)}
+#lawn .srail .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:16px}
+#lawn .srail .c{position:relative;padding-top:21px}
+#lawn .srail .c::before{content:"";position:absolute;top:0;left:0;width:9px;height:9px;border-radius:50%;
+  background:var(--accent)}
+#lawn .srail .c::after{content:"";position:absolute;top:4px;left:13px;right:-20px;height:1px;background:var(--rule)}
+#lawn .srail .c:last-child::after{display:none}
+#lawn .srail .s{font-size:11.5px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}
+#lawn .srail .d{font-size:14px;line-height:1.5;color:var(--ink-soft);margin-top:5px}
+@media(max-width:760px){#lawn .srail .rgrid{grid-template-columns:1fr 1fr;gap:22px}
+  #lawn .srail .c::after{display:none}}
+/* services — a photo band on top of each card, icon pill overlapping the seam */
+#lawn .svc-head{max-width:50ch}
+#lawn .svc-card{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--rule);
+  border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(22,37,26,.04);transition:transform .2s,box-shadow .2s}
+#lawn .svc-card:hover{transform:translateY(-4px);box-shadow:0 16px 36px -14px rgba(22,37,26,.26)}
+#lawn .svc-card .ph{height:132px;background-size:cover;background-position:center;position:relative}
+#lawn .svc-card .ic{position:absolute;left:22px;bottom:-22px;width:48px;height:48px;border-radius:15px;
+  display:grid;place-items:center;background:var(--bg);color:var(--accent);border:1px solid var(--rule)}
+#lawn .svc-card .bd{padding:38px 24px 24px;display:flex;flex-direction:column;flex:1}
+#lawn .svc-card h3{font-size:20px;font-weight:800;letter-spacing:-.018em}
+#lawn .svc-card p{color:var(--ink-soft);font-size:15px;line-height:1.6;margin-top:9px}
+#lawn .svc-tag{margin-top:auto;padding-top:18px;font-size:12.5px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--accent)}
+/* area — two-up over a mow-stripe field */
+#lawn .area{position:relative;overflow:hidden}
+#lawn .area .grid{display:grid;grid-template-columns:1fr 1.1fr;gap:52px;align-items:center;position:relative}
+#lawn .area h2{font-size:38px}
+#lawn .tags{display:flex;flex-wrap:wrap;gap:10px}
+#lawn .tag{background:var(--bg);border:1px solid var(--rule);border-radius:999px;padding:11px 19px;
+  font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px}
+#lawn .tag svg{color:var(--accent)}
+@media(max-width:920px){#lawn .area .grid{grid-template-columns:1fr}}
+/* proof — hairline cards, photo avatars, sun-gold stars */
+#lawn .rev-head{text-align:center;max-width:620px;margin:0 auto}
+#lawn .rev-agg{display:inline-flex;align-items:center;gap:14px;margin-top:20px;background:var(--bg);
+  border:1px solid var(--rule);border-radius:18px;padding:14px 24px}
+#lawn .rev-agg .sc{font-family:var(--fd);font-weight:800;font-size:32px;line-height:1;letter-spacing:-.03em;color:var(--accent)}
+#lawn .rev-agg .st{color:var(--sun);letter-spacing:2px;font-size:14px}
+#lawn .rev-agg .sub{font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-top:2px}
+#lawn .qcard{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--rule);
+  border-radius:24px;padding:28px}
+#lawn .qcard .qstars{color:var(--sun);letter-spacing:2px;font-size:14px}
+#lawn .qcard .qtext{margin-top:13px;font-size:15.5px;line-height:1.65;flex:1}
+#lawn .qcard .who{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid var(--rule)}
+#lawn .qcard .ava{width:44px;height:44px;border-radius:50%;background-size:cover;background-position:center}
+#lawn .qcard .n{font-weight:700;font-size:14.5px}
+#lawn .qcard .r{font-size:13px;color:var(--ink-soft)}
+/* FAQ — big soft rows */
+#lawn .faq{max-width:800px;margin:36px auto 0}
+#lawn .faq details{background:var(--bg);border:1px solid var(--rule);border-radius:20px;margin-top:12px;overflow:hidden}
+#lawn .faq details[open]{background:var(--bg-soft);border-color:rgba(47,122,51,.3)}
+#lawn .faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  gap:16px;padding:21px 25px;font-weight:700;font-size:16.5px;letter-spacing:-.012em}
+#lawn .faq summary::-webkit-details-marker{display:none}
+#lawn .faq .ic{color:var(--accent);transition:transform .3s}
+#lawn .faq details[open] .ic{transform:rotate(45deg)}
+#lawn .faq .ans{padding:0 25px 25px;color:var(--ink-soft);font-size:15.5px;line-height:1.72}
+/* CTA — forest band + white card, with a gold "first visit" ribbon */
+#lawn .band-cta{color:#DCE8DB;position:relative;overflow:hidden;background:
+  radial-gradient(900px 340px at 88% -16%,rgba(232,179,58,.14),transparent 62%),
+  linear-gradient(180deg,var(--forest),var(--forest-2))}
+#lawn .band-cta h2{font-size:clamp(30px,3.6vw,44px);color:#fff;line-height:1.06}
+#lawn .band-cta h2 .em{color:var(--sun)}
+#lawn .band-cta .lede{color:#BACCB9}
+#lawn .band-cta .fr{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:22px}
+#lawn .band-cta .fr span{display:flex;gap:8px;align-items:center;font-size:14.5px;font-weight:600;color:#D3E0D2}
+#lawn .band-cta .fr svg{color:var(--sun)}
+#lawn .cta-form{position:relative;background:var(--bg);border-radius:26px;padding:30px;
+  box-shadow:0 30px 60px -24px rgba(14,38,20,.6)}
+#lawn .ribbon{position:absolute;top:-14px;right:22px;background:var(--sun);color:#2A1F04;font-size:12px;
+  font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:7px 15px}
+#lawn .cta-form .cf-head{font-family:var(--fd);font-weight:800;font-size:21px;letter-spacing:-.02em;color:var(--ink)}
+#lawn .cta-form .cf-sub{font-size:13.5px;color:var(--ink-soft);margin-top:6px}
+#lawn .cta-form label{color:var(--ink-soft)}
+#lawn .cta-form .cf-fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;
+  color:var(--ink-soft);margin-top:12px;font-weight:600}
+#lawn footer.ftr{background:var(--forest-2);color:#A6BAA6}
+#lawn footer.ftr .logo{color:#fff}
+#lawn .fblurb{margin-top:16px;font-size:14.5px;line-height:1.6;max-width:34ch}
+#lawn .fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+#lawn .fbadge{font-size:12px;color:#A6BAA6;border:1px solid var(--f-rule);border-radius:999px;padding:6px 13px}
+#lawn .fcol h4{color:var(--sun)}
+#lawn .fcol a,#lawn .fcol .ln{color:#C8D8C7}
+#lawn .fcol .ln svg{color:var(--sun);margin-top:3px}
+
+/* ─── 5 · CAR DETAILING — "showroom / dark / premium" ────────────────────────
+   Thesis: detailing is sold on finish, and finish reads against black. This is
+   the only DARK-FIRST template in the set: the page ground is near-black, cards
+   are glass (translucent white + a 1px highlight) with NO drop shadows, and the
+   accent is champagne gold used as hairlines and numerals. The final CTA is the
+   one LIGHT band on the page — the inversion is the punch.
+   NOTE: a dark-ground palette will need an explicit exemption from
+   palette-contrast.test.mjs, the same way hvac.ts documents one today.
+   ─────────────────────────────────────────────────────────────────────────── */
+#detail{--maxw:1180px;--fd:'Bricolage Grotesque',system-ui,sans-serif;--fb:'Bricolage Grotesque',system-ui,sans-serif;
+  --fdw:800;--fdt:-.018em;--fdlh:1.0;
+  --ink:#F2F4F8;--ink-soft:#A3ADBC;--ink-faint:#6C7686;--bg:#0D0E12;--bg-soft:#14161C;--bg-tint:#1B1E26;
+  --accent:#C9A14B;--accent-fg:#0D0E12;--steel:#3E5C82;--light:#F4F2EE;--near-black:#08090C;
+  --rule:#262A33;--f-rule:rgba(255,255,255,.08);--rad-btn:8px;--rad-mark:8px;--rad-inp:8px;
+  --nav-bg:rgba(13,14,18,.86);--nav-brd:#20242C;--nav-link:#A3ADBC;--nav-h:80px;
+  --mark-bg:linear-gradient(145deg,#C9A14B,#8A6A26);--mark-fg:#0D0E12;
+  --ghost-brd:rgba(255,255,255,.22);--sec:92px;--gap:20px;
+  font-family:var(--fb);color:var(--ink);background:var(--bg)}
+#detail .band-soft{background:var(--bg-soft)}
+#detail .band-tint{background:var(--bg-tint)}
+#detail .eyebrow{letter-spacing:.26em;font-size:11.5px}
+#detail .lede{color:var(--ink-soft)}
+#detail .btn-ghost{color:#fff}
+#detail .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+#detail .hair{height:1px;width:72px;background:linear-gradient(90deg,var(--accent),transparent)}
+#detail .glass{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px}
+#detail .nav .navcta .btn-primary{font-weight:800}
+/* hero — centred, vignetted, the gold hairline doing the framing */
+#detail .hero{min-height:680px;display:flex;align-items:center;text-align:center;background:var(--near-black)}
+#detail .hero .bgimg{background-image:url('https://picsum.photos/seed/jdd-detail-hero/1800/1100');filter:saturate(.82) contrast(1.06)}
+#detail .hero .scrim{background:
+  radial-gradient(120% 90% at 50% 40%,transparent 18%,rgba(8,9,12,.72) 68%,rgba(8,9,12,.95) 100%),
+  linear-gradient(180deg,rgba(8,9,12,.62),rgba(8,9,12,.42) 42%,rgba(8,9,12,.93))}
+#detail .hero .wrap{position:relative;padding:104px 24px}
+#detail .hero .inner{max-width:760px;margin:0 auto}
+#detail .hero .hair{margin:0 auto}
+#detail .hero .eyebrow{color:var(--accent);margin-top:20px}
+#detail .hero h1{font-size:clamp(40px,5.6vw,64px);color:#fff;margin-top:18px}
+#detail .hero h1 .em{color:var(--accent)}
+#detail .hero p{color:#C4CBD6;font-size:18.5px;line-height:1.62;margin:18px auto 0;max-width:52ch}
+#detail .hero .cta{display:flex;flex-wrap:wrap;gap:13px;margin-top:32px;justify-content:center}
+#detail .hero .fr{display:flex;flex-wrap:wrap;gap:0 34px;justify-content:center;margin-top:34px;padding-top:24px;
+  border-top:1px solid rgba(255,255,255,.14);max-width:620px;margin-left:auto;margin-right:auto}
+#detail .hero .fr span{font-size:12px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:#9AA4B2}
+/* stat band — a thin strip of gold numerals, hairline-separated */
+#detail .strip{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+#detail .strip .grid{display:grid;grid-template-columns:repeat(4,1fr);padding:30px 0}
+#detail .strip .c{text-align:center;border-left:1px solid var(--rule)}
+#detail .strip .c:first-child{border-left:0}
+#detail .strip .n{font-family:var(--fd);font-weight:800;font-size:38px;line-height:1;letter-spacing:-.03em;color:var(--accent)}
+#detail .strip .l{font-size:11px;font-weight:700;letter-spacing:.19em;text-transform:uppercase;color:var(--ink-faint);margin-top:10px}
+@media(max-width:900px){#detail .strip .grid{grid-template-columns:1fr 1fr;gap:26px 0}
+  #detail .strip .c:nth-child(3){border-left:0}}
+/* services — glass package cards with a price-from line */
+#detail .svc-head{text-align:center;max-width:56ch;margin:0 auto}
+#detail .svc-card{display:flex;flex-direction:column;padding:30px 28px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.085);border-radius:12px;transition:border-color .2s,background .2s}
+#detail .svc-card:hover{border-color:rgba(201,161,75,.45);background:rgba(201,161,75,.055)}
+#detail .svc-ic{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;margin-bottom:20px;
+  border:1px solid rgba(201,161,75,.4);color:var(--accent)}
+#detail .svc-card h3{font-size:20px;font-weight:800;letter-spacing:-.016em;color:#fff}
+#detail .svc-card p{color:var(--ink-soft);font-size:14.5px;line-height:1.65;margin-top:10px}
+#detail .svc-foot{margin-top:auto;padding-top:20px;display:flex;align-items:baseline;justify-content:space-between;
+  gap:12px;border-top:1px solid rgba(255,255,255,.09)}
+#detail .svc-price{font-family:var(--fd);font-weight:800;font-size:19px;letter-spacing:-.02em;color:#fff}
+#detail .svc-price small{font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-faint);display:block}
+#detail .svc-tag{font-size:10.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:var(--accent)}
+/* area — a mobile-radius statement with a concentric ring, towns as a gold-dotted run */
+#detail .area{position:relative;overflow:hidden;text-align:center}
+#detail .area .rings{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:760px;max-width:120%;
+  color:var(--accent);opacity:.13}
+#detail .area .inner{position:relative;max-width:720px;margin:0 auto}
+#detail .area h2{font-size:clamp(28px,3.4vw,40px);color:#fff;margin-top:16px}
+#detail .area .run{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 0;margin-top:30px}
+#detail .area .run span{font-size:14.5px;font-weight:600;color:#C4CBD6;padding:0 16px;position:relative}
+#detail .area .run span+span::before{content:"";position:absolute;left:-3px;top:50%;width:5px;height:5px;
+  border-radius:50%;background:var(--accent);transform:translateY(-50%)}
+/* proof — two large quotes on dark, aggregate centred with one big gold numeral */
+#detail .rev-head{text-align:center;max-width:660px;margin:0 auto}
+#detail .rev-head .sc{font-family:var(--fd);font-weight:800;font-size:68px;line-height:1;letter-spacing:-.04em;
+  color:var(--accent);margin-top:18px}
+#detail .rev-head .st{color:var(--accent);letter-spacing:4px;font-size:19px;margin-top:6px}
+#detail .rev-head .sub{font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-faint);margin-top:12px}
+#detail .q2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}
+@media(max-width:900px){#detail .q2{grid-template-columns:1fr}}
+#detail .qcard{display:flex;flex-direction:column;padding:32px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.085);border-radius:12px}
+#detail .qcard .qstars{color:var(--accent);letter-spacing:2px;font-size:14px}
+#detail .qcard .qtext{font-family:var(--fd);font-weight:500;font-size:19px;line-height:1.55;letter-spacing:-.012em;
+  color:#E8ECF2;margin-top:16px;flex:1}
+#detail .qcard .who{display:flex;align-items:center;gap:13px;margin-top:24px;padding-top:20px;
+  border-top:1px solid rgba(255,255,255,.09)}
+#detail .qcard .ava{width:42px;height:42px;border-radius:50%;background-size:cover;background-position:center}
+#detail .qcard .n{font-weight:700;font-size:14.5px;color:#fff}
+#detail .qcard .r{font-size:12.5px;color:var(--ink-faint)}
+/* FAQ — hairline rows, no cards at all */
+#detail .faqrows{max-width:820px;margin:40px auto 0;border-top:1px solid var(--rule)}
+#detail .faqrows details{border-bottom:1px solid var(--rule)}
+#detail .faqrows summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  gap:18px;padding:24px 4px;font-weight:700;font-size:16.5px;letter-spacing:-.012em;color:#fff}
+#detail .faqrows summary::-webkit-details-marker{display:none}
+#detail .faqrows .ic{color:var(--accent);transition:transform .3s}
+#detail .faqrows details[open] .ic{transform:rotate(45deg)}
+#detail .faqrows .ans{padding:0 4px 26px;color:var(--ink-soft);font-size:15.5px;line-height:1.75;max-width:62ch}
+/* CTA — the one LIGHT band. Inverted on purpose. */
+#detail .band-cta{background:var(--light);color:#171922}
+#detail .band-cta .eyebrow{color:#8A6A26}
+#detail .band-cta h2{font-size:clamp(30px,3.6vw,46px);color:#171922;line-height:1.04}
+#detail .band-cta h2 .em{color:#8A6A26}
+#detail .band-cta .lede{color:#55596A;font-size:17px}
+#detail .band-cta .fr{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:22px}
+#detail .band-cta .fr span{display:flex;gap:8px;align-items:center;font-size:14.5px;font-weight:600;color:#3D4152}
+#detail .band-cta .fr svg{color:#8A6A26}
+#detail .cta-form{background:var(--near-black);border-radius:14px;padding:30px;border:1px solid #23262F}
+#detail .cta-form .cf-head{font-family:var(--fd);font-weight:800;font-size:21px;letter-spacing:-.02em;color:#fff}
+#detail .cta-form .cf-sub{font-size:13.5px;color:var(--ink-soft);margin-top:6px}
+#detail .cta-form label{color:var(--ink-faint);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:11px}
+#detail .cta-form input{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#fff}
+#detail .cta-form input::placeholder{color:#6C7686}
+#detail .cta-form .cf-fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;
+  color:var(--ink-faint);margin-top:13px;font-weight:600}
+#detail footer.ftr{background:var(--near-black);color:var(--ink-faint);border-top:1px solid #1B1E26}
+#detail footer.ftr .logo{color:#fff}
+#detail .fblurb{margin-top:16px;font-size:14.5px;line-height:1.6;max-width:34ch}
+#detail .fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+#detail .fbadge{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);border:1px solid rgba(201,161,75,.3);border-radius:4px;padding:6px 11px}
+#detail .fcol h4{color:var(--accent)}
+#detail .fcol a,#detail .fcol .ln{color:#AEB7C4}
+#detail .fcol .ln svg{color:var(--accent);margin-top:3px}
+</style>
+</head>
+<body>
+
+<div class="tabbar" role="tablist">
+  <button role="tab" aria-selected="true"  data-t="hvac"><span class="dot" style="background:#E0602C"></span>HVAC — reference</button>
+  <button role="tab" aria-selected="false" data-t="roofing"><span class="dot" style="background:#B4512A"></span>Roofing</button>
+  <button role="tab" aria-selected="false" data-t="plumbing"><span class="dot" style="background:#1E6FA8"></span>Plumbing</button>
+  <button role="tab" aria-selected="false" data-t="lawn"><span class="dot" style="background:#2F7A33"></span>Lawn Care</button>
+  <button role="tab" aria-selected="false" data-t="detail"><span class="dot" style="background:#C9A14B"></span>Car Detailing</button>
+</div>
+
+<main>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PANE 1 · HVAC — the reference, reproduced verbatim from
+     design/northstar-standard/mockups.html so the five new templates can be
+     compared against it in the same viewport.
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="pane on" id="hvac">
+  <div class="caption"><b>HVAC — Standard</b> · <span class="k">REFERENCE, unchanged</span> ·
+    Oswald/Inter · accent <b>#E0602C</b> orange, navy structure, gold emphasis · 16px radii, layered shadows ·
+    hero: full-bleed photo, left→right navy scrim · stats: 4 white tiles w/ steel top-notch ·
+    services: 3-up cards, steel icon tiles, uppercase accent tag · area: white chips + silhouette ·
+    proof: centred aggregate + 3 quotes · FAQ: card accordion · CTA: navy band + white form card · footer: navy.
+    <br><b>Note:</b> what ships today renders teal-on-cream in Instrument Sans, not this — see the palette/typography
+    override conflict in the brief.
+    <br><b>CTA rule (all six panes, 2026-10-28):</b> every call to action that is <i>not</i> a phone number
+    routes to <b>/contact</b>. Phone CTAs are <b>tel:</b> links. Buttons inside a lead form submit that form
+    rather than navigating. The one exception is detailing's <b>&ldquo;See packages&rdquo;</b>, routed to
+    <b>/services</b> because it is a browse action, not a conversion &mdash; flagged for your call.</div>
+
+  <div class="site">
+    <nav class="nav"><div class="wrap inner">
+      <a class="logo"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <span>Northstar<small>Heating &amp; Air · Central FL</small></span></a>
+      <div class="navlinks"><a aria-current="page">Home</a><a>Services</a><a>About</a><a>Contact</a></div>
+      <div class="navcta">
+        <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(407) 555-0188</span></span>
+        <a class="btn btn-primary" href="/contact">Book a visit</a>
+      </div>
+    </div></nav>
+
+    <header class="hero">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="wrap"><div class="inner">
+        <div class="rating"><span class="stars">★★★★★</span> 4.9 <span style="font-weight:600;color:#C6D2DE">from 180+ verified reviews</span></div>
+        <h1 class="display">Central Florida's <span class="em">24/7</span> heating &amp; air experts.</h1>
+        <p>When the AC quits in July, you need a real person on the line and a tech at the door the same day — not a voicemail. That's all we do.</p>
+        <div class="cta">
+          <a class="btn btn-primary btn-phone" href="tel:+14075550188"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(407) 555-0188</a>
+          <a class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.4)" href="/contact">Book a visit →</a>
+        </div>
+        <div class="fr"><span>✔ Same-day service</span><span>✔ Upfront flat-rate pricing</span><span>✔ Licensed &amp; insured</span><span>✔ Veteran-owned &amp; local</span></div>
+      </div></div>
+    </header>
+
+    <div class="band-soft sec-sm"><div class="wrap statband"><div class="grid">
+      <div class="stat-tile"><div class="n">24/7</div><div class="l">Emergency service, real humans</div></div>
+      <div class="stat-tile"><div class="n">18+</div><div class="l">Years serving Central Florida</div></div>
+      <div class="stat-tile"><div class="n">4.9★</div><div class="l">From 180+ verified reviews</div></div>
+      <div class="stat-tile"><div class="n">12</div><div class="l">Towns in our coverage area</div></div>
+    </div></div></div>
+
+    <div class="sec"><div class="wrap">
+      <div style="max-width:48ch">
+        <div class="bar"></div>
+        <h2 class="display" style="font-size:40px;margin-top:16px">Repairs, installs, and plans that keep you comfortable.</h2>
+        <p class="lede" style="margin-top:14px">Every job is quoted flat-rate before we start, so the price you hear is the price you pay.</p>
+      </div>
+      <div class="svc-grid">
+        <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div><h3>AC Repair</h3><p>Fast diagnosis and repair on every major brand, often same-day.</p><div class="svc-tag">Repair</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s4 4 4 8a4 4 0 01-8 0c0-2 2-4 4-8z"/></svg></div><h3>Heating &amp; Furnace</h3><p>Tune-ups and repairs that keep the heat on through every cold snap.</p><div class="svc-tag">Repair</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg></div><h3>New Installations</h3><p>Right-sized systems, financing available, installed clean and on time.</p><div class="svc-tag">Install</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/></svg></div><h3>Maintenance Plans</h3><p>Two visits a year, priority scheduling, and no overtime fees.</p><div class="svc-tag">Membership</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>Indoor Air Quality</h3><p>Filtration, purifiers, and humidity control for a healthier home.</p><div class="svc-tag">Install</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h3>Emergency Service</h3><p>Nights, weekends, holidays — someone answers and someone comes.</p><div class="svc-tag">24/7</div></div>
+      </div>
+    </div></div>
+
+    <div class="band-tint sec area">
+      <svg class="silh" viewBox="0 0 200 200" fill="currentColor"><path d="M40 20l30 6 28-10 34 8 26 18-8 30 10 28-20 24-30 6-26-14-28 4-22-20 6-28-14-26 10-28z"/></svg>
+      <div class="wrap"><div class="grid">
+        <div>
+          <h2 class="display"><svg width="28" height="28" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z"/></svg>Where we work</h2>
+          <div class="bar" style="margin-top:16px"></div>
+          <p class="lede" style="margin-top:16px">Not on the list? Call and ask — we travel for bigger jobs across the region.</p>
+          <a class="btn-phone" style="color:var(--accent);display:inline-flex;gap:8px;margin-top:16px" href="tel:+14075550188">(407) 555-0188</a>
+        </div>
+        <div class="chips">
+          <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Orlando</span>
+          <span class="chip">Winter Park</span><span class="chip">Kissimmee</span><span class="chip">Apopka</span>
+          <span class="chip">Sanford</span><span class="chip">Oviedo</span><span class="chip">Lake Mary</span>
+          <span class="chip">Altamonte Springs</span><span class="chip">Clermont</span><span class="chip">Longwood</span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="band-soft sec"><div class="wrap">
+      <div class="rev-head">
+        <div class="eyebrow" style="color:var(--steel-2)">Reviews</div>
+        <h2 class="display" style="font-size:40px;margin-top:12px">Homeowners keep calling us back.</h2>
+        <div class="rev-agg">
+          <div class="score">4.9</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">
+            <div class="bigstars">★★★★★</div>
+            <div style="font-size:13.5px;font-weight:600;color:var(--ink-soft)">Based on 184 verified reviews</div>
+          </div>
+          <div class="sep"></div>
+          <div class="src"><div class="s">Google<small>★ 4.9 · 120</small></div><div class="s">Facebook<small>★ 5.0 · 41</small></div><div class="s">Yelp<small>★ 4.8 · 23</small></div></div>
+        </div>
+      </div>
+      <div class="quotes">
+        <div class="qcard"><div class="qstars">★★★★★</div><p class="qtext">Called at 11pm on a Friday when our furnace died. A tech was at our door within an hour and fixed it that night.</p><div class="who"><div class="ava">M</div><div><div class="n">Michael R.</div><div class="r">Homeowner · Winter Park</div></div></div></div>
+        <div class="qcard"><div class="qstars">★★★★★</div><p class="qtext">Three years of service now — always on time, always honest. When our AC needed a part they sourced it same-day.</p><div class="who"><div class="ava">S</div><div><div class="n">Sandra T.</div><div class="r">Homeowner · Oviedo</div></div></div></div>
+        <div class="qcard"><div class="qstars">★★★★★</div><p class="qtext">Quoted us $800 less than two other companies for a new heat pump. Clean install, and the system has been perfect.</p><div class="who"><div class="ava">J</div><div><div class="n">James O.</div><div class="r">Homeowner · Clermont</div></div></div></div>
+      </div>
+    </div></div>
+
+    <div class="sec"><div class="wrap">
+      <div style="text-align:center;max-width:620px;margin:0 auto">
+        <div class="eyebrow">Good to know</div>
+        <h2 class="display" style="font-size:38px;margin-top:12px">Frequently asked questions</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>Do you really answer 24/7?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Yes. A real person — not a machine — answers every call, including nights, weekends, and holidays. If you need a tech, we dispatch one.</div></details>
+        <details><summary>How does flat-rate pricing work?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">We quote the full price before any work begins, based on the repair — never by the hour. The number you approve is the number you pay.</div></details>
+        <details><summary>Are you licensed and insured?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Fully licensed and insured, with background-checked technicians. We'll happily show documentation on request.</div></details>
+      </div>
+    </div></div>
+
+    <div class="band-navy sec"><div class="wrap"><div class="cta-grid">
+      <div>
+        <div class="eyebrow" style="color:var(--steel-1)">Ready when you are</div>
+        <h2 class="display" style="margin-top:12px">Comfort back on — <span class="em">the same day you call.</span></h2>
+        <p class="lede" style="margin-top:14px">Book a free, no-obligation estimate. A real person answers, and we'll get a technician scheduled — usually same day.</p>
+        <div class="fr">
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Free estimates</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Same-day availability</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No hidden fees</span>
+        </div>
+      </div>
+      <div class="cta-form">
+        <div class="cf-head">Book a free estimate</div>
+        <div class="cf-sub">Tell us what's going on — we'll call you right back.</div>
+        <label>Name</label><input placeholder="Your name" />
+        <label>Phone</label><input placeholder="(407) 555-0188" />
+        <a class="btn btn-primary">Book a free estimate</a>
+        <div class="cf-fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2B9C5A" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No obligation · same-day callback</div>
+      </div>
+    </div></div></div>
+
+    <footer class="ftr"><div class="wrap">
+      <div class="fgrid">
+        <div>
+          <a class="logo"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span><span>Northstar<small style="color:#8ea3bb">Heating &amp; Air · Central FL</small></span></a>
+          <p class="fblurb">Licensed HVAC contractor providing heating, cooling, and air quality services across Central Florida. Emergency service available 24/7.</p>
+          <div class="fbadges"><span class="fbadge">NATE Certified</span><span class="fbadge">EPA 608</span><span class="fbadge">Veteran-Owned</span><span class="fbadge">Licensed &amp; Insured</span></div>
+        </div>
+        <div class="fcol"><h4>Services</h4><a>AC Repair</a><a>Heating &amp; Furnace</a><a>New Installations</a><a>Maintenance Plans</a></div>
+        <div class="fcol"><h4>Company</h4><a>About Us</a><a>Reviews</a><a>Service Area</a><a>FAQ</a></div>
+        <div class="fcol"><h4>Contact</h4>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(407) 555-0188</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>hello@northstarhvac.com</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Serving Orlando &amp; Central FL</span>
+        </div>
+      </div>
+      <div class="fbot"><span>© 2026 Northstar Heating &amp; Air. All rights reserved.</span><span>Licensed &amp; insured · CAC1820xxx · FL</span></div>
+    </div></footer>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PANE 2 · ROOFING
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="pane" id="roofing">
+  <div class="caption"><b>Roofing — Standard</b> · thesis: <span class="k">structure &amp; risk, not comfort</span> ·
+    Archivo 800 · accent <b>#B4512A</b> clay, <b>#241E1B</b> bitumen structure, <b>#E8A33D</b> hazard amber for
+    urgency only · <b>4px radii, zero drop shadows</b> — hairlines and hard rules carry the design.
+    <br><b>Palette revised 2026-10-28:</b> the blue-grey family is gone. HVAC keeps sole ownership of navy +
+    steel; roofing’s structural dark is now <b>bitumen brown-charcoal</b> over a warm grey ground, so the two
+    templates share <b>no hue family at all</b> — the separation registers before the layout does.
+    <br><b>Differs from HVAC:</b> scrim climbs from the bottom so sky stays visible (a roof needs sky) ·
+    stat band is a dark inline <b>ledger bar</b>, not four floating tiles · services are <b>ruled rows with
+    outlined index numerals</b>, not cards · area is a 4-column ruled town index · proof is a dark aggregate
+    panel + two large pull-quotes · FAQ is two-column hairlines · CTA is a photo band with a <b>single inline
+    form row</b> · the hero carries a storm-damage alert card, the one urgent object on the page &mdash; its CTA
+    is an <b>email capture form</b>, not a phone number (changed 2026-10-28), and &ldquo;Book a free
+    inspection&rdquo; routes to <b>/contact</b>.
+    <br><b>Section order:</b> FAQ before proof (matches <code>hvacTemplate()</code> in code).</div>
+
+  <div class="site">
+    <nav class="nav"><div class="wrap inner">
+      <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12L12 4l10 8"/><path d="M5 11v9h14v-9"/></svg></span>
+        <span>Ridgeline<small>Roofing &amp; Exteriors · Tampa Bay</small></span></a>
+      <div class="navlinks"><a aria-current="page">Home</a><a>Services</a><a>About</a><a>Contact</a></div>
+      <div class="navcta">
+        <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(813) 555-0142</span></span>
+        <a class="btn btn-primary" href="/contact">Free inspection</a>
+      </div>
+    </div></nav>
+
+    <header class="hero">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="wrap"><div class="hgrid">
+        <div class="inner">
+          <span class="kicker">Licensed · Bonded · GAF Certified</span>
+          <h1 class="display">Your roof is the <span class="em">only thing</span> between you and the storm.</h1>
+          <p>Full replacements, storm repairs, and insurance claims — documented, warrantied for 30 years, and
+            finished in one to two days.</p>
+          <div class="cta">
+            <a class="btn btn-primary btn-phone" href="tel:+18135550142"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(813) 555-0142</a>
+            <a class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.4)" href="/contact">Book a free inspection →</a>
+          </div>
+          <div class="fr"><span>30-year warranty</span><span>Insurance specialists</span><span>Free photo report</span><span>1–2 day installs</span></div>
+        </div>
+        <div class="stormcard">
+          <div class="t">Storm damage?</div>
+          <p>Hail and wind claims have a filing deadline. We inspect free, document everything, and deal with
+            the adjuster for you.</p>
+          <form onsubmit="return false">
+            <label for="rf-email">Your email</label>
+            <input id="rf-email" type="email" placeholder="you@example.com" />
+            <a class="btn btn-primary">Get a free inspection</a>
+          </form>
+        </div>
+      </div></div>
+    </header>
+
+    <div class="ledger"><div class="wrap"><div class="grid">
+      <div class="cell"><div class="n">500+</div><div class="l">Roofs replaced</div></div>
+      <div class="cell"><div class="n">30 yr</div><div class="l">Workmanship warranty</div></div>
+      <div class="cell"><div class="n">4.9★</div><div class="l">From 210+ reviews</div></div>
+      <div class="cell"><div class="n">1–2</div><div class="l">Days, most re-roofs</div></div>
+    </div></div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="svc-head">
+        <div>
+          <div class="eyebrow">What we do</div>
+          <h2 class="display" style="font-size:42px;margin-top:14px">Complete roofing scope,<br>start to finish.</h2>
+        </div>
+        <p class="lede">Every job opens with a written inspection and photo documentation, and closes with a
+          warranty you can transfer when you sell the house.</p>
+      </div>
+      <div class="svc-rows">
+        <div class="svc-row"><div class="ix">01</div><div><h3>Roof Replacement</h3><span class="tg">Replacement</span></div>
+          <p>Complete tear-off and re-roof in premium GAF architectural shingle. Most residential jobs finished in one to two days, site left clean.</p>
+          <svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="svc-row"><div class="ix">02</div><div><h3>Storm Damage Repair</h3><span class="tg">Storm repair</span></div>
+          <p>Fast response to wind, hail, and water intrusion. We photograph and itemise every point of damage for your claim before anything is touched.</p>
+          <svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="svc-row"><div class="ix">03</div><div><h3>Gutter Installation</h3><span class="tg">Gutters</span></div>
+          <p>Seamless gutters, leaf guards, and downspout extensions sized to your roof's actual water load — not a default.</p>
+          <svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="svc-row"><div class="ix">04</div><div><h3>Roof Inspection</h3><span class="tg">Inspection</span></div>
+          <p>Full written report with photographs of every finding, and an honest remaining-life estimate. Free for homeowners.</p>
+          <svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="svc-row"><div class="ix">05</div><div><h3>Flat &amp; Low-Slope</h3><span class="tg">Commercial</span></div>
+          <p>TPO, EPDM, and modified bitumen systems for commercial buildings and low-slope residential additions.</p>
+          <svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+        <div class="svc-row"><div class="ix">06</div><div><h3>Emergency Tarping</h3><span class="tg">24/7 emergency</span></div>
+          <p>Round-the-clock tarping to stop water getting in while the claim is filed and the repair is scheduled.</p>
+          <svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div>
+      </div>
+    </div></div>
+
+    <div class="band-soft sec area">
+      <svg class="silh" viewBox="0 0 200 140" fill="currentColor"><path d="M0 90L60 30l60 60V140H0zM110 90l45-42 45 42v50h-90z"/></svg>
+      <div class="wrap">
+        <div class="head">
+          <div>
+            <div class="eyebrow">Coverage</div>
+            <h2 class="display" style="margin-top:14px">Where our crews work.</h2>
+          </div>
+          <p class="lede">Outside the list? Call anyway — we travel for full replacements and commercial work
+            across the bay.</p>
+        </div>
+        <div class="towns">
+          <span>Tampa</span><span>St. Petersburg</span><span>Clearwater</span><span>Brandon</span>
+          <span>Riverview</span><span>Wesley Chapel</span><span>Lutz</span><span>Plant City</span>
+          <span>Largo</span><span>Palm Harbor</span><span>Valrico</span><span>Apollo Beach</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec"><div class="wrap">
+      <div style="max-width:52ch">
+        <div class="eyebrow">Good to know</div>
+        <h2 class="display" style="font-size:38px;margin-top:14px">Questions we get before every job.</h2>
+      </div>
+      <div class="faq2">
+        <details open><summary>Does insurance cover a roof replacement?<span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">If the damage came from a covered peril — storm, hail, wind — your policy typically covers replacement minus the deductible. We work with adjusters weekly and document the claim for you.</div></details>
+        <details><summary>How do I know if I have storm damage?<span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Missing or curling shingles, granules in the gutters, dents on flashing, and interior water stains. Our free inspection finds and photographs all of it.</div></details>
+        <details><summary>How long does a roof actually last?<span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Asphalt shingle runs 20–30 years depending on grade and climate; premium shingle with proper ventilation reaches 30–50. We'll tell you honestly where yours stands.</div></details>
+        <details><summary>What warranty do you offer?<span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">30-year workmanship on every installation, plus the manufacturer's materials warranty. Both transfer to the next owner if you sell.</div></details>
+      </div>
+    </div></div>
+
+    <div class="band-tint sec"><div class="wrap">
+      <div class="rev-grid">
+        <div class="agg">
+          <div class="eyebrow" style="color:var(--amber)">Reviews</div>
+          <div class="score" style="margin-top:16px">4.9</div>
+          <div class="bigstars">★★★★★</div>
+          <div class="sub">Based on 211 verified reviews</div>
+          <div class="srcs">
+            <div><span>Google</span><b>4.9 · 142</b></div>
+            <div><span>Facebook</span><b>5.0 · 44</b></div>
+            <div><span>Angi</span><b>4.8 · 25</b></div>
+          </div>
+        </div>
+        <div>
+          <div class="rq"><div class="qstars">★★★★★</div>
+            <p>&ldquo;After the hail came through they were on the roof the next morning and handled the entire
+              insurance claim. New roof in two days and you cannot tell they were ever in the yard.&rdquo;</p>
+            <div class="who"><b>David K.</b> · Homeowner, Brandon</div></div>
+          <div class="rq"><div class="qstars">★★★★★</div>
+            <p>&ldquo;Got three quotes. Theirs was competitive and they were the only crew who could start that
+              week. Done in a day and a half, spotless cleanup, warranty paperwork in hand.&rdquo;</p>
+            <div class="who"><b>Karen M.</b> · Homeowner, Palm Harbor</div></div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="ctaband"><div class="bgimg"></div><div class="scrim"></div><div class="wrap">
+      <div class="eyebrow" style="color:var(--amber)">No cost, no obligation</div>
+      <h2 class="display" style="margin-top:14px">Find out what your roof actually needs — <span class="em">free.</span></h2>
+      <p>A written inspection with photographs of every finding. If it has years left, we'll say so.</p>
+      <div class="inlineform">
+        <input placeholder="Your name" /><input placeholder="(813) 555-0142" />
+        <a class="btn btn-primary">Book my free inspection</a>
+      </div>
+      <div class="fine"><span>✔ Free photo report</span><span>✔ We handle the adjuster</span><span>✔ 30-year warranty</span></div>
+    </div></div>
+
+    <footer class="ftr"><div class="wrap">
+      <div class="fgrid">
+        <div>
+          <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12L12 4l10 8"/><path d="M5 11v9h14v-9"/></svg></span><span>Ridgeline<small style="color:#8EA0AE">Roofing &amp; Exteriors · Tampa Bay</small></span></a>
+          <p class="fblurb">GAF-certified roofing contractor specialising in replacements, storm repair, and
+            gutter systems across the Tampa Bay area.</p>
+          <div class="fbadges"><span class="fbadge">GAF Certified</span><span class="fbadge">Licensed &amp; Bonded</span><span class="fbadge">Insured</span></div>
+        </div>
+        <div class="fcol"><h4>Services</h4><a>Roof Replacement</a><a>Storm Damage Repair</a><a>Gutters</a><a>Emergency Tarping</a></div>
+        <div class="fcol"><h4>Company</h4><a>About Us</a><a>Reviews</a><a>Service Area</a><a>FAQ</a></div>
+        <div class="fcol"><h4>Contact</h4>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(813) 555-0142</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>office@ridgelineroofs.com</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Serving Tampa Bay &amp; the Gulf coast</span>
+        </div>
+      </div>
+      <div class="fbot"><span>© 2026 Ridgeline Roofing &amp; Exteriors. All rights reserved.</span><span>Licensed &amp; insured · CCC1331xxx · FL</span></div>
+    </div></footer>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PANE 3 · PLUMBING
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="pane" id="plumbing">
+  <div class="caption"><b>Plumbing — Standard</b> · thesis: <span class="k">a plumbing emergency is a dispatch problem</span> ·
+    Schibsted Grotesk 800 · accent <b>#1E6FA8</b> · <b>pill geometry throughout</b> (999px buttons, chips, aggregate),
+    20px cards, soft blue-tinted shadows.
+    <br><b>Differs from HVAC:</b> hero is a <b>split panel</b> — solid deep-blue left with the lead form living
+    <i>inside</i> the hero, photo right, no scrim-over-text · a live "trucks out now" dispatch pill ·
+    stat band is inline hairline-separated, <b>no tiles</b> · service cards use circular icon badges + a floated
+    pill tag · area is <b>centred</b> around one oversized <b>24/7</b> promise · proof cards carry a giant ghost
+    quote mark with the aggregate as a pill in the header · final CTA band is the <b>accent blue itself</b>, not
+    navy — this template has no navy at all until the footer.
+    <br><b>Section order:</b> proof before FAQ (matches the approved mockup).</div>
+
+  <div class="site">
+    <nav class="nav"><div class="wrap inner">
+      <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 3v6a3 3 0 003 3h1v9"/><path d="M14 21h4a3 3 0 003-3v-4"/><circle cx="19" cy="9" r="3"/></svg></span>
+        <span>Tideline<small>Plumbing Co. · Greater Austin</small></span></a>
+      <div class="navlinks"><a aria-current="page">Home</a><a>Services</a><a>About</a><a>Contact</a></div>
+      <div class="navcta">
+        <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(512) 555-0177</span></span>
+        <a class="btn btn-primary" href="/contact">Get a plumber</a>
+      </div>
+    </div></nav>
+
+    <header class="hero">
+      <div class="pane-l"><div class="in">
+        <span class="livepill"><span class="pulse"></span>3 trucks out now · next slot today 2:40pm</span>
+        <h1 class="display">A licensed plumber at your door <span class="em">today.</span></h1>
+        <p>Leaks, clogs, water heaters, and the 2am emergencies. Flat-rate priced before we start, and we show
+          up in the window we promised.</p>
+        <div class="fr">
+          <span>✔ Same-day service</span><span>✔ Upfront flat rates</span><span>✔ Licensed &amp; bonded</span>
+        </div>
+        <div class="intake">
+          <div class="h">What's going on?</div>
+          <div class="s">Tell us the problem — a real person calls you back in minutes.</div>
+          <div class="row"><input placeholder="Your name" /><input placeholder="(512) 555-0177" /></div>
+          <a class="btn btn-primary">Get a callback now</a>
+          <div class="fine"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2B9C5A" stroke-width="2.6"><path d="M4 12l5 5L20 6"/></svg> No obligation · we call, you decide</div>
+        </div>
+      </div></div>
+      <div class="pane-r"><div class="img"></div><div class="tint"></div></div>
+    </header>
+
+    <div class="band-soft sec-sm"><div class="wrap"><div class="statrow">
+      <div class="c"><div class="n">24/7</div><div class="l">Real people answer, every hour</div></div>
+      <div class="c"><div class="n">60 min</div><div class="l">Average emergency arrival</div></div>
+      <div class="c"><div class="n">4.9★</div><div class="l">From 240+ verified reviews</div></div>
+      <div class="c"><div class="n">15+</div><div class="l">Years licensed in Travis County</div></div>
+    </div></div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="svc-head">
+        <div class="eyebrow">What we do</div>
+        <h2 class="display" style="font-size:40px;margin-top:12px">Everything behind the wall, done once.</h2>
+        <p class="lede" style="margin:14px auto 0">You get the full price before any work begins — never by the
+          hour, never a surprise on the invoice.</p>
+      </div>
+      <div class="svc-grid">
+        <div class="svc-card"><span class="svc-pill">Repairs</span><div class="svc-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3s5 6 5 10a5 5 0 01-10 0c0-4 5-10 5-10z"/></svg></div><h3>Leak Detection &amp; Repair</h3><p>We pinpoint leaks inside walls and slabs before they become a restoration bill, then fix them properly.</p></div>
+        <div class="svc-card"><span class="svc-pill">Drains</span><div class="svc-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M8 12h8M12 8v8"/></svg></div><h3>Drain Clearing</h3><p>Cleared with a cable or a jetter, not a bottle of chemicals — so it stays clear after we leave.</p></div>
+        <div class="svc-card"><span class="svc-pill">Water heater</span><div class="svc-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M10 8h4"/></svg></div><h3>Water Heater Service</h3><p>Repair, replacement, and tankless conversions. Same-day swap on most standard tanks.</p></div>
+        <div class="svc-card"><span class="svc-pill">Installation</span><div class="svc-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10a3 3 0 013 3v10"/><path d="M4 4v6M20 17h-4"/></svg></div><h3>Repiping &amp; Fixtures</h3><p>Whole-home repipes, new rough-in, and fixture installs for remodels and additions of any size.</p></div>
+        <div class="svc-card"><span class="svc-pill">Emergency</span><div class="svc-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div><h3>Emergency Plumbing</h3><p>Burst pipes, sewer backups, and flooding. We answer at 2am because that's when it happens.</p></div>
+        <div class="svc-card"><span class="svc-pill">Remodel</span><div class="svc-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></div><h3>Kitchen &amp; Bath Remodel</h3><p>Rough-in and finish plumbing coordinated with your builder's schedule, inspected and signed off.</p></div>
+      </div>
+    </div></div>
+
+    <div class="band-tint sec area"><div class="wrap">
+      <div class="eyebrow">Coverage</div>
+      <h2 class="display" style="margin-top:12px">Someone answers, every hour of</h2>
+      <div class="big">24/7</div>
+      <p class="lede" style="margin:18px auto 0">Across Austin and the surrounding towns. Not on the list? Call —
+        we'll tell you straight whether we can get to you.</p>
+      <div class="chips">
+        <span class="chip">Austin</span><span class="chip">Round Rock</span><span class="chip">Cedar Park</span>
+        <span class="chip">Pflugerville</span><span class="chip">Georgetown</span><span class="chip">Leander</span>
+        <span class="chip">Kyle</span><span class="chip">Buda</span><span class="chip">Lakeway</span>
+        <span class="chip">Bee Cave</span><span class="chip">Manor</span><span class="chip">Hutto</span>
+      </div>
+    </div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="rev-head">
+        <div>
+          <div class="eyebrow">Reviews</div>
+          <h2 class="display" style="margin-top:12px">The part people remember is that we showed up.</h2>
+        </div>
+        <div class="aggbox">
+          <div class="sc">4.9</div>
+          <div><div class="st">★★★★★</div><div class="sub">244 verified reviews</div></div>
+        </div>
+      </div>
+      <div class="quotes">
+        <div class="qcard"><span class="qm">&rdquo;</span><div class="qstars">★★★★★</div>
+          <p class="qtext">Water heater let go on a Sunday morning. They answered on the second ring, quoted me
+            flat-rate on the phone, and had a new tank in before dinner.</p>
+          <div class="who"><div class="ava">R</div><div><div class="n">Rachel P.</div><div class="r">Homeowner · Cedar Park</div></div></div></div>
+        <div class="qcard"><span class="qm">&rdquo;</span><div class="qstars">★★★★★</div>
+          <p class="qtext">Two other companies wanted to open the slab. Tideline found the leak with a camera in
+            twenty minutes and repaired it for a fraction of the quote.</p>
+          <div class="who"><div class="ava">M</div><div><div class="n">Marcus D.</div><div class="r">Homeowner · Round Rock</div></div></div></div>
+        <div class="qcard"><span class="qm">&rdquo;</span><div class="qstars">★★★★★</div>
+          <p class="qtext">Repiped the whole house during our remodel. On schedule every single day, passed
+            inspection first time, and the price never moved.</p>
+          <div class="who"><div class="ava">A</div><div><div class="n">Ana L.</div><div class="r">Homeowner · Austin</div></div></div></div>
+      </div>
+    </div></div>
+
+    <div class="band-soft sec"><div class="wrap">
+      <div style="text-align:center;max-width:640px;margin:0 auto">
+        <div class="eyebrow">Good to know</div>
+        <h2 class="display" style="font-size:38px;margin-top:12px">Before you call, you probably want to know</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>How does flat-rate pricing work?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></summary><div class="ans">We diagnose first, then quote the whole job before any work starts. You approve a number, and that's the number on the invoice — regardless of how long it takes us.</div></details>
+        <details><summary>Do you really answer at 2am?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></summary><div class="ans">Yes — a real person, not an answering service that takes a message. If it's an active leak or a backup, we dispatch; if it can safely wait for morning, we'll tell you that too.</div></details>
+        <details><summary>Are your plumbers licensed?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></summary><div class="ans">Every plumber on our trucks is licensed, bonded, and background-checked, and we carry full liability insurance. We'll show you documentation on request.</div></details>
+        <details><summary>Will you tear up my yard or slab?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></summary><div class="ans">Only as a last resort. We locate with cameras and acoustic equipment first, and we'll always show you why an invasive repair is necessary before we recommend one.</div></details>
+      </div>
+    </div></div>
+
+    <div class="band-cta sec"><div class="wrap"><div class="cta-grid">
+      <div>
+        <div class="eyebrow" style="color:#9FDCFF">Ready when you are</div>
+        <h2 class="display" style="margin-top:12px">Describe the problem — <span class="em">we'll call you back.</span></h2>
+        <p class="lede" style="margin-top:14px">No hold music and no form that disappears into an inbox. A real
+          person reads it and calls, usually within minutes.</p>
+        <div class="fr">
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Free estimates</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Same-day slots</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Flat-rate pricing</span>
+        </div>
+      </div>
+      <div class="cta-form">
+        <div class="cf-head">Get a callback</div>
+        <div class="cf-sub">Tell us what's going on — we'll call you right back.</div>
+        <label>Name</label><input placeholder="Your name" />
+        <label>Phone</label><input placeholder="(512) 555-0177" />
+        <a class="btn btn-primary">Get a callback</a>
+        <div class="cf-fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2B9C5A" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No obligation · callback in minutes</div>
+      </div>
+    </div></div></div>
+
+    <footer class="ftr"><div class="wrap">
+      <div class="fgrid">
+        <div>
+          <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 3v6a3 3 0 003 3h1v9"/><path d="M14 21h4a3 3 0 003-3v-4"/><circle cx="19" cy="9" r="3"/></svg></span><span>Tideline<small style="color:#7F9AAE">Plumbing Co. · Greater Austin</small></span></a>
+          <p class="fblurb">Licensed residential and light-commercial plumbing across Greater Austin.
+            Emergency service answered around the clock.</p>
+          <div class="fbadges"><span class="fbadge">Master Licensed</span><span class="fbadge">Bonded</span><span class="fbadge">Insured</span></div>
+        </div>
+        <div class="fcol"><h4>Services</h4><a>Leak Repair</a><a>Drain Clearing</a><a>Water Heaters</a><a>Emergency</a></div>
+        <div class="fcol"><h4>Company</h4><a>About Us</a><a>Reviews</a><a>Service Area</a><a>FAQ</a></div>
+        <div class="fcol"><h4>Contact</h4>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(512) 555-0177</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>dispatch@tidelineplumbing.com</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Serving Austin &amp; Travis County</span>
+        </div>
+      </div>
+      <div class="fbot"><span>© 2026 Tideline Plumbing Co. All rights reserved.</span><span>Licensed &amp; insured · M-41xxx · TX</span></div>
+    </div></footer>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PANE 4 · LAWN CARE
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="pane" id="lawn">
+  <div class="caption"><b>Lawn Care — Standard</b> · thesis: <span class="k">a subscription across a calendar, not an emergency</span> ·
+    Figtree 800 · accent <b>#2F7A33</b> forest, <b>#E8B33A</b> sun gold, warm paper ground <b>#FCFCF8</b> ·
+    <b>24px radii, soft natural shadows, zero cool grey or navy on the entire page.</b>
+    <br><b>Differs from HVAC:</b> the hero's urgency line is replaced by a <b>plan picker</b> (weekly /
+    bi-weekly / one-time) with a visible price anchor — the only hero on any vertical that quotes a price ·
+    the <b>stat band becomes a four-season strip</b>, the biggest structural departure in the set ·
+    service cards carry a <b>photo band</b> with the icon pill overlapping the seam · area sits over a
+    <b>mow-stripe</b> field with pill tags · proof uses photo avatars and hairline-only cards ·
+    CTA is a forest band with a gold <b>offer ribbon</b> on the form card &mdash; that ribbon is
+    <b>client-supplied</b> (<code>extensions.offerBadge</code>), picked at onboarding, never invented by us;
+    absent &rarr; not rendered.
+    <br><b>Section order:</b> proof before FAQ.</div>
+
+  <div class="site">
+    <nav class="nav"><div class="wrap inner">
+      <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21c0-7 4-12 9-13-1 8-4 12-9 13z"/><path d="M12 21C12 14 8 9 3 8c1 8 4 12 9 13z"/></svg></span>
+        <span>Fieldstone<small>Lawn &amp; Landscape · Raleigh</small></span></a>
+      <div class="navlinks"><a aria-current="page">Home</a><a>Services</a><a>About</a><a>Contact</a></div>
+      <div class="navcta">
+        <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(919) 555-0164</span></span>
+        <a class="btn btn-primary" href="/contact">Get a quote</a>
+      </div>
+    </div></nav>
+
+    <header class="hero">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="wrap"><div class="inner">
+        <span class="badge">★ 4.9 from 160+ neighbours</span>
+        <h1 class="display">The <span class="em">best lawn</span> on the street, every week.</h1>
+        <p>Mowing, fertilisation, aeration, and seasonal treatments on a schedule you can set and forget — same
+          crew, same day, all year.</p>
+        <div class="picker">
+          <div class="lbl">How often?</div>
+          <div class="opts">
+            <div class="opt on">Weekly<small>Mar–Oct</small></div>
+            <div class="opt">Bi-weekly<small>Year-round</small></div>
+            <div class="opt">One-time<small>Cleanup</small></div>
+          </div>
+          <div class="foot">
+            <div class="price">from $45 <small>/ visit · quarter-acre</small></div>
+            <a class="btn btn-primary" href="/contact?frequency=weekly">See my price →</a>
+          </div>
+        </div>
+        <span class="annot">BEHAVIOUR &middot; not design &mdash; &ldquo;See my price&rdquo; navigates to
+          <b>/contact?frequency=weekly</b>. The contact form renders <b>&lt;LeadForm withMessage&gt;</b> and the
+          optional &ldquo;What do you need?&rdquo; field arrives <b>pre-filled</b> from the picked frequency, e.g.
+          &ldquo;Weekly mowing &mdash; quarter-acre&rdquo;. The client still enters name + email themselves.
+          Needs a new <b>initialMessage</b> prop on LeadForm (@jdd/ui) &mdash; see PLAN &sect;10.</span>
+      </div></div>
+    </header>
+
+    <div class="band-soft sec-sm"><div class="wrap statband">
+      <!-- Trust first. Every value here is CLIENT-SUPPLIED (D4) — we never generate a
+           statistic. Absent → the tile is not rendered; all four absent → no band (D5). -->
+      <div class="grid">
+        <div class="stat-tile"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M3 18h12a4 4 0 004-4V8"/><circle cx="6" cy="18" r="3"/></svg></span>
+          <div class="n">1,400+</div><div class="l">Lawns serviced every week</div></div>
+        <div class="stat-tile"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+          <div class="n">12 yr</div><div class="l">Serving the Raleigh triangle</div></div>
+        <div class="stat-tile"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5 4.7 1.3 6.8L12 17.4 5.9 20.6 7.2 13.8l-5-4.7 6.9-.8z"/></svg></span>
+          <div class="n">4.9★</div><div class="l">From 164 verified reviews</div></div>
+        <div class="stat-tile"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 21s-7-4.5-7-9.5A7 7 0 0119 11.5c0 5-7 9.5-7 9.5z"/><circle cx="12" cy="11" r="2.4"/></svg></span>
+          <div class="n">10</div><div class="l">Neighbourhoods on our routes</div></div>
+      </div>
+
+      <!-- Season rail — demoted from four cards. CLIENT-SUPPLIED: a client who doesn't run a
+           seasonal programme gets no rail, because we won't describe services they don't sell. -->
+      <div class="srail">
+        <div class="eyebrow">Your year with us</div>
+        <div class="rgrid">
+          <div class="c"><div class="s">Spring</div><div class="d">Pre-emergent weed control and the first feed.</div></div>
+          <div class="c"><div class="s">Summer</div><div class="d">Weekly mow at the right height, spot treatment.</div></div>
+          <div class="c"><div class="s">Fall</div><div class="d">Core aeration, overseeding, leaf removal.</div></div>
+          <div class="c"><div class="s">Winter</div><div class="d">Dormant trims, bed cleanup, next year's plan.</div></div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="svc-head">
+        <div class="eyebrow">What we do</div>
+        <h2 class="display" style="font-size:40px;margin-top:12px">Everything your lawn needs, on one invoice.</h2>
+        <p class="lede" style="margin-top:14px">Low-impact products that are safe for kids, pets, and pollinators —
+          and a guarantee that we'll come back if a visit isn't right.</p>
+      </div>
+      <div class="svc-grid">
+        <div class="svc-card"><div class="ph" style="background-image:url('https://picsum.photos/seed/jdd-lawn-mow/700/400')"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18h12a4 4 0 004-4V8"/><circle cx="6" cy="18" r="3"/></svg></span></div>
+          <div class="bd"><h3>Lawn Mowing</h3><p>Weekly or bi-weekly mow, edge, and blow — same day every time, with a text when we're done.</p><div class="svc-tag">Maintenance</div></div></div>
+        <div class="svc-card"><div class="ph" style="background-image:url('https://picsum.photos/seed/jdd-lawn-fert/700/400')"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M7 8l5-5 5 5"/></svg></span></div>
+          <div class="bd"><h3>Fertilisation</h3><p>A programme matched to your grass type and local soil test — not a generic bag off the shelf.</p><div class="svc-tag">Treatments</div></div></div>
+        <div class="svc-card"><div class="ph" style="background-image:url('https://picsum.photos/seed/jdd-lawn-aer/700/400')"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="8" r="2"/><circle cx="17" cy="8" r="2"/><circle cx="12" cy="16" r="2"/></svg></span></div>
+          <div class="bd"><h3>Core Aeration</h3><p>Relieves compaction so water, air, and fertiliser actually reach the roots. Best paired with overseeding.</p><div class="svc-tag">Aeration</div></div></div>
+        <div class="svc-card"><div class="ph" style="background-image:url('https://picsum.photos/seed/jdd-lawn-leaf/700/400')"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c5 4 6 9 2 13s-9 3-11-1c4 1 7-1 8-5s1-6 1-7z"/></svg></span></div>
+          <div class="bd"><h3>Leaf Removal</h3><p>Fall cleanups and ongoing removal so the lawn goes into winter clean instead of smothered.</p><div class="svc-tag">Seasonal</div></div></div>
+        <div class="svc-card"><div class="ph" style="background-image:url('https://picsum.photos/seed/jdd-lawn-weed/700/400')"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19l6-6M11 13c0-4 3-7 8-8-1 5-4 8-8 8z"/></svg></span></div>
+          <div class="bd"><h3>Weed Control</h3><p>Pre- and post-emergent programmes that stop re-infestation instead of just burning the tops off.</p><div class="svc-tag">Weed control</div></div></div>
+        <div class="svc-card"><div class="ph" style="background-image:url('https://picsum.photos/seed/jdd-lawn-edge/700/400')"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16h18M7 16V8M14 16V11"/></svg></span></div>
+          <div class="bd"><h3>Landscape Edging</h3><p>Clean, precise edges along beds, walks, and driveways — the detail that makes the whole yard read finished.</p><div class="svc-tag">Detail</div></div></div>
+      </div>
+    </div></div>
+
+    <div class="band-tint sec area stripes"><div class="wrap"><div class="grid">
+      <div>
+        <div class="eyebrow">Coverage</div>
+        <h2 class="display" style="margin-top:12px">Neighbourhoods we mow every week.</h2>
+        <p class="lede" style="margin-top:16px">We route by neighbourhood, so your crew is already nearby —
+          that's how the same day every week actually holds.</p>
+        <a class="btn-phone" style="color:var(--accent);display:inline-flex;gap:8px;margin-top:18px;font-weight:700" href="tel:+19195550164">(919) 555-0164</a>
+      </div>
+      <div class="tags">
+        <span class="tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Raleigh</span>
+        <span class="tag">Cary</span><span class="tag">Apex</span><span class="tag">Holly Springs</span>
+        <span class="tag">Wake Forest</span><span class="tag">Morrisville</span><span class="tag">Garner</span>
+        <span class="tag">Knightdale</span><span class="tag">Fuquay-Varina</span><span class="tag">Clayton</span>
+      </div>
+    </div></div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="rev-head">
+        <div class="eyebrow">Reviews</div>
+        <h2 class="display" style="font-size:38px;margin-top:12px">The neighbours noticed first.</h2>
+        <div class="rev-agg"><div class="sc">4.9</div><div><div class="st">★★★★★</div><div class="sub">Based on 164 verified reviews</div></div></div>
+      </div>
+      <div class="quotes">
+        <div class="qcard"><div class="qstars">★★★★★</div>
+          <p class="qtext">Third season with them. Same two guys, same day, and my lawn is visibly the best one
+            on the block now. The fall aeration made the difference.</p>
+          <div class="who"><div class="ava" style="background-image:url('https://picsum.photos/seed/jdd-lawn-a1/120/120')"></div><div><div class="n">Beth A.</div><div class="r">Homeowner · Cary</div></div></div></div>
+        <div class="qcard"><div class="qstars">★★★★★</div>
+          <p class="qtext">They text when they're on the way and again when they're done. I have never once had
+            to call and ask where they were.</p>
+          <div class="who"><div class="ava" style="background-image:url('https://picsum.photos/seed/jdd-lawn-a2/120/120')"></div><div><div class="n">Devon H.</div><div class="r">Homeowner · Apex</div></div></div></div>
+        <div class="qcard"><div class="qstars">★★★★★</div>
+          <p class="qtext">We have a dog and a toddler, so the low-impact products mattered to us. The weed
+            programme worked anyway — front yard is completely clear.</p>
+          <div class="who"><div class="ava" style="background-image:url('https://picsum.photos/seed/jdd-lawn-a3/120/120')"></div><div><div class="n">Priya N.</div><div class="r">Homeowner · Wake Forest</div></div></div></div>
+      </div>
+    </div></div>
+
+    <div class="band-soft sec"><div class="wrap">
+      <div style="text-align:center;max-width:620px;margin:0 auto">
+        <div class="eyebrow">Good to know</div>
+        <h2 class="display" style="font-size:38px;margin-top:12px">Questions before you book</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>Am I locked into a contract?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">No. Weekly and bi-weekly service is month to month — cancel any time with a week's notice. Seasonal treatment programmes are priced per application, not per year.</div></details>
+        <details><summary>What happens if it rains on my day?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">We text you the same morning and move you to the next dry day, usually within 48 hours. Mowing a saturated lawn tears the roots, so we won't do it just to keep a slot.</div></details>
+        <details><summary>Are the products safe for pets and kids?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">We use low-impact fertilisers and targeted treatments, and we'll tell you the exact re-entry window for anything applied — typically a couple of hours once dry.</div></details>
+        <details><summary>Do you do one-time cleanups?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Yes — spring and fall cleanups, overgrown-lot resets, and pre-sale tidy-ups, with no obligation to start a recurring plan afterwards.</div></details>
+      </div>
+    </div></div>
+
+    <div class="band-cta sec"><div class="wrap"><div class="cta-grid">
+      <div>
+        <div class="eyebrow" style="color:var(--sun)">Booking now</div>
+        <h2 class="display" style="margin-top:12px">Get your price in a day — <span class="em">first visit on us.</span></h2>
+        <p class="lede" style="margin-top:14px">Tell us the address and we'll measure it from satellite, send a
+          flat weekly price, and put you on the route.</p>
+        <div class="fr">
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No contract</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Fully insured</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Satisfaction guarantee</span>
+        </div>
+      </div>
+      <div class="cta-form">
+        <!-- Offer ribbon — CLIENT-SUPPLIED (`extensions.offerBadge`), never ours to invent.
+             Collected at onboarding from a short per-vertical pick list + a free-text option.
+             Absent → the ribbon is not rendered (D5). See PLAN §10.2. -->
+        <span class="ribbon">First mow free</span>
+        <div class="cf-head">Get my weekly price</div>
+        <div class="cf-sub">We'll call with a flat quote — usually same day.</div>
+        <label>Name</label><input placeholder="Your name" />
+        <label>Phone</label><input placeholder="(919) 555-0164" />
+        <a class="btn btn-primary">Get my price</a>
+        <div class="cf-fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2F7A33" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No obligation · no contract</div>
+      </div>
+    </div></div></div>
+
+    <footer class="ftr"><div class="wrap">
+      <div class="fgrid">
+        <div>
+          <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21c0-7 4-12 9-13-1 8-4 12-9 13z"/><path d="M12 21C12 14 8 9 3 8c1 8 4 12 9 13z"/></svg></span><span>Fieldstone<small style="color:#8A9E8A">Lawn &amp; Landscape · Raleigh</small></span></a>
+          <p class="fblurb">Weekly lawn maintenance, seasonal treatment programmes, and landscape detail across
+            the Raleigh triangle.</p>
+          <div class="fbadges"><span class="fbadge">Fully Insured</span><span class="fbadge">NC Pesticide Licensed</span><span class="fbadge">Locally Owned</span></div>
+        </div>
+        <div class="fcol"><h4>Services</h4><a>Lawn Mowing</a><a>Fertilisation</a><a>Core Aeration</a><a>Leaf Removal</a></div>
+        <div class="fcol"><h4>Company</h4><a>About Us</a><a>Reviews</a><a>Service Area</a><a>FAQ</a></div>
+        <div class="fcol"><h4>Contact</h4>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(919) 555-0164</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>hello@fieldstonelawn.com</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Serving Raleigh &amp; Wake County</span>
+        </div>
+      </div>
+      <div class="fbot"><span>© 2026 Fieldstone Lawn &amp; Landscape. All rights reserved.</span><span>Insured · NC pesticide lic. 2xxxx</span></div>
+    </div></footer>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PANE 5 · CAR DETAILING
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="pane" id="detail">
+  <div class="caption"><b>Car Detailing — Standard</b> · thesis: <span class="k">finish only reads against black</span> ·
+    Bricolage Grotesque 800 · <b>dark-first</b> ground <b>#0D0E12</b>, champagne <b>#C9A14B</b> as hairlines and
+    numerals · <b>glass cards, no drop shadows anywhere</b>, 8–12px radii, eyebrows tracked to .26em.
+    <br><b>Differs from HVAC:</b> the only template whose <b>page ground is dark</b> · hero is <b>centred and
+    vignetted</b> with a gold hairline framing it, not a left-anchored scrim · stat band is a thin hairline
+    <b>strip</b>, not tiles · services are <b>package cards with a visible price-from</b>, the only vertical that
+    prices on the home page · area is a centred <b>mobile-radius</b> statement with a concentric ring and a
+    gold-dotted town run, no chips · proof is <b>two large quotes</b>, not three cards · FAQ is pure hairline
+    rows · <b>the final CTA is the one LIGHT band on the page</b> with a dark form card — the inversion is the punch.
+    <br><b>Flag:</b> a dark-ground palette needs an explicit exemption in <code>palette-contrast.test.mjs</code>,
+    the same way <code>hvac.ts</code> documents one today.</div>
+
+  <div class="site">
+    <nav class="nav"><div class="wrap inner">
+      <a class="logo"><span class="mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 13l2-5a3 3 0 013-2h8a3 3 0 013 2l2 5v4H3z"/><circle cx="7.5" cy="17" r="1.6"/><circle cx="16.5" cy="17" r="1.6"/></svg></span>
+        <span>Lustre<small>Auto Detail Studio · Scottsdale</small></span></a>
+      <div class="navlinks"><a aria-current="page">Home</a><a>Services</a><a>About</a><a>Contact</a></div>
+      <div class="navcta">
+        <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(480) 555-0129</span></span>
+        <a class="btn btn-primary" href="/contact">Book a detail</a>
+      </div>
+    </div></nav>
+
+    <header class="hero">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="wrap"><div class="inner">
+        <div class="hair"></div>
+        <div class="eyebrow">Ceramic coating · Paint correction · Mobile</div>
+        <h1 class="display">Finished to a standard you can <span class="em">see in the reflection.</span></h1>
+        <p>Interior restoration, multi-stage paint correction, and professional ceramic coating — at our studio
+          or in your driveway.</p>
+        <div class="cta">
+          <a class="btn btn-primary btn-phone" href="tel:+14805550129"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(480) 555-0129</a>
+          <a class="btn btn-ghost" href="/services">See packages →</a>
+        </div>
+        <div class="fr"><span>Certified detailers</span><span>Pro-grade only</span><span>Mobile service</span><span>Satisfaction guaranteed</span></div>
+      </div></div>
+    </header>
+
+    <div class="strip"><div class="wrap"><div class="grid">
+      <div class="c"><div class="n">2,400+</div><div class="l">Vehicles detailed</div></div>
+      <div class="c"><div class="n">5 yr</div><div class="l">Coating durability</div></div>
+      <div class="c"><div class="n">5.0★</div><div class="l">From 190 reviews</div></div>
+      <div class="c"><div class="n">100%</div><div class="l">Mobile capable</div></div>
+    </div></div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="svc-head">
+        <div class="eyebrow" style="color:var(--accent)">Packages</div>
+        <h2 class="display" style="font-size:40px;margin-top:14px;color:#fff">Pick the level of finish.</h2>
+        <p class="lede" style="margin:14px auto 0">Every package is quoted on the vehicle's actual condition —
+          the numbers below are the honest starting point, not a teaser.</p>
+      </div>
+      <div class="svc-grid">
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 18v3M16 18v3"/></svg></div>
+          <h3>Interior Detail</h3><p>Full extraction of every surface — vacuum, steam, leather conditioning, and odour elimination at the source.</p>
+          <div class="svc-foot"><div class="svc-price">$249<small>starting at</small></div><span class="svc-tag">Interior</span></div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 17c4-8 10-8 14 0"/><circle cx="12" cy="9" r="2"/></svg></div>
+          <h3>Exterior Hand Wash</h3><p>Two-bucket wash, chemical and mechanical decontamination, then a finishing sealant. Never an automatic tunnel.</p>
+          <div class="svc-foot"><div class="svc-price">$129<small>starting at</small></div><span class="svc-tag">Exterior</span></div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l8 4v6c0 5-4 7-8 8-4-1-8-3-8-8V7z"/></svg></div>
+          <h3>Ceramic Coating</h3><p>Professional-grade coating with a 2–5 year warranty. Washing becomes trivial and the gloss does not fall off.</p>
+          <div class="svc-foot"><div class="svc-price">$899<small>starting at</small></div><span class="svc-tag">Protection</span></div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="6"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></div>
+          <h3>Paint Correction</h3><p>Single or multi-stage machine polishing to remove swirls, scratches, and oxidation from the clear coat.</p>
+          <div class="svc-foot"><div class="svc-price">$549<small>starting at</small></div><span class="svc-tag">Correction</span></div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 8V6h10v2"/></svg></div>
+          <h3>Engine Bay Detail</h3><p>Safe degrease and dressing of the whole bay — the detail that tells a buyer the car was looked after.</p>
+          <div class="svc-foot"><div class="svc-price">$119<small>starting at</small></div><span class="svc-tag">Engine bay</span></div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 12h11l3-4h4v8H3z"/><circle cx="7" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></svg></div>
+          <h3>Mobile Service</h3><p>The full studio arrives at your home or office — own water and power, no access needed beyond a parking space.</p>
+          <div class="svc-foot"><div class="svc-price">No fee<small>within 25 mi</small></div><span class="svc-tag">Mobile</span></div></div>
+      </div>
+    </div></div>
+
+    <div class="band-soft sec area">
+      <svg class="rings" viewBox="0 0 400 400" fill="none" stroke="currentColor" stroke-width="1">
+        <circle cx="200" cy="200" r="70"/><circle cx="200" cy="200" r="118"/><circle cx="200" cy="200" r="166"/><circle cx="200" cy="200" r="198"/>
+      </svg>
+      <div class="wrap"><div class="inner">
+        <div class="eyebrow" style="color:var(--accent)">Mobile radius</div>
+        <h2 class="display">We come to you, 25 miles out from the studio.</h2>
+        <p class="lede" style="margin:16px auto 0">No mobile fee inside the ring. Beyond it, call — for coating
+          and correction work we travel further.</p>
+        <div class="run">
+          <span>Scottsdale</span><span>Paradise Valley</span><span>Phoenix</span><span>Tempe</span>
+          <span>Mesa</span><span>Chandler</span><span>Gilbert</span><span>Fountain Hills</span>
+          <span>Cave Creek</span><span>Carefree</span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="sec"><div class="wrap">
+      <div class="rev-head">
+        <div class="eyebrow" style="color:var(--accent)">Reviews</div>
+        <div class="sc">5.0</div>
+        <div class="st">★★★★★</div>
+        <div class="sub">190 verified reviews · Google &amp; Yelp</div>
+      </div>
+      <div class="q2">
+        <div class="qcard"><div class="qstars">★★★★★</div>
+          <p class="qtext">&ldquo;Three-year-old black paint full of swirls. After the two-stage correction and
+            coating it looks better than the day I collected it. They sent photos at every stage.&rdquo;</p>
+          <div class="who"><div class="ava" style="background-image:url('https://picsum.photos/seed/jdd-detail-a1/120/120')"></div><div><div class="n">Jordan V.</div><div class="r">Porsche Macan · Paradise Valley</div></div></div></div>
+        <div class="qcard"><div class="qstars">★★★★★</div>
+          <p class="qtext">&ldquo;Came to my office and did the interior while I worked. Two kids' worth of
+            damage, gone. I genuinely could not tell the car had ever had a car seat in it.&rdquo;</p>
+          <div class="who"><div class="ava" style="background-image:url('https://picsum.photos/seed/jdd-detail-a2/120/120')"></div><div><div class="n">Alicia R.</div><div class="r">Volvo XC90 · Tempe</div></div></div></div>
+      </div>
+    </div></div>
+
+    <div class="band-tint sec"><div class="wrap">
+      <div style="text-align:center;max-width:620px;margin:0 auto">
+        <div class="eyebrow" style="color:var(--accent)">Good to know</div>
+        <h2 class="display" style="font-size:36px;margin-top:14px;color:#fff">Before you book</h2>
+      </div>
+      <div class="faqrows">
+        <details open><summary>How long does a ceramic coating actually last?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Two to five years depending on the product tier and how the car is washed and stored. We'll tell you which tier is honest for your use, and the maintenance wash schedule that keeps the warranty valid.</div></details>
+        <details><summary>Do I need paint correction before coating?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Usually yes. A coating locks in whatever is underneath it, including swirls — so correcting first is the difference between a glossy finish and a sealed-in flawed one. On a new car it can sometimes be skipped.</div></details>
+        <details><summary>What do you need for mobile service?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">A parking space and shade if there's any going. We carry our own water and power. Coating work is studio-only — it needs controlled temperature and dust.</div></details>
+        <details><summary>How long will my car be with you?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">An interior or exterior detail is half a day. Correction is a full day. Correction plus coating is two days, because the coating needs to cure before it leaves.</div></details>
+      </div>
+    </div></div>
+
+    <div class="band-cta sec"><div class="wrap"><div class="cta-grid">
+      <div>
+        <div class="eyebrow">Booking this month</div>
+        <h2 class="display" style="margin-top:14px">Send us the car — <span class="em">we'll quote it honestly.</span></h2>
+        <p class="lede" style="margin-top:14px">Tell us the vehicle and what's bothering you. We'll call back with
+          the package that actually fits, and say so if a cheaper one is enough.</p>
+        <div class="fr">
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Free quote</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No mobile fee in 25 mi</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Satisfaction guarantee</span>
+        </div>
+      </div>
+      <div class="cta-form">
+        <div class="cf-head">Request a quote</div>
+        <div class="cf-sub">Tell us what's going on — we'll call you right back.</div>
+        <label>Name</label><input placeholder="Your name" />
+        <label>Phone</label><input placeholder="(480) 555-0129" />
+        <a class="btn btn-primary">Request a quote</a>
+        <div class="cf-fine"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A14B" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No obligation · same-day callback</div>
+      </div>
+    </div></div></div>
+
+    <footer class="ftr"><div class="wrap">
+      <div class="fgrid">
+        <div>
+          <a class="logo"><span class="mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 13l2-5a3 3 0 013-2h8a3 3 0 013 2l2 5v4H3z"/><circle cx="7.5" cy="17" r="1.6"/><circle cx="16.5" cy="17" r="1.6"/></svg></span><span>Lustre<small style="color:#6C7686">Auto Detail Studio · Scottsdale</small></span></a>
+          <p class="fblurb">Certified paint correction, ceramic coating, and interior restoration — studio and
+            mobile, across the Phoenix valley.</p>
+          <div class="fbadges"><span class="fbadge">IDA Certified</span><span class="fbadge">Coating Accredited</span><span class="fbadge">Insured</span></div>
+        </div>
+        <div class="fcol"><h4>Packages</h4><a>Interior Detail</a><a>Paint Correction</a><a>Ceramic Coating</a><a>Mobile Service</a></div>
+        <div class="fcol"><h4>Studio</h4><a>About Us</a><a>Reviews</a><a>Mobile Radius</a><a>FAQ</a></div>
+        <div class="fcol"><h4>Contact</h4>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(480) 555-0129</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>studio@lustredetail.com</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Scottsdale · mobile 25 mi</span>
+        </div>
+      </div>
+      <div class="fbot"><span>© 2026 Lustre Auto Detail Studio. All rights reserved.</span><span>Insured · AZ</span></div>
+    </div></footer>
+  </div>
+</section>
+
+</main>
+
+<script>
+const tabs = [...document.querySelectorAll('.tabbar button')];
+tabs.forEach(b => b.addEventListener('click', () => {
+  tabs.forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === b.dataset.t));
+  window.scrollTo({ top: 0 });
+}));
+</script>
+</body>
+</html>
