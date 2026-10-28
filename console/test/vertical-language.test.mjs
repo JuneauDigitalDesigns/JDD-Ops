@@ -13,6 +13,14 @@ const templateIds = new Set(PAGE_TEMPLATES.map((t) => t.id));
 const homeTemplateIds = new Set(PAGE_TEMPLATES.filter((t) => t.pageType === 'home').map((t) => t.id));
 const langs = Object.entries(VERTICAL_LANGUAGES);
 
+// These verticals intentionally use a pure-white (or, for car-detailing, a dark) ground — the
+// bespoke vertical templates (design/vertical-templates-v1/home-mockups.html) deliberately drop
+// decision 9's shared warm ground for these designs. assertWarm is therefore scoped out for them,
+// per the 2026-10-28 resolution (PLAN §2 / §11 resolution log — "test yields to the approved
+// designs"). car-detailing's dark palette already clears assertWarm unmodified and is NOT listed
+// here; if it ever needs to be, that is a real finding, not a rubber stamp.
+const WARMTH_EXEMPT = new Set(['hvac', 'roofing', 'plumbing']);
+
 test('every pairingId exists in FONT_PAIRINGS', () => {
   for (const [v, lang] of langs) {
     assert.ok(pairingIds.has(lang.pairingId), `${v}: pairingId '${lang.pairingId}' is not a FONT_PAIRINGS id`);
@@ -39,7 +47,7 @@ test('no vertical references a template outside PAGE_TEMPLATES (no private templ
 test('every palette clears the Phase 2 warmth + contrast assertions', () => {
   // Reuses the real @jdd/ui derivation via contrast.mjs rather than restating the maths.
   for (const [v, lang] of langs) {
-    assertWarm(lang.palette, v);
+    if (!WARMTH_EXEMPT.has(v)) assertWarm(lang.palette, v);
     assertPaletteAA(lang.palette, v);
   }
 });
