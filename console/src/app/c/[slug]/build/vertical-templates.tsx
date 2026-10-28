@@ -92,6 +92,54 @@ function hvacTemplate(): SiteComposition {
   };
 }
 
+/**
+ * Roofing — vertical-templates-v1 Phase 5 (design/EXEC-vertical-templates-v1.md), the
+ * "structural / weatherproof" thesis from design/vertical-templates-v1/home-mockups.html's
+ * #roofing pane. Home order matches that mockup: FAQ before testimonials — the one vertical in
+ * this programme that keeps that order (every other new vertical puts testimonials first, D14
+ * resolution log). Services/About/Contact open with RoofingPageHeader, same contract as HVAC.
+ */
+function roofingTemplate(): SiteComposition {
+  return {
+    chrome: {
+      nav:    { id: newSectionId(), categoryId: 'nav', name: 'RoofingNav' },
+      footer: { id: newSectionId(), categoryId: 'footer', name: 'RoofingFooter' },
+      // Chrome SEO is shared, not per-vertical (exactly as hvacTemplate() does it).
+      seo:    { id: newSectionId(), categoryId: 'seo', name: 'SeoLocalBusiness' },
+    },
+    pages: [
+      page('home', 'roofing:home', [
+        S('hero', 'RoofingHero'),
+        S('stats', 'RoofingStats'),
+        S('services', 'RoofingServices'),
+        S('trust', 'RoofingTrust'),
+        S('faq', 'RoofingFaq'),
+        S('testimonials', 'RoofingReviews'),
+        S('finalCta', 'RoofingFinalCta'),
+      ]),
+      page('services', 'roofing:services', [
+        S('pageHeader', 'RoofingPageHeader'),
+        S('services', 'RoofingServices'),
+        S('faq', 'RoofingFaq'),
+        S('finalCta', 'RoofingFinalCta'),
+      ]),
+      page('about', 'roofing:about', [
+        S('pageHeader', 'RoofingPageHeader'),
+        S('about', 'RoofingAbout'),
+        S('trust', 'RoofingTrust'),
+        S('testimonials', 'RoofingReviews'),
+        S('finalCta', 'RoofingFinalCta'),
+      ]),
+      page('contact', 'roofing:contact', [
+        S('pageHeader', 'RoofingPageHeader'),
+        S('contact', 'RoofingContact'),
+        S('faq', 'RoofingFaq'),
+        S('finalCta', 'RoofingFinalCta'),
+      ]),
+    ],
+  };
+}
+
 export type VerticalTemplate = {
   /** Operator-facing name shown on the Studio's single template card. */
   label: string;
@@ -101,6 +149,7 @@ export type VerticalTemplate = {
 
 export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> = {
   hvac: { label: 'HVAC — Standard', build: hvacTemplate },
+  roofing: { label: 'Roofing — Standard', build: roofingTemplate },
 };
 
 /** The template for a vertical, or null when none is built yet. */

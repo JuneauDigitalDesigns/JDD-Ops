@@ -101,6 +101,31 @@ test('the HVAC home mirrors the Northstar Standard tab (bespoke hero/stats/servi
   }
 });
 
+test('Roofing services, about, and contact use the standard sections', () => {
+  const pages = Object.fromEntries(
+    applyVerticalTemplate('roofing').pages.map((p) => [p.route, p.sections.map((s) => s.name)]),
+  );
+  assert.deepEqual(pages.services, ['RoofingPageHeader', 'RoofingServices', 'RoofingFaq', 'RoofingFinalCta']);
+  assert.deepEqual(pages.about, ['RoofingPageHeader', 'RoofingAbout', 'RoofingTrust', 'RoofingReviews', 'RoofingFinalCta']);
+  assert.deepEqual(pages.contact, ['RoofingPageHeader', 'RoofingContact', 'RoofingFaq', 'RoofingFinalCta']);
+});
+
+test('the Roofing home section order exactly matches home-mockups.html #roofing (FAQ before testimonials)', () => {
+  // The one vertical in this programme that keeps FAQ before testimonials — every other new
+  // vertical puts testimonials first (D14 resolution log). A generic "all sections present"
+  // check would not catch an accidental reorder; this pins the exact sequence.
+  const home = applyVerticalTemplate('roofing').pages.find((p) => p.route === '');
+  assert.deepEqual(home.sections.map((s) => s.name), [
+    'RoofingHero',
+    'RoofingStats',
+    'RoofingServices',
+    'RoofingTrust',
+    'RoofingFaq',
+    'RoofingReviews',
+    'RoofingFinalCta',
+  ]);
+});
+
 test('the HVAC home section order exactly matches the Northstar Standard tab (D6c)', () => {
   // `.includes` above only checks presence, not sequence, so it could not have caught the
   // reviews/faq swap this test exists to pin. design/northstar-standard/mockups.html orders

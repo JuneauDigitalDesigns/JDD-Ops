@@ -81,6 +81,41 @@ export const VERTICAL_LANGUAGES: Record<string, VerticalLanguage> = {
     },
     rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
   },
+  /**
+   * Roofing — vertical-templates-v1 Phase 5. Transcribed from the approved mockup's own CSS
+   * custom properties (design/vertical-templates-v1/home-mockups.html #roofing), palette
+   * revised 2026-10-28 so this vertical shares no hue family with HVAC's navy/steel (D1):
+   * bitumen brown-charcoal structural dark over a warm grey ground, clay accent, hazard amber
+   * reserved for urgency only (amber/bitumen/ink-faint are literal hex in the Roofing*
+   * components, same as HVAC's gold/navy/steel — they are not standard palette slots).
+   * `proofSkin` is unused by this vertical's bespoke RoofingReviews (fixed design, no skin —
+   * same as every Hvac* component); kept populated because the type requires a value.
+   */
+  roofing: {
+    pairingId: 'archivo',
+    palette: {
+      accent: '#B4512A',
+      accentFg: '#FFFFFF',
+      bg: '#FFFFFF',
+      bgSoft: '#F5F2EF',
+      ink: '#231D1A',
+      inkSoft: '#5B4F48',
+      rule: '#E2D9D2',
+    },
+    photography: {
+      subjects: [
+        'a roofer installing architectural shingles on a residential roof',
+        'a crew tearing off old shingles before a re-roof',
+        'a technician photographing hail damage for an insurance claim',
+        'a branded work truck in a residential driveway',
+        'seamless gutters being installed along a roofline',
+        'a roof inspection with a clipboard and a drone overhead',
+      ],
+      grade: 'house',
+      ratioBias: 'wide',
+    },
+    rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
+  },
 };
 
 /** The language for a vertical id, falling back to HVAC when the id has no entry yet (every

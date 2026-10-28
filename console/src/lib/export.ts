@@ -14,7 +14,8 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { routePath, styleKeyFor, rhythmClass, type SectionRhythm, type SiteComposition } from '@/lib/pages';
+import { routePath, styleKeyFor, rhythmClass, navHref, type SectionRhythm, type SiteComposition } from '@/lib/pages';
+import { reconcileRoutes } from '@/lib/composition-manifest';
 import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
@@ -32,6 +33,22 @@ import { VERTICAL_PRESETS } from '@/lib/verticals';
 const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 
 /**
+ * The provenance stamp `writeSiteContent` puts at the top of a client repo's site.ts, telling
+ * onboard.js that this file is console-authored content it must not splice over.
+ *
+ * A SECOND COPY of `CONSOLE_CONTENT_MARKER` from jdd-ops/lib/provisioned-fields.js, and the
+ * only duplicated value in this contract. The rest of the module is reached by a dynamic
+ * import (see provisionedFields.ts), but that is necessarily async and `writeSiteContent` is
+ * synchronous with several callers. So the string is mirrored here and
+ * `console/test/provisioned-fields.test.mjs` asserts the two are identical — the same
+ * arrangement, for the same reason, as the ring-window constants in envFields.ts.
+ *
+ * If they ever diverge, onboard.js stops recognising console-authored files and silently goes
+ * back to reverting every export. The test is what makes that impossible rather than unlikely.
+ */
+export const CONSOLE_CONTENT_MARKER = '@jdd:content-source console-export';
+
+/**
  * THE allowlist of category -> component file names. Guards against path traversal via
  * untrusted input, and is what `validateEntries` enforces on export.
  *
@@ -47,25 +64,32 @@ const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
  * app/c/[slug]/build/categories.tsx, or the studio will offer something export refuses.
  */
 export const CATALOG: Record<string, readonly string[]> = {
-  nav:          ['NavMinimal', 'NavEmergencyBar'],
+  // `Hvac*` entries are the bespoke, pixel-faithful vertical-template components mirrored from
+  // the Northstar "Home — Standard" mockup (see src/components/CATALOG-LEGACY.md). Fixed designs,
+  // no `skin`, composed by VERTICAL_TEMPLATES. The Standard tab defines hero/stat-band/services/
+  // service-area/FAQ; testimonials/CTA/footer/nav reuse the existing ("already working") catalog.
+  // `Roofing*` entries are vertical-templates-v1's second bespoke set (design/EXEC-vertical-
+  // templates-v1.md Phase 5), mirrored from design/vertical-templates-v1/home-mockups.html's
+  // #roofing pane. Same contract as Hvac*: fixed designs, no skin, composed by VERTICAL_TEMPLATES.
+  nav:          ['NavMinimal', 'NavEmergencyBar', 'HvacNav', 'RoofingNav'],
   // v2.2: the lightweight header that opens a non-home page. Reads its copy from
   // SiteContent.subpages[route].header, not a global CONTENT import.
-  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal'],
-  hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap'],
-  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea'],
+  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader'],
+  hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap', 'HvacHero', 'RoofingHero'],
+  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust'],
   // New section category (decision 18). Reads about.pillars; no new schema field.
   differentiators: ['DifferentiatorsIndex', 'DifferentiatorsPanels', 'DifferentiatorsRail'],
-  about:        ['AboutFeature', 'AboutStory', 'AboutSticky'],
-  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight'],
+  about:        ['AboutFeature', 'AboutStory', 'AboutSticky', 'HvacAbout', 'RoofingAbout'],
+  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight', 'HvacServices', 'RoofingServices'],
   // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.
   work:         ['RecentJobsGrid', 'BeforeAfter', 'WorkSpotlight', 'WorkMasonry'],
   // New section category (decision 18). Reads about.stats; StatsBand is the one count-up.
-  stats:        ['StatsBand', 'StatsLedger'],
-  faq:          ['FaqAccordion', 'FaqStickyAside', 'FaqIndex'],
-  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsMarquee'],
-  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit'],
-  contact:      ['ContactSplit', 'ContactCardOverlap', 'ContactInlineStrip'],
-  footer:       ['FooterColumns', 'FooterMinimal'],
+  stats:        ['StatsBand', 'StatsLedger', 'HvacStatBand', 'RoofingStats'],
+  faq:          ['FaqAccordion', 'FaqStickyAside', 'FaqIndex', 'HvacFaq', 'RoofingFaq'],
+  testimonials: ['TestimonialsGrid', 'TestimonialsCarousel', 'TestimonialsMarquee', 'HvacReviews', 'RoofingReviews'],
+  finalCta:     ['FinalCtaBanner', 'FinalCtaSimple', 'FinalCtaSplit', 'HvacFinalCta', 'RoofingFinalCta'],
+  contact:      ['ContactSplit', 'ContactCardOverlap', 'ContactInlineStrip', 'HvacContact', 'RoofingContact'],
+  footer:       ['FooterColumns', 'FooterMinimal', 'HvacFooter', 'RoofingFooter'],
   seo:          ['SeoDefault', 'SeoLocalBusiness'],
 };
 
@@ -498,6 +522,17 @@ function skinAttr(ref: { name: string; skin?: string }): string {
   return ref.skin && supportsSkin(ref.name) ? ` skin="${ref.skin}"` : '';
 }
 
+/**
+ * Every bespoke vertical-template nav. Each one takes `currentPath` instead of `skin` (fixed
+ * designs; no skin at all) so wirePages can mark the active nav link per page.
+ *
+ * Was a single `=== 'HvacNav'` string comparison until roofing (vertical-templates-v1 Phase 5)
+ * added a second vertical nav — at a single entry there was no way to tell "the one special
+ * case" from "the general rule", so the comparison just grew into a hardcoded string instead of
+ * a set. A set is the version that scales to the remaining three without another rewrite.
+ */
+const VERTICAL_NAVS = new Set(['HvacNav', 'RoofingNav']);
+
 /** The neutral header baked into a subpage when SiteContent.subpages[route] is absent, so a
  *  page whose header copy hasn't been generated still builds and renders. */
 function fallbackHeaderLiteral(label: string): string {
@@ -587,7 +622,12 @@ export function wirePages(
       `  return (`,
       `    <main className="font-sans text-ink">`,
       `      {/* @studio:body:start */}`,
-      ...emit(`<${comp.chrome.nav.name}${skinAttr(comp.chrome.nav)} />`, comp.chrome.nav),
+      ...emit(
+        VERTICAL_NAVS.has(comp.chrome.nav.name)
+          ? `<${comp.chrome.nav.name} currentPath="${navHref(page.route)}" />`
+          : `<${comp.chrome.nav.name}${skinAttr(comp.chrome.nav)} />`,
+        comp.chrome.nav,
+      ),
     );
     for (const ref of page.sections) {
       if (ref.categoryId === 'pageHeader') {
@@ -610,46 +650,29 @@ export function wirePages(
     writeFileSync(dest, lines.join('\n') + '\n', 'utf8');
   }
 
-  pruneStaleRoutes(repoDir, comp);
-}
-
-/**
- * Delete `src/app/<route>/page.tsx` (and its now-empty dir) for any route generated by a previous
- * export that this composition no longer has. Tracked in `.studio-pages.json` at the repo root.
- */
-function pruneStaleRoutes(repoDir: string, comp: SiteComposition): void {
-  const stateFile = resolve(repoDir, '.studio-pages.json');
-  const current = comp.pages.map((p) => p.route).filter((r) => r !== '');
-  let prev: string[] = [];
-  if (existsSync(stateFile)) {
-    try {
-      const parsed = JSON.parse(readFileSync(stateFile, 'utf8')) as unknown;
-      if (Array.isArray(parsed)) prev = parsed.filter((r): r is string => typeof r === 'string');
-    } catch {
-      /* unreadable state file — treat as no prior routes */
-    }
-  }
-  for (const route of prev) {
-    if (current.includes(route) || !route) continue;
-    try {
-      rmSync(resolve(repoDir, 'src', 'app', route), { recursive: true, force: true });
-    } catch {
-      /* best-effort cleanup */
-    }
-  }
-  writeFileSync(stateFile, JSON.stringify(current) + '\n', 'utf8');
+  // Prunes routes this composition dropped, then records it as the new manifest. Lives in
+  // composition-manifest.ts because that module owns "what did the last export write" — and
+  // because, unlike this file, it is reachable from a test. See reconcileRoutes.
+  reconcileRoutes(repoDir, comp);
 }
 
 /**
  * Copy the preview's v2.1 site.ts into the client repo, overwriting the
  * template's minimal placeholder schema so exported repos build with rich data.
  */
-export function copySiteData(repoRoot: string, slug: string): void {
+export function copySiteData(
+  repoRoot: string,
+  slug: string,
+  transform: (c: SiteContent) => SiteContent = (c) => c,
+): void {
   // Fallback path (no edited content, no vertical preset): seed the client repo with the
   // studio's preview CONTENT. Routed through writeSiteContent so the output is self-contained
   // (inlines SITE_TYPES_SOURCE) — the console's own site.ts now only re-exports @jdd/schema
   // types and must never be copied verbatim into a client repo.
-  writeSiteContent(repoRoot, slug, CONTENT);
+  //
+  // `transform` is how the export route carries provisioned fields through this branch too.
+  // Defaulted to identity so the other callers (and tests) are unaffected.
+  writeSiteContent(repoRoot, slug, transform(CONTENT));
 }
 
 /**
@@ -665,9 +688,38 @@ export function copySiteData(repoRoot: string, slug: string): void {
 export function writeSiteContent(repoRoot: string, slug: string, content: SiteContent): void {
   const { copyBrief: _copyBrief, ...restMeta } = content._meta;
   const stripped: SiteContent = { ...content, _meta: restMeta };
-  const output = `${SITE_TYPES_SOURCE}\nexport const CONTENT: SiteContent = ${JSON.stringify(stripped, null, 2)};\n`;
+  // Provenance stamp, read by onboard.js (lib/provisioned-fields.js) to decide whether this
+  // file is console-authored content it must leave alone. Without it, step 3 of every
+  // provisioning run splices clients/{slug}/site.ts over the top and reverts the operator's
+  // copy, nav and imagery to the raw intake.
+  const output =
+    `// ${CONSOLE_CONTENT_MARKER}\n` +
+    `${SITE_TYPES_SOURCE}\nexport const CONTENT: SiteContent = ${JSON.stringify(stripped, null, 2)};\n`;
   const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
   writeFileSync(dest, output, 'utf8');
+}
+
+/**
+ * The SiteContent currently in the client repo's site.ts, or null when there isn't a readable
+ * one (no repo yet, a template placeholder, a hand-edited file).
+ *
+ * Exists so the exporter can carry PROVISIONED fields forward. The payload the studio sends
+ * holds the owner's intake phone in `brand.phone`; the repo holds the published Twilio number
+ * that provisioning put there. Reading the repo is the only way to know the latter — it is not
+ * in the draft, not in clients/{slug}/site.ts, and not in the studio's state.
+ */
+export function readRepoSiteContent(
+  repoRoot: string,
+  slug: string,
+  extract: (src: string) => Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const file = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
+  if (!existsSync(file)) return null;
+  try {
+    return extract(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 /** @deprecated Use writeSiteContent. Kept as a thin alias for the vertical-preset path. */

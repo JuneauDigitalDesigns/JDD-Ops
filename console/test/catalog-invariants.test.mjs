@@ -12,8 +12,12 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SKINS } from '@jdd/ui/skins';
+// Straight from @jdd/ui, not through the ../src/lib/skins.ts shim: that file is a bare
+// `export * from '@jdd/ui/skins'`, and the tsx loader does not surface named exports through
+// a star re-export of a .ts source inside node_modules. Same reason SKINS is imported this way.
+import { SKINS, isValidSkin, supportsSkin } from '@jdd/ui/skins';
 import { ARCHETYPES, COLLISION_EXEMPT_CATEGORIES } from '../src/lib/archetypes.ts';
+import { PAGE_TEMPLATES, defaultCompositionFor } from '../src/app/c/[slug]/build/page-templates.tsx';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG_DIR = path.join(ROOT, 'src/components/catalog');
@@ -38,6 +42,15 @@ function components() {
 
 const ALL = components();
 
+// Bespoke whole-site vertical-template components (meta `verticalTemplate: true`, composed by
+// VERTICAL_TEMPLATES — see src/components/CATALOG-LEGACY.md). They are pinned to an approved,
+// human-designed mockup rather than assembled from the generic catalog, so the anti-slop
+// HEURISTICS that exist to keep the generic catalog from reading as AI-made do NOT apply to them:
+// archetype variety (decision 23), no-gradients (30b) and no-uniform-three-up (30a). The mockup
+// deliberately uses a warm hero wash, a dark-CTA glow and three-up grids. Every UNIVERSAL check
+// still applies (img dimensions, chrome anchors, accent-fg/contrast, "use client", lead-form).
+const isVerticalTemplate = (c) => /verticalTemplate:\s*true/.test(c.src);
+
 test('catalog is non-empty (guards against a broken glob silently passing everything)', () => {
   assert.ok(ALL.length > 20, `expected >20 components, found ${ALL.length}`);
 });
@@ -55,6 +68,22 @@ test('no component uses the cut signature effects: parallaxY or cursor glow (dec
     }
   }
   assert.deepEqual(offenders, [], `cut signature effects present:\n${offenders.join('\n')}`);
+});
+
+// A nav/footer component is site CHROME — it renders on every page. A hardcoded `#section`
+// anchor in it (the brand wordmark's `#top`, a CTA's `#cta`) therefore scrolls to nothing on
+// every page that doesn't host that section, which on a multi-page site is most of them. That
+// shipped on _e2e_test_starter. Chrome link targets must come from the data (footer.cols) or be
+// derived from `nav` (NavMinimal/NavEmergencyBar's multiPage branch), never baked into the JSX.
+test('no nav/footer component hardcodes a section anchor (would dangle off-page on multi-page)', () => {
+  const SECTION_ANCHOR = /href="#(top|cta|services|about|testimonials|faq|work|contact)"/;
+  const offenders = [];
+  for (const c of ALL) {
+    if (c.category !== 'nav' && c.category !== 'footer') continue;
+    const m = SECTION_ANCHOR.exec(c.src);
+    if (m) offenders.push(`${c.rel}: ${m[0]}`);
+  }
+  assert.deepEqual(offenders, [], `hardcoded chrome anchors present:\n${offenders.join('\n')}`);
 });
 
 // ── The four sources that must agree ─────────────────────────────────────────
@@ -133,7 +162,14 @@ test('every nav component that consumes nav renders the page links (plan 9e)', (
 
 test('no wide-tracked uppercase eyebrows', () => {
   // Cut by SPEC §3. The heading names the section and a plain sentence supports it.
-  const bad = ALL.filter((c) => /tracking-\[0\.2/.test(c.src));
+  //
+  // Exempts verticalTemplate components, same principle as the isVerticalTemplate block above:
+  // they are pinned to an approved mockup, not assembled from the generic catalog, so an
+  // anti-slop heuristic doesn't apply to a value the mockup itself specifies. This check never
+  // consulted isVerticalTemplate before 2026-10-28 — not a deliberate carve-out, just that no
+  // Hvac* component happened to use exactly 0.2em (they use 0.17/0.12/0.04/0.01) until roofing's
+  // mockup (home-mockups.html #roofing .eyebrow{letter-spacing:.2em}) did.
+  const bad = ALL.filter((c) => !isVerticalTemplate(c) && /tracking-\[0\.2/.test(c.src));
   assert.deepEqual(bad.map((c) => c.rel), []);
 });
 
@@ -181,6 +217,13 @@ test('every component declares a known archetype and a signature flag', () => {
   // Decision 23. A component without these is invisible to the collision lint and to
   // page-rhythm.test.mjs's motion budget, so a missing field is a silent hole in both.
   for (const c of ALL) {
+    // Vertical-template components still declare a signature flag (page-rhythm's motion budget
+    // reads it) but carry no archetype — they are never offered alongside sibling variants, so
+    // the collision lint has nothing to compare them against.
+    if (isVerticalTemplate(c)) {
+      assert.match(c.src, /signature:\s*(true|false)/, `${c.rel}: meta has no signature flag`);
+      continue;
+    }
     const a = archetypeOf(c.src);
     assert.ok(a, `${c.rel}: meta has no archetype`);
     assert.ok(ARCHETYPES.includes(a), `${c.rel}: unknown archetype '${a}'`);
@@ -195,6 +238,7 @@ test('no two variants in a category share an archetype', () => {
   const byCat = new Map();
   for (const c of ALL) {
     if (COLLISION_EXEMPT_CATEGORIES.includes(c.category)) continue;   // seo renders nothing
+    if (isVerticalTemplate(c)) continue;                              // pinned to a mockup, no archetype
     const a = archetypeOf(c.src);
     const seen = byCat.get(c.category) ?? new Map();
     assert.ok(!seen.has(a), `${c.category}: ${c.name} and ${seen.get(a)} are both '${a}'. ` +
@@ -214,6 +258,7 @@ test('no uniform three-up card row (decision 30a)', () => {
   const ICON_CARD_CATEGORIES = ['differentiators', 'about', 'trust'];
   const bad = [];
   for (const c of ALL) {
+    if (isVerticalTemplate(c)) continue;                     // mockup-pinned; three-up is intentional
     if (!/\bgrid-cols-3\b/.test(c.src)) continue;            // matches sm:/md:/lg: prefixes too
     if (/\.slice\(0,\s*3\)/.test(c.src)) { bad.push(`${c.rel}: grid-cols-3 over a hard-capped three`); continue; }
     if (!/\.map\(/.test(c.src))          { bad.push(`${c.rel}: grid-cols-3 with three literal children`); continue; }
@@ -231,6 +276,7 @@ test('no gradients (decision 30b)', () => {
   const ALLOWED = [/repeating-linear-gradient\(/g, /radial-gradient\(circle at 1px 1px/g];
   const bad = [];
   for (const c of ALL) {
+    if (isVerticalTemplate(c)) continue;                     // mockup-pinned; warm wash / CTA glow are intentional
     let src = c.src;
     for (const a of ALLOWED) src = src.replace(a, '');
     for (const m of src.matchAll(/bg-accent-grad|bg-gradient-to-|linear-gradient\(|radial-gradient\(/g)) {
@@ -267,4 +313,74 @@ test('no hard-coded white on an accent surface (decision 10 / the accentFg guara
     }
   }
   assert.deepEqual(bad, [], 'on-accent text is text-accentFg; on-ink text is text-onInk');
+});
+
+test('no page template assigns a skin its component does not support', () => {
+  // SHIPPED DEFECT. `home-standard` — the template that seeds defaultCompositionFor(), i.e.
+  // the home page of every new client — carried `skin="inverted"` on FinalCtaBanner, which has
+  // no entry in SKINS and no `skin` prop at all.
+  //
+  // Nothing rendered differently, because wirePages gates the attribute on `supportsSkin`. But
+  // the export route's `validateEntries` checks skin validity BEFORE wiring, over the flattened
+  // component list, and threw `Unknown skin "inverted" for component "FinalCtaBanner"`. The
+  // DEFAULT four-page site therefore could not be exported AT ALL — found only by trying to
+  // repair a client whose live site had collapsed to a nav bar above a footer.
+  //
+  // Asserted over every template, not just the default: the same mistake in an optional
+  // template breaks the export only for the clients who happened to pick it, which is worse.
+  const bad = [];
+  for (const t of PAGE_TEMPLATES) {
+    for (const s of t.sections) {
+      if (!s.skin) continue;
+      if (!isValidSkin(s.name, s.skin)) {
+        bad.push(`${t.id}: ${s.name} skin="${s.skin}" (supportsSkin=${supportsSkin(s.name)})`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], 'the export route’s validateEntries will refuse these compositions');
+});
+
+test('every chrome fallback and default-composition skin is valid too', () => {
+  // The same check for the parts of a composition that are not page sections. Chrome is chosen
+  // once per site, so an invalid skin there would block every export rather than some.
+  const comp = defaultCompositionFor();
+  const bad = [];
+  for (const [slot, ref] of Object.entries(comp.chrome)) {
+    if (ref.skin && !isValidSkin(ref.name, ref.skin)) bad.push(`chrome.${slot}: ${ref.name} skin="${ref.skin}"`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test('every component importing a client-only package declares "use client"', () => {
+  // SHIPPED DEFECT, and the one that made a multi-page export unbuildable.
+  //
+  // All four pageHeader components lacked the directive while three of them imported
+  // `@phosphor-icons/react`, whose module scope calls React.createContext. Pulled into a
+  // SERVER component that resolves against the react-server build of React, where
+  // createContext does not exist — so `next build` failed collecting page data for every
+  // subpage with `(0 , l.createContext) is not a function`.
+  //
+  // It could only ever surface on a multi-page site, because pageHeader renders exclusively on
+  // subpages, and no multi-page export had ever completed. 39 of 45 catalog components already
+  // had the directive; this makes the rule the catalog was already following enforceable.
+  const CLIENT_ONLY = ['@phosphor-icons/react', 'framer-motion'];
+  const bad = [];
+  for (const c of ALL) {
+    const needs = CLIENT_ONLY.filter((p) => c.src.includes(`from '${p}'`));
+    if (needs.length === 0) continue;
+    if (!/^\s*(['"])use client\1;/m.test(c.src.split('\n').slice(0, 3).join('\n'))) {
+      bad.push(`${c.rel}: imports ${needs.join(', ')} without "use client"`);
+    }
+  }
+  assert.deepEqual(bad, [], 'a server component cannot import a package that calls createContext');
+});
+
+test('seo components stay SERVER components', () => {
+  // The flip side, and why the rule above is scoped to client-only imports rather than applied
+  // blanket. An seo component's whole job is to export `generateMetadata`, which Next may only
+  // collect from a server module — a "use client" here would break metadata on every site.
+  for (const c of ALL.filter((x) => x.category === 'seo')) {
+    assert.doesNotMatch(c.src.split('\n').slice(0, 3).join('\n'), /use client/, `${c.rel} must stay server-side`);
+    assert.match(c.src, /export\s+(async\s+)?function\s+generateMetadata|export\s+const\s+generateMetadata/, c.rel);
+  }
 });

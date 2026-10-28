@@ -48,6 +48,35 @@ import { meta as seoLocalBusinessMeta } from '@/components/catalog/seo/SeoLocalB
 import NavEmergencyBar, { meta as navEmergencyMeta } from '@/components/catalog/nav/NavEmergencyBar';
 import TrustReviewsAggregate, { meta as trustReviewsMeta } from '@/components/catalog/trust/TrustReviewsAggregate';
 import ServiceArea, { meta as serviceAreaMeta } from '@/components/catalog/trust/ServiceArea';
+// Bespoke HVAC vertical-template components (fixed designs, no skin). Composed by
+// VERTICAL_TEMPLATES, not offered individually — registered here so the Studio preview and
+// compose-page can render them. See src/components/CATALOG-LEGACY.md.
+import HvacNav, { meta as hvacNavMeta } from '@/components/catalog/nav/HvacNav';
+import HvacHero, { meta as hvacHeroMeta } from '@/components/catalog/hero/HvacHero';
+import HvacStatBand, { meta as hvacStatBandMeta } from '@/components/catalog/stats/HvacStatBand';
+import HvacServices, { meta as hvacServicesMeta } from '@/components/catalog/services/HvacServices';
+import HvacServiceArea, { meta as hvacServiceAreaMeta } from '@/components/catalog/trust/HvacServiceArea';
+import HvacFaq, { meta as hvacFaqMeta } from '@/components/catalog/faq/HvacFaq';
+import HvacReviews, { meta as hvacReviewsMeta } from '@/components/catalog/testimonials/HvacReviews';
+import HvacFinalCta, { meta as hvacFinalCtaMeta } from '@/components/catalog/finalCta/HvacFinalCta';
+import HvacFooter, { meta as hvacFooterMeta } from '@/components/catalog/footer/HvacFooter';
+import HvacPageHeader, { meta as hvacPageHeaderMeta } from '@/components/catalog/pageHeader/HvacPageHeader';
+import HvacAbout, { meta as hvacAboutMeta } from '@/components/catalog/about/HvacAbout';
+import HvacContact, { meta as hvacContactMeta } from '@/components/catalog/contact/HvacContact';
+// Bespoke Roofing vertical-template components (vertical-templates-v1 Phase 5). Same contract
+// as the Hvac* set above: fixed designs, no skin, composed by VERTICAL_TEMPLATES.
+import RoofingNav, { meta as roofingNavMeta } from '@/components/catalog/nav/RoofingNav';
+import RoofingHero, { meta as roofingHeroMeta } from '@/components/catalog/hero/RoofingHero';
+import RoofingStats, { meta as roofingStatsMeta } from '@/components/catalog/stats/RoofingStats';
+import RoofingServices, { meta as roofingServicesMeta } from '@/components/catalog/services/RoofingServices';
+import RoofingTrust, { meta as roofingTrustMeta } from '@/components/catalog/trust/RoofingTrust';
+import RoofingFaq, { meta as roofingFaqMeta } from '@/components/catalog/faq/RoofingFaq';
+import RoofingReviews, { meta as roofingReviewsMeta } from '@/components/catalog/testimonials/RoofingReviews';
+import RoofingFinalCta, { meta as roofingFinalCtaMeta } from '@/components/catalog/finalCta/RoofingFinalCta';
+import RoofingFooter, { meta as roofingFooterMeta } from '@/components/catalog/footer/RoofingFooter';
+import RoofingPageHeader, { meta as roofingPageHeaderMeta } from '@/components/catalog/pageHeader/RoofingPageHeader';
+import RoofingAbout, { meta as roofingAboutMeta } from '@/components/catalog/about/RoofingAbout';
+import RoofingContact, { meta as roofingContactMeta } from '@/components/catalog/contact/RoofingContact';
 
 import SeoPreviewBody from './SeoPreviewBody';
 import type { SiteContent } from '@/data/site';
@@ -95,6 +124,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'NavMinimal',         id: navMinimalMeta.id,      label: navMinimalMeta.label,      skins: skinsFor('NavMinimal'),      render: (skin) => <NavMinimal content={effective} skin={skin} /> },
         { name: 'NavEmergencyBar',    id: navEmergencyMeta.id,    label: navEmergencyMeta.label,    skins: skinsFor('NavEmergencyBar'), render: (skin) => <NavEmergencyBar content={effective} skin={skin} /> },
+        { name: 'HvacNav',            id: hvacNavMeta.id,         label: hvacNavMeta.label,         skins: skinsFor('HvacNav'),         render: () => <HvacNav content={effective} /> },
+        { name: 'RoofingNav',         id: roofingNavMeta.id,      label: roofingNavMeta.label,      skins: skinsFor('RoofingNav'),      render: () => <RoofingNav content={effective} /> },
       ],
     },
     {
@@ -118,6 +149,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'PageHeaderEditorial', id: pageHeaderEditorialMeta.id, label: pageHeaderEditorialMeta.label, skins: skinsFor('PageHeaderEditorial'), render: () => <PageHeaderEditorial data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'PageHeaderOverlap',  id: pageHeaderOverlapMeta.id,  label: pageHeaderOverlapMeta.label,  skins: skinsFor('PageHeaderOverlap'),  render: () => <PageHeaderOverlap data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'PageHeaderMinimal',  id: pageHeaderMinimalMeta.id,  label: pageHeaderMinimalMeta.label,  skins: skinsFor('PageHeaderMinimal'),  render: () => <PageHeaderMinimal data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
+        { name: 'HvacPageHeader', id: hvacPageHeaderMeta.id, label: hvacPageHeaderMeta.label, skins: skinsFor('HvacPageHeader'), render: () => <HvacPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
+        { name: 'RoofingPageHeader', id: roofingPageHeaderMeta.id, label: roofingPageHeaderMeta.label, skins: skinsFor('RoofingPageHeader'), render: () => <RoofingPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
       ],
     },
     {
@@ -128,6 +161,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HeroSplit',     id: heroSplitMeta.id,     label: heroSplitMeta.label,     skins: skinsFor('HeroSplit'),     render: (skin) => <HeroSplit content={effective} skin={skin} /> },
         { name: 'HeroFormFocus', id: heroFormMeta.id,      label: heroFormMeta.label,      skins: skinsFor('HeroFormFocus'), render: (skin) => <HeroFormFocus content={effective} skin={skin} /> },
         { name: 'HeroOverlap',   id: heroOverlapMeta.id,   label: heroOverlapMeta.label,   skins: skinsFor('HeroOverlap'),   render: () => <HeroOverlap content={effective} /> },
+        { name: 'HvacHero',      id: hvacHeroMeta.id,      label: hvacHeroMeta.label,      skins: skinsFor('HvacHero'),      render: () => <HvacHero content={effective} /> },
+        { name: 'RoofingHero',   id: roofingHeroMeta.id,   label: roofingHeroMeta.label,   skins: skinsFor('RoofingHero'),   render: () => <RoofingHero content={effective} /> },
       ],
     },
     {
@@ -138,6 +173,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'TrustBadges',   id: trustBadgesMeta.id,   label: trustBadgesMeta.label,   skins: skinsFor('TrustBadges'),   render: () => <TrustBadges content={effective} /> },
         { name: 'TrustReviewsAggregate', id: trustReviewsMeta.id, label: trustReviewsMeta.label, skins: skinsFor('TrustReviewsAggregate'), render: (skin) => <TrustReviewsAggregate content={effective} skin={skin} /> },
         { name: 'ServiceArea', id: serviceAreaMeta.id, label: serviceAreaMeta.label, skins: skinsFor('ServiceArea'), render: (skin: SkinId) => <ServiceArea content={effective} skin={skin} /> },
+        { name: 'HvacServiceArea', id: hvacServiceAreaMeta.id, label: hvacServiceAreaMeta.label, skins: skinsFor('HvacServiceArea'), render: () => <HvacServiceArea content={effective} /> },
+        { name: 'RoofingTrust', id: roofingTrustMeta.id, label: roofingTrustMeta.label, skins: skinsFor('RoofingTrust'), render: () => <RoofingTrust content={effective} /> },
       ],
     },
     {
@@ -158,6 +195,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'AboutFeature',  id: aboutFeatureMeta.id,  label: aboutFeatureMeta.label,  skins: skinsFor('AboutFeature'),  render: (skin) => <AboutFeature content={effective} skin={skin} /> },
         { name: 'AboutStory',    id: aboutStoryMeta.id,    label: aboutStoryMeta.label,    skins: skinsFor('AboutStory'),    render: (skin) => <AboutStory content={effective} skin={skin} /> },
         { name: 'AboutSticky',   id: aboutStickyMeta.id,   label: aboutStickyMeta.label,   skins: skinsFor('AboutSticky'),   render: (skin) => <AboutSticky content={effective} skin={skin} /> },
+        { name: 'HvacAbout',     id: hvacAboutMeta.id,     label: hvacAboutMeta.label,     skins: skinsFor('HvacAbout'),     render: () => <HvacAbout content={effective} /> },
+        { name: 'RoofingAbout',  id: roofingAboutMeta.id,  label: roofingAboutMeta.label,  skins: skinsFor('RoofingAbout'),  render: () => <RoofingAbout content={effective} /> },
       ],
     },
     {
@@ -170,6 +209,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'ServicesPanel',     id: servicesPanelMeta.id,     label: servicesPanelMeta.label,     skins: skinsFor('ServicesPanel'),     render: () => <ServicesPanel content={effective} /> },
         { name: 'ServicesShowcase',  id: servicesShowcaseMeta.id,  label: servicesShowcaseMeta.label,  skins: skinsFor('ServicesShowcase'),  render: (skin) => <ServicesShowcase content={effective} skin={skin} /> },
         { name: 'ServicesSpotlight', id: servicesSpotlightMeta.id, label: servicesSpotlightMeta.label, skins: skinsFor('ServicesSpotlight'), render: (skin) => <ServicesSpotlight content={effective} skin={skin} /> },
+        { name: 'HvacServices',      id: hvacServicesMeta.id,      label: hvacServicesMeta.label,      skins: skinsFor('HvacServices'),      render: () => <HvacServices content={effective} /> },
+        { name: 'RoofingServices',   id: roofingServicesMeta.id,   label: roofingServicesMeta.label,   skins: skinsFor('RoofingServices'),   render: () => <RoofingServices content={effective} /> },
       ],
     },
     {
@@ -190,6 +231,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'StatsBand',   id: statsBandMeta.id,   label: statsBandMeta.label,   skins: skinsFor('StatsBand'),   render: (skin) => <StatsBand content={effective} skin={skin} /> },
         { name: 'StatsLedger', id: statsLedgerMeta.id, label: statsLedgerMeta.label, skins: skinsFor('StatsLedger'), render: (skin) => <StatsLedger content={effective} skin={skin} /> },
+        { name: 'HvacStatBand', id: hvacStatBandMeta.id, label: hvacStatBandMeta.label, skins: skinsFor('HvacStatBand'), render: () => <HvacStatBand content={effective} /> },
+        { name: 'RoofingStats', id: roofingStatsMeta.id, label: roofingStatsMeta.label, skins: skinsFor('RoofingStats'), render: () => <RoofingStats content={effective} /> },
       ],
     },
     {
@@ -200,6 +243,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'FaqAccordion',   id: faqAccordionMeta.id,   label: faqAccordionMeta.label,   skins: skinsFor('FaqAccordion'),   render: (skin) => <FaqAccordion content={effective} skin={skin} /> },
         { name: 'FaqStickyAside', id: faqStickyAsideMeta.id, label: faqStickyAsideMeta.label, skins: skinsFor('FaqStickyAside'), render: (skin) => <FaqStickyAside content={effective} skin={skin} /> },
         { name: 'FaqIndex',       id: faqIndexMeta.id,       label: faqIndexMeta.label,       skins: skinsFor('FaqIndex'),       render: (skin) => <FaqIndex content={effective} skin={skin} /> },
+        { name: 'HvacFaq',        id: hvacFaqMeta.id,        label: hvacFaqMeta.label,        skins: skinsFor('HvacFaq'),        render: () => <HvacFaq content={effective} /> },
+        { name: 'RoofingFaq',     id: roofingFaqMeta.id,     label: roofingFaqMeta.label,     skins: skinsFor('RoofingFaq'),     render: () => <RoofingFaq content={effective} /> },
       ],
     },
     {
@@ -210,6 +255,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'TestimonialsGrid',     id: testimonialsGridMeta.id,     label: testimonialsGridMeta.label,     skins: skinsFor('TestimonialsGrid'),     render: (skin) => <TestimonialsGrid content={effective} skin={skin} /> },
         { name: 'TestimonialsCarousel', id: 'testimonials-carousel',     label: 'Testimonials / Carousel',      skins: skinsFor('TestimonialsCarousel'), render: () => <TestimonialsCarousel content={effective} /> },
         { name: 'TestimonialsMarquee',  id: testimonialsMarqueeMeta.id,  label: testimonialsMarqueeMeta.label,  skins: skinsFor('TestimonialsMarquee'), render: (skin) => <TestimonialsMarquee content={effective} skin={skin} /> },
+        { name: 'HvacReviews',          id: hvacReviewsMeta.id,          label: hvacReviewsMeta.label,          skins: skinsFor('HvacReviews'),         render: () => <HvacReviews content={effective} /> },
+        { name: 'RoofingReviews',       id: roofingReviewsMeta.id,       label: roofingReviewsMeta.label,       skins: skinsFor('RoofingReviews'),      render: () => <RoofingReviews content={effective} /> },
       ],
     },
     {
@@ -220,6 +267,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'FinalCtaBanner',   id: finalCtaBannerMeta.id,   label: finalCtaBannerMeta.label,   skins: skinsFor('FinalCtaBanner'),     render: () => <FinalCtaBanner content={effective} /> },
         { name: 'FinalCtaSimple',   id: finalCtaSimpleMeta.id,   label: finalCtaSimpleMeta.label,   skins: skinsFor('FinalCtaSimple'),   leadMode: finalCtaSimpleMeta.leadMode,   render: () => <FinalCtaSimple content={effective} /> },
         { name: 'FinalCtaSplit',    id: finalCtaSplitMeta.id,    label: finalCtaSplitMeta.label,    skins: skinsFor('FinalCtaSplit'),       render: (skin: SkinId) => <FinalCtaSplit content={effective} skin={skin} /> },
+        { name: 'HvacFinalCta',     id: hvacFinalCtaMeta.id,     label: hvacFinalCtaMeta.label,     skins: skinsFor('HvacFinalCta'),        render: () => <HvacFinalCta content={effective} /> },
+        { name: 'RoofingFinalCta',  id: roofingFinalCtaMeta.id,  label: roofingFinalCtaMeta.label,  skins: skinsFor('RoofingFinalCta'),     render: () => <RoofingFinalCta content={effective} /> },
       ].filter(forPlan),
     },
     {
@@ -230,6 +279,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'ContactSplit',        id: contactSplitMeta.id,         label: contactSplitMeta.label,           skins: skinsFor('ContactSplit'),               render: (skin: SkinId) => <ContactSplit content={effective} skin={skin} /> },
         { name: 'ContactCardOverlap',  id: contactCardOverlapMeta.id,   label: contactCardOverlapMeta.label,     skins: skinsFor('ContactCardOverlap'),   render: (skin: SkinId) => <ContactCardOverlap content={effective} skin={skin} /> },
         { name: 'ContactInlineStrip',  id: contactInlineStripMeta.id,   label: contactInlineStripMeta.label,     skins: skinsFor('ContactInlineStrip'),   render: (skin: SkinId) => <ContactInlineStrip content={effective} skin={skin} /> },
+        { name: 'HvacContact',         id: hvacContactMeta.id,          label: hvacContactMeta.label,            skins: skinsFor('HvacContact'),            render: () => <HvacContact content={effective} /> },
+        { name: 'RoofingContact',      id: roofingContactMeta.id,       label: roofingContactMeta.label,         skins: skinsFor('RoofingContact'),         render: () => <RoofingContact content={effective} /> },
       ].filter(forPlan),
     },
     {
@@ -239,6 +290,8 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
       variants: [
         { name: 'FooterColumns',  id: footerColumnsMeta.id,  label: footerColumnsMeta.label,  skins: skinsFor('FooterColumns'),  render: (skin) => <FooterColumns content={effective} skin={skin} /> },
         { name: 'FooterMinimal',  id: footerMinimalMeta.id,  label: footerMinimalMeta.label,  skins: skinsFor('FooterMinimal'),  render: (skin) => <FooterMinimal content={effective} skin={skin} /> },
+        { name: 'HvacFooter',     id: hvacFooterMeta.id,     label: hvacFooterMeta.label,     skins: skinsFor('HvacFooter'),     render: () => <HvacFooter content={effective} /> },
+        { name: 'RoofingFooter',  id: roofingFooterMeta.id,  label: roofingFooterMeta.label,  skins: skinsFor('RoofingFooter'),  render: () => <RoofingFooter content={effective} /> },
       ],
     },
     {
