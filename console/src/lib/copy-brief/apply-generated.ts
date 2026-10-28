@@ -78,9 +78,11 @@ export function applyGeneratedCopy(
       body: a.body ?? base.about.body,
       story: a.story?.length ? a.story : base.about.story,
       pillars: mergeArray(base.about.pillars, a.pillars, (b, c) => ({ ...b, t: c.t ?? b.t, d: c.d ?? b.d })),
-      stats: a.stats?.length
-        ? mergeArray(base.about.stats, a.stats, (b, c) => ({ ...b, n: c.n ?? b.n, l: c.l ?? b.l }))
-        : base.about.stats,
+      // ALWAYS base.about.stats, never model output (PLAN D4) — stats is not even in
+      // CopyResult.about any more, so there is no `a.stats` to read. Pure passthrough, same
+      // guarantee `about.seasons` needs once a vertical generates copy near it.
+      stats: base.about.stats,
+      seasons: base.about.seasons,
     };
   }
 
@@ -141,6 +143,7 @@ export function applyGeneratedCopy(
       ...base.finalCta,
       eyebrow: f.eyebrow ?? base.finalCta.eyebrow,
       headline: f.headline ?? base.finalCta.headline,
+      headlineEmphasis: f.headlineEmphasis ?? base.finalCta.headlineEmphasis,
       sub: f.sub ?? base.finalCta.sub,
       cta: f.cta ?? base.finalCta.cta,
       secondary: f.secondary ?? base.finalCta.secondary,
