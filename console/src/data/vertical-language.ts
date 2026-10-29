@@ -149,6 +149,39 @@ export const VERTICAL_LANGUAGES: Record<string, VerticalLanguage> = {
     },
     rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
   },
+  /**
+   * Plumbing — vertical-templates-v1 Phase 8. Transcribed from the approved mockup's own CSS
+   * custom properties (design/vertical-templates-v1/home-mockups.html #plumbing): deep-blue
+   * accent on a white/soft-blue ground, Schibsted Grotesk throughout. Deep/deep-2 (the hero and
+   * footer structural darks) are literal hex in the Plumbing* components (not standard palette
+   * slots), same as every other vertical's signature colours. White ground, same as hvac/roofing
+   * — see the WARMTH_EXEMPT set in vertical-language.test.mjs.
+   */
+  plumbing: {
+    pairingId: 'schibsted',
+    palette: {
+      accent: '#1E6FA8',
+      accentFg: '#FFFFFF',
+      bg: '#FFFFFF',
+      bgSoft: '#EEF4F8',
+      ink: '#10212E',
+      inkSoft: '#4C6274',
+      rule: '#D7E3EC',
+    },
+    photography: {
+      subjects: [
+        'a plumber soldering a copper pipe under a sink',
+        'a branded service van parked in a residential driveway',
+        'a technician running a drain camera inspection',
+        'a tankless water heater installed in a utility closet',
+        'a plumber inspecting a water heater with a flashlight',
+        'a crew loading pipe and fittings for a same-day job',
+      ],
+      grade: 'house',
+      ratioBias: 'wide',
+    },
+    rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
+  },
 };
 
 /** The language for a vertical id, falling back to HVAC when the id has no entry yet (every

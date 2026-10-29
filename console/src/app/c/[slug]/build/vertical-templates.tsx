@@ -189,6 +189,54 @@ function lawnTemplate(): SiteComposition {
   };
 }
 
+/**
+ * Plumbing — vertical-templates-v1 Phase 8 (design/EXEC-vertical-templates-v1.md), the "a
+ * plumbing emergency is a dispatch problem" thesis from design/vertical-templates-v1/
+ * home-mockups.html's #plumbing pane. Home order matches that mockup: proof before FAQ (the
+ * common case, same as lawn — roofing is the one exception). Services/About/Contact open with
+ * PlumbingPageHeader, same contract as every other vertical.
+ */
+function plumbingTemplate(): SiteComposition {
+  return {
+    chrome: {
+      nav:    { id: newSectionId(), categoryId: 'nav', name: 'PlumbingNav' },
+      footer: { id: newSectionId(), categoryId: 'footer', name: 'PlumbingFooter' },
+      // Chrome SEO is shared, not per-vertical (exactly as hvacTemplate() does it).
+      seo:    { id: newSectionId(), categoryId: 'seo', name: 'SeoLocalBusiness' },
+    },
+    pages: [
+      page('home', 'plumbing:home', [
+        S('hero', 'PlumbingHero'),
+        S('stats', 'PlumbingStats'),
+        S('services', 'PlumbingServices'),
+        S('trust', 'PlumbingTrust'),
+        S('testimonials', 'PlumbingReviews'),
+        S('faq', 'PlumbingFaq'),
+        S('finalCta', 'PlumbingFinalCta'),
+      ]),
+      page('services', 'plumbing:services', [
+        S('pageHeader', 'PlumbingPageHeader'),
+        S('services', 'PlumbingServices'),
+        S('faq', 'PlumbingFaq'),
+        S('finalCta', 'PlumbingFinalCta'),
+      ]),
+      page('about', 'plumbing:about', [
+        S('pageHeader', 'PlumbingPageHeader'),
+        S('about', 'PlumbingAbout'),
+        S('trust', 'PlumbingTrust'),
+        S('testimonials', 'PlumbingReviews'),
+        S('finalCta', 'PlumbingFinalCta'),
+      ]),
+      page('contact', 'plumbing:contact', [
+        S('pageHeader', 'PlumbingPageHeader'),
+        S('contact', 'PlumbingContact'),
+        S('faq', 'PlumbingFaq'),
+        S('finalCta', 'PlumbingFinalCta'),
+      ]),
+    ],
+  };
+}
+
 export type VerticalTemplate = {
   /** Operator-facing name shown on the Studio's single template card. */
   label: string;
@@ -200,6 +248,7 @@ export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> =
   hvac: { label: 'HVAC — Standard', build: hvacTemplate },
   roofing: { label: 'Roofing — Standard', build: roofingTemplate },
   'lawn-care': { label: 'Lawn Care — Standard', build: lawnTemplate },
+  plumbing: { label: 'Plumbing — Standard', build: plumbingTemplate },
 };
 
 /** The template for a vertical, or null when none is built yet. */

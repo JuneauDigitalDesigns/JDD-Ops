@@ -148,6 +148,28 @@ test('the Roofing home section order exactly matches home-mockups.html #roofing 
   ]);
 });
 
+test('Plumbing services, about, and contact use the standard sections', () => {
+  const pages = Object.fromEntries(
+    applyVerticalTemplate('plumbing').pages.map((p) => [p.route, p.sections.map((s) => s.name)]),
+  );
+  assert.deepEqual(pages.services, ['PlumbingPageHeader', 'PlumbingServices', 'PlumbingFaq', 'PlumbingFinalCta']);
+  assert.deepEqual(pages.about, ['PlumbingPageHeader', 'PlumbingAbout', 'PlumbingTrust', 'PlumbingReviews', 'PlumbingFinalCta']);
+  assert.deepEqual(pages.contact, ['PlumbingPageHeader', 'PlumbingContact', 'PlumbingFaq', 'PlumbingFinalCta']);
+});
+
+test('the Plumbing home section order exactly matches home-mockups.html #plumbing (reviews before FAQ)', () => {
+  const home = applyVerticalTemplate('plumbing').pages.find((p) => p.route === '');
+  assert.deepEqual(home.sections.map((s) => s.name), [
+    'PlumbingHero',
+    'PlumbingStats',
+    'PlumbingServices',
+    'PlumbingTrust',
+    'PlumbingReviews',
+    'PlumbingFaq',
+    'PlumbingFinalCta',
+  ]);
+});
+
 test('the HVAC home section order exactly matches the Northstar Standard tab (D6c)', () => {
   // `.includes` above only checks presence, not sequence, so it could not have caught the
   // reviews/faq swap this test exists to pin. design/northstar-standard/mockups.html orders

@@ -91,6 +91,20 @@ import LawnFooter, { meta as lawnFooterMeta } from '@/components/catalog/footer/
 import LawnPageHeader, { meta as lawnPageHeaderMeta } from '@/components/catalog/pageHeader/LawnPageHeader';
 import LawnAbout, { meta as lawnAboutMeta } from '@/components/catalog/about/LawnAbout';
 import LawnContact, { meta as lawnContactMeta } from '@/components/catalog/contact/LawnContact';
+// Bespoke Plumbing vertical-template components (vertical-templates-v1 Phase 8). Same
+// contract as Hvac*/Roofing*/Lawn*: fixed designs, no skin, composed by VERTICAL_TEMPLATES.
+import PlumbingNav, { meta as plumbingNavMeta } from '@/components/catalog/nav/PlumbingNav';
+import PlumbingHero, { meta as plumbingHeroMeta } from '@/components/catalog/hero/PlumbingHero';
+import PlumbingStats, { meta as plumbingStatsMeta } from '@/components/catalog/stats/PlumbingStats';
+import PlumbingServices, { meta as plumbingServicesMeta } from '@/components/catalog/services/PlumbingServices';
+import PlumbingTrust, { meta as plumbingTrustMeta } from '@/components/catalog/trust/PlumbingTrust';
+import PlumbingFaq, { meta as plumbingFaqMeta } from '@/components/catalog/faq/PlumbingFaq';
+import PlumbingReviews, { meta as plumbingReviewsMeta } from '@/components/catalog/testimonials/PlumbingReviews';
+import PlumbingFinalCta, { meta as plumbingFinalCtaMeta } from '@/components/catalog/finalCta/PlumbingFinalCta';
+import PlumbingFooter, { meta as plumbingFooterMeta } from '@/components/catalog/footer/PlumbingFooter';
+import PlumbingPageHeader, { meta as plumbingPageHeaderMeta } from '@/components/catalog/pageHeader/PlumbingPageHeader';
+import PlumbingAbout, { meta as plumbingAboutMeta } from '@/components/catalog/about/PlumbingAbout';
+import PlumbingContact, { meta as plumbingContactMeta } from '@/components/catalog/contact/PlumbingContact';
 
 import SeoPreviewBody from './SeoPreviewBody';
 import type { SiteContent } from '@/data/site';
@@ -141,6 +155,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacNav',            id: hvacNavMeta.id,         label: hvacNavMeta.label,         skins: skinsFor('HvacNav'),         render: () => <HvacNav content={effective} /> },
         { name: 'RoofingNav',         id: roofingNavMeta.id,      label: roofingNavMeta.label,      skins: skinsFor('RoofingNav'),      render: () => <RoofingNav content={effective} /> },
         { name: 'LawnNav',            id: lawnNavMeta.id,         label: lawnNavMeta.label,         skins: skinsFor('LawnNav'),         render: () => <LawnNav content={effective} /> },
+        { name: 'PlumbingNav',        id: plumbingNavMeta.id,     label: plumbingNavMeta.label,     skins: skinsFor('PlumbingNav'),     render: () => <PlumbingNav content={effective} /> },
       ],
     },
     {
@@ -167,6 +182,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacPageHeader', id: hvacPageHeaderMeta.id, label: hvacPageHeaderMeta.label, skins: skinsFor('HvacPageHeader'), render: () => <HvacPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'RoofingPageHeader', id: roofingPageHeaderMeta.id, label: roofingPageHeaderMeta.label, skins: skinsFor('RoofingPageHeader'), render: () => <RoofingPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'LawnPageHeader', id: lawnPageHeaderMeta.id, label: lawnPageHeaderMeta.label, skins: skinsFor('LawnPageHeader'), render: () => <LawnPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
+        { name: 'PlumbingPageHeader', id: plumbingPageHeaderMeta.id, label: plumbingPageHeaderMeta.label, skins: skinsFor('PlumbingPageHeader'), render: () => <PlumbingPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
       ],
     },
     {
@@ -180,6 +196,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacHero',      id: hvacHeroMeta.id,      label: hvacHeroMeta.label,      skins: skinsFor('HvacHero'),      render: () => <HvacHero content={effective} /> },
         { name: 'RoofingHero',   id: roofingHeroMeta.id,   label: roofingHeroMeta.label,   skins: skinsFor('RoofingHero'),   render: () => <RoofingHero content={effective} /> },
         { name: 'LawnHero',      id: lawnHeroMeta.id,      label: lawnHeroMeta.label,      skins: skinsFor('LawnHero'),      render: () => <LawnHero content={effective} /> },
+        { name: 'PlumbingHero',  id: plumbingHeroMeta.id,  label: plumbingHeroMeta.label,  skins: skinsFor('PlumbingHero'),  render: () => <PlumbingHero content={effective} /> },
       ],
     },
     {
@@ -193,6 +210,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacServiceArea', id: hvacServiceAreaMeta.id, label: hvacServiceAreaMeta.label, skins: skinsFor('HvacServiceArea'), render: () => <HvacServiceArea content={effective} /> },
         { name: 'RoofingTrust', id: roofingTrustMeta.id, label: roofingTrustMeta.label, skins: skinsFor('RoofingTrust'), render: () => <RoofingTrust content={effective} /> },
         { name: 'LawnTrust', id: lawnTrustMeta.id, label: lawnTrustMeta.label, skins: skinsFor('LawnTrust'), render: () => <LawnTrust content={effective} /> },
+        { name: 'PlumbingTrust', id: plumbingTrustMeta.id, label: plumbingTrustMeta.label, skins: skinsFor('PlumbingTrust'), render: () => <PlumbingTrust content={effective} /> },
       ],
     },
     {
@@ -216,6 +234,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacAbout',     id: hvacAboutMeta.id,     label: hvacAboutMeta.label,     skins: skinsFor('HvacAbout'),     render: () => <HvacAbout content={effective} /> },
         { name: 'RoofingAbout',  id: roofingAboutMeta.id,  label: roofingAboutMeta.label,  skins: skinsFor('RoofingAbout'),  render: () => <RoofingAbout content={effective} /> },
         { name: 'LawnAbout',     id: lawnAboutMeta.id,     label: lawnAboutMeta.label,     skins: skinsFor('LawnAbout'),     render: () => <LawnAbout content={effective} /> },
+        { name: 'PlumbingAbout', id: plumbingAboutMeta.id, label: plumbingAboutMeta.label, skins: skinsFor('PlumbingAbout'), render: () => <PlumbingAbout content={effective} /> },
       ],
     },
     {
@@ -231,6 +250,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacServices',      id: hvacServicesMeta.id,      label: hvacServicesMeta.label,      skins: skinsFor('HvacServices'),      render: () => <HvacServices content={effective} /> },
         { name: 'RoofingServices',   id: roofingServicesMeta.id,   label: roofingServicesMeta.label,   skins: skinsFor('RoofingServices'),   render: () => <RoofingServices content={effective} /> },
         { name: 'LawnServices',      id: lawnServicesMeta.id,      label: lawnServicesMeta.label,      skins: skinsFor('LawnServices'),      render: () => <LawnServices content={effective} /> },
+        { name: 'PlumbingServices',  id: plumbingServicesMeta.id,  label: plumbingServicesMeta.label,  skins: skinsFor('PlumbingServices'),  render: () => <PlumbingServices content={effective} /> },
       ],
     },
     {
@@ -254,6 +274,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacStatBand', id: hvacStatBandMeta.id, label: hvacStatBandMeta.label, skins: skinsFor('HvacStatBand'), render: () => <HvacStatBand content={effective} /> },
         { name: 'RoofingStats', id: roofingStatsMeta.id, label: roofingStatsMeta.label, skins: skinsFor('RoofingStats'), render: () => <RoofingStats content={effective} /> },
         { name: 'LawnStats', id: lawnStatsMeta.id, label: lawnStatsMeta.label, skins: skinsFor('LawnStats'), render: () => <LawnStats content={effective} /> },
+        { name: 'PlumbingStats', id: plumbingStatsMeta.id, label: plumbingStatsMeta.label, skins: skinsFor('PlumbingStats'), render: () => <PlumbingStats content={effective} /> },
       ],
     },
     {
@@ -267,6 +288,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacFaq',        id: hvacFaqMeta.id,        label: hvacFaqMeta.label,        skins: skinsFor('HvacFaq'),        render: () => <HvacFaq content={effective} /> },
         { name: 'RoofingFaq',     id: roofingFaqMeta.id,     label: roofingFaqMeta.label,     skins: skinsFor('RoofingFaq'),     render: () => <RoofingFaq content={effective} /> },
         { name: 'LawnFaq',        id: lawnFaqMeta.id,        label: lawnFaqMeta.label,        skins: skinsFor('LawnFaq'),        render: () => <LawnFaq content={effective} /> },
+        { name: 'PlumbingFaq',    id: plumbingFaqMeta.id,    label: plumbingFaqMeta.label,    skins: skinsFor('PlumbingFaq'),    render: () => <PlumbingFaq content={effective} /> },
       ],
     },
     {
@@ -280,6 +302,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacReviews',          id: hvacReviewsMeta.id,          label: hvacReviewsMeta.label,          skins: skinsFor('HvacReviews'),         render: () => <HvacReviews content={effective} /> },
         { name: 'RoofingReviews',       id: roofingReviewsMeta.id,       label: roofingReviewsMeta.label,       skins: skinsFor('RoofingReviews'),      render: () => <RoofingReviews content={effective} /> },
         { name: 'LawnReviews',          id: lawnReviewsMeta.id,          label: lawnReviewsMeta.label,          skins: skinsFor('LawnReviews'),         render: () => <LawnReviews content={effective} /> },
+        { name: 'PlumbingReviews',      id: plumbingReviewsMeta.id,      label: plumbingReviewsMeta.label,      skins: skinsFor('PlumbingReviews'),     render: () => <PlumbingReviews content={effective} /> },
       ],
     },
     {
@@ -293,6 +316,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacFinalCta',     id: hvacFinalCtaMeta.id,     label: hvacFinalCtaMeta.label,     skins: skinsFor('HvacFinalCta'),        render: () => <HvacFinalCta content={effective} /> },
         { name: 'RoofingFinalCta',  id: roofingFinalCtaMeta.id,  label: roofingFinalCtaMeta.label,  skins: skinsFor('RoofingFinalCta'),     render: () => <RoofingFinalCta content={effective} /> },
         { name: 'LawnFinalCta',     id: lawnFinalCtaMeta.id,     label: lawnFinalCtaMeta.label,     skins: skinsFor('LawnFinalCta'),        render: () => <LawnFinalCta content={effective} /> },
+        { name: 'PlumbingFinalCta', id: plumbingFinalCtaMeta.id, label: plumbingFinalCtaMeta.label, skins: skinsFor('PlumbingFinalCta'),    render: () => <PlumbingFinalCta content={effective} /> },
       ].filter(forPlan),
     },
     {
@@ -306,6 +330,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacContact',         id: hvacContactMeta.id,          label: hvacContactMeta.label,            skins: skinsFor('HvacContact'),            render: () => <HvacContact content={effective} /> },
         { name: 'RoofingContact',      id: roofingContactMeta.id,       label: roofingContactMeta.label,         skins: skinsFor('RoofingContact'),         render: () => <RoofingContact content={effective} /> },
         { name: 'LawnContact',         id: lawnContactMeta.id,          label: lawnContactMeta.label,            skins: skinsFor('LawnContact'),            render: () => <LawnContact content={effective} /> },
+        { name: 'PlumbingContact',     id: plumbingContactMeta.id,      label: plumbingContactMeta.label,        skins: skinsFor('PlumbingContact'),        render: () => <PlumbingContact content={effective} /> },
       ].filter(forPlan),
     },
     {
@@ -318,6 +343,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'HvacFooter',     id: hvacFooterMeta.id,     label: hvacFooterMeta.label,     skins: skinsFor('HvacFooter'),     render: () => <HvacFooter content={effective} /> },
         { name: 'RoofingFooter',  id: roofingFooterMeta.id,  label: roofingFooterMeta.label,  skins: skinsFor('RoofingFooter'),  render: () => <RoofingFooter content={effective} /> },
         { name: 'LawnFooter',     id: lawnFooterMeta.id,     label: lawnFooterMeta.label,     skins: skinsFor('LawnFooter'),     render: () => <LawnFooter content={effective} /> },
+        { name: 'PlumbingFooter', id: plumbingFooterMeta.id, label: plumbingFooterMeta.label, skins: skinsFor('PlumbingFooter'), render: () => <PlumbingFooter content={effective} /> },
       ],
     },
     {

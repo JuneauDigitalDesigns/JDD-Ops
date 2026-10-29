@@ -3,9 +3,9 @@
 // destination at all — a button-styled <a> with no href is a dead link a client would never see
 // fail, because it renders fine and does nothing on click.
 //
-// Roofing only for now (vertical-templates-v1 Phase 5). The allowlist for a non-/contact
-// conversion CTA (detailing's "See packages -> /services", D16) is added when detailing lands
-// (EXEC Phase 9) — not pre-emptively here.
+// Roofing (Phase 5) and Plumbing (Phase 8) so far. The allowlist for a non-/contact conversion
+// CTA (detailing's "See packages -> /services", D16) is added when detailing lands (EXEC Phase 9)
+// — not pre-emptively here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -15,14 +15,16 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG_DIR = path.join(ROOT, 'src/components/catalog');
 
-/** Every Roofing*.tsx file across all catalog categories. */
-function roofingFiles() {
+const VERTICAL_PREFIXES = ['Roofing', 'Plumbing'];
+
+/** Every <Prefix>*.tsx file across all catalog categories, for every prefix in VERTICAL_PREFIXES. */
+function verticalFiles() {
   const out = [];
   for (const cat of readdirSync(CATALOG_DIR, { withFileTypes: true })) {
     if (!cat.isDirectory()) continue;
     const dir = path.join(CATALOG_DIR, cat.name);
     for (const f of readdirSync(dir)) {
-      if (f.startsWith('Roofing') && f.endsWith('.tsx')) out.push(path.join(dir, f));
+      if (VERTICAL_PREFIXES.some((p) => f.startsWith(p)) && f.endsWith('.tsx')) out.push(path.join(dir, f));
     }
   }
   return out;
@@ -43,9 +45,9 @@ function anchors(src) {
 
 const ALLOWED_LITERAL_NON_CONVERSION = new Set(['/']); // logo links, etc.
 
-test('every <a> in the Roofing* catalog has an href (no dead CTA links)', () => {
+test('every <a> in the Roofing*/Plumbing* catalog has an href (no dead CTA links)', () => {
   const bad = [];
-  for (const file of roofingFiles()) {
+  for (const file of verticalFiles()) {
     const src = readFileSync(file, 'utf8');
     for (const a of anchors(src)) {
       if (a.href === null && !a.isExpression) bad.push(`${path.basename(file)}: <a${a.tag}>`);
@@ -54,9 +56,9 @@ test('every <a> in the Roofing* catalog has an href (no dead CTA links)', () => 
   assert.deepEqual(bad, []);
 });
 
-test('every literal non-phone, non-mailto Roofing* CTA href is /contact', () => {
+test('every literal non-phone, non-mailto Roofing*/Plumbing* CTA href is /contact', () => {
   const bad = [];
-  for (const file of roofingFiles()) {
+  for (const file of verticalFiles()) {
     const src = readFileSync(file, 'utf8');
     for (const a of anchors(src)) {
       if (a.href === null) continue; // dynamic/expression hrefs (data-driven nav/footer links)
@@ -68,10 +70,10 @@ test('every literal non-phone, non-mailto Roofing* CTA href is /contact', () => 
   assert.deepEqual(bad, []);
 });
 
-test('RoofingHero and RoofingNav each carry at least one tel: link', () => {
+test('each vertical\'s Hero and Nav carry at least one phone link', () => {
   // The phone CTA is the one thing that must NOT route to /contact — confirms the previous
   // test's allowlist isn't hiding a missed tel: link by accident.
-  for (const name of ['hero/RoofingHero.tsx', 'nav/RoofingNav.tsx']) {
+  for (const name of ['hero/RoofingHero.tsx', 'nav/RoofingNav.tsx', 'hero/PlumbingHero.tsx', 'nav/PlumbingNav.tsx']) {
     const src = readFileSync(path.join(CATALOG_DIR, name), 'utf8');
     assert.ok(/href=\{?[`"']?tel:/.test(src) || /brand\.phoneHref/.test(src), `${name} has no phone link`);
   }
