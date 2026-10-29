@@ -57,7 +57,11 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
   const [selected, setSelected] = useState<(typeof FREQUENCIES)[number]['key']>('weekly');
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
   const review = extensions.reviewBadge;
-  const priceFrom = services.items.find((it) => it.priceFrom)?.priceFrom;
+  // items[0], not a find() over all items: the <E> edit path below has to name a FIXED index,
+  // and a find() that lands on item 2 while the edit path says item 0 writes the operator's
+  // change to the wrong service with no error anywhere. The first service is the primary one
+  // (weekly, in every lawn preset); unpriced → no price line (D5).
+  const priceFrom = services.items[0]?.priceFrom;
 
   return (
     <section className="relative isolate flex min-h-[620px] items-center overflow-hidden bg-[#1E4028]">

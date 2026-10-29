@@ -26,7 +26,7 @@ import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { materializeImages } from '@/lib/image-pipeline';
-import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
+import { presetFor, type VerticalId } from '@/lib/verticals';
 import { resolveVerticalIds } from '@/lib/verticals-registry';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
 import { loadGithubToken } from '@/lib/opsSecrets';
@@ -307,10 +307,25 @@ export async function POST(req: Request) {
             preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))),
           );
         } else if (vertical) {
+          /**
+           * `presetFor`, NOT the raw `VERTICAL_PRESETS[vertical]`.
+           *
+           * VERTICAL_LANGUAGES is the single palette + typography authority for the bespoke
+           * vertical templates (PLAN D12); `presetFor` composes it over the preset, and it is
+           * what the Studio sends as `content` on the branch above. Reading the raw preset here
+           * made this the one path that shipped a vertical's OLD, vestigial palette — invisible
+           * for the verticals whose preset happens to sit close to its language entry, and
+           * illegible for car-detailing, whose components are written for a dark ground while
+           * its preset palette is still a light one.
+           *
+           * Not reachable from the Studio — DeployDialog and LaunchDialog both always post
+           * `content` — so no shipped client site carried this. It is reachable by any direct
+           * API call, which is exactly how the vertical-templates-v1 R6 acceptances drove it.
+           */
           writeSiteContent(
             repoRoot,
             slug,
-            preserveProvisioned(await materialize(withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step))),
+            preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step))),
           );
         } else {
           // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
