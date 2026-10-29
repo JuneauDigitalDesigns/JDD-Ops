@@ -4,6 +4,7 @@ import {
   copySiteData,
   hasStubbedContactRoute,
   mergePackageJson,
+  readRepoSiteContent,
   writeOnboardRoutes,
   writeSiteContent,
   isValidSlug,
@@ -20,7 +21,8 @@ import {
   verifyUiPinsFor,
   type Entry,
 } from '@/lib/export';
-import { navLinksFor, type SiteComposition } from '@/lib/pages';
+import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
+import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { materializeImages } from '@/lib/image-pipeline';
@@ -30,6 +32,7 @@ import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/li
 import { loadGithubToken } from '@/lib/opsSecrets';
 import { deleteDraft } from '@/lib/draft';
 import { lockedReason } from '@/lib/onboardingGate';
+import { loadProvisionedFields } from '@/lib/provisionedFields';
 
 /** npm install and next build are both legitimately slow; past this they are stuck, not slow. */
 const NPM_TIMEOUT_MS = 10 * 60_000;
@@ -156,6 +159,20 @@ export async function POST(req: Request) {
         // from preset content and, with `deploy`, push it.
         const lockedMsg = await lockedReason(slug);
         if (lockedMsg) throw new Error(lockedMsg);
+        /**
+         * Structural validation of the composition, SERVER-SIDE, before anything is written.
+         *
+         * `validateEntries` below cannot stand in for this: it checks the flattened component
+         * list against the catalog allowlist, and chrome alone fills that list with three
+         * valid entries. A composition whose pages are empty passes it cleanly — which is how
+         * a client site went live as a nav bar stacked on a footer, with every subpage route
+         * deleted by pruneStaleRoutes on the way out.
+         *
+         * `validateComposition` is the UI's own validator and it had no callers anywhere; the
+         * rules it encodes were being enforced on nobody. Throwing here puts the message on
+         * the NDJSON stream through the catch below, like any other export failure.
+         */
+        if (composition) validateComposition(composition);
         const entries = validateEntries(composition ? collectSectionRefs(composition) : selections);
         const repoRoot = resolveRepoRoot();
 
@@ -179,7 +196,56 @@ export async function POST(req: Request) {
 
         // Multi-page: the site nav becomes route links generated from the composition (Home,
         // Services, …), not the single-page anchor links. Generated routing, not client copy.
-        if (composition && content) content.nav = navLinksFor(composition);
+        if (composition && content) {
+          content.nav = navLinksFor(composition);
+
+          // The rest of the site chrome carries single-page anchors too. On a multi-page site a
+          // footer `#services`/`#about`/… link scrolls to nothing from every page that doesn't
+          // host that section — the same class of dead link the nav regeneration above fixes.
+          // Rewrite each footer link to the route that actually carries its section; refuse the
+          // export when a link points at a section on NO page, so a dead chrome link surfaces in
+          // the deploy dialog (this stream) instead of shipping silently. Runs BEFORE copyTemplate
+          // and the npm steps, so it fails fast; it only edits content.footer (not the
+          // composition or the provisioned-fields snapshot taken below).
+          if (content.footer?.cols?.length) {
+            const { cols, dangling } = remapFooterCols(content.footer, composition);
+            if (dangling.length > 0) {
+              const list = dangling.map((d) => `  • “${d.label}” (${d.href}) in footer column “${d.col}”`).join('\n');
+              throw new Error(
+                `This footer links to ${dangling.length} section${dangling.length === 1 ? '' : 's'} that ${dangling.length === 1 ? 'is' : 'are'} on no page of the site, so ${dangling.length === 1 ? 'it' : 'they'} would scroll to nothing:\n${list}\n\n` +
+                  'Add a page or section that carries that content in the Studio, or remove the link, then export again.',
+              );
+            }
+            content.footer = { ...content.footer, cols };
+          }
+        }
+
+        /**
+         * Snapshot what PROVISIONING put in this repo's site.ts, before anything overwrites it.
+         *
+         * Must happen before `copyTemplate`: `src/data/site.ts` is in TEMPLATE_OWNED_FILES, so
+         * an overwrite export (which is every deploy) reverts it to the template's placeholder
+         * on the very next statement. Read it afterwards and the provisioned values are already
+         * gone — the snapshot would be of the template, and the overlay a no-op.
+         *
+         * The field that matters is `brand.phone`/`phoneHref`. The studio's payload carries the
+         * OWNER'S number from the intake; the repo carries the published JDD Twilio number that
+         * `applyTwilioNumberToSite` wrote. Shipping the payload verbatim republishes the owner's
+         * line, and from then on every inbound caller reaches the owner directly instead of
+         * `/api/voice` — no human-first forward, no Retell fallback, no Airtable row, and
+         * nothing anywhere that reads as an error. See jdd-ops/lib/provisioned-fields.js.
+         */
+        const pf = await loadProvisionedFields();
+        const provisioned = readRepoSiteContent(repoRoot, slug, pf.extractContentObject);
+
+        /** Carry the provisioned fields onto outgoing content, reporting any override made. */
+        const preserveProvisioned = (c: SiteContent): SiteContent => {
+          const { content: merged, applied } = pf.overlayProvisionedFields(c, provisioned);
+          for (const { path, value } of applied) {
+            step(`Keeping the provisioned ${path} (${String(value)}) rather than the value from the studio.`);
+          }
+          return merged;
+        };
 
         // 1. Copy (or reuse) the template repo.
         const existed = repoExists(repoRoot, slug);
@@ -235,15 +301,22 @@ export async function POST(req: Request) {
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
-          writeSiteContent(repoRoot, slug, await materialize(withPlaceholders(resolved, vertical, step)));
+          writeSiteContent(
+            repoRoot,
+            slug,
+            preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))),
+          );
         } else if (vertical) {
           writeSiteContent(
             repoRoot,
             slug,
-            await materialize(withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step)),
+            preserveProvisioned(await materialize(withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step))),
           );
         } else {
-          copySiteData(repoRoot, slug);
+          // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
+          // other two branches — a preset's placeholder phone would otherwise overwrite a
+          // provisioned one just as readily as an edited payload's.
+          copySiteData(repoRoot, slug, preserveProvisioned);
         }
 
         // 2. Place each selected component.
