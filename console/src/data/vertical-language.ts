@@ -150,6 +150,41 @@ export const VERTICAL_LANGUAGES: Record<string, VerticalLanguage> = {
     rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
   },
   /**
+   * Car Detailing — vertical-templates-v1 Phase 9 (the last vertical in this programme).
+   * Transcribed from the approved mockup's own CSS custom properties (design/vertical-
+   * templates-v1/home-mockups.html #detail): the one DARK-FIRST template — champagne accent on
+   * a near-black ground, near-white ink. Steel/near-black/light (the hero/footer structural
+   * darks and the one inverted light CTA band) are literal hex in the Detail* components (not
+   * standard palette slots), same as every other vertical's signature colours. NOT in
+   * WARMTH_EXEMPT: assertWarm only rejects PURE #ffffff/#000000, and #0D0E12/#F2F4F8 both clear
+   * that bar unmodified — confirmed by vertical-language.test.mjs, no exemption needed.
+   */
+  'car-detailing': {
+    pairingId: 'bricolage',
+    palette: {
+      accent: '#C9A14B',
+      accentFg: '#0D0E12',
+      bg: '#0D0E12',
+      bgSoft: '#14161C',
+      ink: '#F2F4F8',
+      inkSoft: '#A3ADBC',
+      rule: '#262A33',
+    },
+    photography: {
+      subjects: [
+        'a detailer polishing a car hood under studio lighting',
+        'a close-up of water beading on a freshly coated paint surface',
+        'a detailer steam-cleaning a car interior',
+        'a mobile detailing van parked in a driveway',
+        'a technician applying ceramic coating in a controlled bay',
+        'a before-and-after of a paint correction on a dark-coloured car',
+      ],
+      grade: 'house',
+      ratioBias: 'wide',
+    },
+    rhythm: { homeTemplateId: 'home-standard', proofSkin: 'soft' },
+  },
+  /**
    * Plumbing — vertical-templates-v1 Phase 8. Transcribed from the approved mockup's own CSS
    * custom properties (design/vertical-templates-v1/home-mockups.html #plumbing): deep-blue
    * accent on a white/soft-blue ground, Schibsted Grotesk throughout. Deep/deep-2 (the hero and

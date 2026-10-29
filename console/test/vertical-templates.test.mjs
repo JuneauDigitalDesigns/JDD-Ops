@@ -76,8 +76,11 @@ test('applyVerticalTemplate mints fresh, distinct section ids each call', () => 
 });
 
 test('applyVerticalTemplate returns null for a vertical with no template', () => {
-  // car-detailing has no bespoke template yet; the Studio falls back to the default composition.
-  assert.equal(applyVerticalTemplate('car-detailing'), null);
+  // health is excluded from vertical-templates-v1 (see design/HANDOFF-health-vertical-research.md)
+  // and has no bespoke template; the Studio falls back to the default composition. car-detailing
+  // was this test's case through Phase 8 — it has a builder as of Phase 9 (EXEC T9.2), so this
+  // assertion moved rather than being dropped.
+  assert.equal(applyVerticalTemplate('health'), null);
 });
 
 test('HVAC services, about, and contact use the standard sections', () => {
@@ -167,6 +170,28 @@ test('the Plumbing home section order exactly matches home-mockups.html #plumbin
     'PlumbingReviews',
     'PlumbingFaq',
     'PlumbingFinalCta',
+  ]);
+});
+
+test('Car Detailing services, about, and contact use the standard sections', () => {
+  const pages = Object.fromEntries(
+    applyVerticalTemplate('car-detailing').pages.map((p) => [p.route, p.sections.map((s) => s.name)]),
+  );
+  assert.deepEqual(pages.services, ['DetailPageHeader', 'DetailServices', 'DetailFaq', 'DetailFinalCta']);
+  assert.deepEqual(pages.about, ['DetailPageHeader', 'DetailAbout', 'DetailTrust', 'DetailReviews', 'DetailFinalCta']);
+  assert.deepEqual(pages.contact, ['DetailPageHeader', 'DetailContact', 'DetailFaq', 'DetailFinalCta']);
+});
+
+test('the Car Detailing home section order exactly matches home-mockups.html #detail (reviews before FAQ)', () => {
+  const home = applyVerticalTemplate('car-detailing').pages.find((p) => p.route === '');
+  assert.deepEqual(home.sections.map((s) => s.name), [
+    'DetailHero',
+    'DetailStats',
+    'DetailServices',
+    'DetailTrust',
+    'DetailReviews',
+    'DetailFaq',
+    'DetailFinalCta',
   ]);
 });
 

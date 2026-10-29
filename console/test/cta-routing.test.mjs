@@ -3,9 +3,10 @@
 // destination at all — a button-styled <a> with no href is a dead link a client would never see
 // fail, because it renders fine and does nothing on click.
 //
-// Roofing (Phase 5) and Plumbing (Phase 8) so far. The allowlist for a non-/contact conversion
-// CTA (detailing's "See packages -> /services", D16) is added when detailing lands (EXEC Phase 9)
-// — not pre-emptively here.
+// Roofing (Phase 5), Plumbing (Phase 8) and Car Detailing (Phase 9, last vertical). Detailing's
+// DetailHero carries the one documented exception to the universal CTA rule: "See packages ->
+// /services" (D16) — a browse action, not a conversion, so it is allowlisted by exact file +
+// href rather than widening /contact's replacement for every vertical.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -15,7 +16,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG_DIR = path.join(ROOT, 'src/components/catalog');
 
-const VERTICAL_PREFIXES = ['Roofing', 'Plumbing'];
+const VERTICAL_PREFIXES = ['Roofing', 'Plumbing', 'Detail'];
+
+/** The one documented non-/contact conversion-area CTA (PLAN D16): DetailHero's "See packages"
+ *  browse action. Scoped to this exact file + href so a stray /services elsewhere still fails. */
+const D16_EXCEPTION = { file: 'DetailHero.tsx', href: '/services' };
 
 /** Every <Prefix>*.tsx file across all catalog categories, for every prefix in VERTICAL_PREFIXES. */
 function verticalFiles() {
@@ -45,7 +50,7 @@ function anchors(src) {
 
 const ALLOWED_LITERAL_NON_CONVERSION = new Set(['/']); // logo links, etc.
 
-test('every <a> in the Roofing*/Plumbing* catalog has an href (no dead CTA links)', () => {
+test('every <a> in the Roofing*/Plumbing*/Detail* catalog has an href (no dead CTA links)', () => {
   const bad = [];
   for (const file of verticalFiles()) {
     const src = readFileSync(file, 'utf8');
@@ -56,24 +61,41 @@ test('every <a> in the Roofing*/Plumbing* catalog has an href (no dead CTA links
   assert.deepEqual(bad, []);
 });
 
-test('every literal non-phone, non-mailto Roofing*/Plumbing* CTA href is /contact', () => {
+test('every literal non-phone, non-mailto Roofing*/Plumbing*/Detail* CTA href is /contact (D16 exception allowlisted)', () => {
   const bad = [];
   for (const file of verticalFiles()) {
     const src = readFileSync(file, 'utf8');
+    const base = path.basename(file);
     for (const a of anchors(src)) {
       if (a.href === null) continue; // dynamic/expression hrefs (data-driven nav/footer links)
       if (a.href.startsWith('tel:') || a.href.startsWith('mailto:')) continue;
       if (ALLOWED_LITERAL_NON_CONVERSION.has(a.href)) continue;
-      if (a.href !== '/contact') bad.push(`${path.basename(file)}: href="${a.href}"`);
+      if (base === D16_EXCEPTION.file && a.href === D16_EXCEPTION.href) continue;
+      if (a.href !== '/contact') bad.push(`${base}: href="${a.href}"`);
     }
   }
   assert.deepEqual(bad, []);
 });
 
+test('DetailHero carries the D16 "See packages" -> /services exception, and nowhere else does', () => {
+  // Pins the allowlist to exactly one file + href, so a future vertical can't silently piggyback
+  // on this exception by reusing the same literal href.
+  for (const file of verticalFiles()) {
+    const src = readFileSync(file, 'utf8');
+    const base = path.basename(file);
+    const hasServicesHref = anchors(src).some((a) => a.href === '/services');
+    if (base === D16_EXCEPTION.file) {
+      assert.ok(hasServicesHref, `${base} should carry the D16 /services exception but does not`);
+    } else {
+      assert.ok(!hasServicesHref, `${base} has a literal /services href — only ${D16_EXCEPTION.file} is allowlisted`);
+    }
+  }
+});
+
 test('each vertical\'s Hero and Nav carry at least one phone link', () => {
   // The phone CTA is the one thing that must NOT route to /contact — confirms the previous
   // test's allowlist isn't hiding a missed tel: link by accident.
-  for (const name of ['hero/RoofingHero.tsx', 'nav/RoofingNav.tsx', 'hero/PlumbingHero.tsx', 'nav/PlumbingNav.tsx']) {
+  for (const name of ['hero/RoofingHero.tsx', 'nav/RoofingNav.tsx', 'hero/PlumbingHero.tsx', 'nav/PlumbingNav.tsx', 'hero/DetailHero.tsx', 'nav/DetailNav.tsx']) {
     const src = readFileSync(path.join(CATALOG_DIR, name), 'utf8');
     assert.ok(/href=\{?[`"']?tel:/.test(src) || /brand\.phoneHref/.test(src), `${name} has no phone link`);
   }

@@ -237,6 +237,55 @@ function plumbingTemplate(): SiteComposition {
   };
 }
 
+/**
+ * Car Detailing — vertical-templates-v1 Phase 9 (design/EXEC-vertical-templates-v1.md), the last
+ * vertical in this programme. The "finish only reads against black" thesis from design/vertical-
+ * templates-v1/home-mockups.html's #detail pane: the one dark-first template, champagne accent on
+ * a near-black ground. Home order matches that mockup: reviews before FAQ, the common case
+ * (roofing is the one exception). DetailHero's "See packages" CTA routes to /services, not
+ * /contact — the one allowlisted exception to the universal CTA rule (PLAN D16).
+ */
+function detailTemplate(): SiteComposition {
+  return {
+    chrome: {
+      nav:    { id: newSectionId(), categoryId: 'nav', name: 'DetailNav' },
+      footer: { id: newSectionId(), categoryId: 'footer', name: 'DetailFooter' },
+      // Chrome SEO is shared, not per-vertical (exactly as hvacTemplate() does it).
+      seo:    { id: newSectionId(), categoryId: 'seo', name: 'SeoLocalBusiness' },
+    },
+    pages: [
+      page('home', 'car-detailing:home', [
+        S('hero', 'DetailHero'),
+        S('stats', 'DetailStats'),
+        S('services', 'DetailServices'),
+        S('trust', 'DetailTrust'),
+        S('testimonials', 'DetailReviews'),
+        S('faq', 'DetailFaq'),
+        S('finalCta', 'DetailFinalCta'),
+      ]),
+      page('services', 'car-detailing:services', [
+        S('pageHeader', 'DetailPageHeader'),
+        S('services', 'DetailServices'),
+        S('faq', 'DetailFaq'),
+        S('finalCta', 'DetailFinalCta'),
+      ]),
+      page('about', 'car-detailing:about', [
+        S('pageHeader', 'DetailPageHeader'),
+        S('about', 'DetailAbout'),
+        S('trust', 'DetailTrust'),
+        S('testimonials', 'DetailReviews'),
+        S('finalCta', 'DetailFinalCta'),
+      ]),
+      page('contact', 'car-detailing:contact', [
+        S('pageHeader', 'DetailPageHeader'),
+        S('contact', 'DetailContact'),
+        S('faq', 'DetailFaq'),
+        S('finalCta', 'DetailFinalCta'),
+      ]),
+    ],
+  };
+}
+
 export type VerticalTemplate = {
   /** Operator-facing name shown on the Studio's single template card. */
   label: string;
@@ -249,6 +298,7 @@ export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> =
   roofing: { label: 'Roofing — Standard', build: roofingTemplate },
   'lawn-care': { label: 'Lawn Care — Standard', build: lawnTemplate },
   plumbing: { label: 'Plumbing — Standard', build: plumbingTemplate },
+  'car-detailing': { label: 'Car Detailing — Standard', build: detailTemplate },
 };
 
 /** The template for a vertical, or null when none is built yet. */
