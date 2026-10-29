@@ -42,9 +42,13 @@ const DETAIL: Record<PhaseLabel, string> = {
   [PHASE_LABELS.number]: 'Buy a JDD Twilio number, point voiceUrl at /api/voice',
   [PHASE_LABELS.airtable]: 'Create the “{brand} — Calls” base with a Call Log table',
   [PHASE_LABELS.callLogging]: 'Clone the post-call Make scenario, set the Retell webhook',
+  [PHASE_LABELS.publishNumber]: 'Put the Twilio number on the site, keeping the owner’s line as the forward target',
+  [PHASE_LABELS.checks]: 'Assert the run is correct — tier matrix, published number, Airtable field mapping',
   [PHASE_LABELS.push]: 'Commit and push the client repo',
   [PHASE_LABELS.vercel]: 'Create/link the Vercel project and sync env',
+  [PHASE_LABELS.deploy]: 'Trigger a preview deployment — review it, then promote in the Vercel dashboard',
   [PHASE_LABELS.portal]: 'Create the Clerk portal account record',
+  [PHASE_LABELS.testLogin]: 'Create or update the Clerk test login for the portal',
 };
 
 function planned(
@@ -66,21 +70,28 @@ function planned(
  * The phases a run for this client SHOULD emit, in order.
  *
  * Gating mirrors onboard.js exactly:
- *  - starter skips AI prompt / Retell agent / phone number / Airtable / call logging (:1360)
+ *  - a WEB-ONLY client (Starter + receptionistMode 'declined') skips AI prompt / Retell agent /
+ *    phone number / Airtable / call logging (onboard.js:2006). Every other client — including a
+ *    Starter WITH a receptionist — runs the full stack. The gate is `isWebOnly`, never the plan.
  *  - the site tag is only emitted when sites.length > 1 (:1349), so single-site keys are bare
  *  - Airtable is created on the FIRST site only; enterprise sites 2+ reuse the shared base
  *    via a plain console.log, NOT a log(8, …) marker — so they get no Airtable phase (:1367-73)
  *
- * The list is exactly what onboard.js will emit — nothing more. An earlier version also emitted
- * starter's five voice phases pre-marked 'skipped', to hold a constant diagram shape across
- * tiers. That backfired: 'skipped' and 'pending' rendered almost identically, so an
- * unprovisioned GROWTH client looked like a client that only runs Intake. The shape argument
- * wasn't worth a diagram that misrepresents the common case.
+ * The voice phases ARE emitted for a web-only client, pre-marked 'skipped' so the pipeline shows
+ * them struck through rather than hidden (the operator asked to see the full shape). This is NOT
+ * the earlier mistake of pre-marking a GROWTH client's phases 'skipped' — those run and are
+ * 'pending'; only a genuinely web-only client gets 'skipped'. 'skipped' and 'pending' are styled
+ * distinctly in PipelineFlow (dashed + struck vs solid), so the two no longer look alike.
  */
 export function expectedPhases(ctx: ClientContext): PlannedPhase[] {
   const sites = ctx.sites.length ? ctx.sites : [null];
   const multi = sites.length > 1;
-  const voice = ctx.plan !== 'starter';
+  // Keyed on web-only, not plan (mirrors onboard.js:2006). A web-only client (Starter + declined)
+  // is the only one that skips the voice stack; everyone else runs it. The voice phases are still
+  // EMITTED for a web-only client, pre-marked 'skipped', so the pipeline shows the full shape with
+  // those steps struck through rather than hiding them.
+  const voice = !ctx.isWebOnly;
+  const voiceStatus: PlannedPhase['status'] = voice ? 'pending' : 'skipped';
 
   const out: PlannedPhase[] = [
     { ...planned(PHASE_LABELS.intake, ''), key: phaseKey(PHASE_LABELS.intake) },
@@ -97,21 +108,36 @@ export function expectedPhases(ctx: ClientContext): PlannedPhase[] {
       planned(PHASE_LABELS.env, tag, slug),
       planned(PHASE_LABELS.build, tag, slug),
     );
-    if (voice) {
-      out.push(
-        planned(PHASE_LABELS.prompt, tag, slug),
-        planned(PHASE_LABELS.agent, tag, slug),
-        planned(PHASE_LABELS.number, tag, slug),
-      );
-      // Only site 1 creates the base; the rest inherit it without a step marker.
-      if (i === 0) out.push(planned(PHASE_LABELS.airtable, tag, slug));
-      out.push(planned(PHASE_LABELS.callLogging, tag, slug));
-    }
-    out.push(planned(PHASE_LABELS.push, tag, slug), planned(PHASE_LABELS.vercel, tag, slug));
+    out.push(
+      planned(PHASE_LABELS.prompt, tag, slug, voiceStatus),
+      planned(PHASE_LABELS.agent, tag, slug, voiceStatus),
+      planned(PHASE_LABELS.number, tag, slug, voiceStatus),
+    );
+    // Only site 1 creates the base; the rest inherit it without a step marker.
+    if (i === 0) out.push(planned(PHASE_LABELS.airtable, tag, slug, voiceStatus));
+    out.push(planned(PHASE_LABELS.callLogging, tag, slug, voiceStatus));
+    // Publishing the number needs a number, so it is voice-gated like the purchase itself.
+    out.push(planned(PHASE_LABELS.publishNumber, tag, slug, voiceStatus));
+    // The checks run for EVERY client including web-only — a web-only client still has a tier
+    // matrix to get wrong. Vendor-facing checks inside it self-skip.
+    out.push(planned(PHASE_LABELS.checks, tag, slug));
+    out.push(
+      planned(PHASE_LABELS.push, tag, slug),
+      planned(PHASE_LABELS.vercel, tag, slug),
+      // The preview deploy runs for every client (web-only included) — not voice-gated.
+      planned(PHASE_LABELS.deploy, tag, slug),
+      // Portal attach is PER SITE and therefore site-tagged. onboard.js links each site inside
+      // the loop deliberately — an enterprise run that dies on site 3 should still leave sites
+      // 1 and 2 visible in the client's portal. This was previously planned once, untagged,
+      // after the loop, so on an enterprise run the planned node never lit up and the two real
+      // ones rendered as `unplanned`. Caught by phase-contract.test.mjs.
+      planned(PHASE_LABELS.portal, tag, slug),
+    );
   });
 
-  // Runs after the loop with CURRENT_SITE_LABEL cleared (:1397), so never site-tagged.
-  out.push(planned(PHASE_LABELS.portal, ''));
+  // The Clerk test login is genuinely once-per-client: it runs after the loop with
+  // CURRENT_SITE_LABEL cleared, so it alone is untagged.
+  out.push(planned(PHASE_LABELS.testLogin, ''));
   return out;
 }
 
@@ -153,6 +179,9 @@ export function mergeRun(expected: PlannedPhase[], run: RunState | null): Planne
  */
 export function restingPhases(ctx: ClientContext): PlannedPhase[] {
   return expectedPhases(ctx).map((p): PlannedPhase => {
+    // A phase expectedPhases already marked 'skipped' (web-only voice stack) will never run, so
+    // disk state can't make it done/pending — keep it struck.
+    if (p.status === 'skipped') return p;
     const site = p.siteSlug ? ctx.sites.find((s) => s.slug === p.siteSlug) : ctx.sites[0];
     const env = site?.env ?? {};
     const built = site?.repoBuilt ?? ctx.repoBuilt;
@@ -172,8 +201,25 @@ export function restingPhases(ctx: ClientContext): PlannedPhase[] {
       case PHASE_LABELS.airtable: done = !!env.AIRTABLE_BASE_ID; break;
       case PHASE_LABELS.callLogging: done = !!env.RETELL_POST_CALL_WEBHOOK_URL; break;
       case PHASE_LABELS.vercel: done = !!env.VERCEL_PROJECT_NAME; break;
-      // Pre-flight leaves no artifact, and the portal record lives in KV, not on disk —
-      // neither is knowable from clients/, so both stay pending until a run reports them.
+      // Deliberately NOT inferred from TWILIO_NUMBER alone: a number exists from the moment it
+      // is bought, and treating that as "published" is the exact bug this phase was added to
+      // catch — the site kept the owner's number while the stack hung off the Twilio one.
+      //
+      // The site.ts-vs-env comparison itself happens in clients.ts (`numberPublished`), where
+      // @jdd/schema's `samePhone` is already available. Keeping that import out of this file is
+      // not incidental: @jdd/schema declares only an `import` export condition, so a .ts module
+      // that pulls it in cannot be loaded by the tsx-based test runner — which is exactly how
+      // the phase-contract test broke when this logic first lived here.
+      case PHASE_LABELS.publishNumber: done = !!site?.numberPublished; break;
+      case PHASE_LABELS.testLogin: done = !!env.CLERK_USER_ID; break;
+      // The portal record itself lives in KV, but onboard.js carries PORTAL_ACCOUNT_EMAIL into
+      // .env.local (see CARRIED_KEYS), so the attach IS knowable from disk. This previously
+      // fell through to `default` with a comment claiming otherwise, which left a fully
+      // provisioned client showing a permanently pending Portal node.
+      case PHASE_LABELS.portal: done = !!env.PORTAL_ACCOUNT_EMAIL; break;
+      // Genuinely unknowable from clients/: pre-flight and the correctness checks leave no
+      // artifact at all, and a preview deploy's state lives in Vercel. These stay pending
+      // until a run reports them — which is honest, not a gap.
       default: done = false;
     }
     // Everything expectedPhases() emits will run, so anything not already on disk is simply

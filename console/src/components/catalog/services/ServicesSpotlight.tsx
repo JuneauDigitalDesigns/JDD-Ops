@@ -1,12 +1,16 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// ServicesSpotlight — the stacked-panels archetype (see DESIGN-LANGUAGE.md and the
-// Phase 5 specimen). Full-width horizontal panels, one column. Hierarchy comes from
-// PANEL HEIGHT VARIATION plus display-3 vs card-title, not decoration: the first
-// service is the tall lead panel (with its image on desktop), the rest are compact.
-// No cursor glow (decision 28) — that effect was this component's old identity and
-// is cut.
+// ServicesSpotlight — numbered hover-swap list (2026-10 visual upgrade, "Home — Quiet").
+//
+// Was stacked full-width panels. The upgrade adopts the reference pattern (Air Service of
+// Florida): a crossfading image panel beside a numbered 01/02 title list; hovering/focusing a
+// row swaps the panel image and the caption detail, with an accent left-border marking the
+// active row. Distinctive and interactive while staying "quiet" — one image, generous type.
+//
+// NOT a signature moment (decision 26): the swap is pointer-driven, not scroll-linked, so it
+// does not spend the per-page motion budget. A subtle on-entry fade remains (below the fold).
 // ─────────────────────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
@@ -37,80 +41,85 @@ export default function ServicesSpotlight({
   const still = stillFor(skin, reduce);
   const s = skinClasses(skin);
   const { services } = content;
-  const items = services.items;
+  const items = services.items.filter((it) => it.t?.trim());
+  const [active, setActive] = useState(0);
   if (!items.length) return null;
 
-  const [lead, ...rest] = items;
+  const cur = items[Math.min(active, items.length - 1)];
+  const panelShadow =
+    '0 4px 10px color-mix(in srgb, var(--accent-2) 10%, transparent), 0 26px 50px -18px color-mix(in srgb, var(--accent-2) 40%, transparent)';
 
   return (
-    <section id="services" className={`py-24 ${s.section}`}>
-      <div className="mx-auto max-w-5xl px-6">
-        <motion.h2
-          className={`max-w-xl font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}
-          initial={still ? false : { opacity: 0, y: 14 }}
+    <section id="services" className={`py-20 lg:py-24 ${s.section}`}>
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="max-w-2xl">
+          <h2 className={`font-heading text-3xl font-bold tracking-[-0.01em] md:text-4xl ${s.heading}`}><E p="services.title">{services.title}</E></h2>
+          <span className="accent-bar mt-5" aria-hidden="true" />
+          {services.sub && <p className={`mt-4 text-[17px] leading-relaxed ${s.body}`}><E p="services.sub">{services.sub}</E></p>}
+        </div>
+
+        <motion.div
+          className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_1fr] lg:items-stretch"
+          initial={still ? false : { opacity: 0, y: 16 }}
           whileInView={still ? undefined : { opacity: 1, y: 0 }}
           viewport={viewportOnce}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          <E p="services.title">{services.title}</E>
-        </motion.h2>
-
-        <div className="mt-10">
-          {/* Lead panel: tall, display-3 title, image on desktop. */}
-          <motion.div
-            className={`grid gap-6 border-t ${s.rule} py-10 lg:grid-cols-[minmax(0,1fr)_34%] lg:items-center`}
-            initial={still ? false : { opacity: 0, y: 16 }}
-            whileInView={still ? undefined : { opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: 0.5, ease: EASE }}
-          >
-            <div>
-              <span className={`text-sm font-semibold ${s.body}`}><E p="services.items.0.tag">{lead.tag}</E></span>
-              <h3 className={`mt-1 font-heading text-2xl font-semibold tracking-[-0.01em] ${s.heading} md:text-3xl`}><E p="services.items.0.t">{lead.t}</E></h3>
-              <p className={`mt-3 max-w-xl ${s.body}`}><E p="services.items.0.d">{lead.d}</E></p>
-            </div>
-            <div className="overflow-hidden rounded-xl">
-              {lead.image?.url ? (
+          {/* Crossfading image panel. */}
+          <div className="relative min-h-[320px] overflow-hidden rounded-2xl bg-ink lg:min-h-[440px]" style={{ boxShadow: panelShadow }}>
+            {items.map((it, i) =>
+              it.image?.url ? (
                 <img
-                  {...responsiveImage(lead.image.url)}
-                  alt={lead.image.alt}
+                  key={i}
+                  {...responsiveImage(it.image.url)}
+                  alt={it.image.alt}
                   loading="lazy"
                   decoding="async"
-                  width={800}
-                  height={533}
-                  sizes="(min-width: 1024px) 34vw, 100vw"
-                  className="aspect-[3/2] h-full w-full object-cover"
+                  width={900}
+                  height={600}
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${i === active ? 'opacity-100' : 'opacity-0'}`}
                 />
               ) : (
-                <div className="flex aspect-[3/2] w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
-                  <span className="font-heading text-4xl font-black leading-none text-inkSoft/30">01</span>
+                <div
+                  key={i}
+                  className={`absolute inset-0 flex items-center justify-center bg-ink bg-[repeating-linear-gradient(45deg,transparent,transparent_12px,rgba(255,255,255,0.04)_12px,rgba(255,255,255,0.04)_24px)] transition-opacity duration-500 ${i === active ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <span className="font-heading text-5xl font-bold leading-none text-onInk/20">{String(i + 1).padStart(2, '0')}</span>
                 </div>
-              )}
+              ),
+            )}
+            {/* Active detail caption — flat dark plate (no gradient tell). */}
+            <div className="absolute inset-x-0 bottom-0 z-[2] bg-[rgba(8,14,22,0.74)] p-5">
+              <p className="font-heading text-[13px] font-bold tracking-[0.12em] text-[color:var(--accent-200)]">
+                {String(active + 1).padStart(2, '0')} — {cur.t.toUpperCase()}
+              </p>
+              <p className="mt-1.5 max-w-[46ch] text-[14px] leading-relaxed text-onInkSoft">
+                <E p={`services.items.${active}.d`}>{cur.d}</E>
+              </p>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Compact panels: the height difference is the hierarchy. */}
-          {rest.map((item, idx) => {
-            const i = idx + 1;
-            const last = i === items.length - 1;
-            return (
-              <motion.div
-                key={item.n ?? i}
-                className={`border-t ${s.rule} py-6 ${last ? `border-b ${s.rule}` : ''}`}
-                initial={still ? false : { opacity: 0, y: 12 }}
-                whileInView={still ? undefined : { opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 0.4, ease: EASE, delay: still ? 0 : idx * 0.05 }}
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-                  <h3 className={`font-heading text-xl font-semibold tracking-[-0.01em] ${s.heading}`}><E p={`services.items.${i}.t`}>{item.t}</E></h3>
-                  <span className={`text-sm ${s.body}`}><E p={`services.items.${i}.tag`}>{item.tag}</E></span>
-                </div>
-                <p className={`mt-1 max-w-2xl text-sm ${s.body}`}><E p={`services.items.${i}.d`}>{item.d}</E></p>
-              </motion.div>
-            );
-          })}
-        </div>
+          {/* Numbered hover-swap list. */}
+          <div className="flex flex-col justify-center">
+            {items.map((it, i) => {
+              const on = i === active;
+              return (
+                <button
+                  type="button"
+                  key={it.n ?? i}
+                  onMouseEnter={() => setActive(i)}
+                  onFocus={() => setActive(i)}
+                  onClick={() => setActive(i)}
+                  className={`border-l-2 py-4 text-left transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${on ? 'border-accent pl-7' : `pl-5 ${s.rule}`}`}
+                >
+                  <span className={`block text-[11px] font-bold tracking-[0.14em] ${on ? 'text-accent' : s.body}`}>{String(i + 1).padStart(2, '0')}</span>
+                  <span className={`mt-1 block font-heading text-2xl font-semibold leading-tight tracking-[-0.01em] ${on ? s.heading : s.body}`}><E p={`services.items.${i}.t`}>{it.t}</E></span>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
       </div>
     </section>
   );

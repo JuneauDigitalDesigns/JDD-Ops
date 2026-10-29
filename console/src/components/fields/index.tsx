@@ -46,7 +46,10 @@ export function ReviewBadge() {
 export function Field({
   content, setField, path, label, type = 'text', placeholder, flagged,
 }: {
-  content: SiteContent; setField: SetField; path: string; label: string;
+  // ReactNode, not string: the Brief stage's Facts editor appends a per-field source chip
+  // ("from intake" / "preset") to the label. Widening is backwards compatible — every other
+  // caller passes a plain string and renders identically.
+  content: SiteContent; setField: SetField; path: string; label: React.ReactNode;
   type?: 'text' | 'number' | 'url'; placeholder?: string; flagged?: boolean;
 }) {
   return (

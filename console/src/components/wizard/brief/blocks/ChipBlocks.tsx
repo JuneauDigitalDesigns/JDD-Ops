@@ -3,11 +3,11 @@
 import type { CopyBrief } from '@jdd/schema';
 import type { OffersBlock, PositioningBlock } from '@/lib/copy-brief/types';
 import { setBlockEnabled, setBlockOverride, setChipFreeText, setChipSelected, toggleChip } from '@/lib/copy-brief/mutations';
-import { BlockHeader, ChipGroupEditor, FieldLabel, OverrideTextarea } from '../BlockPrimitives';
+import { BlockHeader, ChipGroupEditor, FieldLabel, OverrideTextarea, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
-export function PositioningBlockEditor({ block, onUpdate }: { block: PositioningBlock; onUpdate: Update }) {
+export function PositioningBlockEditor({ block, onUpdate, variant = 'page' }: { block: PositioningBlock; onUpdate: Update; variant?: BlockVariant }) {
   return (
     <div>
       <BlockHeader
@@ -15,6 +15,7 @@ export function PositioningBlockEditor({ block, onUpdate }: { block: Positioning
         channel={block.channel}
         enabled={block.enabled}
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, 'positioning', v))}
+        variant={variant}
       />
       {block.groups.map((group) => (
         <ChipGroupEditor
@@ -32,7 +33,7 @@ export function PositioningBlockEditor({ block, onUpdate }: { block: Positioning
   );
 }
 
-export function OffersBlockEditor({ block, onUpdate }: { block: OffersBlock; onUpdate: Update }) {
+export function OffersBlockEditor({ block, onUpdate, variant = 'page' }: { block: OffersBlock; onUpdate: Update; variant?: BlockVariant }) {
   return (
     <div>
       <BlockHeader
@@ -40,6 +41,7 @@ export function OffersBlockEditor({ block, onUpdate }: { block: OffersBlock; onU
         channel={block.channel}
         enabled={block.enabled}
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, 'offers', v))}
+        variant={variant}
       />
       <div className="mb-4">
         <div className="mb-1.5 flex items-center justify-between gap-2">

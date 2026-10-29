@@ -1,4 +1,12 @@
 /**
+ * ARCHIVED AS A STUDIO CHOICE (2026-10 vertical-template pivot). The Studio no longer offers
+ * `PAGE_TEMPLATES` or per-page template switching — its unit of choice is now one bespoke
+ * whole-site template per vertical (see vertical-templates.tsx + src/components/CATALOG-LEGACY.md).
+ * This registry is KEPT because its helpers (`defaultCompositionFor`, `pageFromType`,
+ * `servicePageFrom`, `pageMetaFor`, the add-page sets) still back the generic fallback
+ * composition, add-page, per-service pages, and the HVAC template's interim subpages. Do not
+ * delete until every vertical's four pages have a bespoke replacement.
+ *
  * The page-template registry: for each kind of page, one or more ready-made compositions of the
  * existing section catalog. A "page template" is just an ordered list of SectionRef (into the
  * catalog); the Studio's page picker applies one to a page. Non-home templates open with a
@@ -32,7 +40,14 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       S('testimonials', 'TestimonialsGrid', 'normal'),
       S('work', 'RecentJobsGrid', 'bleed'),
       S('faq', 'FaqAccordion', 'loose'),
-      S('finalCta', 'FinalCtaBanner', 'tight', 'inverted'),
+      // No skin. FinalCtaBanner has no entry in SKINS (@jdd/ui) and no `skin` prop, so
+      // `supportsSkin` is false for it and wirePages would never emit the attribute anyway —
+      // but `validateEntries` checks the skin BEFORE that, and refused the whole export with
+      // `Unknown skin "inverted" for component "FinalCtaBanner"`. Since this template seeds
+      // defaultCompositionFor(), the DEFAULT 4-page site could not be exported at all. The
+      // value was decorative in the payload and fatal at the gate; dropping it changes
+      // nothing about the rendered page. Guarded by catalog-invariants.test.mjs.
+      S('finalCta', 'FinalCtaBanner', 'tight'),
     ],
   },
   {

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { loadManageTarget } from '@/lib/manageSites';
 import { loadRetellApiKey } from '@/lib/opsSecrets';
 import { appendAudit } from '@/lib/audit';
+import { ensureBaseline, recordPromptVersion } from '@/lib/promptVersions';
 
 /**
  * Read and update a client's Retell agent prompt.
@@ -37,8 +38,12 @@ export async function GET(req: Request) {
   if (!target.ok) return NextResponse.json({ error: target.error }, { status: target.status });
 
   const { ctx, resolved } = target;
-  if (ctx.plan === 'starter') {
-    return NextResponse.json({ error: 'Starter clients have no voice agent.' }, { status: 400 });
+  // Gated on isWebOnly, NOT on plan. Since the 2026-10-12 reprice every tier includes the
+  // receptionist — a Starter client who kept theirs has an agent, a prompt and a phone number
+  // like any Growth client. The old `plan === 'starter'` test locked every one of them out of
+  // their own prompt, in a route whose entire job is editing it.
+  if (ctx.isWebOnly) {
+    return NextResponse.json({ error: 'This client declined the receptionist — no voice agent.' }, { status: 400 });
   }
 
   const path = resolve(resolved.dir, PROMPT_FILE);
@@ -130,8 +135,12 @@ export async function POST(req: Request) {
   if (!target.ok) return NextResponse.json({ error: target.error }, { status: target.status });
 
   const { ctx, resolved } = target;
-  if (ctx.plan === 'starter') {
-    return NextResponse.json({ error: 'Starter clients have no voice agent.' }, { status: 400 });
+  // Gated on isWebOnly, NOT on plan. Since the 2026-10-12 reprice every tier includes the
+  // receptionist — a Starter client who kept theirs has an agent, a prompt and a phone number
+  // like any Growth client. The old `plan === 'starter'` test locked every one of them out of
+  // their own prompt, in a route whose entire job is editing it.
+  if (ctx.isWebOnly) {
+    return NextResponse.json({ error: 'This client declined the receptionist — no voice agent.' }, { status: 400 });
   }
 
   const prompt = typeof body.prompt === 'string' ? body.prompt : '';
@@ -141,6 +150,18 @@ export async function POST(req: Request) {
 
   // Disk first, always: a push that fails must still leave the edit recoverable.
   const path = resolve(resolved.dir, PROMPT_FILE);
+
+  // Keep what's about to be overwritten, before overwriting it. Without this the FIRST edit
+  // through the console is the one change that can't be undone — onboard.js's generated prompt
+  // would be gone before any version of it was ever kept.
+  try {
+    if (existsSync(path)) {
+      ensureBaseline({ slug: ctx.slug, siteSlug: resolved.site.slug, diskContent: readFileSync(path, 'utf8') });
+    }
+  } catch {
+    // A failed baseline must not block the save.
+  }
+
   try {
     writeFileSync(path, prompt, 'utf8');
   } catch (err) {
@@ -157,6 +178,11 @@ export async function POST(req: Request) {
     ok: true,
     summary: `Saved ${PROMPT_FILE} (${prompt.length.toLocaleString()} chars)`,
   });
+
+  // Recorded on every write, before the push is attempted — so a push whose Retell leg fails
+  // still leaves the text recoverable. A successful push promotes this same entry to `pushed`
+  // rather than appending a duplicate.
+  recordPromptVersion({ slug: ctx.slug, siteSlug: resolved.site.slug, trigger: 'saved', content: prompt });
 
   if (!body.push) {
     return NextResponse.json({ ok: true, saved: true, pushed: false, chars: prompt.length });
@@ -208,6 +234,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, saved: true, pushed: false, pushError: message });
     }
 
+    recordPromptVersion({ slug: ctx.slug, siteSlug: resolved.site.slug, trigger: 'pushed', content: prompt });
     appendAudit({
       slug: ctx.slug,
       siteSlug: resolved.site.slug,

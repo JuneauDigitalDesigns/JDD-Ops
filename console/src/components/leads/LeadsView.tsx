@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowsClockwise, CircleNotch, Plus } from '@phosphor-icons/react';
 import type { DemoCall, QueuedLead } from '@/lib/leadTypes';
 import { LEADS_LAST_SEEN_KEY } from '@/lib/lead-meta';
@@ -27,6 +27,7 @@ type Tab = 'board' | 'calls';
 
 export default function LeadsView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<QueuedLead[]>([]);
   const [calls, setCalls] = useState<DemoCall[]>([]);
   const [siteUrl, setSiteUrl] = useState('https://juneaudigitaldesigns.com');
@@ -56,6 +57,8 @@ export default function LeadsView() {
    */
   const [lastSeenAt, setLastSeenAt] = useState<number | null>(null);
   const lastSeenRead = useRef(false);
+  /** One-shot guard for the `?open={id}` deep-link (e.g. "View lead" from a meeting). */
+  const openParamRead = useRef(false);
 
   useEffect(() => {
     const check = () => setNarrow(window.innerWidth < 900);
@@ -129,6 +132,23 @@ export default function LeadsView() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Deep-link: /leads?open={id} opens that lead once it has loaded — the back-link a meeting's
+  // "View lead" uses. Waits for the leads to arrive so the id can resolve, then strips the query
+  // so a later refresh or close doesn't reopen it. One-shot via the ref guard.
+  useEffect(() => {
+    if (openParamRead.current || loading) return;
+    const id = searchParams.get('open');
+    if (!id) {
+      openParamRead.current = true;
+      return;
+    }
+    if (leads.some((l) => l.id === id)) {
+      setOpenId(id);
+      openParamRead.current = true;
+      router.replace('/leads');
+    }
+  }, [loading, leads, searchParams, router]);
 
   /**
    * Commit a change to one lead, optimistically.
@@ -345,6 +365,14 @@ export default function LeadsView() {
           onPatch={(p) => patch(openLead.id, p)}
           onDelete={removeLead}
           onOpenScript={() => setScriptId(openLead.id)}
+          onAddToCalendar={() => {
+            const p = new URLSearchParams({ create: '1', leadId: openLead.id });
+            if (openLead.businessName) p.set('business', openLead.businessName);
+            if (openLead.name) p.set('name', openLead.name);
+            if (openLead.trade) p.set('trade', openLead.trade);
+            if (openLead.phone) p.set('phone', openLead.phone);
+            router.push(`/calendar?${p.toString()}`);
+          }}
           // The roster reads `?new=` to scroll to and flash the card this just created.
           onConverted={(slug) => {
             setOpenId(null);

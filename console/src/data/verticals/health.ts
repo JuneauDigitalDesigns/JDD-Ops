@@ -18,6 +18,7 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#0E9C8A",
+      accent2:  "#1E3A4F",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",
@@ -26,12 +27,12 @@ export const CONTENT: SiteContent = {
       rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "0.005em",
+      headingLineHeight: 1.0,
     },
   },
 
@@ -130,8 +131,9 @@ export const CONTENT: SiteContent = {
   },
 
   finalCta: {
-    eyebrow:   "Ready When You Are",
-    headline:  "Take the First Step Toward Feeling Better",
+    eyebrow:          "Ready When You Are",
+    headline:         "Take the First Step Toward Feeling Better",
+    headlineEmphasis: null,
     sub:       "Booking a first visit is simple, and there's no pressure. We're here whenever you're ready to start.",
     cta:       "Book a First Visit",
     secondary: "Call (555) 555-0123",

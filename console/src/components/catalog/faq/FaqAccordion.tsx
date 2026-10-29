@@ -1,6 +1,6 @@
 'use client';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Plus, Minus, PhoneCall } from '@phosphor-icons/react';
+import { Plus, PhoneCall } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
@@ -50,22 +50,23 @@ export default function FaqAccordion({
           {faq.items.map((f, i) => (
             <motion.details
               key={i}
-              className={`group rounded-2xl border ${s.cardRule} ${s.card}`}
+              className={`group rounded-2xl border transition-[border-color,box-shadow] duration-300 open:border-accent/40 open:shadow-[0_2px_6px_rgba(0,0,0,0.05),0_18px_34px_-16px_rgba(20,30,48,0.28)] ${s.cardRule} ${s.card}`}
               initial={still ? false : { opacity: 0, y: 8 }}
               whileInView={still ? undefined : { opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.4, ease: EASE, delay: still ? 0 : i * 0.04 }}
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5">
                 <span className={`font-semibold ${s.heading}`}><E p={`faq.items.${i}.q`}>{f.q}</E></span>
+                {/* One Plus that rotates to an × — smoother than swapping two glyphs. */}
                 <span className="shrink-0 text-accent" aria-hidden="true">
-                  <Plus size={18} className="block group-open:hidden" />
-                  <Minus size={18} className="hidden group-open:block" />
+                  <Plus size={18} className="transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-open:rotate-[135deg]" />
                 </span>
               </summary>
-              <div className="grid grid-rows-[0fr] overflow-hidden transition-[grid-template-rows] duration-200 group-open:grid-rows-[1fr]">
+              {/* Height slides down over 0.32s with a soft ease; the answer fades in as it opens. */}
+              <div className="grid grid-rows-[0fr] overflow-hidden transition-[grid-template-rows] duration-[320ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-open:grid-rows-[1fr]">
                 <div className="overflow-hidden">
-                  <p className={`px-5 pb-5 pt-1 leading-relaxed ${s.body}`}><E p={`faq.items.${i}.a`}>{f.a}</E></p>
+                  <p className={`px-6 pb-7 pt-1.5 text-[15.5px] leading-[1.72] opacity-0 transition-opacity duration-300 ease-out group-open:opacity-100 ${s.body}`}><E p={`faq.items.${i}.a`}>{f.a}</E></p>
                 </div>
               </div>
             </motion.details>

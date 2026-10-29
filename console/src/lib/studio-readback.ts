@@ -2,7 +2,7 @@ import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clientDir } from './paths';
-import { isValidSkin, type SkinId } from './skins';
+import { parseExportedPage, type ReadBackEntry, type StudioReadBack } from './readback-parse';
 
 /**
  * Read a client's page composition back OUT of their exported repo.
@@ -21,31 +21,28 @@ import { isValidSkin, type SkinId } from './skins';
  * shape there, change it here in the same commit or the studio will silently start showing
  * an empty page again.
  *
+ * ── SUPERSEDED, for anything multi-page ─────────────────────────────────────
+ *
+ * This reads ONE file — home's — and returns the flat legacy `{selections, order}` shape,
+ * which cannot represent a second page. A four-page client read back through here comes out
+ * as a ONE-page composition, and the next export then writes one page and lets
+ * pruneStaleRoutes delete `src/app/services`, `/about` and `/contact`.
+ *
+ * So the exporter now writes `.studio/composition.json` (see composition-manifest.ts) and
+ * callers prefer that. This remains the fallback for repos exported before the manifest
+ * existed, and for the deploy diff's `git show` baseline, where a historical page.tsx is all
+ * there is to read. Prefer `readCompositionManifest` wherever a manifest might exist.
+ *
  * NOT recoverable, and accepted: the `vertical` preset the client was started from. It only
  * supplies fallbacks for fields site.ts doesn't define, and site.ts is loaded separately as
  * the real content, so the cost is limited to placeholder imagery in the preview.
+ *
+ * The parsing itself lives in `readback-parse.ts` — pure, and therefore testable, since
+ * `server-only` throws under the tsx test loader.
  */
 
-export interface ReadBackEntry {
-  categoryId: string;
-  name: string;
-  skin?: SkinId;
-}
-
-export interface StudioReadBack {
-  /** categoryId -> component name. */
-  selections: Record<string, string>;
-  /**
-   * categoryId -> skin id, only where the repo carries an explicit skin prop AND that skin
-   * is still valid for that component. A skin that has since been renamed or removed from
-   * the catalog is dropped rather than fed back into the studio as an unknown SkinId.
-   */
-  skins: Record<string, SkinId>;
-  /** Body categories in page order (nav first, footer last, as written). */
-  order: string[];
-  /** Every entry including `seo`, for callers that need the flat list. */
-  entries: ReadBackEntry[];
-}
+export { parseExportedPage };
+export type { ReadBackEntry, StudioReadBack };
 
 /** Absolute path to the wired page for a client's exported repo. */
 export function repoPagePath(slug: string): string {
@@ -55,63 +52,6 @@ export function repoPagePath(slug: string): string {
 /** True when this client has an exported repo whose page we can read. */
 export function hasExportedPage(slug: string): boolean {
   return existsSync(repoPagePath(slug));
-}
-
-/** `import Hero from '@/components/catalog/hero/HeroSplit';` -> name -> categoryId */
-const IMPORT_RE =
-  /^import\s+(\w+)\s+from\s+'@\/components\/catalog\/([\w-]+)\/\1';/gm;
-
-/** The body region wirePage() writes between its two anchors. */
-const BODY_RE = /\{\/\* @studio:body:start \*\/\}([\s\S]*?)\{\/\* @studio:body:end \*\/\}/;
-
-/** `<HeroSplit skin="contrast" />` — skin is optional and only present when supported. */
-const ELEMENT_RE = /<(\w+)((?:\s+\w+="[^"]*")*)\s*\/>/g;
-
-/** `export { generateMetadata } from '@/components/catalog/seo/SeoDefault';` */
-const SEO_RE =
-  /export\s*\{\s*generateMetadata\s*\}\s*from\s*'@\/components\/catalog\/seo\/(\w+)';/;
-
-/**
- * Parse an exported page.tsx into the studio's composition, or null if it isn't one we
- * recognise (no body markers = not a studio-wired page, e.g. a hand-edited repo).
- */
-export function parseExportedPage(src: string): StudioReadBack | null {
-  const body = BODY_RE.exec(src);
-  if (!body) return null;
-
-  // name -> categoryId, from the import block.
-  const categoryByName = new Map<string, string>();
-  for (const m of src.matchAll(IMPORT_RE)) {
-    categoryByName.set(m[1], m[2]);
-  }
-
-  const entries: ReadBackEntry[] = [];
-  const selections: Record<string, string> = {};
-  const skins: Record<string, SkinId> = {};
-  const order: string[] = [];
-
-  for (const m of body[1].matchAll(ELEMENT_RE)) {
-    const name = m[1];
-    const categoryId = categoryByName.get(name);
-    // An element with no matching catalog import isn't ours — skip rather than guess.
-    if (!categoryId) continue;
-    const raw = /\bskin="([^"]*)"/.exec(m[2] ?? '')?.[1];
-    const skin = raw && isValidSkin(name, raw) ? (raw as SkinId) : undefined;
-
-    entries.push(skin ? { categoryId, name, skin } : { categoryId, name });
-    selections[categoryId] = name;
-    if (skin) skins[categoryId] = skin;
-    if (!order.includes(categoryId)) order.push(categoryId);
-  }
-
-  // SEO isn't in the body — it rides in as a generateMetadata re-export.
-  const seo = SEO_RE.exec(src);
-  if (seo) {
-    entries.push({ categoryId: 'seo', name: seo[1] });
-    selections.seo = seo[1];
-  }
-
-  return { selections, skins, order, entries };
 }
 
 /**

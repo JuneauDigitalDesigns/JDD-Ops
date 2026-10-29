@@ -7,7 +7,7 @@ import type { CustomBlock } from '@/lib/copy-brief/types';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
 import { addCustomField, removeCustomField, updateCustomField } from '@/lib/copy-brief/mutations';
-import { FieldLabel, OverrideInput, OverrideTextarea } from '../BlockPrimitives';
+import { FieldLabel, OverrideInput, OverrideTextarea, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
@@ -24,11 +24,19 @@ function newField(): CopyBriefCustomField {
   return { id: crypto.randomUUID(), kind: 'instruction', label: '', value: '', sections: [] };
 }
 
-export default function CustomFieldsBlockEditor({ block, onUpdate }: { block: CustomBlock; onUpdate: Update }) {
+/** Builds its own header rather than using BlockHeader — Custom fields has no enabled toggle
+ *  (an empty list is already "off") and carries an Add button instead. The variant switch
+ *  therefore has to be applied by hand here. */
+export default function CustomFieldsBlockEditor({ block, onUpdate, variant = 'page' }: { block: CustomBlock; onUpdate: Update; variant?: BlockVariant }) {
+  const card = variant === 'card';
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between border-b border-uiCardRule pb-4">
-        <h2 className="font-display text-xl font-semibold text-uiInk">{block.label}</h2>
+      <div className={card ? 'mb-3 flex items-center justify-between' : 'mb-4 flex items-center justify-between border-b border-uiCardRule pb-4'}>
+        {card ? (
+          <h3 className="font-display text-base font-semibold text-uiInk">{block.label}</h3>
+        ) : (
+          <h2 className="font-display text-xl font-semibold text-uiInk">{block.label}</h2>
+        )}
         <button
           type="button"
           onClick={() => onUpdate((b) => addCustomField(b, newField()))}

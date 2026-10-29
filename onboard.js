@@ -42,6 +42,7 @@ import twilio from 'twilio';
 import {
   syncEnvToVercel,
   syncVercelFirewall,
+  triggerPreviewDeploy,
   sanitizeProjectName,
   vercelAppHost,
   getVercelProjectId,
@@ -63,8 +64,32 @@ import {
   ensureClientRecord,
   clientRecordsConfigured,
 } from './lib/client-record-store.js';
-
-const TOTAL_STEPS = 10;
+// The .env.local template, shared with the console's plan-upgrade route. It lives in lib/
+// rather than here because onboard.js pulls in dotenv, Anthropic, Octokit, twilio and Clerk —
+// too heavy for a Next server route — so the console previously kept its own copy, and that
+// copy had already drifted to an unsafe ring window. See lib/client-env.js.
+import { buildClientEnvLines } from './lib/client-env.js';
+import {
+  extractContentObject,
+  hasConsoleMarker,
+  setPath,
+} from './lib/provisioned-fields.js';
+// The correctness predicates, shared verbatim with test/*.test.mjs. See lib/onboard-checks.js
+// for why they are a separate module rather than inline assertions.
+import {
+  checkEnvTierMatrix,
+  checkForwardNotSelf,
+  checkSitePublishesTwilioNumber,
+  checkForwardPreserved,
+  checkBlueprintFieldsResolve,
+  checkBlueprintEventFilter,
+  checkBlueprintNoDatastore,
+  checkAirtableSchemaCovers,
+  checkNotMasterBase,
+  checkNotMasterHook,
+  formatCheckLines,
+  summarizeChecks,
+} from './lib/onboard-checks.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -84,15 +109,58 @@ let DRY_RUN = false;
 let FORCE_TEST_PORTAL = false;   // set by --test-portal; forces the test-login path for non-_e2e slugs
 let CURRENT_SITE_LABEL = ''; // e.g., "site 2/3" when looping
 
+// Monotonic step counter. The run's steps are NOT a fixed 1..10: markers repeat (site content +
+// api routes both printed "step 3"), several sub-actions shared "step 8", and for enterprise the
+// whole block loops per site — so the old constant `/10` denominator was always a lie. Each
+// emitted step now gets the next sequence number and no denominator. The console parser keys
+// phases on the message text, not this number, so the value is purely for a human reading the raw
+// log. The legacy `step` argument on log()/fail() is kept as a loose grouping hint at call sites
+// but no longer printed.
+let STEP_N = 0;
+
 function log(step, msg) {
   const tag = CURRENT_SITE_LABEL ? ` ${CURRENT_SITE_LABEL}` : '';
-  console.log(`\n[step ${step}/${TOTAL_STEPS}${tag}] ${msg}`);
+  console.log(`\n[step ${++STEP_N}${tag}] ${msg}`);
+}
+
+/**
+ * A fatal provisioning stop.
+ *
+ * `fail()` used to call `process.exit(1)` directly. That made every validation path
+ * untestable: `node:test` runs the suite in-process, so one assertion on a refusal
+ * (`validateIntake` rejecting an unstated receptionistMode, `preflight` catching a missing
+ * credential) would have taken the whole runner down with it instead of failing one case.
+ *
+ * Throwing instead changes nothing at the ~44 call sites — `fail()` still never returns — and
+ * the CLI guard at the bottom of this file turns it back into the exact same stderr line and
+ * exit code. The format is load-bearing: console/src/lib/onboard-parse.ts keys a fatal run on
+ * the literal `FAIL:` token, so the wording below must not drift.
+ *
+ * Verified before the change: all three `fail()` calls that sit near a `try` are inside its
+ * `catch` clause, not its body, so none of them is swallowed by the throw.
+ */
+class OnboardError extends Error {
+  constructor(message, { step, cause } = {}) {
+    super(message);
+    this.name = 'OnboardError';
+    this.step = step;
+    if (cause !== undefined) this.cause = cause;
+  }
 }
 
 function fail(step, msg, err) {
-  console.error(`\n[step ${step}/${TOTAL_STEPS}] FAIL: ${msg}`);
-  if (err) console.error(err);
-  process.exit(1);
+  throw new OnboardError(msg, { step: STEP_N, cause: err });
+}
+
+/** Render a fatal stop exactly as the pre-throw `fail()` did, for the CLI and the console parser. */
+function reportFatal(err) {
+  if (err instanceof OnboardError) {
+    console.error(`\n[step ${err.step || '?'}] FAIL: ${err.message}`);
+    if (err.cause) console.error(err.cause);
+  } else {
+    console.error(`\n[step ${STEP_N || '?'}] FAIL: unhandled error in onboard.js`);
+    console.error(err);
+  }
 }
 
 function dryLog(msg) {
@@ -511,6 +579,92 @@ async function createRepoFromLocal(siteSlug, content, clientDir) {
 // Step 3: Write src/data/site.ts
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * Step 3 proper: install the schema, UNLESS the console already authored it.
+ *
+ * ── Why this can't just overwrite ───────────────────────────────────────────
+ *
+ * The console's exporter is the editor for a client's site: it writes generated copy, the
+ * palette, route-based nav, localized imagery, and per-section styling into the repo's
+ * site.ts. This step used to splice `clients/{slug}/site.ts` — the raw INTAKE — straight over
+ * all of it, every run. So the loop "edit in the console, export, re-run onboard" silently
+ * reverted the site to its intake: anchor nav instead of routes, intake copy instead of
+ * generated copy, hotlinked placeholders instead of localized images. That is how a client
+ * shipped with `nav` pointing at `#about` on a multi-page site.
+ *
+ * So the ownership is field-level, not file-level (jdd-ops/lib/provisioned-fields.js). The
+ * console owns the content; this script owns the provisioned facts and writes them through
+ * `updateRepoSchemaFields` instead of rewriting the whole file.
+ *
+ * The intake is still spliced for a repo the console has NOT authored — a freshly scaffolded
+ * template copy — because then it is the only content there is.
+ *
+ * Deliberately keeps step 3's single `log()` call on every path. The phase contract
+ * (console/test/phase-contract.test.mjs) replays recorded dry-run stdout through the real
+ * parser and asserts the phases match; adding, dropping or reordering a log() here fails it.
+ * The skip also must not emit the token `FAIL:`, which onboard-parse.ts treats as fatal.
+ */
+function installClientSchema(repoDir, content) {
+  const siteFile = resolve(repoDir, 'src/data/site.ts');
+  let consoleAuthored = false;
+  if (existsSync(siteFile)) {
+    const src = readFileSync(siteFile, 'utf8');
+    consoleAuthored = hasConsoleMarker(src) && Boolean(extractContentObject(src));
+  }
+
+  if (!consoleAuthored) {
+    writeClientSchema(repoDir, content);
+    return;
+  }
+
+  // Phrased to START with "Write src/data/site.ts" so PHASE_MAP's /Write src\/data\/site\.ts/
+  // entry still matches (console/src/lib/onboard-parse.ts). A message it doesn't match falls
+  // through to labelFor's raw-message fallback and renders as an `unplanned` coral node — which
+  // is what every re-provision of a console-authored client would otherwise have shown.
+  log(3, `Write src/data/site.ts — keeping console-authored content`);
+  if (DRY_RUN) {
+    // A dry run answers "would this provision correctly?", so it must not claim it "would
+    // splice CONTENT" when it would do no such thing. Misreporting the one step that decides
+    // whose content ships is exactly the lie a dry run exists to prevent.
+    dryLog(`would KEEP the console's src/data/site.ts and not splice the intake over it`);
+    dryLog(`would still apply provisioned fields individually (see "Publish number on the site")`);
+    return;
+  }
+  console.log(`  ${siteFile} was written by the console's export — its content wins.`);
+  console.log(`  Provisioned fields are applied individually; see "Publish number on the site".`);
+}
+
+/**
+ * Apply specific dotted-path fields to the repo's EXISTING site.ts content, leaving everything
+ * else byte-for-byte alone.
+ *
+ * This is how provisioning writes its own fields without reverting the console's. Reading the
+ * file rather than using the in-memory intake object is the whole point: after
+ * `installClientSchema` declines to splice, the intake and the repo hold different content,
+ * and the repo's is the one that is deployed.
+ *
+ * Returns false when the file can't be read as content, so the caller can fall back to the
+ * wholesale write rather than silently skipping a provisioned value.
+ */
+function updateRepoSchemaFields(repoDir, updates) {
+  const siteFile = resolve(repoDir, 'src/data/site.ts');
+  if (!existsSync(siteFile)) return false;
+  const src = readFileSync(siteFile, 'utf8');
+  const current = extractContentObject(src);
+  if (!current) return false;
+
+  for (const [path, value] of Object.entries(updates)) {
+    if (!setPath(current, path, value)) return false;
+  }
+
+  const marker = 'export const CONTENT: SiteContent = ';
+  const idx = src.indexOf(marker);
+  if (idx === -1) return false;
+  const out = `${src.slice(0, idx)}${marker}${JSON.stringify(current, null, 2)};\n`;
+  writeFileSync(siteFile, out, 'utf8');
+  return true;
+}
+
 function writeClientSchema(repoDir, content) {
   log(3, `Write src/data/site.ts in local repo`);
   if (DRY_RUN) {
@@ -532,6 +686,106 @@ function writeClientSchema(repoDir, content) {
   const newFile = `${typePrefix}export const CONTENT: SiteContent = ${serialized};\n`;
   writeFileSync(siteFile, newFile, 'utf8');
   console.log(`  Wrote ${siteFile} (${newFile.length.toLocaleString()} chars)`);
+}
+
+/**
+ * Repoint the site's PUBLISHED phone number at the JDD-owned Twilio number.
+ *
+ * Until this existed, the deployed site advertised the number the owner gave us at intake,
+ * while the whole voice stack hung off a Twilio number that appeared nowhere public. Every
+ * real caller dialed the owner's line directly and so bypassed `/api/voice` entirely: no
+ * human-first forward, no Retell fallback on no-answer, no Airtable call log. The
+ * receptionist worked perfectly and was simply never reached.
+ *
+ * Two numbers, two different jobs, and they must not be confused:
+ *   - `brand.phone` / `brand.phoneHref` — what the website shows. Becomes the Twilio number.
+ *   - `CLIENT_FORWARD_PHONE` in .env.local — where `/api/voice` forwards. Stays the owner's
+ *     real line, forever.
+ * This is why the call order matters: `writeClientEnvLocal` has already run and captured
+ * `content.brand.phone` while it was still the owner's number. Mutating the content any
+ * earlier would set CLIENT_FORWARD_PHONE to the Twilio number, and `/api/voice` would dial
+ * the number that invoked it — an inbound call forwarding to itself.
+ *
+ * Gated on `!webOnly`, not on plan: since the 2026-10-12 reprice a Starter client WITH a
+ * receptionist also owns a Twilio number and needs it published, exactly like Growth. Only
+ * a declined-receptionist client has no number to swap in.
+ */
+/**
+ * What the site would advertise for a given Twilio number — or null if it isn't dialable.
+ *
+ * Pure, so the dry-run checks can state the published number without writing a file. All three
+ * forms derive from `toE164` in @jdd/schema, so nothing here holds a second opinion about what
+ * a valid number is — the mistake that left five diverging copies of that regex in the tree.
+ */
+function resolvePublishedPhone(twilioNumber) {
+  const e164 = toE164(twilioNumber);
+  if (!e164) return null;
+  return { e164, display: formatPhoneForDisplay(e164), href: `tel:${e164}` };
+}
+
+function applyTwilioNumberToSite(repoDir, content, twilioNumber) {
+  const previous = content.brand.phone;
+  const published = resolvePublishedPhone(twilioNumber);
+
+  // provisionTwilioNumber returns a '<dry-run-number>' sentinel rather than a real one, so a
+  // dry run reports against a stand-in: validating the sentinel would print a scary "not
+  // dialable" warning on every dry run and preview nothing useful. When .env.local already
+  // carries a real number (the reuse path), `published` is real and the checks can assert it.
+  if (DRY_RUN) {
+    log(3, `Publish number on the site (was ${previous})`);
+    const preview = published ?? resolvePublishedPhone('+14075551212');
+    dryLog(`would rewrite brand.phone → ${preview.display} / phoneHref → ${preview.href}${published ? '' : ' (illustrative — no number provisioned yet)'}`);
+    dryLog(`would leave CLIENT_FORWARD_PHONE=${previous} untouched as the forward target`);
+    return { written: false, published, previous };
+  }
+
+  if (!published) {
+    // Don't publish a number we can't dial. Leaving the owner's number up is the lesser
+    // failure: the site still rings a human, where a mangled number rings nobody.
+    console.warn(`  ⚠ Twilio number "${twilioNumber}" is not dialable — leaving the published number as-is.`);
+    console.warn(`    The site will advertise ${previous}, so calls bypass /api/voice and nothing is logged.`);
+    return { written: false, published: null, previous };
+  }
+
+  log(3, `Publish number on the site (was ${previous})`);
+  // Keep the in-memory copy in step with the file: the correctness checks, the Vercel env
+  // sync and the agent prompt all read `content` after this point.
+  content.brand.phone = published.display;
+  content.brand.phoneHref = published.href;
+
+  /**
+   * Write the two fields INTO whatever the repo currently holds, rather than writing
+   * `content` wholesale.
+   *
+   * On a re-provision of a console-authored repo those are not the same document: `content` is
+   * the intake, the repo is the console's exported site. A wholesale write here would undo
+   * everything `installClientSchema` just declined to overwrite — publishing the number
+   * correctly while reverting the copy, nav and imagery in the same breath.
+   *
+   * Falls back to the wholesale write when the file can't be parsed as content (a hand-edited
+   * repo, a template that changed shape). Publishing the number is the more important of the
+   * two: leave it unwritten and the site advertises the owner's line and every caller bypasses
+   * /api/voice.
+   */
+  const patched = updateRepoSchemaFields(repoDir, {
+    'brand.phone': published.display,
+    'brand.phoneHref': published.href,
+  });
+  if (!patched) writeClientSchema(repoDir, content);
+  console.log(`  Published number ${published.display}; forwards to ${previous}`);
+  return { written: true, published, previous };
+}
+
+/**
+ * E.164 → the punctuation the rest of the schema uses, e.g. +14075551212 → "(407) 555-1212".
+ *
+ * Presentation only. The dialable forms both come from `toE164` in @jdd/schema, so this adds
+ * no second opinion about what a valid number is — the mistake that left five diverging
+ * copies of that regex in the tree.
+ */
+function formatPhoneForDisplay(e164) {
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : e164;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -587,66 +841,28 @@ function readEnvLocal(clientDir) {
 
 function writeClientEnvLocal(clientDir, siteSlug, plan, content, webOnly) {
   log(4, `Write .env.local (plan=${plan}${webOnly ? ', website-only' : ''})`);
-  if (DRY_RUN) {
-    dryLog(`would write ${clientDir}/.env.local (preserving any already-provisioned IDs)`);
-    return;
-  }
-  const envPath = resolve(clientDir, '.env.local');
   // Preserve already-provisioned values so re-runs are idempotent and don't
   // wipe RETELL_AGENT_ID / TWILIO_NUMBER / AIRTABLE_BASE_ID.
   const prev = readEnvLocal(clientDir);
-  const keep = (k) => (prev[k] ? prev[k] : '');
+  // `env` is passed explicitly rather than defaulted, so the builder stays pure and a test can
+  // drive it without touching the real environment.
+  const { lines, carried } = buildClientEnvLines({ siteSlug, plan, content, webOnly, prev, env: process.env });
 
-  /**
-   * Assembled from two parts rather than copy-pasted templates, because the shapes overlap now.
-   *
-   *  - Lead delivery: Starter (receptionist or web-only) hands web-form leads to the owner by
-   *    email; Growth and Enterprise call them back. This matches syncVercelEnv's
-   *    `LEAD_DELIVERY_MODE` exactly, which is the only intended runtime difference between a
-   *    Starter-with-receptionist and a Growth site.
-   *  - Voice: everything except a web-only client gets the number, agent, forwarding and call
-   *    log. Starter joined this in the 2026-10-12 reprice; only a declined receptionist opts out.
-   */
-  const wantsEmailLeads = plan === 'starter';
-  const wantsVoice = !webOnly;
-  const lines = ['# Auto-generated by onboard.js — edit via the console /manage tab, which also syncs to Vercel. Values here are preserved on re-run.'];
-  lines.push(`LEAD_DELIVERY_MODE=${wantsEmailLeads ? 'email' : 'callback'}`);
-  if (wantsEmailLeads) {
-    lines.push(`LEAD_TO_EMAIL=${content.brand.email}`);
-    lines.push(`LEAD_BRAND_NAME=${content.brand.name}`);
-    lines.push(`RESEND_API_KEY=${keep('RESEND_API_KEY')}`);
-    lines.push('RESEND_FROM_EMAIL=leads@juneaudigitaldesigns.com');
+  // Computed above even in dry mode, and returned either way, so the correctness checks can
+  // inspect what WOULD be written without anything touching disk.
+  if (DRY_RUN) {
+    dryLog(`would write ${clientDir}/.env.local (preserving any already-provisioned IDs)`);
+    return { lines, carried };
   }
-  if (wantsVoice) {
-    lines.push(`RETELL_AGENT_ID=${keep('RETELL_AGENT_ID')}`);
-    lines.push(`RETELL_LLM_ID=${keep('RETELL_LLM_ID')}`);
-    lines.push(`RETELL_API_KEY=${process.env.RETELL_API_KEY || ''}`);
-    lines.push(`RETELL_SIP_DOMAIN=${process.env.RETELL_SIP_DOMAIN || 'sip.retellai.com'}`);
-    lines.push(`TWILIO_NUMBER=${keep('TWILIO_NUMBER')}`);
-    // Human-first routing: the caller's own line rings first, the agent only picks up on
-    // no-answer. Keep the window under ~20s or the owner's carrier voicemail answers first,
-    // Twilio scores the call answered, and the agent never gets it.
-    lines.push(`CLIENT_FORWARD_PHONE=${content.brand.phone}`);
-    lines.push(`CLIENT_FORWARD_RING_SECONDS=${keep('CLIENT_FORWARD_RING_SECONDS') || '15'}`);
-    lines.push(`AIRTABLE_BASE_ID=${keep('AIRTABLE_BASE_ID')}`);
-    lines.push(`RETELL_POST_CALL_WEBHOOK_URL=${keep('RETELL_POST_CALL_WEBHOOK_URL')}`);
-  }
-  lines.push(`VERCEL_PROJECT_NAME=${siteSlug}`);
-  let body = lines.join('\n') + '\n';
-  // Keys onboard.js writes LATER in the run (steps 8–10) and that are absent from the
-  // templates above. Without this they are silently dropped on every re-run — and
-  // PORTAL_ACCOUNT_EMAIL in particular is what a later `--link-portal --email` reads to know
-  // which account to move the sites off.
-  const CARRIED_KEYS = ['AIRTABLE_SITE_TAG', 'CLERK_USER_ID', 'PORTAL_ACCOUNT_EMAIL'];
-  const carried = CARRIED_KEYS.filter((k) => prev[k]);
-  for (const k of carried) body += `${k}=${prev[k]}\n`;
 
-  writeFileSync(envPath, body, 'utf8');
+  const envPath = resolve(clientDir, '.env.local');
+  writeFileSync(envPath, lines.join('\n') + '\n', 'utf8');
   const preserved = [
     ...['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'CLIENT_FORWARD_PHONE', 'AIRTABLE_BASE_ID'].filter((k) => prev[k]),
     ...carried,
   ];
   console.log(`  Wrote ${envPath}${preserved.length ? ` (preserved: ${preserved.join(', ')})` : ''}`);
+  return { lines, carried };
 }
 
 function patchEnvLocal(clientDir, key, value) {
@@ -684,6 +900,31 @@ function buildClientRepo(repoDir) {
 
 async function generateRetellPrompt(content, clientDir, siteSlug) {
   log(6, `Claude → Retell agent prompt`);
+
+  /**
+   * On a resume, reuse the prompt on disk instead of regenerating it.
+   *
+   * If RETELL_AGENT_ID is set, that agent's LLM already carries the prompt uploaded when it was
+   * created. Regenerating would then do three unhelpful things at once: spend an Anthropic call,
+   * OVERWRITE agent-prompt.txt — destroying any hand-tuning, which is the whole point of
+   * writing it to disk for review — and change nothing about the live agent, because
+   * createRetellAgent short-circuits on the existing id and never uploads the new text. The
+   * file would end up disagreeing with the agent, and the console's voice-agent editor reads
+   * that file with no read-back from Retell, so it would show a prompt that was never applied.
+   *
+   * Changing a live prompt stays the job of `npm run update-prompt`, which targets the LLM.
+   *
+   * Keyed on the AGENT, not the file: if no agent exists the file is a leftover from a run that
+   * died before creating one, and regenerating is correct.
+   */
+  const promptFile = resolve(clientDir, 'agent-prompt.txt');
+  if (readEnvLocal(clientDir).RETELL_AGENT_ID && existsSync(promptFile)) {
+    const existing = readFileSync(promptFile, 'utf8');
+    console.log(`  Reusing ${promptFile} (${existing.length.toLocaleString()} chars) — agent already exists, so not regenerating`);
+    console.log(`  To change the live prompt: npm run update-prompt -- --slug ${basename(clientDir)}`);
+    return existing;
+  }
+
   if (DRY_RUN) {
     dryLog(`would call Anthropic Claude (model claude-sonnet-4-6) to generate agent prompt for "${content.brand.name}"`);
     dryLog(`would write ${clientDir}/agent-prompt.txt`);
@@ -831,27 +1072,53 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
   // every client share one LLM/prompt. So create a per-client LLM (cloning the
   // master template's model + tools) carrying this client's prompt, then bind the
   // agent to it. The greeting is baked into agentPrompt, so no begin_message.
-  const tplRes = await fetch(`https://api.retellai.com/get-retell-llm/${templateLlmId}`, { headers: authHeaders });
-  if (!tplRes.ok) fail(7, `Retell get-retell-llm (template ${templateLlmId}) returned ${tplRes.status}: ${await tplRes.text()}`);
-  const tpl = await tplRes.json();
+  // Adopt a per-client LLM a previous interrupted run already created.
+  //
+  // RETELL_LLM_ID is recorded immediately after creation, but the only reuse check used to be
+  // on RETELL_AGENT_ID — so a run that died between creating the LLM and creating the agent
+  // (a real window: that is two sequential API calls) would, on resume, create a SECOND LLM
+  // and orphan the first. Each one carries a copy of the prompt, so the orphan is both clutter
+  // and a second place the prompt could appear to live.
+  //
+  // Note the same key names the master template: `RETELL_LLM_ID` in the ROOT .env is the
+  // template to clone from, while `RETELL_LLM_ID` in the CLIENT .env.local is this client's own
+  // LLM. readEnvLocal only ever reads the latter.
+  let clientLlmId = readEnvLocal(clientDir).RETELL_LLM_ID || null;
+  if (clientLlmId) {
+    const check = await fetch(`https://api.retellai.com/get-retell-llm/${clientLlmId}`, { headers: authHeaders });
+    if (check.ok) {
+      console.log(`  Reusing per-client LLM ${clientLlmId} from an earlier interrupted run`);
+    } else if (check.status === 404) {
+      console.warn(`  ⚠ Saved RETELL_LLM_ID ${clientLlmId} no longer exists in Retell (404) — creating a fresh one.`);
+      clientLlmId = null;
+    } else {
+      fail(7, `Retell get-retell-llm for ${clientLlmId} returned ${check.status}: ${await check.text()}`);
+    }
+  }
 
-  const llmRes = await fetch('https://api.retellai.com/create-retell-llm', {
-    method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({
-      model: tpl.model ?? 'gpt-4.1-mini',
-      ...(tpl.model_high_priority !== undefined ? { model_high_priority: tpl.model_high_priority } : {}),
-      ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
-      ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
-      general_prompt: agentPrompt,
-    }),
-  });
-  if (!llmRes.ok) fail(7, `Retell create-retell-llm returned ${llmRes.status}: ${await llmRes.text()}`);
-  const llmData = await llmRes.json();
-  const clientLlmId = llmData.llm_id;
-  if (!clientLlmId) fail(7, `Retell create-retell-llm response missing llm_id: ${JSON.stringify(llmData)}`);
-  console.log(`  Per-client LLM: ${clientLlmId}`);
-  patchEnvLocal(clientDir, 'RETELL_LLM_ID', clientLlmId);
+  if (!clientLlmId) {
+    const tplRes = await fetch(`https://api.retellai.com/get-retell-llm/${templateLlmId}`, { headers: authHeaders });
+    if (!tplRes.ok) fail(7, `Retell get-retell-llm (template ${templateLlmId}) returned ${tplRes.status}: ${await tplRes.text()}`);
+    const tpl = await tplRes.json();
+
+    const llmRes = await fetch('https://api.retellai.com/create-retell-llm', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        model: tpl.model ?? 'gpt-4.1-mini',
+        ...(tpl.model_high_priority !== undefined ? { model_high_priority: tpl.model_high_priority } : {}),
+        ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
+        ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
+        general_prompt: agentPrompt,
+      }),
+    });
+    if (!llmRes.ok) fail(7, `Retell create-retell-llm returned ${llmRes.status}: ${await llmRes.text()}`);
+    const llmData = await llmRes.json();
+    clientLlmId = llmData.llm_id;
+    if (!clientLlmId) fail(7, `Retell create-retell-llm response missing llm_id: ${JSON.stringify(llmData)}`);
+    console.log(`  Per-client LLM: ${clientLlmId}`);
+    patchEnvLocal(clientDir, 'RETELL_LLM_ID', clientLlmId);
+  }
 
   // Structured fields Retell extracts after each call and includes in the
   // call_ended webhook (under call_analysis.custom_analysis_data). The shared
@@ -965,7 +1232,24 @@ async function provisionTwilioNumber(content, siteSlug, clientDir) {
   let numberRecord = null;
   for (const { label, query } of strategies) {
     console.log(`  Searching for a local number by ${label}…`);
-    const results = await client.availablePhoneNumbers('US').local.list({ ...query, limit: 1 });
+    let results;
+    try {
+      results = await client.availablePhoneNumbers('US').local.list({ ...query, limit: 1 });
+    } catch (err) {
+      // Twilio's SDK throws a RestException here. Left uncaught it reaches the top as
+      // "unhandled error in onboard.js" plus a stack trace through the SDK's internals, which
+      // tells an operator nothing about the cause — and this is the first Twilio call in the
+      // run, so it is where an account-level problem lands. 20003 is authentication failure,
+      // which covers both a bad token and a live-but-suspended account.
+      if (err?.code === 20003 || err?.status === 401) {
+        fail(8,
+          `Twilio rejected the request while searching for a number: ${err.message}\n` +
+          '    If it says the account is "not active", the account is suspended or closed — settle ' +
+          'billing or clear the verification hold in the Twilio Console, then re-run. The Retell ' +
+          'agent and repo from this run are preserved and will be reused.');
+      }
+      fail(8, `Twilio number search failed (${label}): ${err?.message ?? err}`, err);
+    }
     if (results.length) {
       numberRecord = await client.incomingPhoneNumbers.create({
         phoneNumber: results[0].phoneNumber,
@@ -1092,6 +1376,107 @@ async function ensureSiteChoices(baseId, tags) {
   }
 }
 
+/**
+ * Read one base's `Call Log` schema as both directions of a name↔field-id map.
+ *
+ * Airtable table and field ids are **base-scoped**: `tbl3YWgGdVXNPz3Eg` and every `fld…`
+ * in the master scenario's Airtable module belong to the master base alone. Cloning the
+ * scenario and swapping only `mapper.base` left the module pointed at a table id that does
+ * not exist in the client's new base, so every post-call write failed — the scenario looked
+ * healthy and the call log stayed empty. Column *names* are the only stable join between
+ * the two bases, so the blueprint patch translates master-id → name → client-id.
+ *
+ * Returns null if the schema can't be read, which the caller treats as "don't touch the
+ * Airtable module" rather than guessing at ids.
+ */
+async function airtableFieldMap(baseId) {
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  if (!apiKey || !baseId) return null;
+  try {
+    const res = await fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      console.warn(`  ⚠ Could not read base ${baseId} schema (${res.status}).`);
+      return null;
+    }
+    const table = ((await res.json()).tables ?? []).find((t) => t.name === 'Call Log');
+    if (!table) {
+      console.warn(`  ⚠ Base ${baseId} has no "Call Log" table.`);
+      return null;
+    }
+    const byName = {};
+    const byId = {};
+    // singleSelect choices, by column name. Needed because a choice the master writes but the
+    // client base lacks is rejected as an invalid option under `typecast: false` — and that
+    // rejects the ENTIRE row, not just the cell. This is why `Call type` is lowercase.
+    const choices = {};
+    for (const f of table.fields ?? []) {
+      byName[f.name] = f.id;
+      byId[f.id] = f.name;
+      if (Array.isArray(f.options?.choices)) {
+        choices[f.name] = f.options.choices.map((c) => c.name);
+      }
+    }
+    return { tableId: table.id, byName, byId, choices };
+  } catch (err) {
+    console.warn(`  ⚠ Base ${baseId} schema read failed (${err?.message ?? err}).`);
+    return null;
+  }
+}
+
+/**
+ * The `Call Log` columns every client base gets.
+ *
+ * Module-level and exported so a test can compare this spec against a LIVE read of the Make
+ * master's Airtable module. That comparison is the real contract: step 8c remaps the cloned
+ * blueprint's record keys BY COLUMN NAME, so a name present on one side and not the other
+ * silently drops that value from every logged call. Freezing a captured client base as a
+ * fixture would only prove what one historical base looked like; checking this array proves
+ * what the next client base will look like.
+ *
+ * The singleSelect choices are the master's literal values, not prettier labels. The master
+ * maps `{{1.call.direction}}` straight into `Call type`, which Retell emits as
+ * "inbound"/"outbound", and the module runs with `typecast: false`. Choices of
+ * "Inbound"/"Outbound callback" therefore rejected the write as an invalid option and failed
+ * the whole row — the casing has to match what Retell actually sends.
+ */
+const CALL_LOG_FIELDS = [
+  { name: 'Date', type: 'dateTime', options: { dateFormat: { name: 'us' }, timeFormat: { name: '12hour' }, timeZone: 'client' } },
+  { name: 'Caller name', type: 'singleLineText' },
+  { name: 'Caller number', type: 'phoneNumber' },
+  { name: 'Summary', type: 'multilineText' },
+  { name: 'Duration (seconds)', type: 'number', options: { precision: 0 } },
+  {
+    name: 'Call type',
+    type: 'singleSelect',
+    options: { choices: [{ name: 'inbound' }, { name: 'outbound' }] },
+  },
+  { name: 'Email', type: 'email' },
+  { name: 'Address', type: 'singleLineText' },
+  { name: 'Recording URL', type: 'url' },
+  {
+    name: 'Priority',
+    type: 'singleSelect',
+    options: { choices: [{ name: 'emergency' }, { name: 'callback' }] },
+  },
+  // Nothing writes Outcome — the master scenario has no mapping for it. It exists for the
+  // owner to set by hand while triaging the log, which is why it keeps human-cased labels.
+  {
+    name: 'Outcome',
+    type: 'singleSelect',
+    options: {
+      choices: [
+        { name: 'Qualified' },
+        { name: 'Not qualified' },
+        { name: 'Follow-up needed' },
+        { name: 'No answer' },
+        { name: 'Voicemail' },
+      ],
+    },
+  },
+];
+
 async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
   const siteTags = intake.sites.map((_, i) => siteTagFor(baseSlug, intake, i));
   const existingBaseId = readEnvLocal(clientDir).AIRTABLE_BASE_ID;
@@ -1116,31 +1501,7 @@ async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
   const apiKey = requireEnv('AIRTABLE_API_KEY');
   const workspaceId = requireEnv('AIRTABLE_WORKSPACE_ID');
 
-  const fields = [
-    { name: 'Date', type: 'dateTime', options: { dateFormat: { name: 'us' }, timeFormat: { name: '12hour' }, timeZone: 'client' } },
-    { name: 'Caller name', type: 'singleLineText' },
-    { name: 'Caller number', type: 'phoneNumber' },
-    { name: 'Summary', type: 'multilineText' },
-    { name: 'Duration (seconds)', type: 'number', options: { precision: 0 } },
-    {
-      name: 'Call type',
-      type: 'singleSelect',
-      options: { choices: [{ name: 'Inbound' }, { name: 'Outbound callback' }] },
-    },
-    {
-      name: 'Outcome',
-      type: 'singleSelect',
-      options: {
-        choices: [
-          { name: 'Qualified' },
-          { name: 'Not qualified' },
-          { name: 'Follow-up needed' },
-          { name: 'No answer' },
-          { name: 'Voicemail' },
-        ],
-      },
-    },
-  ];
+  const fields = [...CALL_LOG_FIELDS];
 
   if (isEnterprise) {
     fields.push({
@@ -1214,32 +1575,159 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
     return null;
   }
   if (DRY_RUN) {
-    dryLog(`would clone scenario ${masterId} → "Post-call: ${content.brand.name}"`);
-    dryLog(`would patch Airtable base=${baseId}${siteTag ? `, Site=${siteTag}` : ''}`);
+    const adopting = readEnvLocal(clientDir).MAKE_POST_CALL_SCENARIO_ID;
+    if (adopting) {
+      dryLog(`would ADOPT scenario ${adopting} from an earlier interrupted run (no new clone)`);
+    } else {
+      // Resolve and show the actual clone parameters. A dry run that said only "would clone"
+      // is a dry run that could not have caught the 400 this step died on: teamId, states and
+      // organizationId were all missing, and none of them were visible anywhere.
+      const master = await resolveMasterResources();
+      const teamId = master?.teamId ?? null;
+      const organizationId = master?.organizationId ?? null;
+      const masterHookId = master?.hookId ?? null;
+      const existingHook = readEnvLocal(clientDir).MAKE_POST_CALL_HOOK_ID;
+      // "would clone scenario 5315889" read as though 5315889 were the clone. It is the
+      // SOURCE — saying so avoids sending someone to Make looking for a scenario by that id.
+      dryLog(`would clone FROM master scenario ${masterId} → new scenario "Post-call: ${content.brand.name}"`);
+      dryLog(existingHook
+        ? `would reuse webhook ${existingHook} recorded by an earlier run`
+        : `would first create a gateway-webhook for this client (master's hook ${masterHookId} stays with the master)`);
+      if (typeof teamId === 'number' && typeof organizationId === 'number') {
+        dryLog(`  POST /scenarios/${masterId}/clone?organizationId=${organizationId} body { teamId: ${teamId}, states: false, hook: { ${masterHookId}: <new> } }`);
+      } else {
+        console.warn(`  ⚠ Could not resolve teamId/organizationId (got ${teamId}/${organizationId}) — a real run would fail here.`);
+        console.warn('    The clone endpoint requires both as integers; check MAKE_API_KEY can read the master scenario and its hook.');
+      }
+    }
+    dryLog(`would repoint Airtable module at base=${baseId}, remapping its table + field ids by column name`);
+    if (siteTag) dryLog(`  + Site="${siteTag}" written into mapper.record (not as a top-level mapper key)`);
+    dryLog(`would REMOVE the vestigial datastore module, carrying its event filter forward`);
     dryLog(smsEnabled
       ? `would patch Twilio from=${fromNum}, to=${toNum}`
       : `would REMOVE the Twilio module (no SMS consent on file)`);
-    dryLog(`would activate clone, read webhook URL, set Retell agent ${agentId} webhook_url`);
+    dryLog(`would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent ${agentId} webhook_url`);
     return null;
   }
 
   const headers = { Authorization: `Token ${apiKey}`, 'Content-Type': 'application/json' };
 
-  // 1) Clone the master scenario.
-  let res = await fetch(`${MAKE_ZONE}/scenarios/${masterId}/clone`, {
-    method: 'POST', headers,
-    body: JSON.stringify({ name: `Post-call: ${content.brand.name}` }),
-  });
-  if (!res.ok) fail(8, `Make clone returned ${res.status}: ${await res.text()}`);
-  const cloneId = (await res.json())?.scenario?.id;
-  if (!cloneId) fail(8, `Make clone response missing scenario id`);
-  console.log(`  Cloned scenario ${cloneId}`);
+  // 1) Clone the master scenario — or adopt the clone a previous interrupted run already made.
+  //
+  // The clone id is recorded the instant it exists, because the six calls that follow (patch
+  // blueprint, read scenario, read hook, activate, re-point the agent, record the webhook) are
+  // all places a run can die. Before this, the only "already done" marker was
+  // RETELL_POST_CALL_WEBHOOK_URL, written LAST — so a failure anywhere in between orphaned a
+  // possibly-already-active clone and the next run made another, with no dedupe. Several live
+  // scenarios on one Airtable base means duplicate rows for every call.
+  //
+  // Everything after the clone is safe to repeat, which is what makes adoption sound: patching
+  // the blueprint is idempotent, /start on a running scenario is a no-op, and re-pointing the
+  // agent webhook writes the same value.
+  let cloneId = readEnvLocal(clientDir).MAKE_POST_CALL_SCENARIO_ID || null;
+  let res;
 
-  // 2) GET the clone's blueprint, patch per-client values, PATCH it back.
+  if (cloneId) {
+    console.log(`  Adopting scenario ${cloneId} from an earlier interrupted run (not cloning again)`);
+  } else {
+    // `teamId` (integer, body), `states` (boolean, body) and `organizationId` (integer, query)
+    // are REQUIRED by POST /scenarios/{id}/clone. Omitting them is what produced
+    //   400 SC400 [{"Expected required property"},{"Expected integer"}]
+    // on a live run. Both ids come from the master's own hook record, so there is no second
+    // place for them to go stale. `states: false` resets module state — a fresh client clone
+    // must not inherit the master's.
+    const master = await resolveMasterResources();
+    const teamId = master?.teamId ?? null;
+    const organizationId = master?.organizationId ?? null;
+    const masterHookId = master?.hookId ?? null;
+    if (typeof teamId !== 'number' || typeof organizationId !== 'number') {
+      fail(8,
+        `Cannot clone: Make did not report a numeric teamId/organizationId for master scenario ${masterId} ` +
+        `(got teamId=${teamId}, organizationId=${organizationId}). The clone endpoint requires both as ` +
+        'integers, so attempting it would 400. Check MAKE_API_KEY can read the master scenario and its hook.');
+    }
+    if (!masterHookId) {
+      fail(8, `Cannot clone: master scenario ${masterId} reports no hookId, so there is no trigger to remap.`);
+    }
+
+    /**
+     * Give the clone its OWN webhook, and tell Make to substitute it.
+     *
+     * A webhook-triggered scenario cannot simply be duplicated: without a `hook` mapping Make
+     * tries to attach the clone to the MASTER's hook, which already belongs to the master, and
+     * refuses with `{"detail":"The hook already has a scenario assigned.","code":"IM000"}`.
+     * That is also the definitive answer to a question left open earlier — a clone does NOT
+     * get a fresh hook automatically. It errors loudly rather than silently sharing one.
+     *
+     * The settings mirror master hook 2421720 exactly (`method`/`headers`/`stringify` all
+     * false). They are not cosmetic: they decide the shape of the payload the modules see, and
+     * every mapping in the blueprint reads `{{1.call.…}}` straight off the parsed JSON body.
+     * Turning on `headers` or `method` would shift that structure; `stringify` would hand the
+     * modules a string instead of an object.
+     *
+     * Recorded before the clone is attempted, for the same reason the clone id is: creating a
+     * hook and then failing would otherwise orphan it, and the next run would make another.
+     */
+    let cloneHookId = readEnvLocal(clientDir).MAKE_POST_CALL_HOOK_ID || null;
+    if (cloneHookId) {
+      console.log(`  Reusing hook ${cloneHookId} from an earlier interrupted run`);
+    } else {
+      const hookRes = await fetch(`${MAKE_ZONE}/hooks`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: `Post-call: ${content.brand.name}`.slice(0, 128), // Make caps hook names at 128
+          teamId: String(teamId), // documented as a STRING here, unlike the integer the clone wants
+          typeName: 'gateway-webhook',
+          method: false,
+          headers: false,
+          stringify: false,
+        }),
+      });
+      if (!hookRes.ok) fail(8, `Make create-hook returned ${hookRes.status}: ${await hookRes.text()}`);
+      cloneHookId = (await hookRes.json())?.hook?.id;
+      if (!cloneHookId) fail(8, `Make create-hook response missing hook id`);
+      patchEnvLocal(clientDir, 'MAKE_POST_CALL_HOOK_ID', cloneHookId);
+      console.log(`  Created webhook ${cloneHookId} for this client (recorded before cloning)`);
+    }
+
+    res = await fetch(`${MAKE_ZONE}/scenarios/${masterId}/clone?organizationId=${organizationId}`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        name: `Post-call: ${content.brand.name}`.slice(0, 120), // Make caps the name at 120 chars
+        teamId,
+        states: false,
+        // Substitute the master's trigger hook with this client's own.
+        hook: { [String(masterHookId)]: cloneHookId },
+      }),
+    });
+    if (!res.ok) fail(8, `Make clone returned ${res.status}: ${await res.text()}`);
+    cloneId = (await res.json())?.scenario?.id;
+    if (!cloneId) fail(8, `Make clone response missing scenario id`);
+
+    // Recorded FIRST, before anything else can fail.
+    patchEnvLocal(clientDir, 'MAKE_POST_CALL_SCENARIO_ID', cloneId);
+    console.log(`  Cloned scenario ${cloneId} (recorded, so a failed run resumes rather than re-clones)`);
+  }
+
+  // 2) GET the clone's blueprint, patch per-client values, PATCH it back. Safe to repeat on a
+  //    resume: the patch is computed from the master's shape and this client's ids either way.
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}/blueprint`, { headers });
   if (!res.ok) fail(8, `Make get-blueprint returned ${res.status}: ${await res.text()}`);
   const blueprint = (await res.json())?.response?.blueprint;
-  patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum, smsEnabled }); // mutates in place
+
+  // The clone still carries the MASTER base's table/field ids. Resolve both schemas so the
+  // patch can translate them by column name; the master base id is whatever the inherited
+  // Airtable module currently points at, so we never hardcode it.
+  const masterBaseId = (blueprint?.flow ?? []).find((m) => (m.module ?? '').startsWith('airtable'))?.mapper?.base;
+  const [masterMap, clientMap] = await Promise.all([
+    airtableFieldMap(masterBaseId),
+    airtableFieldMap(baseId),
+  ]);
+
+  patchPostCallBlueprint(blueprint, {
+    baseId, siteTag, fromNum, toNum, smsEnabled, masterMap, clientMap,
+  }); // mutates in place
 
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}`, {
     method: 'PATCH', headers,
@@ -1247,14 +1735,33 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   });
   if (!res.ok) fail(8, `Make patch-blueprint returned ${res.status}: ${await res.text()}`);
 
-  // 3) Resolve the clone's webhook URL (module 1 = custom webhook trigger).
-  //    NOTE: verify this response shape against your Make zone (see report §8).
-  res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}/hooks`, { headers });
-  const webhookUrl = (await res.json())?.hooks?.[0]?.url;
-  if (!webhookUrl) fail(8, `Could not resolve clone webhook URL`);
+  // 3) Resolve the clone's webhook URL.
+  //
+  // There is no `GET /scenarios/{id}/hooks` in Make API v2 — it 404s, which made this step
+  // fail on every single run (after the clone had already been created, so each attempt
+  // orphaned a scenario). The scenario record itself carries `hookId`; the hook's url comes
+  // from `GET /hooks/{hookId}`.
+  res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}`, { headers });
+  if (!res.ok) fail(8, `Make get-scenario returned ${res.status}: ${await res.text()}`);
+  const hookId = (await res.json())?.scenario?.hookId;
+  if (!hookId) fail(8, `Clone ${cloneId} has no hookId — is the master still webhook-triggered?`);
 
-  // 4) Activate the clone.
-  await fetch(`${MAKE_ZONE}/scenarios/${cloneId}/start`, { method: 'POST', headers });
+  res = await fetch(`${MAKE_ZONE}/hooks/${hookId}`, { headers });
+  if (!res.ok) fail(8, `Make get-hook ${hookId} returned ${res.status}: ${await res.text()}`);
+  const webhookUrl = (await res.json())?.hook?.url;
+  if (!webhookUrl) fail(8, `Hook ${hookId} returned no url`);
+
+  // A clone that inherits the master's hook would put every client on one webhook, which is
+  // worth catching loudly rather than discovering through crossed-over call logs.
+  if (hookId === Number(process.env.MAKE_POST_CALL_MASTER_HOOK_ID)) {
+    fail(8, `Clone ${cloneId} reuses the master's hook ${hookId} — refusing to share a webhook across clients.`);
+  }
+
+  // 4) Activate the clone. An unchecked failure here is the worst outcome available: Make
+  // accepts posts to an inactive scenario's webhook and discards them, so the agent, the
+  // number and the webhook all look wired while no call is ever logged.
+  res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}/start`, { method: 'POST', headers });
+  if (!res.ok) fail(8, `Make start-scenario returned ${res.status}: ${await res.text()}`);
   console.log(`  Activated clone; webhook ${webhookUrl}`);
 
   // 5) Wire the webhook onto the Retell agent's post-call webhook.
@@ -1272,22 +1779,105 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
 
 // Rewrites the cloned blueprint's Airtable + Twilio modules for this client.
 // Modules are matched by app name so it survives module-id changes on clone.
-// NOTE: mapper field keys ('base' / 'from' / 'to' / 'Site') depend on how the
-// master's modules are configured — confirm against a GET of the master
-// blueprint before the first live run (see report §8).
-function patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum, smsEnabled }) {
+//
+// Mapper key shapes below were confirmed against a live GET of the master blueprint:
+//   airtable:ActionCreateRecord → { base, table, record: { <fldId>: <expr> }, typecast, useColumnId }
+//   twilio:SendSMS              → { to, from, fromType, body, messageBody }
+// Note that Airtable column values live inside `record`, keyed by field id — NOT as
+// top-level mapper keys. An earlier version set `mapper.Site`, a key the module does not
+// read, so the enterprise per-site tag was never written and the portal (which filters on
+// `row.Site === site.slug`) showed no calls at all for a multi-site client.
+function patchPostCallBlueprint(
+  blueprint,
+  { baseId, siteTag, fromNum, toNum, smsEnabled, masterMap, clientMap, quiet = false },
+) {
+  // `quiet` is for the dry-run preview, which patches a throwaway copy purely to inspect it.
+  // Announcing "Removed 1 datastore module(s) from the clone" when no clone exists would be
+  // the kind of confidently-wrong log line this whole exercise is about removing.
+  const say = quiet ? () => {} : (m) => console.log(m);
+  const warn = quiet ? () => {} : (m) => console.warn(m);
   const flows = blueprint?.flow ?? [];
   for (const mod of flows) {
     const app = mod.module ?? '';
     if (app.startsWith('airtable')) {
       mod.mapper = mod.mapper ?? {};
       mod.mapper.base = baseId;
-      if (siteTag) mod.mapper.Site = siteTag; // enterprise per-site tag
+
+      if (masterMap && clientMap) {
+        mod.mapper.table = clientMap.tableId;
+
+        // Translate every record key master-fld-id → column name → client-fld-id. A column
+        // the client base lacks is dropped with a warning rather than left pointing at a
+        // foreign id, because one unresolvable key fails the entire row, not just that cell.
+        const remapped = {};
+        const dropped = [];
+        for (const [masterFld, expr] of Object.entries(mod.mapper.record ?? {})) {
+          const name = masterMap.byId[masterFld];
+          const clientFld = name ? clientMap.byName[name] : undefined;
+          if (clientFld) remapped[clientFld] = expr;
+          else dropped.push(name ?? masterFld);
+        }
+
+        // Enterprise per-site tag, written the way every other column is.
+        if (siteTag) {
+          const siteFld = clientMap.byName.Site;
+          if (siteFld) remapped[siteFld] = siteTag;
+          else warn(`  ⚠ Base ${baseId} has no "Site" column — per-site call filtering will not work.`);
+        }
+
+        mod.mapper.record = remapped;
+        if (dropped.length) {
+          warn(`  ⚠ Dropped unmapped Airtable column(s): ${dropped.join(', ')} — add them to createAirtableBase.`);
+        }
+        say(`  Airtable module → base ${baseId}, table ${clientMap.tableId}, ${Object.keys(remapped).length} field(s)`);
+      } else {
+        warn(`  ⚠ Could not resolve Airtable schemas — left table/field ids pointing at the master base.`);
+        warn(`    Fix the Airtable module by hand in the clone, or post-call rows will not be written.`);
+      }
     }
     if (app.startsWith('twilio') && smsEnabled) {
       mod.mapper = mod.mapper ?? {};
       mod.mapper.from = fromNum;
       mod.mapper.to = toNum;
+    }
+  }
+
+  // The master still carries a `datastore:GetRecord` ("retell-agent-lookup", keyed on
+  // {{1.call.agent_id}}) from the superseded one-shared-scenario design, where the Airtable
+  // base id was looked up per agent instead of baked into a per-client clone. Each clone
+  // hardcodes its own base above, so the lookup is dead weight — and worse than inert: no
+  // datastore record is ever written for a newly provisioned agent, and a GetRecord miss
+  // emits no bundle, which halts the route before Airtable or Twilio ever run. Left in
+  // place it would silently no-op every cloned scenario.
+  //
+  // Its `filter` must survive the removal, though. In a Make blueprint the filter sits on
+  // the module it gates entry to, and this one carries `{{1.event}} = call_analyzed` —
+  // Retell posts call_started and call_ended to the same webhook, so dropping the module
+  // and its filter together would log three rows per call, two of them with no transcript
+  // or summary. So the filter is carried forward onto the next module that doesn't define
+  // one of its own.
+  if (Array.isArray(blueprint.flow)) {
+    const kept = [];
+    let carriedFilter = null;
+    let removed = 0;
+    for (const mod of blueprint.flow) {
+      if ((mod.module ?? '').startsWith('datastore')) {
+        carriedFilter = carriedFilter ?? mod.filter ?? null;
+        removed += 1;
+        continue;
+      }
+      if (carriedFilter && !mod.filter) {
+        mod.filter = carriedFilter;
+        carriedFilter = null;
+      }
+      kept.push(mod);
+    }
+    blueprint.flow = kept;
+    if (removed > 0) {
+      say(`  Removed ${removed} datastore module(s) from the clone (per-client base is hardcoded)`);
+      if (carriedFilter) {
+        warn(`  ⚠ Could not re-home the datastore module's event filter — the clone may log non-call_analyzed events.`);
+      }
     }
   }
 
@@ -1299,8 +1889,173 @@ function patchPostCallBlueprint(blueprint, { baseId, siteTag, fromNum, toNum, sm
     const before = blueprint.flow.length;
     blueprint.flow = blueprint.flow.filter((m) => !(m.module ?? '').startsWith('twilio'));
     const removed = before - blueprint.flow.length;
-    if (removed > 0) console.log(`  Removed ${removed} Twilio module(s) from the clone (no SMS consent)`);
+    if (removed > 0) say(`  Removed ${removed} Twilio module(s) from the clone (no SMS consent)`);
   }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Correctness checks
+//
+// The question a dry run should answer is not "would this provision?" but "would this
+// provision CORRECTLY?" — the seven bugs that prompted this all left a run looking fine.
+//
+// The predicates live in lib/onboard-checks.js and are shared verbatim with test/*.test.mjs.
+// That sharing is the design: a dry run with its own copy of the rules could bless a client
+// the suite would reject, which is the same mistake as a mocked test certifying a 404.
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The master scenario's blueprint, hook, Airtable base, and the team/org ids a clone needs —
+ * resolved once per run.
+ *
+ * Memoized because four callers want it (the pre-flight master-resource refusal, the clone
+ * itself, the blueprint preview, and the per-site checks) and an enterprise run would
+ * otherwise re-fetch the same endpoints for every site. The master is read-only in all of them.
+ *
+ * `teamId` and `organizationId` come free: the hook record already fetched here carries both,
+ * and `POST /scenarios/{id}/clone` requires them. Taking them from the live hook rather than
+ * from env means there is no second place for them to drift out of date.
+ *
+ * Returns null when credentials are missing or Make is unreachable, which every caller treats
+ * as "could not check" rather than as a pass.
+ */
+let MASTER_RESOURCES;
+async function resolveMasterResources() {
+  if (MASTER_RESOURCES !== undefined) return MASTER_RESOURCES;
+  MASTER_RESOURCES = null;
+
+  const apiKey = process.env.MAKE_API_KEY;
+  const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
+  if (!apiKey || !masterId) return MASTER_RESOURCES;
+
+  const headers = { Authorization: `Token ${apiKey}` };
+  try {
+    const bres = await fetch(`${MAKE_ZONE}/scenarios/${masterId}/blueprint`, { headers });
+    if (!bres.ok) return MASTER_RESOURCES;
+    const blueprint = (await bres.json())?.response?.blueprint;
+    if (!blueprint?.flow) return MASTER_RESOURCES;
+
+    const masterBaseId =
+      blueprint.flow.find((m) => (m.module ?? '').startsWith('airtable'))?.mapper?.base ?? null;
+
+    // The master's own hook, so a client wired to it can be recognised — and the team/org ids
+    // the clone endpoint requires, which the hook record happens to carry.
+    let masterHookUrl = null;
+    let teamId = null;
+    let organizationId = null;
+    const sres = await fetch(`${MAKE_ZONE}/scenarios/${masterId}`, { headers });
+    const scenario = sres.ok ? (await sres.json())?.scenario : null;
+    const hookId = scenario?.hookId ?? null;
+    // The scenario record carries teamId directly; the hook record carries both.
+    if (typeof scenario?.teamId === 'number') teamId = scenario.teamId;
+    if (hookId) {
+      const hres = await fetch(`${MAKE_ZONE}/hooks/${hookId}`, { headers });
+      if (hres.ok) {
+        const hook = (await hres.json())?.hook ?? {};
+        masterHookUrl = hook.url ?? null;
+        if (typeof hook.teamId === 'number') teamId = hook.teamId;
+        if (typeof hook.organizationId === 'number') organizationId = hook.organizationId;
+      }
+    }
+
+    MASTER_RESOURCES = { blueprint, masterBaseId, masterHookUrl, hookId, teamId, organizationId };
+  } catch {
+    MASTER_RESOURCES = null; // offline: unknown, not broken
+  }
+  return MASTER_RESOURCES;
+}
+
+/**
+ * Patch a THROWAWAY copy of the live master blueprint to see how it would come out.
+ *
+ * Read-only: reads the memoized master blueprint and both Airtable schemas, patches an
+ * in-memory clone, and never touches Make. Returns null when credentials are absent, which the
+ * checks surface as `?` rather than as a pass — CI has no secrets and must not read as
+ * "verified".
+ */
+async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir }) {
+  if (!baseId) return null;
+  const master = await resolveMasterResources();
+  if (!master) return null;
+
+  const { masterBaseId, masterHookUrl } = master;
+  const [masterMap, clientMap] = await Promise.all([
+    airtableFieldMap(masterBaseId),
+    airtableFieldMap(baseId),
+  ]);
+  if (!masterMap || !clientMap) return { blueprint: null, masterBaseId, masterHookUrl, masterMap, clientMap };
+
+  const smsEnabled = smsAlerts?.consented === true && Boolean(smsAlerts?.phone);
+  // Deep copy: the memoized blueprint is shared across sites, so patching it in place would
+  // leak one site's base and Site tag into the next site's preview.
+  const copy = JSON.parse(JSON.stringify(master.blueprint));
+  patchPostCallBlueprint(copy, {
+    baseId,
+    siteTag,
+    fromNum: readEnvLocal(clientDir).TWILIO_NUMBER,
+    toNum: smsEnabled ? (toE164(smsAlerts?.phone) ?? '') : '',
+    smsEnabled,
+    masterMap,
+    clientMap,
+    quiet: true,
+  });
+  return { blueprint: copy, masterBaseId, masterHookUrl, masterMap, clientMap };
+}
+
+/**
+ * Run every check for one site and print the report.
+ *
+ * Returns the summary. A failure is fatal on a real run (there is no reason to push a client
+ * we already know is misconfigured) but only reported on a dry run, whose job is to list
+ * everything wrong rather than stop at the first thing.
+ */
+async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, phoneSwap, baseId, siteTag, smsAlerts, clientDir }) {
+  log(8, `Correctness checks`);
+
+  const checks = [
+    checkEnvTierMatrix({ lines: envLines, plan, webOnly }),
+    checkForwardNotSelf({ lines: envLines, twilioNumber }),
+    checkSitePublishesTwilioNumber({ published: phoneSwap?.published ?? null, twilioNumber, webOnly }),
+    checkForwardPreserved({ lines: envLines, previousPhone: phoneSwap?.previous ?? null, webOnly }),
+  ];
+
+  // Vendor-facing checks. Skipped wholesale for a web-only client, which has no call log.
+  if (!webOnly) {
+    const preview = await previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir });
+    checks.push(
+      checkNotMasterBase({ clientBaseId: baseId, masterBaseId: preview?.masterBaseId ?? null }),
+      // Re-verified here against what the run actually wired, not just what pre-flight saw —
+      // cloneAndWirePostCall runs in between and is the thing that sets the agent's webhook.
+      checkNotMasterHook({
+        clientWebhookUrl: readEnvLocal(clientDir).RETELL_POST_CALL_WEBHOOK_URL,
+        agentWebhookUrl: null, // the live agent is read at pre-flight; avoid a second GET per site
+        masterHookUrl: preview?.masterHookUrl ?? null,
+      }),
+      checkBlueprintFieldsResolve({ blueprint: preview?.blueprint ?? null, clientMap: preview?.clientMap ?? null, siteTag }),
+      checkBlueprintEventFilter({ blueprint: preview?.blueprint ?? null }),
+      checkBlueprintNoDatastore({ blueprint: preview?.blueprint ?? null }),
+      checkAirtableSchemaCovers({
+        masterMap: preview?.masterMap ?? null,
+        clientMap: preview?.clientMap ?? null,
+        masterChoices: preview?.masterMap?.choices ?? null,
+        clientChoices: preview?.clientMap?.choices ?? null,
+      }),
+    );
+  }
+
+  for (const line of formatCheckLines(checks)) console.log(line);
+  const summary = summarizeChecks(checks);
+  console.log(`  ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} not checked`);
+
+  if (!summary.allClear) {
+    const msg = `Correctness checks failed: ${summary.failedIds.join(', ')}`;
+    // Report-don't-stop in dry mode; a real run refuses to continue.
+    if (DRY_RUN) console.warn(`  [dry-run] ${msg} — fix these before a real run`);
+    else fail(8, `${msg}. Nothing further was provisioned.`);
+  } else if (summary.skipped) {
+    console.log(`  Note: ${summary.skipped} check(s) could not run (missing credentials or nothing provisioned yet).`);
+  }
+  return summary;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1343,6 +2098,7 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
     dryLog(`would lookup/create Vercel project "${projectName}" linked to GitHub repo ${process.env.GITHUB_ORG || '<GITHUB_ORG>'}/${siteSlug}`);
     dryLog(`would push env vars from ${clientDir}/.env.local + NEXT_PUBLIC_BRAND_NAME="${content.brand.name}"`);
     dryLog(`would sync Vercel Firewall rules (global 200/60s per-IP → challenge; AI/search-bot 100/60s per-IP → deny)`);
+    log(9, `Preview deploy → would create a preview deployment (dry run)`);
     return { dryRun: true };
   }
   if (!process.env.VERCEL_TOKEN) {
@@ -1367,6 +2123,19 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
       console.log(`  ✓ Firewall rules synced: ${fw.applied.join('; ')}`);
     } else {
       console.warn(`  ⚠ Firewall rules not applied: ${fw.reason}. Retry later with the console or re-run onboard.`);
+    }
+
+    // Preview-first: create a preview deployment and report its URL so the operator can review it
+    // before promoting to production in the Vercel dashboard (we never auto-promote). Best-effort:
+    // the repo is already pushed and env synced, so a deploy-trigger failure must not fail the run.
+    try {
+      const dep = await triggerPreviewDeploy({ slug: siteSlug });
+      const state = String(dep.readyState || 'building').toLowerCase();
+      log(9, `Preview deploy → ${dep.url || '(url pending)'} (${state})`);
+    } catch (err) {
+      console.warn(
+        `  ⚠ Preview deploy not triggered: ${err.message}. If the org GitHub integration auto-deploys on push, the deployment may already exist — check Vercel.`,
+      );
     }
 
     return result;
@@ -1719,6 +2488,18 @@ async function linkPortal(slug, opts = {}) {
  * verifying is the most automation available here.
  */
 async function checkAnalytics(provisioned) {
+  // A dry run promises "no external API calls" in its own banner, and this was the one place
+  // that broke the promise — getProjectAnalytics was called unconditionally, so every dry run
+  // hit Vercel. `analyticsEnabled: null` is the established tristate for "didn't look", which
+  // analyticsLines already renders as "couldn't check" rather than claiming it's fine.
+  if (DRY_RUN) {
+    return provisioned.map((p) => ({
+      siteSlug: p.siteSlug,
+      projectId: null,
+      analyticsEnabled: null,
+      reason: 'dry run — not checked',
+    }));
+  }
   return Promise.all(
     provisioned.map(async (p) => ({
       siteSlug: p.siteSlug,
@@ -1819,12 +2600,20 @@ async function printHandoff({ intake, provisioned, sharedBaseId, baseSlug, porta
 // (esp. before the paid Twilio purchase) so a bad .env fails fast and free.
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * Credential presence + ID-format validation.
+ *
+ * Runs in dry mode too. Nothing in here is a network call — it is pure `process.env`
+ * inspection — so the old blanket `if (DRY_RUN) return` was skipping checks that cost
+ * nothing, and skipping exactly the ones a dry run exists to surface. A dry run that cannot
+ * tell you `AIRTABLE_WORKSPACE_ID` holds a base id instead of a workspace id has not told you
+ * whether the real run will work.
+ *
+ * In dry mode the findings are reported but never fatal: a dry run's job is to list what is
+ * wrong, not to stop at the first problem. The live run still hard-fails.
+ */
 function preflight(intake) {
   console.log('\n[pre-flight] Validating credentials & ID formats…');
-  if (DRY_RUN) {
-    console.log('  [dry-run] skipping live credential checks');
-    return;
-  }
   const errors = [];
   const warnings = [];
   const need = (name) => { if (!process.env[name]) errors.push(`missing env ${name}`); };
@@ -1897,9 +2686,181 @@ function preflight(intake) {
   for (const w of warnings) console.warn(`  ⚠ ${w}`);
   if (errors.length) {
     for (const e of errors) console.error(`  ✗ ${e}`);
-    fail(0, `Pre-flight failed (${errors.length} issue${errors.length === 1 ? '' : 's'}) — fix .env and re-run. No resources were created.`);
+    const summary = `Pre-flight failed (${errors.length} issue${errors.length === 1 ? '' : 's'}) — fix .env and re-run. No resources were created.`;
+    // Report-don't-stop in dry mode, so one missing credential doesn't hide the rest of the
+    // run from you. `✓ Pre-flight passed` is deliberately NOT printed here: onboard-parse.ts
+    // closes the pre-flight phase on that line, and claiming it passed would be a lie.
+    if (DRY_RUN) {
+      console.warn(`  [dry-run] ${summary.replace(' No resources were created.', '')}`);
+      return { errors, warnings };
+    }
+    fail(0, summary);
   }
   console.log('  ✓ Pre-flight passed');
+  return { errors, warnings };
+}
+
+/**
+ * Refuse to provision a client that is wired into a MASTER resource.
+ *
+ * Runs at pre-flight — before the Twilio purchase, the Retell agent, the Airtable base and the
+ * Make clone — because this is a configuration mistake, and a configuration mistake should
+ * cost nothing to discover.
+ *
+ * The case that prompted it: `_e2e_test_growth` had `AIRTABLE_BASE_ID` set to the master base,
+ * and its Retell agent's `webhook_url` was the master scenario's own hook. So the one client
+ * that existed to prove the pipeline ran entirely through the master and never once exercised
+ * `cloneAndWirePostCall` — which is why five bugs in that function shipped unnoticed. Sharing
+ * a master resource does not look broken; it looks like a working client whose calls land in
+ * the wrong place.
+ *
+ * Read-only: three GETs at most (master scenario → hookId → hook url, master blueprint →
+ * airtable base) plus one per site to read the live agent. Nothing is created or modified; in
+ * particular the master scenario is never touched.
+ */
+async function verifyNoMasterResources(intake, baseSlug) {
+  console.log('\n[pre-flight] Checking no client is wired to a master resource…');
+
+  const master = await resolveMasterResources();
+  if (!master) {
+    console.warn('  ⚠ Could not resolve the master scenario (no Make credentials, or unreachable) — not checked. This is not a pass.');
+    return;
+  }
+  const { masterBaseId, masterHookUrl } = master;
+  if (!masterBaseId && !masterHookUrl) {
+    console.warn('  ⚠ Master scenario carries neither an Airtable base nor a hook — not checked. This is not a pass.');
+    return;
+  }
+
+  const problems = [];
+  for (let i = 0; i < intake.sites.length; i++) {
+    const label = isMultiSite(intake) ? `site ${i + 1}/${intake.sites.length}` : 'client';
+    const env = readEnvLocal(siteDirFor(baseSlug, intake, i));
+
+    // What the live agent will actually POST to. The env file can be silent while the agent is
+    // wired — exactly how the e2e fixture hid.
+    let agentWebhookUrl = null;
+    if (env.RETELL_AGENT_ID && process.env.RETELL_API_KEY) {
+      try {
+        const res = await fetch(`https://api.retellai.com/get-agent/${env.RETELL_AGENT_ID}`, {
+          headers: { Authorization: `Bearer ${process.env.RETELL_API_KEY}` },
+        });
+        if (res.ok) agentWebhookUrl = (await res.json())?.webhook_url ?? null;
+      } catch {
+        // Unreachable Retell is reported by the checks step; don't block pre-flight on it.
+      }
+    }
+
+    // A master base id in .env.local is fatal: createAirtableBase short-circuits on it, so the
+    // run would reuse the master base rather than replace it.
+    const baseCheck = checkNotMasterBase({ clientBaseId: env.AIRTABLE_BASE_ID, masterBaseId });
+    if (baseCheck.ok === false) problems.push(`${label}: ${baseCheck.detail}`);
+
+    // Same for a recorded webhook: cloneAndWirePostCall short-circuits when
+    // RETELL_POST_CALL_WEBHOOK_URL is already set, so a master hook here is never corrected.
+    const envHookCheck = checkNotMasterHook({
+      clientWebhookUrl: env.RETELL_POST_CALL_WEBHOOK_URL,
+      agentWebhookUrl: null,
+      masterHookUrl,
+    });
+    if (envHookCheck.ok === false) problems.push(`${label}: ${envHookCheck.detail}`);
+
+    // The live AGENT pointing at the master is different in kind: when no webhook is recorded
+    // yet, this run will clone the master and re-point the agent at that clone, so the
+    // condition is about to be fixed by the very run a hard failure would block. Warn instead —
+    // refusing here would make the one client that needs decoupling impossible to decouple.
+    const agentHookCheck = checkNotMasterHook({
+      clientWebhookUrl: null,
+      agentWebhookUrl,
+      masterHookUrl,
+    });
+    if (agentHookCheck.ok === false) {
+      if (env.RETELL_POST_CALL_WEBHOOK_URL) {
+        problems.push(`${label}: ${agentHookCheck.detail}`);
+      } else {
+        console.warn(`  ⚠ ${label}: the Retell agent currently posts to the MASTER scenario's hook.`);
+        console.warn('    This run will clone the master and re-point the agent at its own clone, which fixes it.');
+      }
+    }
+  }
+
+  if (problems.length) {
+    for (const p of problems) console.error(`  ✗ ${p}`);
+    const summary =
+      `This client is wired to a master resource (${problems.length} issue${problems.length === 1 ? '' : 's'}). ` +
+      'Clear AIRTABLE_BASE_ID / RETELL_POST_CALL_WEBHOOK_URL from the client .env.local so the run creates its own, ' +
+      'and re-point the Retell agent off the master hook.';
+    // Report-don't-stop in dry mode, matching preflight: a dry run's job is to show you
+    // everything that is wrong, not to stop at the first thing. A real run refuses.
+    if (DRY_RUN) {
+      console.warn(`  [dry-run] ${summary}`);
+      return;
+    }
+    fail(0, `${summary} No resources were created.`);
+  }
+  console.log('  ✓ No master resources in use');
+}
+
+/**
+ * Is the master Twilio account actually usable?
+ *
+ * Pre-flight already checked that `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are present and
+ * that the SID looks like a SID. That is not the same as the account being able to do anything:
+ * a suspended or closed account returns 401 / code 20003 ("account … with status 4 is not
+ * active") on every request, including a plain account fetch, with credentials that are
+ * perfectly well-formed.
+ *
+ * This was found the expensive way. A run reached step 9 — GitHub repo created, site content
+ * written, build run, agent prompt generated, a per-client Retell LLM and agent created — and
+ * only then discovered the account was inactive, surfacing as a raw RestException reported as
+ * "unhandled error in onboard.js". One read-only GET here turns that into a free, legible stop
+ * before anything exists.
+ *
+ * Gated on web-only, which buys no number and needs no Twilio at all.
+ */
+async function verifyTwilioAccountActive(intake) {
+  if (intakeIsWebOnly(intake)) return;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  // preflight already hard-failed on absence; guard defensively so this never throws first.
+  if (!sid || !token) return;
+
+  console.log('\n[pre-flight] Checking the Twilio account is active…');
+
+  // Deliberately runs in dry mode too. It is a single read-only GET, and a dry run that cannot
+  // tell you the account is suspended has not told you whether the real run will work — which
+  // is the whole point of the dry run. Reported rather than fatal there, matching preflight.
+  const stop = (msg) => {
+    if (DRY_RUN) {
+      console.warn(`  [dry-run] ${msg}`);
+      return;
+    }
+    fail(0, `${msg} Nothing was created.`);
+  };
+
+  let account = null;
+  try {
+    account = await twilio(sid, token).api.v2010.accounts(sid).fetch();
+  } catch (err) {
+    // 20003 is Twilio's authentication failure, which covers BOTH a bad token and a live-but-
+    // unusable account. The message says which, so pass it through rather than guessing.
+    return stop(
+      `Twilio rejected the master credentials: ${err?.message ?? String(err)}\n` +
+      '    If that says the account is "not active", the account is suspended or closed and no ' +
+      `credential change will fix it — settle any unpaid balance or clear the verification hold ` +
+      `for ${sid.slice(0, 10)}… in the Twilio Console.\n` +
+      '    If it says the token is wrong, update TWILIO_AUTH_TOKEN in .env.',
+    );
+  }
+
+  if (account?.status !== 'active') {
+    return stop(
+      `Twilio account ${sid.slice(0, 10)}… has status "${account?.status}", not "active" — it ` +
+      'cannot search for or buy a number. Resolve it in the Twilio Console (billing, or a ' +
+      'verification hold) and re-run.',
+    );
+  }
+  console.log(`  ✓ Twilio account active (${account.friendlyName ?? sid.slice(0, 10)}…)`);
 }
 
 /**
@@ -1953,7 +2914,12 @@ async function main() {
   }
 
   if (DRY_RUN) {
-    console.log('\n=== DRY RUN MODE — no external API calls, no file writes outside this print ===\n');
+    // Wording matters. This used to claim "no external API calls", which was already untrue
+    // (checkAnalytics called Vercel) and is now untrue on purpose: the correctness checks GET
+    // the live Make master blueprint and the Airtable schemas, because the only way to know
+    // the field mapping will resolve is to ask the services that own those ids. What a dry run
+    // guarantees is that it CREATES and WRITES nothing — which is the promise that matters.
+    console.log('\n=== DRY RUN MODE — read-only: nothing is created, written, or purchased ===\n');
   }
 
   const baseSlug = deriveBaseSlug(args.schema || '');
@@ -1968,6 +2934,12 @@ async function main() {
   if (args.receptionist) intake.receptionistMode = args.receptionist;
   validateIntake(intake);
   preflight(intake);
+  // Before any paid resource exists: refuse a client pointed at the master base or master hook.
+  await verifyNoMasterResources(intake, baseSlug);
+  // …and confirm Twilio can actually be used. A suspended account authenticates as a 401 on
+  // every call, so without this the run dies at step 9 having already created a GitHub repo
+  // and a billable Retell agent.
+  await verifyTwilioAccountActive(intake);
   await verifyA2pRegistered(intake);
 
   // Computed once, from the stated mode. Every per-site decision below keys off this rather
@@ -1992,13 +2964,19 @@ async function main() {
     CURRENT_SITE_LABEL = isMultiSite(intake) ? `site ${i + 1}/${intake.sites.length}` : '';
 
     const { repoDir, repoUrl } = await createRepoFromLocal(siteSlug, site, clientDir);
-    writeClientSchema(repoDir, site);
+    installClientSchema(repoDir, site);
     writeApiRoutes(repoDir);
-    writeClientEnvLocal(clientDir, siteSlug, intake.plan, site, webOnly);
+    // The env lines are returned (and computed even in dry mode) so the correctness checks can
+    // assert the tier matrix and the forward target without re-reading the file.
+    const { lines: envLines } = writeClientEnvLocal(clientDir, siteSlug, intake.plan, site, webOnly);
     buildClientRepo(repoDir);
 
     let agentId = null;
     let twilioNumber = null;
+    let siteTag = null;
+    // The computed published/forward numbers, handed to the correctness checks below. Null for
+    // a web-only client, which has no number to publish.
+    let phoneSwap = null;
 
     // Keyed on web-only, not on plan: Starter now provisions the full voice stack like Growth
     // (the only runtime difference is LEAD_DELIVERY_MODE=email, set in syncVercelEnv). The only
@@ -2013,7 +2991,7 @@ async function main() {
       // The value written into the Call Log's `Site` column — the provisioning slug, and set
       // for EVERY enterprise site including the first. Tagging only sites 2+ left site 1's
       // rows untagged, and the portal shows untagged rows under every site.
-      const siteTag = siteTagFor(baseSlug, intake, i);
+      siteTag = siteTagFor(baseSlug, intake, i);
 
       if (i === 0) {
         sharedBaseId = await createAirtableBase(intake, site, clientDir, baseSlug);
@@ -2032,7 +3010,35 @@ async function main() {
         // Envelope-level: one owner, one consented cell, however many sites they run.
         intake.smsAlerts,
       );
+
+      // Last thing before the commit: swap the number the site advertises. Deliberately
+      // after writeClientEnvLocal (which captured the owner's real line as the forward
+      // target) and after the purchase (which has no number to publish until it succeeds).
+      if (twilioNumber) {
+        phoneSwap = applyTwilioNumberToSite(repoDir, site, twilioNumber);
+        if (phoneSwap.written) {
+          // The early build at step 5 is the fail-cheap gate — it runs before we spend money
+          // on a number, an agent or a base. This second one is narrower: it type-checks the
+          // tree we are actually about to push, since site.ts changed after that gate.
+          buildClientRepo(repoDir);
+        }
+      }
     }
+
+    // Last gate before the push. Everything the checks need is settled by now: the env lines,
+    // the published number, the Airtable base and the Site tag. On a real run a failure here
+    // stops before commitAndPush, so a client we already know is misconfigured never ships.
+    await runCorrectnessChecks({
+      envLines,
+      plan: intake.plan,
+      webOnly,
+      twilioNumber,
+      phoneSwap,
+      baseId: sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID || null,
+      siteTag,
+      smsAlerts: intake.smsAlerts,
+      clientDir,
+    });
 
     commitAndPush(repoDir, site.brand.name);
     const sync = await syncVercelEnv(siteSlug, site, clientDir, intake.plan);
@@ -2091,4 +3097,49 @@ async function main() {
   }
 }
 
-main().catch((err) => fail(0, 'unhandled error in onboard.js', err));
+// Only provision when invoked as the CLI. The guard exists so verification scripts can
+// import the pure blueprint/format helpers below and exercise them against the real master
+// scenario without the import itself kicking off a live run.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    reportFatal(err);
+    process.exit(1);
+  });
+}
+
+// Exported for scripts/verify-*.js and test/*.test.mjs. Copying any of these into a verifier
+// or a test instead would recreate the drift this repo has already been bitten by — a checker
+// that validates its own private copy of the logic proves nothing about what onboard.js will
+// do. Everything here is pure or returns its computed result, which is what makes a dry run
+// able to assert on the same values the real run writes.
+export {
+  OnboardError,
+  // Make / Airtable wiring
+  patchPostCallBlueprint,
+  airtableFieldMap,
+  CALL_LOG_FIELDS,
+  // Phone publishing
+  formatPhoneForDisplay,
+  resolvePublishedPhone,
+  applyTwilioNumberToSite,
+  // Env + schema shaping
+  buildClientEnvLines,
+  readEnvLocal,
+  stripInterfaceBlocks,
+  // Repo schema ownership — see lib/provisioned-fields.js for the console/onboard contract
+  installClientSchema,
+  updateRepoSchemaFields,
+  // Slug / directory / tag derivation
+  deriveBaseSlug,
+  isMultiSite,
+  siteSlugFor,
+  siteDirFor,
+  siteTagFor,
+  intakeIsWebOnly,
+  // Validation
+  validateSite,
+  validateIntake,
+  preflight,
+  // Reporting
+  analyticsLines,
+};

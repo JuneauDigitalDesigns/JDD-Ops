@@ -2,8 +2,20 @@
 // interpolates each client's real values (slug, plan, env IDs, canonical). Pure function
 // of ClientContext so it is safe to run on the client. One source of truth for the guide.
 
-import { vercelVoiceUrl } from '@jdd/schema';
+import { ENV_FIELDS } from './envFields';
 import type { ClientContext, OpsConfig, Plan, SiteInfo } from './types';
+
+/**
+ * The default ring window, in seconds, read from the copy the console bundle already pins.
+ *
+ * NOT a literal. The guide used to say "~25s" in two places while `lib/client-env.js` defaulted
+ * to 15 and clamped at 20 — prose that tells an operator to expect a window the system will not
+ * give them, and the same stale 25 that reached the plan-upgrade route and the env field's max.
+ * ring-window.test.mjs pins envFields.ts to client-env.js, so deriving from it here means this
+ * copy cannot drift on its own.
+ */
+const RING_SECONDS_DEFAULT =
+  ENV_FIELDS.find((f) => f.key === 'CLIENT_FORWARD_RING_SECONDS')?.placeholder ?? '15';
 
 export type Block =
   | { t: 'text'; body: string }
@@ -24,6 +36,15 @@ export type Block =
   // being restated at every call site. `siteSlug` picks the site on enterprise; omit for the
   // primary site. Only rendered on /onboard — Part A has no client, so BlockView drops it.
   | { t: 'diagram'; kind: 'call-routing' | 'pipeline' | 'post-call'; siteSlug?: string }
+  // Faithful replicas of the two Make.com modules that must be edited by hand per client,
+  // side by side. Thin like `diagram`: the whole field model is derived in make-modules.ts
+  // from ClientContext, so the ten Airtable mappings exist in exactly one place.
+  | { t: 'make-module'; siteSlug?: string }
+  // The deployed site as the focal point of its review step: the .vercel.app URL in display
+  // type plus a live preview frame.
+  | { t: 'site-hero'; siteSlug?: string }
+  // In-step prompt editor + version history, for the call → edit → push → call-again loop.
+  | { t: 'prompt-tuner'; siteSlug?: string }
   // Success criteria: what you should observe if the step worked. Previously written as a
   // trailing "You should see: …" info callout, which read as advice rather than a check.
   | { t: 'verify'; title?: string; items: { text: string; detail?: string }[] }
@@ -49,12 +70,15 @@ export type Block =
 /**
  * Which blocks break out of the stage's prose column.
  *
- * The stage is a reading column (~70ch) because that's what body text needs. Diagrams are not
- * text and were being squeezed into it — that's what clipped them. One place decides, so the
- * two stages can't disagree.
+ * The stage is a CENTRED reading column because that's what body text needs. Everything else —
+ * diagrams, the Make replicas, the site hero, the prompt tuner — is not text and was being
+ * squeezed into it, which is what clipped the diagrams. Wide blocks break out to the full stage
+ * width while the prose stays centred under them. One place decides, so the two stages can't
+ * disagree.
  */
+const WIDE_BLOCKS = new Set(['diagram', 'make-module', 'site-hero', 'prompt-tuner']);
 export function isWideBlock(b: Block): boolean {
-  return b.t === 'diagram';
+  return WIDE_BLOCKS.has(b.t);
 }
 
 export interface Step {
@@ -78,6 +102,12 @@ export interface Phase {
   id: string;
   title: string;
   subtitle?: string;
+  /**
+   * Which macro-phase this sub-phase belongs to: all `onboarding` sub-phases (the work) render
+   * before all `review` sub-phases (checks + reference). OPTIONAL so go-live-content.ts phases,
+   * which borrow this type and have no macro grouping, keep compiling. buildRunbook always sets it.
+   */
+  group?: 'onboarding' | 'review';
   steps: Step[];
 }
 
@@ -98,7 +128,7 @@ function clerkMetadataJson(ctx: ClientContext): string {
     plan: ctx.plan,
     canonical: primary?.canonical ?? 'https://REPLACE_WITH_LIVE_URL',
     airtableBaseId:
-      ctx.plan === 'starter' ? null : primary?.env.AIRTABLE_BASE_ID ?? 'appREPLACE_FROM_ENV_LOCAL',
+      ctx.isWebOnly ? null : primary?.env.AIRTABLE_BASE_ID ?? 'appREPLACE_FROM_ENV_LOCAL',
     vercelProjectId: primary?.env.VERCEL_PROJECT_ID ?? 'prj_REPLACE_FROM_VERCEL',
   };
   if (ctx.isEnterprise) {
@@ -113,25 +143,26 @@ function clerkMetadataJson(ctx: ClientContext): string {
 }
 
 // ── per-client phases ────────────────────────────────────────────────────────
+// Two macro-groups, in order: ONBOARDING (everything you must DO) then REVIEW (everything you
+// check once the work is done, plus reference). `group` tags each sub-phase; buildRunbook emits
+// all onboarding sub-phases first, then all review sub-phases. Sub-phase titles name the action.
+
+// ── Onboarding: Provision ─────────────────────────────────────────────────────
 function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
-  const primary = ctx.sites[0];
-  const proj = envVal(primary?.env.VERCEL_PROJECT_NAME, ctx.slug);
-  const voice = ctx.plan !== 'starter';
+  const voice = !ctx.isWebOnly;
   const org = config.githubOrg ?? 'GITHUB_ORG';
   return {
     id: 'provision',
-    title: 'Provision & preview',
-    subtitle: 'Run the orchestrator, then confirm the site renders.',
+    group: 'onboarding',
+    title: 'Provision the stack',
+    subtitle: 'Run the orchestrator to stand up the whole client stack.',
     steps: [
       {
         id: 'run-onboard',
         launch: true,
         title: 'Launch onboard.js',
-        why: 'One command stands up the whole stack: GitHub repo, schema, build, Vercel deploy — plus (Growth/Enterprise) the Retell agent, phone number, Airtable base, Make Data Store row, and the Clerk portal user.',
+        why: 'One command stands up the whole stack: GitHub repo, schema, build, Vercel deploy — plus (Growth/Enterprise) the Retell agent, phone number, Airtable base, Make post-call clone, and the Clerk portal user.',
         blocks: [
-          // The step-by-step "click dry run, then click provision" instructions used to live
-          // here. They're gone: the launch screen IS those instructions, and a checklist that
-          // narrates the button next to it is the exact "dump of info" this redesign removes.
           { t: 'diagram', kind: 'pipeline' },
           {
             t: 'context',
@@ -160,37 +191,137 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
           },
         ],
       },
+    ],
+  };
+}
+
+// ── Onboarding: map the cloned post-call scenario (per site, non-web-only) ──────
+// The clone inherits the MASTER's module settings, so its Airtable + Twilio modules must be
+// pointed at THIS client by hand before the first real call. The exact field expressions and
+// message body are operator-supplied and reproduced verbatim.
+function callLoggingSetupStepsForSite(ctx: ClientContext, s: SiteInfo): Step[] {
+  const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
+  return [
+    {
+      id: `make-fieldmap-${s.slug}`,
+      site: s.slug,
+      title: `Map the cloned call-log scenario${label}`,
+      why: 'onboard.js clones the master post-call scenario for this client, but the clone carries the master’s module settings — it is not pointed at this client yet. Until you do this, a finished call writes nothing, or writes into someone else’s log.',
+      blocks: [
+        {
+          t: 'substeps',
+          items: [
+            { text: `Open Make.com → this client’s cloned scenario “Post-call: ${s.brandName}”.` },
+            { text: 'In the Airtable module, set Base to this client’s own base and Table to “Call Log”.', detail: 'The clone still points at the master’s base until you change it.' },
+            { text: 'Map each Call Log field to the expression shown below — click any box to copy it.', detail: 'The column names are a contract with the master scenario. A column the master writes that this base does not have is dropped silently from every logged call.' },
+            { text: 'In the Twilio module, set From to this client’s number and To to the owner’s consented alert number, then paste the message body.' },
+            { text: 'Save both modules, then confirm the scenario is Active.' },
+          ],
+        },
+        { t: 'make-module', siteSlug: s.slug },
+        {
+          t: 'callout',
+          tone: 'danger',
+          title: 'Never wire this client to a master resource',
+          body: 'A client must own its Airtable base and its own clone of the scenario. Sharing a master resource does not look broken — it looks like a working client whose calls land in someone else’s log.',
+        },
+      ],
+    },
+  ];
+}
+
+function callLoggingSetupPhase(ctx: ClientContext): Phase {
+  return {
+    id: 'call-logging-setup',
+    group: 'onboarding',
+    title: 'Map the call log (Make)',
+    subtitle: ctx.isEnterprise
+      ? 'Point each site’s cloned post-call scenario at its own base + number.'
+      : 'Point the cloned post-call scenario at this client’s base + number.',
+    steps: ctx.sites.flatMap((s) => callLoggingSetupStepsForSite(ctx, s)),
+  };
+}
+
+// ── Onboarding: analytics ──────────────────────────────────────────────────────
+function analyticsPhase(ctx: ClientContext): Phase {
+  return {
+    id: 'analytics',
+    group: 'onboarding',
+    title: 'Enable analytics',
+    subtitle: 'Switch on Web Analytics so the portal’s Traffic tab has data.',
+    steps: [
       {
-        id: 'checkpoint-1',
-        title: 'Checkpoint 1 — review the deployed site',
-        est: '~15 min',
-        why: 'Confirm the live build renders with real brand content before wiring anything else.',
+        id: 'enable-web-analytics',
+        title: 'Enable Web Analytics on the client’s Vercel project',
+        why: 'The portal’s Traffic tab reads page views + visitors from the Vercel Web Analytics API, keyed by the user’s vercelProjectId. The exported site already renders <Analytics /> from @vercel/analytics (template root layout), so enabling Web Analytics is the only step — no GA4 property, no site tag, no service-account grant.',
         blocks: [
           {
-            t: 'context',
-            label: 'Vercel project',
-            from: 'the ONBOARDED summary onboard.js printed (step 9), or the Vercel dashboard',
-            to: 'open it in Vercel → Deployments → Production → Visit',
-            value: proj.pending ? undefined : proj.value,
-            example: ctx.slug,
-            pending: proj.pending,
+            t: 'callout',
+            tone: 'info',
+            body: 'The portal account record already has vercelProjectId set (onboard.js step 10 wrote it from the client’s Vercel project). You only need to switch Web Analytics on — no command, no account edit.',
           },
           {
             t: 'substeps',
             items: [
-              { text: 'Open the Vercel project (name above) → Deployments → the latest Production deploy → Visit.' },
-              { text: 'Confirm the hero, services, and contact form show this client’s real copy — not “TODO” placeholders.', detail: 'Placeholders mean the intake (site.ts) still has unfilled fields.' },
-              { text: 'Tab through the page on mobile width; check the nav and footer render.' },
+              { text: 'Vercel → the client’s project → Analytics → Enable Web Analytics.', detail: '@vercel/analytics is already in the template root layout, so no code change or redeploy is needed — the project starts collecting once enabled.' },
+              { text: 'The Traffic tab stays empty until the live site receives real visitors — visit the site once and confirm data appears within ~30s.' },
+              { text: 'Verify it rather than trusting the toggle: npm run audit-analytics', detail: 'Exit 0 = every live site collecting, 1 = at least one is off (it names the project), 2 = could not check. onboard.js also reports this at the end of a run.' },
             ],
           },
-          { t: 'nav', app: 'Vercel', path: ['Project', 'Deployments', 'Production', 'Visit'] },
+          { t: 'nav', app: 'Vercel', path: ['Project', 'Analytics', 'Enable Web Analytics'] },
           { t: 'link', label: 'Open Vercel dashboard', href: 'https://vercel.com/dashboard' },
-          ...(ctx.plan === 'starter'
+          ...(ctx.isEnterprise
+            ? ([
+                {
+                  t: 'callout',
+                  tone: 'warn',
+                  body: 'Enterprise: enable Web Analytics on each site’s Vercel project. Every entry in the account record’s sites[] carries its own vercelProjectId, and each project needs Analytics switched on to light up that site’s Traffic tab.',
+                } as Block,
+              ])
+            : []),
+          { t: 'json', label: 'publicMetadata shape (onboard.js step 10 set this, including vercelProjectId)', json: clerkMetadataJson(ctx) },
+        ],
+      },
+    ],
+  };
+}
+
+// ── Review: the deployed site ───────────────────────────────────────────────────
+function siteReviewPhase(ctx: ClientContext): Phase {
+  const primary = ctx.sites[0];
+  return {
+    id: 'review-site',
+    group: 'review',
+    title: 'Review the site',
+    subtitle: 'Confirm the live build renders with real brand content.',
+    steps: [
+      {
+        id: 'checkpoint-1',
+        title: 'Review the deployed site',
+        est: '~15 min',
+        why: 'Confirm the live build renders with this client’s real content before trusting anything downstream of it.',
+        blocks: [
+          { t: 'site-hero', siteSlug: primary?.slug },
+          {
+            t: 'substeps',
+            items: [
+              { text: 'Confirm the hero, services and contact form show this client’s real copy — not “TODO” placeholders.', detail: 'Placeholders mean the intake (site.ts) still has unfilled fields.' },
+              ...(ctx.isWebOnly
+                ? []
+                : [{
+                    text: 'Confirm the number on the page is the Twilio number, not the owner’s line.',
+                    detail: 'If the site still advertises the owner’s number, every caller dials them directly and bypasses /api/voice — no human-first forward, no AI fallback, no Airtable row, and no error anywhere to find.',
+                  }]),
+              { text: 'Check the page at mobile width; confirm the nav and footer render.' },
+            ],
+          },
+          { t: 'link', label: 'Open Vercel dashboard', href: 'https://vercel.com/dashboard' },
+          ...(ctx.isWebOnly
             ? ([
                 {
                   t: 'callout',
                   tone: 'info',
-                  body: `Starter has no voice agent or Make scenario. Submit the contact form with a test message and confirm the lead email lands at ${primary?.env.LEAD_DELIVERY_MODE ? 'the brand inbox' : (primary?.brandName ?? 'the brand') + '’s inbox'} (Resend).`,
+                  body: `This is a web-only client (receptionist declined) — no voice agent or Make scenario. Submit the contact form with a test message and confirm the lead email lands at ${primary?.env.LEAD_DELIVERY_MODE ? 'the brand inbox' : (primary?.brandName ?? 'the brand') + '’s inbox'} (Resend).`,
                 } as Block,
               ])
             : []),
@@ -200,161 +331,69 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
   };
 }
 
-function voicePhase(ctx: ClientContext, config: OpsConfig): Phase {
-  const routingStep: Step = {
-    id: 'call-routing',
-    title: 'How inbound calls route (human-first → AI fallback over SIP)',
-    auto: true,
-    why: 'onboard.js (step 8) and the site template wire this automatically — there is no manual Twilio or Retell console step for routing. Understand it before you test-call: the Retell agent only answers when the client misses the call.',
-    blocks: [
-      // The 5-step substeps list and the per-site `fields` table that used to sit here are
-      // both gone — the diagram carries the sequence AND binds the same three env values, so
-      // keeping either would print every number on this screen twice.
-      ...ctx.sites.map((s): Block => ({ t: 'diagram', kind: 'call-routing', siteSlug: s.slug })),
-      {
-        t: 'callout',
-        tone: 'danger',
-        title: 'Never import this number into Retell',
-        body: 'A Retell-managed / SIP-trunked number bypasses /api/voice entirely, which kills the human-first ring — every call would go straight to the AI. The number must stay JDD/Twilio-owned with its voiceUrl pointed at /api/voice, which onboard.js sets automatically.',
-      },
-      {
-        t: 'callout',
-        tone: 'warn',
-        title: 'Only works once deployed',
-        body: 'Twilio has to reach /api/voice at the .vercel.app URL, so routing is dead until the repo is deployed with env synced (local dev gets no Twilio webhooks without a tunnel). To change the ring window, set CLIENT_FORWARD_RING_SECONDS in .env.local and re-sync — no code edit.',
-      },
-      {
-        t: 'callout',
-        tone: 'info',
-        title: 'If the AI leg 500s after the ring',
-        body: '/api/voice/no-answer needs RETELL_API_KEY and RETELL_SIP_DOMAIN at runtime to register the call and build the SIP URI. onboard.js writes both and Vercel sync pushes them — so if it fails, confirm RETELL_API_KEY actually exists on the Vercel project.',
-      },
-    ],
-  };
+// ── Review: test-call each agent (+ routing reference last) ─────────────────────
+/**
+ * Test-call each agent and tune its prompt in place.
+ *
+ * The routing reference that used to close this phase is gone from the step list — it lives in
+ * the reference panel now. It was a non-actionable page sitting BETWEEN two checkpoints, so
+ * finishing the test call and pressing Next landed you on a wall of diagrams instead of the
+ * post-call verification you were heading for.
+ */
+function voiceReviewPhase(ctx: ClientContext): Phase {
   return {
-    id: 'voice',
-    title: 'Voice agent',
-    subtitle: 'Understand call routing, tune each agent, then wire post-call logging.',
-    steps: [
-      routingStep,
-      ...ctx.sites.map((s, i): Step => {
-        const agent = envVal(s.env.RETELL_AGENT_ID, 'agent_… (provision first)');
-        const num = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
-        const slugForCmd = ctx.isEnterprise ? `${ctx.slug}/site-${i + 1}` : ctx.slug;
-        return {
-          id: `checkpoint-2-${s.slug}`,
-          site: s.slug,
-          title: ctx.isEnterprise ? `Checkpoint 2 — test-call & tune (${s.brandName})` : 'Checkpoint 2 — test-call & tune the agent',
-          est: '~20 min',
-          why: 'Hear the greeting and qualifying flow on a real call, fix anything wrong in the prompt, and re-upload.',
-          blocks: [
-            { t: 'copy', label: 'Call this number', value: num.value, pending: num.pending },
-            {
-              t: 'substeps',
-              items: [
-                { text: 'To reach the AI, call the number from a phone that is NOT the client’s, and let the client’s real phone go unanswered for ~25s — only then does the agent pick up (human-first routing). Confirm the greeting names the business correctly.', detail: 'Answering the client’s phone within the ring window (CLIENT_FORWARD_RING_SECONDS, default 25s) connects a normal call and the AI never engages — see “How inbound calls route”.' },
-                { text: 'Run a fake lead: ask about a service, give a name and a callback number, mention a timeline.' },
-                { text: 'Note anything off — wrong hours, missing services, awkward phrasing, quoting a price (it should never quote prices).' },
-                { text: `Edit the prompt at clients/${slugForCmd}/agent-prompt.txt to fix it.` },
-                { text: 'Re-upload with the command below, then call again to confirm.' },
-              ],
-            },
-            {
-              t: 'context',
-              label: 'Agent prompt file',
-              from: `generated by onboard step 6 → clients/${slugForCmd}/agent-prompt.txt`,
-              to: 'edit it, then re-upload with the command below',
-              example: 'plain-text system prompt',
-            },
-            { t: 'cmd', command: `npm run update-prompt -- ${agent.value} --slug ${slugForCmd}`, cwd: 'jdd-ops/' },
-            {
-              t: 'verify',
-              title: 'You should hear',
-              items: [
-                { text: 'A warm greeting using the exact business name.' },
-                { text: 'FAQ answers drawn only from the intake — nothing invented.' },
-                { text: 'Pricing deferred to the owner.', detail: 'The agent should never quote a price.' },
-                { text: 'The agent collecting a name and a callback number.' },
-              ],
-            },
-          ],
-        };
-      }),
-      // The old `post-call-webhook` reference step lived here. It and `postcall-auto-{slug}`
-      // (in the Post-call phase) both said "confirm the webhook URL matches" — two rail rows
-      // per site for one fact. Merged into the latter, which is where the per-client values
-      // already were. At enterprise N=3 that's three fewer near-duplicate rows.
-    ],
+    id: 'review-voice',
+    group: 'review',
+    title: 'Test-call the agent',
+    subtitle: 'Hear each agent on a real call, then fix the prompt without leaving the step.',
+    steps: ctx.sites.map((s): Step => {
+      const num = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
+      const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? RING_SECONDS_DEFAULT;
+      return {
+        id: `checkpoint-2-${s.slug}`,
+        site: s.slug,
+        title: ctx.isEnterprise ? `Test-call & tune (${s.brandName})` : 'Test-call & tune the agent',
+        est: '~20 min',
+        why: 'Hear the greeting and the qualifying flow on a real call, then fix anything wrong and push it straight to the live agent.',
+        blocks: [
+          { t: 'copy', label: 'Call this number', value: num.value, pending: num.pending },
+          {
+            t: 'substeps',
+            items: [
+              {
+                text: `Call from a phone that is NOT the client’s, and let their real line ring out for ~${ring}s.`,
+                detail: 'Only then does the agent pick up — answering inside the ring window connects a normal call and the AI never engages. See Reference → Call routing.',
+              },
+              { text: 'Confirm the greeting names the business correctly.' },
+              { text: 'Run a fake lead: ask about a service, give a name and a callback number, mention a timeline.' },
+              { text: 'Note anything off — wrong hours, missing services, awkward phrasing, quoting a price.' },
+              { text: 'Fix it in the editor below, push it to Retell, then call again.', detail: 'Every save and push is kept, so any change is reversible.' },
+            ],
+          },
+          { t: 'prompt-tuner', siteSlug: s.slug },
+          {
+            t: 'verify',
+            title: 'You should hear',
+            items: [
+              { text: 'A warm greeting using the exact business name.' },
+              { text: 'FAQ answers drawn only from the intake — nothing invented.' },
+              { text: 'Pricing deferred to the owner.', detail: 'The agent should never quote a price.' },
+              { text: 'The agent collecting a name and a callback number.' },
+            ],
+          },
+        ],
+      };
+    }),
   };
 }
 
-function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[] {
+// ── Review: prove post-call logging + owner SMS (per site) ──────────────────────
+function callLoggingReviewStepsForSite(ctx: ClientContext, s: SiteInfo): Step[] {
   const twilio = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
   const owner = envVal(s.env.CLIENT_FORWARD_PHONE, 'the owner number (brand.phone)');
-  const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? '25';
-  const slugForCmd = ctx.isEnterprise ? `${ctx.slug}/site-${i + 1}` : ctx.slug;
+  const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? RING_SECONDS_DEFAULT;
   const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
-  // Must match what onboard.js actually sets on the number, or this tells you to verify
-  // against a hostname that was never configured. Two bugs lived on this line: it used the
-  // RAW slug (skipping sanitizeProjectName's leading-punctuation and illegal-char rules)
-  // and it hyphenated underscores where Vercel drops them. Now one shared implementation.
-  const voiceUrl = vercelVoiceUrl(s.slug);
-  const isTollFree = /^\+1(800|833|844|855|866|877|888)/.test(twilio.value);
   return [
-    {
-      id: `postcall-auto-${s.slug}`,
-      site: s.slug,
-      title: `Post-call logging + owner SMS (automated)${label}`,
-      auto: true,
-      why: 'onboard.js cloned the master post-call scenario for this client, pointed its Airtable + Twilio SMS modules at this client, activated it, and set the clone’s webhook on the Retell agent. Nothing to do here unless verification fails.',
-      blocks: [
-        // The diagram binds the webhook URL, Airtable base, owner number and Twilio number, so
-        // the `context` card and the info callout that restated all four are gone.
-        { t: 'diagram', kind: 'post-call', siteSlug: s.slug },
-        {
-          t: 'verify',
-          title: 'Two things to confirm',
-          items: [
-            { text: `Make.com has a scenario “Post-call: ${s.brandName}” and it is Active.` },
-            {
-              text: 'The Retell agent’s Post-call webhook URL matches the one in the diagram.',
-              detail: `Retell → Agents → this client’s agent → Settings. The value is RETELL_POST_CALL_WEBHOOK_URL in clients/${slugForCmd}/.env.local, written by onboard.js.`,
-            },
-          ],
-        },
-        { t: 'nav', app: 'Retell', path: ['Agents', '{agent}', 'Settings', 'Post-call webhook URL'] },
-      ],
-    },
-    {
-      id: `twilio-sms-reg-${s.slug}`,
-      site: s.slug,
-      title: `Enable SMS on the Twilio number${label}`,
-      why: 'US carriers block outbound SMS from unregistered numbers. Until this number is registered/approved, the owner-notification texts silently fail.',
-      blocks: [
-        {
-          t: 'callout',
-          tone: 'warn',
-          body: isTollFree
-            ? 'This is a TOLL-FREE number → it needs per-number Toll-Free Verification (submit the form; approval ~1–3 weeks). SMS will not deliver until Verified.'
-            : 'This is a LOCAL 10DLC number → add it to the JDD A2P Messaging Service (campaign approved once in one-time setup).',
-        },
-        {
-          t: 'substeps',
-          items: isTollFree
-            ? [
-                { text: 'Twilio Console → Messaging → Regulatory Compliance → Toll-Free Verification → Create.' },
-                { text: `Select ${twilio.value}; business info; use-case “Customer Care / Notifications”; sample = the owner call-brief SMS. Opt-in = a separate unchecked checkbox beside a mobile-number field on the public agreement page (juneaudigitaldesigns.com/agreement); it is not a condition of purchase, and consent records carry timestamp, IP, and a hash of the wording shown.` },
-                { text: 'Submit; status must reach Verified before SMS delivers.' },
-              ]
-            : [
-                { text: 'Twilio Console → Messaging → Services → the JDD Messaging Service → Sender Pool.' },
-                { text: `Add ${twilio.value} to the pool so it sends under the approved A2P campaign.` },
-              ],
-        },
-        { t: 'copy', label: 'This site’s /api/voice URL (voice webhook — already set by onboard.js at purchase; paste to re-verify)', value: voiceUrl },
-        { t: 'nav', app: 'Twilio', path: ['Phone Numbers', twilio.value, 'Voice Configuration', 'A call comes in → Webhook'] },
-      ],
-    },
     {
       id: `checkpoint-postcall-${s.slug}`,
       site: s.slug,
@@ -389,93 +428,31 @@ function callbackStepsForSite(ctx: ClientContext, s: SiteInfo, i: number): Step[
   ];
 }
 
-function callbackPhase(ctx: ClientContext): Phase {
+function callLoggingReviewPhase(ctx: ClientContext): Phase {
   return {
-    id: 'callback',
-    title: 'Post-call logging & SMS (Make)',
+    id: 'review-call-logging',
+    group: 'review',
+    title: 'Verify call logging',
     subtitle: ctx.isEnterprise
-      ? 'One post-call clone per site (automated); register each number for SMS.'
-      : 'Post-call clone is automated; register the number for SMS.',
-    steps: ctx.sites.flatMap((s, i) => callbackStepsForSite(ctx, s, i)),
+      ? 'Prove each site logs calls + texts the owner.'
+      : 'Prove the chain: AI call → Airtable row + owner SMS.',
+    steps: ctx.sites.flatMap((s) => callLoggingReviewStepsForSite(ctx, s)),
   };
 }
 
-function portalPhase(ctx: ClientContext, config: OpsConfig): Phase {
-  const steps: Step[] = [];
-
-  steps.push({
-    id: 'enable-web-analytics',
-    title: 'Enable Web Analytics on the client’s Vercel project',
-    why: 'The portal’s Traffic tab reads page views + visitors from the Vercel Web Analytics API, keyed by the user’s vercelProjectId. The exported site already renders <Analytics /> from @vercel/analytics (template root layout), so enabling Web Analytics is the only step — no GA4 property, no site tag, no service-account grant.',
-    blocks: [
-      {
-        t: 'callout',
-        tone: 'info',
-        body: 'The portal account record already has vercelProjectId set (onboard.js step 10 wrote it from the client’s Vercel project). You only need to switch Web Analytics on — no command, no account edit.',
-      },
-      {
-        t: 'substeps',
-        items: [
-          { text: 'Vercel → the client’s project → Analytics → Enable Web Analytics.', detail: '@vercel/analytics is already in the template root layout, so no code change or redeploy is needed — the project starts collecting once enabled.' },
-          { text: 'The Traffic tab stays empty until the live site receives real visitors — visit the site once and confirm data appears within ~30s.' },
-          { text: 'Verify it rather than trusting the toggle: npm run audit-analytics', detail: 'Exit 0 = every live site collecting, 1 = at least one is off (it names the project), 2 = could not check. onboard.js also reports this at the end of a run.' },
-        ],
-      },
-      { t: 'nav', app: 'Vercel', path: ['Project', 'Analytics', 'Enable Web Analytics'] },
-      { t: 'link', label: 'Open Vercel dashboard', href: 'https://vercel.com/dashboard' },
-      ...(ctx.isEnterprise
-        ? ([
-            {
-              t: 'callout',
-              tone: 'warn',
-              body: 'Enterprise: enable Web Analytics on each site’s Vercel project. Every entry in the account record’s sites[] carries its own vercelProjectId, and each project needs Analytics switched on to light up that site’s Traffic tab.',
-            } as Block,
-          ])
-        : []),
-      { t: 'json', label: 'publicMetadata shape (onboard.js step 10 set this, including vercelProjectId)', json: clerkMetadataJson(ctx) },
-    ],
-  });
-
-  steps.push({
-    id: 'invite-client',
-    title: 'Invite the client & verify',
-    why: 'Final handoff — the client signs in and sees their dashboard.',
-    blocks: [
-      {
-        t: 'substeps',
-        items: [
-          { text: 'Clerk → Users → this client → Send invitation (or copy a sign-in link).' },
-          { text: 'Have them sign in at the portal URL below.' },
-          { text: 'Confirm all relevant tabs load with data: Traffic (Vercel Web Analytics), Performance (PageSpeed)' + (ctx.plan === 'starter' ? '.' : ', and Calls (Airtable).') },
-        ],
-      },
-      { t: 'nav', app: 'Clerk', path: ['Users', '{client}', 'Send invitation'] },
-      {
-        t: 'context',
-        label: 'Portal sign-in link',
-        from: 'send via Clerk → Users → this client → Send invitation',
-        to: `the client signs in here`,
-        value: config.portalSignInUrl ?? 'https://juneaudigitaldesigns.com/portal/sign-in',
-      },
-    ],
-  });
-
-  return {
-    id: 'portal',
-    title: 'Client portal',
-    subtitle: 'Give the client their performance + call-log dashboard.',
-    steps,
-  };
-}
-
-/** The ordered per-client phases, gated by plan. */
+/** The ordered per-client phases: all Onboarding (work) first, then all Review. */
 export function buildRunbook(ctx: ClientContext, config: OpsConfig = {}): Phase[] {
-  const phases: Phase[] = [provisionPhase(ctx, config)];
-  if (ctx.plan !== 'starter') {
-    phases.push(voicePhase(ctx, config));
-    phases.push(callbackPhase(ctx));
+  const phases: Phase[] = [];
+  // ── Onboarding (do the work) ──
+  phases.push(provisionPhase(ctx, config));
+  if (!ctx.isWebOnly) phases.push(callLoggingSetupPhase(ctx));
+  phases.push(analyticsPhase(ctx));
+  // ── Review (verify + reference) ──
+  phases.push(siteReviewPhase(ctx));
+  if (!ctx.isWebOnly) {
+    phases.push(voiceReviewPhase(ctx));
+    phases.push(callLoggingReviewPhase(ctx));
   }
-  phases.push(portalPhase(ctx, config));
   return phases;
 }
 

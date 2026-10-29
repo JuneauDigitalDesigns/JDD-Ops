@@ -3,13 +3,13 @@
 import type { CopyBrief } from '@jdd/schema';
 import type { ForbiddenBlock, ProseBlock } from '@/lib/copy-brief/types';
 import { setBlockEnabled, setBlockOverride, setChipSelected, toggleChip } from '@/lib/copy-brief/mutations';
-import { BlockHeader, ChipGroupEditor, OverrideTextarea } from '../BlockPrimitives';
+import { BlockHeader, ChipGroupEditor, OverrideTextarea, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
 /** role and guardrails share this editor — both are a single editable paragraph with one
  *  default/edited/revert. Guardrails additionally shows a note when the vertical has none. */
-export function ProseBlockEditor({ block, onUpdate }: { block: ProseBlock; onUpdate: Update }) {
+export function ProseBlockEditor({ block, onUpdate, variant = 'page' }: { block: ProseBlock; onUpdate: Update; variant?: BlockVariant }) {
   const { part } = block;
   return (
     <div>
@@ -20,6 +20,7 @@ export function ProseBlockEditor({ block, onUpdate }: { block: ProseBlock; onUpd
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, block.id, v))}
         edited={part.edited}
         onRevert={() => onUpdate((b) => setBlockOverride(b, block.id, 'full', undefined))}
+        variant={variant}
       />
       {block.id === 'guardrails' && !part.defaultText && !part.edited && (
         <p className="mb-3 text-sm text-uiInkSoft">
@@ -37,7 +38,7 @@ export function ProseBlockEditor({ block, onUpdate }: { block: ProseBlock; onUpd
   );
 }
 
-export function ForbiddenBlockEditor({ block, onUpdate }: { block: ForbiddenBlock; onUpdate: Update }) {
+export function ForbiddenBlockEditor({ block, onUpdate, variant = 'page' }: { block: ForbiddenBlock; onUpdate: Update; variant?: BlockVariant }) {
   const { words, freeText } = block;
   const edited = words.selected.join() !== words.defaultSelected.join() || freeText.edited;
   return (
@@ -55,6 +56,7 @@ export function ForbiddenBlockEditor({ block, onUpdate }: { block: ForbiddenBloc
           })
         }
         revertLabel="Revert to the vertical's defaults"
+        variant={variant}
       />
       <ChipGroupEditor
         label="Clichés to never use"

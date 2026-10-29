@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, ArrowUUpLeft, ArrowUUpRight } from '@phosphor-icons/react';
+import { Check, ArrowUUpLeft, ArrowUUpRight } from '@phosphor-icons/react';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
@@ -22,8 +22,9 @@ import {
 import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import PageStudio from './PageStudio';
-import { defaultCompositionFor, pageFromType, servicePageFrom, applyTemplate, PAGE_TEMPLATES } from './page-templates';
-import { liftLegacyToComposition, ensureSectionIds, servicePageRoutes, MAX_PAGES, type SiteComposition, type PageTypeId } from '@/lib/pages';
+import { defaultCompositionFor } from './page-templates';
+import { applyVerticalTemplate } from './vertical-templates';
+import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
@@ -63,7 +64,14 @@ type WizardBundle = {
   selections: Selections;
   skins: SkinSelections;
   order: string[];
-  /** The Intake step's own sub-stage (Brief / Prompt / Review). */
+  /**
+   * The Intake's position — one step id from lib/intake-steps.ts.
+   *
+   * A plain string, not a union, because a bundle saved before the Intake was flattened holds
+   * one of the old sub-stage names ('brief' | 'prompt' | 'review'). IntakeStep migrates it on
+   * mount via migrateStepId; this layer deliberately doesn't know the step registry, so the
+   * sequence lives in exactly one file.
+   */
   intakeStage: IntakeStageId;
   /** Everything the Brief stage's eleven blocks read and write — including which sections
    *  are ticked for generation (brief.tickedSections), which used to be its own field here. */
@@ -109,18 +117,26 @@ function readBundle(slug: string): Partial<WizardBundle> | null {
 }
 
 function freshBundle(seed: SiteContent | null): WizardBundle {
+  const vertical = verticalFromIntake(seed) ?? DEFAULT_VERTICAL;
+  const tmpl = applyVerticalTemplate(vertical);
+  const preset = presetFor(vertical);
   return {
-    vertical: verticalFromIntake(seed) ?? DEFAULT_VERTICAL,
+    vertical,
     imported: seed,
     generated: null,
-    edits: {},
+    // When a vertical template seeds the site, the template owns the palette + type: seed those
+    // as edits so the whole site renders the template's colors from the first paint.
+    edits: tmpl ? { 'brand.palette': preset.brand.palette, 'brand.typography': preset.brand.typography } : {},
     selections: {},
     skins: {},
     order: [],
-    intakeStage: 'brief',
+    // 'intake' is step 1 — the client-intake review screen. migrateStepId maps the legacy
+    // 'brief' here too, so either value is safe; this is the canonical new one.
+    intakeStage: 'intake',
     brief: normalizeVerdicts((seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief()),
     copyModel: DEFAULT_MODEL_ID,
-    siteComposition: defaultCompositionFor(),
+    // Seed from the vertical's whole-site template when one exists; else the generic 4-page site.
+    siteComposition: tmpl ?? defaultCompositionFor(),
   };
 }
 
@@ -138,14 +154,22 @@ function freshBundle(seed: SiteContent | null): WizardBundle {
 export default function BuildWizard({
   slug,
   seed,
+  manifest,
   composition,
   draftBundle,
 }: {
   slug: string;
   seed: SiteContent | null;
   /**
-   * The page composition read back from the client's exported repo, when they have one.
-   * Present = this client is already built, and the repo is the source of truth.
+   * The FULL multi-page composition, read from the repo's `.studio/composition.json` — the
+   * manifest the exporter wrote. Preferred over `composition` below whenever present, because
+   * it is what was actually exported rather than an inference about it.
+   */
+  manifest: SiteComposition | null;
+  /**
+   * The page composition recovered by parsing home's `page.tsx`. A lossy fallback for repos
+   * exported before the manifest existed: it carries the legacy single-page shape, so a
+   * multi-page site read through it comes back as one page. Never preferred over `manifest`.
    */
   composition: StudioReadBack | null;
   /** Server-side draft saved by the last session. Survives cache clears and mid-generation refreshes. */
@@ -153,13 +177,17 @@ export default function BuildWizard({
 }) {
   const reduce = useReducedMotion();
 
+  /** This client has an exported site on disk, by either record. Drives the opening step and
+   *  whether the Studio's primary action is Deploy rather than Launch. */
+  const exported = Boolean(manifest || composition);
+
   // ── Wizard position ────────────────────────────────────────────────────────
   // A client that has already been exported opens on STUDIO, not Intake. Intake is a
   // first-pass screen — "where does the content come from, and what's still missing" — and
   // for a site that already shipped the answer is "the repo". You came here to change the
   // page, so start on the page. (The rail is forward-only, so landing on Intake would also
   // mean an extra click every single time.)
-  const [stepIndex, setStepIndex] = useState(composition ? STEPS.length - 1 : 0);
+  const [stepIndex, setStepIndex] = useState(exported ? STEPS.length - 1 : 0);
   const [dir, setDir] = useState(1);
   const step: StepId = STEPS[stepIndex].id;
 
@@ -174,7 +202,7 @@ export default function BuildWizard({
   // separate details/scanUrl/source/genSections fields — they were lifted into the bundle in
   // the first place because the step tree unmounts on navigation, and `brief` inherits that
   // same reasoning: it has to survive the Intake step's own sub-stage navigation too.
-  const [intakeStage, setIntakeStage] = useState<IntakeStageId>('brief');
+  const [intakeStage, setIntakeStage] = useState<IntakeStageId>('intake');
   const [brief, setBrief] = useState<CopyBrief>(emptyCopyBrief);
   const [copyModel, setCopyModel] = useState<string>(DEFAULT_MODEL_ID);
 
@@ -406,7 +434,7 @@ export default function BuildWizard({
     setSelections(b.selections ?? {});
     setSkins(b.skins ?? {});
     setOrder(b.order ?? []);
-    setIntakeStage(b.intakeStage ?? 'brief');
+    setIntakeStage(b.intakeStage ?? 'intake');
     // Falls back to the durably-saved brief (site.ts's _meta.copyBrief, P4 of the intake
     // rebuild) rather than an empty one — a bundle can be missing the key entirely (an old
     // save predating the Brief stage) or the client's localStorage can simply be gone, and
@@ -416,14 +444,12 @@ export default function BuildWizard({
     // Prefer a saved composition; otherwise lift the legacy selections/order (existing clients),
     // otherwise the default 4-page site. ensureSectionIds backfills stable ids on any composition
     // that predates them (older bundles, legacy lifts) so per-section styling can key off them.
-    setSiteComposition(
-      ensureSectionIds(
-        b.siteComposition ??
-          (b.selections || b.order
-            ? liftLegacyToComposition({ selections: b.selections ?? {}, skins: b.skins, order: b.order ?? [] })
-            : defaultCompositionFor()),
-      ),
-    );
+    //
+    // The three-way choice lives in compositionFromBundle (lib/pages.ts) rather than inline,
+    // because the inline version was `b.selections || b.order` — and `{}`/`[]` are truthy, so an
+    // empty bundle lifted to a one-page site with no sections instead of falling back to the
+    // default. That is testable now, and tested.
+    setSiteComposition(ensureSectionIds(compositionFromBundle(b, defaultCompositionFor)));
     // `seed` is read for the durable-brief fallback, so it belongs in the deps — an empty
     // array here would pin this callback to the first client's intake.
   }, [seed]);
@@ -484,55 +510,24 @@ export default function BuildWizard({
   }, [intakeCheckpoint]);
 
   // ── Page composition setters (multi-page studio) ─────────────────────────
-  const selectTemplate = useCallback((route: string, templateId: string) => {
-    const tmpl = PAGE_TEMPLATES.find((t) => t.id === templateId);
-    if (!tmpl) return;
+  // Apply the whole-site vertical template. Defaults to the current intake vertical; pass an
+  // explicit id to apply any vertical's template (used by the "show all" QA mode in PageStudio).
+  const applyVertical = useCallback((id?: VerticalId) => {
+    const target = id ?? vertical;
+    const next = applyVerticalTemplate(target);
+    if (!next) return;
     studioCheckpoint();
-    setSiteComposition((prev) => ({
-      ...prev,
-      pages: prev.pages.map((p) => (p.route === route ? applyTemplate(p, tmpl) : p)),
+    setSiteComposition(ensureSectionIds(next));
+    // The template owns the palette + type across the whole site: apply the vertical preset's
+    // brand.palette/typography and drop any per-section color overrides, so every token-driven
+    // surface renders the template's colors (fixes off-template/"pink" section backgrounds).
+    const preset = presetFor(target);
+    setEdits((e) => ({
+      ...Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('sectionStyles.'))),
+      'brand.palette': preset.brand.palette,
+      'brand.typography': preset.brand.typography,
     }));
-  }, [studioCheckpoint]);
-  const addPage = useCallback((pageType: PageTypeId) => {
-    studioCheckpoint();
-    setSiteComposition((prev) =>
-      prev.pages.some((p) => p.pageType === pageType)
-        ? prev
-        : { ...prev, pages: [...prev.pages, pageFromType(pageType)] },
-    );
-  }, [studioCheckpoint]);
-  const removePage = useCallback((route: string) => {
-    if (route === '') return; // home is never removable
-    studioCheckpoint();
-    setSiteComposition((prev) => ({ ...prev, pages: prev.pages.filter((p) => p.route !== route) }));
-  }, [studioCheckpoint]);
-  /** One page per service (decision 20). Appends a service page for each services.items entry whose
-   *  route is not already present. Idempotent; respects MAX_PAGES. Header copy is filled at export
-   *  from the service item, never invented here. */
-  const generateServicePages = useCallback(() => {
-    const items = effective.services?.items ?? [];
-    if (!items.length) return;
-    const routes = servicePageRoutes(items);
-    studioCheckpoint();
-    setSiteComposition((prev) => {
-      const existing = new Set(prev.pages.map((p) => p.route));
-      const additions = items
-        .map((item, i) => ({ item, route: routes[i] }))
-        .filter(({ route }) => !existing.has(route))
-        .map(({ item, route }) => servicePageFrom(item, route));
-      if (!additions.length) return prev;
-      const room = Math.max(0, MAX_PAGES - prev.pages.length);
-      return { ...prev, pages: [...prev.pages, ...additions.slice(0, room)] };
-    });
-  }, [effective, studioCheckpoint]);
-  const renameLabel = useCallback((route: string, label: string) => {
-    studioCheckpoint();
-    setSiteComposition((prev) => ({ ...prev, pages: prev.pages.map((p) => (p.route === route ? { ...p, label } : p)) }));
-  }, [studioCheckpoint]);
-  const toggleNav = useCallback((route: string) => {
-    studioCheckpoint();
-    setSiteComposition((prev) => ({ ...prev, pages: prev.pages.map((p) => (p.route === route ? { ...p, navVisible: !p.navVisible } : p)) }));
-  }, [studioCheckpoint]);
+  }, [vertical, studioCheckpoint]);
   /**
    * Swap a chrome slot's (nav/footer/seo) variant and/or skin. One function covers both the
    * Site style panel's "pick a different variant" (skin omitted → carries the old skin forward
@@ -677,7 +672,7 @@ export default function BuildWizard({
 
     const saved = readBundle(slug);
 
-    if (composition) {
+    if (manifest || composition) {
       // ── Already exported: DISK WINS, for CONTENT. ───────────────────────────────────
       // The repo is what the client's site actually is, so opening the studio shows that
       // and nothing else. A stale localStorage draft from some earlier session must not
@@ -687,14 +682,22 @@ export default function BuildWizard({
       // The intake INPUTS are carried across anyway. They aren't content and can't
       // misrepresent what's deployed — they're the brief you wrote — and an exported client
       // is precisely when you come back to tweak the guidance and regenerate.
+      //
+      // `siteComposition` is passed through when the MANIFEST supplied it, so a multi-page
+      // site opens as the multi-page site it is. Falling back to the parsed legacy
+      // selections/order is strictly for pre-manifest repos, and is lossy by nature — it
+      // describes home only. compositionFromBundle then lifts it, and (critically) now falls
+      // back to the 4-page default instead of producing an empty one-page site when the parse
+      // yielded nothing. "Disk wins" must never mean "disk said nothing, so ship nothing".
       applyBundle({
         vertical: DEFAULT_VERTICAL,
         imported: seed,
         generated: null,
         edits: {},
-        selections: composition.selections,
-        skins: composition.skins,
-        order: composition.order,
+        siteComposition: manifest ?? undefined,
+        selections: composition?.selections,
+        skins: composition?.skins,
+        order: composition?.order,
         intakeStage: saved?.intakeStage ?? draftBundle?.intakeStage as IntakeStageId | undefined,
         brief: (saved?.brief ?? draftBundle?.brief as CopyBrief | undefined) ?? (seed?._meta.copyBrief as CopyBrief | undefined),
         copyModel: saved?.copyModel ?? draftBundle?.copyModel as string | undefined,
@@ -713,8 +716,6 @@ export default function BuildWizard({
   }, [slug]);
 
   // ── Navigation ───────────────────────────────────────────────────────────
-  const isLast = stepIndex === STEPS.length - 1;
-
   function go(nextIndex: number) {
     if (nextIndex < 0 || nextIndex > STEPS.length - 1) return;
     setDir(nextIndex > stepIndex ? 1 : -1);
@@ -723,104 +724,82 @@ export default function BuildWizard({
 
   const variants = stepVariants(reduce);
 
+  // The step pills, defined once and rendered in exactly one place per step: the ToolBar strip
+  // on Intake (via NavSlot) or the PageStudio toolbar on Studio (via the stepNav prop). Only one
+  // branch mounts at a time because `step` is one value, so there is no duplicate-key risk.
+  const stepNav = (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {STEPS.map((s, i) => {
+        const state = i === stepIndex ? 'active' : i < stepIndex ? 'done' : 'todo';
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => i < stepIndex && go(i)}
+            disabled={i > stepIndex}
+            className={[
+              'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+              state === 'active'
+                ? 'bg-accent text-[var(--accent-ink)]'
+                : state === 'done'
+                ? 'text-accent hover:bg-surface'
+                : 'cursor-default text-fg3/60',
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'flex h-4 w-4 items-center justify-center rounded-full text-2xs',
+                state === 'active'
+                  ? 'bg-[var(--accent-ink)] text-accent'
+                  : state === 'done'
+                  ? 'bg-accent text-[var(--accent-ink)]'
+                  : 'border border-current',
+              ].join(' ')}
+            >
+              {state === 'done' ? <Check size={9} weight="bold" /> : i + 1}
+            </span>
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-uiCanvas">
-      {/* ── Wizard chrome, in the per-tool ToolBar strip directly above the work.
-             Step pills · undo/redo · Back/Next.
-
-             These used to render into the console BAR alongside the app mark, the client
-             name, a plan chip, a status badge and the three tool tabs — twelve-plus targets
-             in one 64px band. They are ACTIONS, so they belong next to what they act on;
-             the bar is wayfinding only now.
-
-             Note the Studio step's own controls (zoom, reset, full screen, Launch/Deploy)
-             stay in StudioStep's canvas bar rather than moving here. Those act on the
-             CANVAS, not on the wizard, and Deploy in particular should sit with the page
-             it deploys. ─────────────────────────────────────────────────────────────── */}
+      {/* The two step pills (Intake · Studio). On the Intake step they render in the ToolBar
+          strip (below); on the Studio step they are handed to PageStudio and render inline in
+          its toolbar, so the 40px strip collapses and the preview gets that height back. */}
       <NavSlot>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {STEPS.map((s, i) => {
-            const state = i === stepIndex ? 'active' : i < stepIndex ? 'done' : 'todo';
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => i < stepIndex && go(i)}
-                disabled={i > stepIndex}
-                className={[
-                  'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                  state === 'active'
-                    ? 'bg-accent text-[var(--accent-ink)]'
-                    : state === 'done'
-                    ? 'text-accent hover:bg-surface'
-                    : 'cursor-default text-fg3/60',
-                ].join(' ')}
-              >
-                <span
-                  className={[
-                    'flex h-4 w-4 items-center justify-center rounded-full text-2xs',
-                    state === 'active'
-                      ? 'bg-[var(--accent-ink)] text-accent'
-                      : state === 'done'
-                      ? 'bg-accent text-[var(--accent-ink)]'
-                      : 'border border-current',
-                  ].join(' ')}
+        {step === 'intake' && (
+          <>
+            {stepNav}
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {/* Undo/redo for the Intake step only — drives the Intake stack. The Studio step's
+                  undo/redo lives in the PageStudio toolbar. */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={intakeHistory.undo}
+                  disabled={!intakeHistory.canUndo}
+                  aria-label="Undo"
+                  className="rounded-md p-1.5 text-fg3 hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  {state === 'done' ? <Check size={9} weight="bold" /> : i + 1}
-                </span>
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Who you're building for used to be repeated here. ClientChrome owns it now — it
-            is the same in every tool, and the shell keeps it pinned above this bar. */}
-
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {/* Undo/redo for the Intake step only — it drives the Intake stack (vertical, generated
-              copy, seed, missing-field edits). The Studio step has its own undo/redo down in the
-              Studio control bar, scoped to page composition + inline edits. */}
-          {step === 'intake' && (
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={intakeHistory.undo}
-                disabled={!intakeHistory.canUndo}
-                aria-label="Undo"
-                className="rounded-md p-1.5 text-fg3 hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <ArrowUUpLeft size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={intakeHistory.redo}
-                disabled={!intakeHistory.canRedo}
-                aria-label="Redo"
-                className="rounded-md p-1.5 text-fg3 hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <ArrowUUpRight size={15} />
-              </button>
+                  <ArrowUUpLeft size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={intakeHistory.redo}
+                  disabled={!intakeHistory.canRedo}
+                  aria-label="Redo"
+                  className="rounded-md p-1.5 text-fg3 hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ArrowUUpRight size={15} />
+                </button>
+              </div>
             </div>
-          )}
-          {stepIndex > 0 && (
-            <button type="button" onClick={() => go(stepIndex - 1)} className="btn btn-sm">
-              <ArrowLeft size={14} /> Back
-            </button>
-          )}
-          {/* Hidden on the Intake step: IntakeStep now owns its own "Approve & continue to
-              Studio" action on its last sub-stage, so a second Next here would be a
-              redundant, confusing second way to do the same thing. */}
-          {!isLast && step !== 'intake' && (
-            <button
-              type="button"
-              onClick={() => go(stepIndex + 1)}
-              className="btn btn-sm btn-primary"
-            >
-              Next <ArrowRight size={14} />
-            </button>
-          )}
-        </div>
+          </>
+        )}
       </NavSlot>
 
       {/* ── Sliding step viewport ──────────────────────────────────────────── */}
@@ -870,17 +849,13 @@ export default function BuildWizard({
             {step === 'studio' && (
               <div className="h-full">
                 <PageStudio
+                  stepNav={stepNav}
                   composition={siteComposition}
                   effective={effective}
                   categories={categories}
                   vertical={vertical}
                   slug={slug}
-                  onSelectTemplate={selectTemplate}
-                  onAddPage={addPage}
-                  onGenerateServicePages={generateServicePages}
-                  onRemovePage={removePage}
-                  onRenameLabel={renameLabel}
-                  onToggleNav={toggleNav}
+                  onApplyVerticalTemplate={(id) => applyVertical(id)}
                   onSetChrome={setChrome}
                   onSetSectionSkin={setSectionSkin}
                   onSetSectionVariant={setSectionVariant}
@@ -893,7 +868,7 @@ export default function BuildWizard({
                   canRedo={studioHistory.canRedo}
                   // A composition read back from disk means this client is already live,
                   // so the studio's primary action becomes Deploy rather than Launch.
-                  alreadyDeployed={Boolean(composition)}
+                  alreadyDeployed={exported}
                   brandName={effective.brand?.name}
                   reverts={reverts}
                 />

@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Pre-commit gate for the provisioning path.
+#
+# Runs ONLY the root suite: it is hermetic (recorded fixtures, no network, no credentials) and
+# finishes in about a second. The console suite and the dry-run phase contract are left to CI
+# on purpose — a hook slow enough to be annoying is a hook that gets disabled with --no-verify,
+# and a disabled hook protects nothing.
+#
+# Enable once per clone (git config is not committable):
+#     npm run setup-hooks
+#
+# Bypass deliberately, when you know why:
+#     git commit --no-verify
+
+# Only run when something that feeds the suite actually changed. A docs-only commit should
+# not pay for a test run.
+changed=$(git diff --cached --name-only --diff-filter=ACM)
+case "$changed" in
+  *onboard.js*|*lib/*|*test/*|*package.json*) ;;
+  *)
+    exit 0
+    ;;
+esac
+
+echo "pre-commit: running the onboard.js correctness suite…"
+if ! npm test --silent; then
+  echo ""
+  echo "✗ The correctness suite failed. These tests encode bugs that already shipped once:"
+  echo "  a Make endpoint that 404s, an Airtable table id that was never remapped,"
+  echo "  singleSelect casing that failed whole rows, a published phone number that"
+  echo "  left every caller bypassing /api/voice. None of them produced an error at"
+  echo "  the time — that is why they are assertions now."
+  echo ""
+  echo "  Fix the failure, or bypass with --no-verify if you know why it is wrong."
+  exit 1
+fi

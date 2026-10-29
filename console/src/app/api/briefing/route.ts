@@ -10,6 +10,7 @@ import type { SiteMoney } from '@/lib/reconcile';
 import { loadStripeKey } from '@/lib/opsSecrets';
 import { accountStoreConfigured, getAccount } from '@/lib/accountStore';
 import { fixturesIncludedByDefault } from '@/lib/fixtures';
+import { getFinanceOverview, type FinanceOverview } from '@/lib/financeOverview';
 import Stripe from 'stripe';
 
 /**
@@ -51,6 +52,12 @@ export interface BriefingPayload {
   };
   /** Straight from Stripe: the real total, and how much of it is unaccounted for. */
   stripe: StripeFacts;
+  /**
+   * The /finances headline figures (net profit, to-set-aside, net YTD, tax reserve), so the
+   * briefing's Money panel is a true snapshot of /finances rather than a parallel number.
+   * Computed by `getFinanceOverview`, which reuses the same tax math /finances leads with.
+   */
+  finances: FinanceOverview;
   funnel: {
     leadsTotal: number;
     leadsNew: number;
@@ -358,6 +365,10 @@ export async function GET() {
       .map((t) => ({ id: t.id, subject: t.subject, siteSlug: t.siteSlug, status: t.status, createdAt: t.createdAt }));
   }
 
+  // The /finances headline figures. Degrades on its own (see getFinanceOverview) — a Stripe or
+  // KV failure leaves `configured: false` rather than breaking the briefing.
+  const finances = await getFinanceOverview().catch(() => null);
+
   const payload: BriefingPayload = {
     issues,
     counts,
@@ -373,6 +384,14 @@ export async function GET() {
     checkedAt: newestCheck,
     includingFixtures,
     stripe: stripeFacts,
+    finances: finances ?? {
+      configured: false,
+      month: new Date().toISOString().slice(0, 7),
+      netThisMonthCents: 0,
+      setAsideThisMonthCents: 0,
+      netYtdCents: 0,
+      reserve: { reservedCents: 0, owedCents: 0, state: 'on-track' },
+    },
   };
 
   return NextResponse.json(payload);

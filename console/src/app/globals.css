@@ -136,6 +136,12 @@
     --accent-strong: #185a99;
     --accent-glow: rgba(30, 111, 191, 0.32);
     --accent-grad: linear-gradient(135deg, #1e6fbf 0%, #185a99 100%);
+    /* Two-tone secondary accent + accent-bar gradient (runtime values come from paletteVars). */
+    --accent-2: #2f4a63;
+    --accent-2-fg: #ffffff;
+    --accent-2-soft: #e3e9f0;
+    --accent-2-strong: #203444;
+    --accent-bar: linear-gradient(90deg, #6c8cae 0%, #2f4a63 55%, #1e3346 100%);
     --ink-panel: #0e1929;
     --ink-panel-2: #16283f;
     --on-ink: #ffffff;
@@ -223,7 +229,7 @@
      Form field labels use .field-label. If you are reaching for .kicker and the
      thing you're labelling is not a section header, you want .meta. ─────────── */
   .kicker {
-    font-family: var(--font-dm-mono), 'DM Mono', monospace;
+    font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
     font-size: 11.5px;
     font-weight: 500;
     letter-spacing: var(--tracking-widest);
@@ -235,15 +241,17 @@
      The workhorse for machine-ish values that sit beside content: counts,
      durations, slugs, plan names, timestamps, relative times, group labels.
 
-     Stays MONOSPACE deliberately — mono is the control-panel signal, and moving
-     this layer to the body face is what would make the console read bland. What
-     was dropped is the editorial part: uppercase and 0.14em tracking.
+     Now on the BODY face. It was monospace to read as a "control-panel signal",
+     but applied this widely it was the main reason the whole app read as mono
+     texture rather than as a tool. Monospace is now reserved for literal code
+     and values (.mono, .codechip, .mono-field, the font-mono utility), not for
+     labels. The editorial uppercase/0.14em tracking was already dropped.
 
      It also replaces a dozen inline `style={{ fontSize: 8.5|9|9.5 }}` overrides
      that existed only because .kicker was the sole small-label class available —
      so the smallest type in the app went UP, not down. ──────────────────────── */
   .meta {
-    font-family: var(--font-dm-mono), 'DM Mono', monospace;
+    font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
     font-size: 11px;
     font-weight: 500;
     line-height: 1.4;
@@ -289,10 +297,10 @@
     gap: 6px;
     padding: 3px 10px 4px;
     border-radius: 999px;
-    font-family: var(--font-dm-mono), monospace;
+    font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
     font-size: 11.5px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     border: 1px solid var(--rule-strong);
     color: var(--fg-2);
@@ -435,9 +443,9 @@
 
   /* ── Area tag ────────────────────────────────────────────────────────────
      Labels a finding row with its `area` (site/voice/leads/billing/portal/
-     account) — DM Mono at the 11.5px floor, since it sits beside .meta text. */
+     account) — on the body face at the 11.5px floor, since it sits beside .meta text. */
   .area-tag {
-    font-family: var(--font-dm-mono), monospace;
+    font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
     font-size: 11.5px;
     color: var(--fg-3);
     border: 1px solid var(--rule-weak);
@@ -570,3 +578,73 @@
   100% { box-shadow: 0 0 0 0 rgba(63, 143, 92, 0), 0 0 0 0 rgba(63, 143, 92, 0); }
 }
 .client-new-highlight { animation: clientNewHighlight 2.5s ease-out 1; }
+
+/* ── Catalog preview material (mirrors template/src/styles/globals.css) ───────
+   The accent-bar motif and the hero's pure-CSS stagger must render identically in the studio
+   preview and on the shipped client site, so these are kept in step with the template twin. */
+.accent-bar {
+  display: block;
+  height: 4px;
+  width: 68px;
+  border-radius: 999px;
+  background: var(--accent-bar);
+}
+@keyframes hero-rise  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes hero-slide { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+@keyframes hero-bar   { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.hero-rise  { animation: hero-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.hero-slide { animation: hero-slide 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.hero-bar   { transform-origin: left center; animation: hero-bar 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise, .hero-slide, .hero-bar { animation: none; }
+}
+
+/* ── Make.com module replicas (/onboard → map the call log) ──────────────────
+   Deliberately NOT themed to the console: these reproduce Make's own white UI so that what
+   is on screen matches what the operator has open in the other tab. The colours live in the
+   component as literals for the same reason — they are Make's, not ours.
+
+   The pair sits side by side joined by a dot trail running Airtable blue → Twilio red. Below
+   the breakpoint the panels stack and the trail rotates to point down, so the "these two are
+   one flow" reading survives the reflow. */
+.make-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
+  align-items: center;
+}
+.make-trail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 10px;
+}
+.make-trail i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  animation: makeTrailPulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes makeTrailPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+@media (max-width: 1180px) {
+  .make-pair { grid-template-columns: minmax(0, 1fr); gap: 46px; }
+  .make-trail { transform: rotate(90deg); height: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .make-trail i { animation: none; opacity: 0.85; }
+}
+
+/* Make's own scrollbar inside a module panel — the panels scroll internally exactly as the
+   real ones do, which is what keeps the fields below the fold reachable without the step
+   growing to three screens. */
+.make-scroll::-webkit-scrollbar { width: 11px; }
+.make-scroll::-webkit-scrollbar-track { background: #f3f5f7; }
+.make-scroll::-webkit-scrollbar-thumb {
+  background: #c9ced4;
+  border-radius: 9px;
+  border: 3px solid #fff;
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import { CheckCircle } from '@phosphor-icons/react';
 import type { SiteContent } from '@/data/site';
 import { type Section, type VerdictKey, verdictKey } from '@/lib/copy-schema';
 import { buildReviewGroups, type ReviewGroup, type ReviewPage } from '@/lib/copy-review-groups';
@@ -30,7 +31,7 @@ export interface SectionVerdict {
 }
 
 export default function CopyWireframe({
-  content, setField, verdictFor, pages, unreviewed,
+  content, setField, verdictFor, pages, unreviewed, hasGenerated,
 }: {
   content: SiteContent;
   setField: (path: string, value: unknown) => void;
@@ -42,11 +43,26 @@ export default function CopyWireframe({
   /** The gate's own set (ticked AND has generated copy) so the group counts shown here match
    *  exactly what blocks the Approve button; built once in IntakeStep. */
   unreviewed: Set<VerdictKey>;
+  /** Whether a run has produced copy at all. Distinguishes "you reviewed everything" from
+   *  "there is nothing to review yet" — both have an empty `unreviewed` set, and telling the
+   *  operator they're clear when no copy has been generated would be a false all-clear. */
+  hasGenerated: boolean;
 }) {
   const groups = buildReviewGroups(pages);
   return (
     <EditProvider setField={setField}>
       <div className="mx-auto max-w-2xl space-y-10 pb-16">
+        {hasGenerated && unreviewed.size === 0 && (
+          <div
+            className="flex items-center gap-2.5 rounded-xl border p-4"
+            style={{ borderColor: 'var(--ok)', background: 'var(--ok-glow, var(--ui-surface))' }}
+          >
+            <CheckCircle size={16} weight="fill" style={{ color: 'var(--ok)', flexShrink: 0 }} />
+            <p className="text-sm text-uiFg2">
+              Every generated section has been reviewed — you can continue to the Studio.
+            </p>
+          </div>
+        )}
         {groups.map((g) => (
           <ReviewGroupBlock
             key={g.route || 'home'}
@@ -74,9 +90,14 @@ function ReviewGroupBlock({
   return (
     <section className="space-y-6">
       <div className="sticky top-0 z-10 -mx-1 flex items-center gap-3 border-b border-uiCardRule bg-uiCanvas/90 px-1 py-2 backdrop-blur-sm">
-        <h2 className="font-display text-sm font-semibold text-uiInk">{group.label}</h2>
+        <h2 className="font-display text-base font-semibold text-uiInk">{group.label}</h2>
         {group.route && <span className="font-chromeMono text-2xs text-uiFg3">/{group.route}</span>}
-        <span className="ml-auto font-chromeMono text-2xs text-uiFg3">
+        {/* Amber while anything in this page is outstanding — the count is what the Approve
+            gate reads, so it should look like a blocker rather than a statistic. */}
+        <span
+          className="ml-auto font-chromeMono text-2xs"
+          style={count > 0 ? { color: 'var(--warn)' } : { color: 'var(--ui-fg-3)' }}
+        >
           {count > 0 ? `${count} unreviewed` : 'all reviewed'}
         </span>
       </div>
@@ -102,13 +123,16 @@ function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVe
   return (
     <div className="mb-3 flex items-center gap-3 border-b border-uiCardRule pb-3">
       <span className="kicker">{labelFor(section)}</span>
-      <div className="ml-auto flex items-center gap-1">
+      {/* Bigger than the 2xs/py-1 these were: three verbs sitting 4px apart, each small enough
+          to misclick, governing whether a section gets regenerated or thrown away. Accept is
+          the affirmative one and reads as a button; the other two stay quiet until hovered. */}
+      <div className="ml-auto flex items-center gap-1.5">
         <button
           type="button"
           onClick={verdict.onAccept}
           disabled={!verdict.ticked}
           title="Accept — stop re-generating this section"
-          className="rounded-md px-2 py-1 font-chromeMono text-2xs uppercase tracking-wide text-uiInkSoft transition-colors hover:bg-uiSurface hover:text-uiInk disabled:cursor-default disabled:opacity-40"
+          className="rounded-md border border-uiCardRule px-2.5 py-1.5 font-chromeMono text-xs uppercase tracking-wide text-uiFg2 transition-colors hover:border-uiAccent hover:bg-uiSurface hover:text-uiAccent disabled:cursor-default disabled:border-transparent disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-uiFg2"
         >
           Accept
         </button>
@@ -116,7 +140,7 @@ function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVe
           type="button"
           onClick={verdict.onReroll}
           title="Tick for regeneration and jump to the Prompt stage"
-          className="rounded-md px-2 py-1 font-chromeMono text-2xs uppercase tracking-wide text-uiInkSoft transition-colors hover:bg-uiSurface hover:text-uiInk"
+          className="rounded-md px-2.5 py-1.5 font-chromeMono text-xs uppercase tracking-wide text-uiInkSoft transition-colors hover:bg-uiSurface hover:text-uiInk"
         >
           Re-roll
         </button>
@@ -125,7 +149,7 @@ function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVe
           onClick={verdict.onRevert}
           disabled={!verdict.canRevert}
           title="Restore this section's value from before the last run"
-          className="rounded-md px-2 py-1 font-chromeMono text-2xs uppercase tracking-wide text-uiInkSoft transition-colors hover:bg-uiSurface hover:text-uiInk disabled:cursor-default disabled:opacity-40"
+          className="rounded-md px-2.5 py-1.5 font-chromeMono text-xs uppercase tracking-wide text-uiInkSoft transition-colors hover:bg-uiSurface hover:text-uiInk disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
         >
           Revert
         </button>

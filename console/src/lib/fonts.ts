@@ -27,11 +27,17 @@
 export interface FontPairing {
   id: string;
   label: string;
-  /** The CSS variable both loaders define via next/font. */
+  /** The CSS variable both loaders define via next/font. For a two-family pairing this is the
+   *  BODY family (what `fontSans` names and what pairingIdFromStack keys on). */
   varName: string;
-  /** The full font-family stack written into brand.typography. */
+  /** The full font-family stack written into brand.typography (the body/fontSans stack). */
   stack: string;
-  /** Display treatment. `weight` must be a weight the family actually ships. */
+  /** Two-family pairings only (decision 7 was "one family"; the condensed-display pass relaxes
+   *  it): a SEPARATE display family for headings. When unset, headings reuse `stack`/`varName`.
+   *  The body `stack` must stay unique across pairings so pairingIdFromStack can still key on it. */
+  displayVarName?: string;
+  displayStack?: string;
+  /** Display treatment. `weight` must be a weight the display family actually ships. */
   display: { weight: number; tracking: string; lineHeight: number };
   body: { weight: number };
   /** One sentence for the operator, shown under the specimen. No em-dashes. */
@@ -39,6 +45,22 @@ export interface FontPairing {
 }
 
 export const FONT_PAIRINGS: FontPairing[] = [
+  {
+    id: 'oswald',
+    label: 'Oswald Condensed',
+    // Two-family: a condensed industrial DISPLAY (Oswald) over a clean humanist BODY (Inter).
+    // This is the reference look (Atlantic Compressor = Oswald + Geist, Air Service = Bebas +
+    // Inter) and the premium default. `varName`/`stack` are the BODY (Inter) so fontSans and
+    // pairingIdFromStack key on it; Inter is used by no other pairing, so the body stack stays
+    // unique. Oswald ships 200–700 (no 800), so the display weight is 600.
+    varName: '--font-inter',
+    stack: 'var(--font-inter), system-ui, sans-serif',
+    displayVarName: '--font-oswald',
+    displayStack: 'var(--font-oswald), system-ui, sans-serif',
+    display: { weight: 600, tracking: '0.005em', lineHeight: 1.0 },
+    body: { weight: 400 },
+    note: 'Condensed industrial headings over a quiet humanist body. The trade-brand look, and the premium default.',
+  },
   {
     id: 'instrument',
     label: 'Instrument',
@@ -90,7 +112,7 @@ export const FONT_PAIRINGS: FontPairing[] = [
   },
 ];
 
-export const DEFAULT_PAIRING_ID = 'instrument';
+export const DEFAULT_PAIRING_ID = 'oswald';
 
 const BY_ID = new Map(FONT_PAIRINGS.map((p) => [p.id, p]));
 
@@ -112,7 +134,7 @@ export function typographyFor(id: string | null | undefined) {
   const p = pairingFor(id);
   return {
     fontSans: p.stack,
-    fontHeading: p.stack,
+    fontHeading: p.displayStack ?? p.stack,
     headingWeight: p.display.weight,
     bodyWeight: p.body.weight,
     headingTracking: p.display.tracking,

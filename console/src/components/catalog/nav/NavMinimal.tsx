@@ -50,6 +50,15 @@ export default function NavMinimal({
   const [open, setOpen] = useState(false);
   const scrolled = useScrolled();
 
+  // On a multi-page site (nav carries route links, not the lone home link) the brand wordmark and
+  // CTA can't be `#top`/`#cta` anchors: those sections live on other routes, so they scroll to
+  // nothing off their home page. Point the wordmark at home and the CTA at the contact route.
+  // A single-page site keeps the anchors (they still scroll within the one page). Derived from
+  // `nav` alone — this component ships into client repos and must not import console libs.
+  const multiPage = nav.length > 1;
+  const homeHref = multiPage ? '/' : '#top';
+  const ctaHref = multiPage ? (nav.find((n) => n.href === '/contact')?.href ?? '/') : '#cta';
+
   useEffect(() => {
     if (!open) return;
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -62,7 +71,7 @@ export default function NavMinimal({
       className={`sticky top-0 z-50 border-b ${s.rule} ${s.section} backdrop-blur transition-shadow duration-200 ${scrolled ? 'shadow-sm' : ''}`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-6">
-        <a href="#top" className={`font-heading text-lg font-bold ${s.heading}`}>
+        <a href={homeHref} className={`font-heading text-lg font-bold ${s.heading}`}>
           <E p="brand.name">{brand.name}</E>
         </a>
 
@@ -83,7 +92,7 @@ export default function NavMinimal({
               with the call button for the same tap, and the call is the conversion. The
               action itself is not lost — the hero carries it. */}
           <a
-            href="#cta"
+            href={ctaHref}
             className={`hidden rounded-lg border-2 px-4 py-2.5 text-[15px] font-bold lg:inline-flex ${s.heading} border-current/25 hover:bg-accent hover:text-accentFg hover:border-transparent transition-colors`}
           >
             <E p="hero.cta">{hero.cta}</E>
@@ -138,7 +147,7 @@ export default function NavMinimal({
                 </a>
               ))}
               <a
-                href="#cta"
+                href={ctaHref}
                 onClick={() => setOpen(false)}
                 className="mt-2 flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-current/25 px-4 text-[15px] font-bold"
               >

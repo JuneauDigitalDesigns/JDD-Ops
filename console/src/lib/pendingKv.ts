@@ -98,6 +98,9 @@ export function buildPendingClientContext(rec: PendingOnboardRecord): ClientCont
     detectedStatus: 'needs-build',
     schemaPath: `clients/${rec.slug}/site.ts`,
     hasIntake: false,
+    // A paid-but-not-onboarded client has no schema yet, so no stated receptionist mode.
+    isWebOnly: false,
+    receptionistModeVerified: false,
     sites: [
       {
         slug: rec.slug,
@@ -108,6 +111,9 @@ export function buildPendingClientContext(rec: PendingOnboardRecord): ClientCont
         env: {},
         missingFields: [],
         accent: null,
+        // A paid-but-not-onboarded client has no site.ts and no number, so nothing published.
+        brandPhone: null,
+        numberPublished: false,
       },
     ],
     pendingOnboarding: {

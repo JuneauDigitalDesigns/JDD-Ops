@@ -1,0 +1,109 @@
+{
+  "baseId": "appurtlGfg7Z5UuAI",
+  "table": {
+    "id": "tbl3YWgGdVXNPz3Eg",
+    "name": "Call Log",
+    "primaryFieldId": "fld8sG3TSj5Va42yI",
+    "fields": [
+      {
+        "type": "dateTime",
+        "options": {
+          "dateFormat": {
+            "name": "us",
+            "format": "M/D/YYYY"
+          },
+          "timeFormat": {
+            "name": "12hour",
+            "format": "h:mma"
+          },
+          "timeZone": "client"
+        },
+        "id": "fld8sG3TSj5Va42yI",
+        "name": "Date"
+      },
+      {
+        "type": "singleLineText",
+        "id": "fldMGK569tnD647g2",
+        "name": "Caller name"
+      },
+      {
+        "type": "phoneNumber",
+        "id": "fld2smPri8IPvoNwh",
+        "name": "Caller number"
+      },
+      {
+        "type": "multilineText",
+        "id": "fld9ONpSErMn97LP6",
+        "name": "Summary"
+      },
+      {
+        "type": "number",
+        "options": {
+          "precision": 0
+        },
+        "id": "fldtqHttzKEPSQazh",
+        "name": "Duration (seconds)"
+      },
+      {
+        "type": "singleSelect",
+        "options": {
+          "choices": [
+            {
+              "id": "selYPwaSr8kberIz6",
+              "name": "inbound",
+              "color": "pinkLight2"
+            },
+            {
+              "id": "sel8jWNFGdp5zbWpv",
+              "name": "outbound",
+              "color": "orangeLight2"
+            }
+          ]
+        },
+        "id": "fld2HEMxzE7SFhniW",
+        "name": "Call type"
+      },
+      {
+        "type": "email",
+        "id": "fld7GZx09e7dnHNIU",
+        "name": "Email"
+      },
+      {
+        "type": "singleLineText",
+        "id": "fld3xCSY4BXXEkdMM",
+        "name": "Address"
+      },
+      {
+        "type": "url",
+        "id": "fldxb2nunz4Pt1SJT",
+        "name": "Recording URL"
+      },
+      {
+        "type": "singleSelect",
+        "options": {
+          "choices": [
+            {
+              "id": "sel3WkFcD27DyRg81",
+              "name": "emergency",
+              "color": "yellowLight2"
+            },
+            {
+              "id": "selo9YuASlSkgyveu",
+              "name": "callback",
+              "color": "redLight2"
+            }
+          ]
+        },
+        "id": "fldVbJMLbBiDzEvZF",
+        "name": "Priority"
+      }
+    ],
+    "views": [
+      {
+        "id": "viwcV8iFgXzch4pJJ",
+        "name": "Grid view",
+        "type": "grid"
+      }
+    ]
+  }
+}

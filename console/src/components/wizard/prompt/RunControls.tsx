@@ -7,6 +7,7 @@ import type { SiteContent } from '@/data/site';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
+import { relativeTime } from '@/lib/relativeTime';
 import { MODEL_OPTIONS, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
@@ -157,7 +158,7 @@ export default function RunControls({
   return (
     <div className="flex h-full flex-col gap-5 overflow-y-auto border-l border-uiCardRule p-5">
       <div>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-1 flex items-center justify-between">
           <p className="kicker">Sections to write</p>
           <button
             type="button"
@@ -168,6 +169,10 @@ export default function RunControls({
             {allTicked ? 'None' : 'All'}
           </button>
         </div>
+        <p className="mb-2 text-2xs leading-relaxed text-uiInkSoft">
+          Only what&apos;s ticked is written. Unticking a section leaves whatever is already there
+          untouched — it is not cleared.
+        </p>
         <div className="overflow-hidden rounded-lg border border-uiCardRule">
           {sectionOptions.map((s, i) => {
             const status = statuses[s] ?? 'idle';
@@ -214,9 +219,14 @@ export default function RunControls({
         {estimating ? (
           <p className="mono text-xs text-uiInkSoft">estimating…</p>
         ) : estimate ? (
-          <p className="mono text-xs text-uiFg2">
-            ~{estimate.estInputTokens.toLocaleString()} in / ~{estimate.estOutputTokens.toLocaleString()} out · ~${estimate.estCostUsd.toFixed(2)}
-          </p>
+          <>
+            <p className="font-display text-lg font-semibold tracking-tightish text-uiInk">
+              ~${estimate.estCostUsd.toFixed(2)}
+            </p>
+            <p className="mono mt-0.5 text-2xs text-uiFg2">
+              ~{estimate.estInputTokens.toLocaleString()} in / ~{estimate.estOutputTokens.toLocaleString()} out
+            </p>
+          </>
         ) : (
           <p className="mono text-xs text-uiInkSoft">tick a section to estimate</p>
         )}
@@ -232,6 +242,15 @@ export default function RunControls({
         {busy ? <CircleNotch size={15} className="animate-spin" /> : <Sparkle size={15} weight="fill" />}
         {busy ? 'Generating…' : `${hasGenerated ? 'Regenerate' : 'Generate'} ${tickedSections.length} section${tickedSections.length === 1 ? '' : 's'}`}
       </button>
+
+      {/* `lastRunAt` is stamped on approve, not on generate (see IntakeStep's approve()), so
+          this reads "last approved" rather than "last generated" — labelled accordingly rather
+          than mislabelled as a run timestamp. */}
+      {brief.lastRunAt && !busy && (
+        <p className="mono text-2xs text-uiInkSoft">
+          Last approved {relativeTime(brief.lastRunAt)}
+        </p>
+      )}
 
       {run.kind === 'done' && (
         <p className="flex items-center gap-1.5 text-sm text-ok">

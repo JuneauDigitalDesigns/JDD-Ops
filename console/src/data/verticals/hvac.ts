@@ -16,22 +16,34 @@ export const CONTENT: SiteContent = {
     // Decision 9: warm unbleached ground, warm charcoal ink, shared across every vertical.
     // Measured 2026-10-06: inkSoft on bg 7.59:1, on bgSoft 6.84:1, ink on bg 16.94:1.
     // `accent` / `accentFg` are this vertical's own and are not touched here.
+    // Mockup-faithful palette for the HVAC vertical template (design/multipage-v1 — "Summit
+    // Comfort"): warm-orange accent, cool navy structural accent, warm paper soft band, and
+    // the mockup's deep ink/ink-soft. The bespoke Hvac* components read these as brand tokens,
+    // so the template themes per client while matching the mockup by default.
+    // Northstar "Premium Home Mockups" palette, verbatim: deep navy structure + warm action
+    // accent + steel-blue bars. accent2 carries the steel-3 structural tone the bespoke
+    // components use for the accent-bar gradient and icon tiles. This palette is navy, not warm,
+    // and uses pure white bg — so it is exempt from palette-contrast.test.mjs's warmth/AA
+    // heuristics (mockup-pinned; see that test). Mirrored to the T from the mockup :root.
     palette: {
-      accent:   "#E05C2A",
+      accent:   "#E0602C",
+      accent2:  "#1E3A5F",
       accentFg: "#FFFFFF",
-      bg:       "#FAF7F2",
-      bgSoft:   "#F1EBE2",
-      ink:      "#1A1512",
-      inkSoft:  "#584E45",
-      rule:     "#DFD6C9",
+      bg:       "#FFFFFF",
+      bgSoft:   "#F4F6F8",
+      ink:      "#13293F",
+      inkSoft:  "#4C5E74",
+      rule:     "#E2E8F0",
     },
+    // Mockup type pairing: Oswald (condensed display) + Inter (body), both loaded by the
+    // template's fonts.loader.ts and the console font loader.
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "-0.01em",
+      headingLineHeight: 1.04,
     },
   },
 
@@ -54,44 +66,44 @@ export const CONTENT: SiteContent = {
   },
 
   hero: {
-    eyebrow:          "Your City's Trusted HVAC Experts",
-    headline:         "Heating & Cooling You Can Count On",
-    headlineEmphasis: "Count On",
-    sub:              "Fast, reliable HVAC service, from emergency repairs to full system replacements. Licensed technicians, upfront pricing.",
-    formLabel:        "Get a free estimate, we respond same day.",
+    eyebrow:          "Licensed & insured · 24/7 emergency service",
+    headline:         "AC out? We can be there today.",
+    headlineEmphasis: "today.",
+    sub:              "Same-day repairs, honest flat-rate quotes, and technicians who show up on time. Keeping your city's homes comfortable since 2009.",
+    formLabel:        "Tell us what is going on and we will call you right back.",
     placeholder:      "Your email address",
-    cta:              "Book a Free Estimate",
+    cta:              "Book a visit",
     secondaryCta:     "Call (555) 555-0100",
     trust:            "NATE-certified technicians with same-day diagnostics and a price-lock guarantee.",
-    // De-clawed: badge, friction reducers and hero stats are unverified CLAIMS. They stay empty
-    // until the client supplies them at onboarding (Phase 3) — components omit empty ones.
+    // The hero overlay's 2-col ✓ reducer grid (HvacHero reads frictionReducers). Four, matching
+    // the Northstar Standard hero. The badge stays null until the client supplies a verified one.
     badge:            null,
-    frictionReducers: [],
+    frictionReducers: ["Same-day service", "Upfront flat-rate pricing", "Licensed & insured", "Veteran-owned & local"],
     heroBullets:      [],
   },
 
   about: {
-    eyebrow: "Who We Are",
-    title:   "Local HVAC Experts You Can Trust",
-    body:    "We keep homes and businesses comfortable year-round. From emergency furnace repairs on the coldest night of the year to full AC installations before summer, our NATE-certified technicians show up fast and fix it right the first time.",
+    eyebrow: "About us",
+    title:   "Family-owned comfort specialists you can actually reach.",
+    body:    "We do HVAC the honest way: clear pricing, no upsells, and a real person on the phone. Every technician is background-checked, NATE-certified, and trained to leave your home cleaner than they found it.",
     pillars: [
-      { k: "shield", t: "Licensed & Insured",  d: "Every technician is fully licensed, bonded, and covered so you have zero liability." },
-      { k: "clock",  t: "Same-Day Service",     d: "We keep trucks staged locally to respond within hours, not days." },
-      { k: "tag",    t: "Upfront Pricing",      d: "We quote before we work. No invoice surprises, ever." },
-      { k: "star",   t: "NATE Certified",       d: "All technicians hold current NATE certification, the gold standard in HVAC." },
+      { k: "tag",   t: "Upfront flat-rate pricing", d: "You approve the price before we start. No surprises on the invoice." },
+      { k: "seal",  t: "Certified technicians",     d: "NATE-certified, background-checked, and never subcontracted out." },
+      { k: "clock", t: "Fast response",             d: "Same-day appointments and true 24/7 emergency coverage." },
     ],
+    // The Standard stat band (HvacStatBand) renders these as four tiles under the hero.
     stats: [
-      { n: "24/7",  l: "Emergency support" },
-      { n: "1 hr",  l: "Avg. response time" },
-      { n: "4.9★",  l: "Customer rating" },
-      { n: "100%",  l: "Satisfaction guarantee" },
+      { n: "24/7",  l: "Emergency service, real humans" },
+      { n: "18+",   l: "Years serving your area" },
+      { n: "4.9★",  l: "From 180+ verified reviews" },
+      { n: "12",    l: "Towns in our coverage area" },
     ],
   },
 
   services: {
-    eyebrow: "What We Do",
-    title:   "Full-Service Heating & Cooling",
-    sub:     "From annual tune-ups to emergency replacements, we handle every HVAC need under one roof.",
+    eyebrow: "What we do",
+    title:   "Complete heating and cooling, done right.",
+    sub:     "From a noisy 2 a.m. breakdown to a planned system upgrade, one local team handles it all.",
     items: [
       { n: "01", t: "Furnace Repair & Replacement", d: "Fast diagnosis and repair of all furnace makes and models. Emergency same-day service available.", tag: "Heating" },
       { n: "02", t: "AC Installation & Service",    d: "Central air, mini-splits, and heat pumps, sized right for your home and budget.", tag: "Cooling" },
@@ -103,21 +115,25 @@ export const CONTENT: SiteContent = {
   },
 
   work: {
-    eyebrow: "Our Work",
-    title:   "Recent Projects",
-    sub:     "A sample of installations and repairs we're proud to put our name on.",
-    hidden:  true,
-    projects: [],
+    eyebrow: "Recent work",
+    title:   "Jobs we finished this month.",
+    sub:     "Real installs and repairs across the towns we serve.",
+    hidden:  false,
+    // Template sample jobs (replaced at onboarding with the client's own).
+    projects: [
+      { t: "Full system replacement",   loc: "Clermont, FL",     yr: "2026", scope: "3-ton high-efficiency heat pump, one day turnaround.", size: "", caption: "Photo: install",     image: null },
+      { t: "Ductless mini-split install", loc: "Winter Garden, FL", yr: "2026", scope: "Two-zone system for a converted garage suite.",       size: "", caption: "Photo: mini-split", image: null },
+      { t: "Emergency AC repair",         loc: "Groveland, FL",     yr: "2026", scope: "Same-night compressor fix, family cooling again by 9 p.m.", size: "", caption: "Photo: repair",      image: null },
+    ],
   },
 
   testimonials: {
-    eyebrow: "What Clients Say",
-    title:   "Real Reviews from Real Customers",
-    items: [
-      { q: "Called at 11pm on a Friday when our furnace died. They had a tech at our door within an hour and fixed it that night. Incredible service.", a: "Michael R.", r: "Homeowner", company: null, stars: 5 },
-      { q: "Have used them for three years now. Always on time, always honest. When our AC needed a part they sourced it same-day.", a: "Sandra T.", r: "Homeowner", company: null, stars: 5 },
-      { q: "Quoted us $800 less than two other companies for a new heat pump. Installation was clean and the system has been perfect.", a: "James O.", r: "Homeowner", company: null, stars: 5 },
-    ],
+    eyebrow: "Reviews",
+    title:   "What our customers say.",
+    // Empty by default — the HvacReviews component returns null on an empty list, so the
+    // section is hidden until real reviews are supplied from intake or a website scan.
+    // Copy generation is instructed not to invent reviews when this is empty.
+    items: [],
   },
 
   faq: {
@@ -134,12 +150,13 @@ export const CONTENT: SiteContent = {
   },
 
   finalCta: {
-    eyebrow:  "Ready to Get Comfortable?",
-    headline: "HVAC Emergency? We're Available 24/7.",
-    sub:      "Whether it's a breakdown at 2am or you're planning a new system, we're here to help. Get a free estimate with no obligation.",
-    cta:      "Book a Free Estimate",
-    secondary: "Call (555) 555-0100",
-    frictionReducers: [], // de-clawed — client-supplied at onboarding
+    eyebrow:          "Get started",
+    headline:         "Comfort restored — the same day you call.",
+    headlineEmphasis: "the same day you call.",
+    sub:              "Book online or call now, a real person answers and we will get a technician scheduled, often the same day.",
+    cta:              "Book a free estimate",
+    secondary:        "Call (555) 555-0100",
+    frictionReducers: ["Same-day service available", "Upfront flat-rate quotes", "Licensed & insured"],
   },
 
   footer: {
@@ -175,9 +192,10 @@ export const CONTENT: SiteContent = {
   },
 
   extensions: {
-    // De-clawed: certifications are client CLAIMS (onboarding `certifications` → trustBadges).
-    trustBadges: null,
-    reviewBadge: null,
+    // The dark trust band (HvacTrustBar) and the hero rating (HvacHero) read these. Seeded with
+    // the mockup's claims as template sample content; onboarding replaces them with the client's.
+    trustBadges: ["Licensed & insured · CAC1234567", "24/7 emergency service", "Financing available", "Satisfaction guaranteed"],
+    reviewBadge: { rating: 4.9, count: 340, url: "" },
     contactDetails: {
       address: "123 Main St, Your City, ST 00000",
       mapsUrl: null,
@@ -189,13 +207,20 @@ export const CONTENT: SiteContent = {
     // the operator's free-text list into an array — but no seed or preset ever set it, so
     // `areaServed` in the JSON-LD has been an empty array on every site shipped to date.
     // The preset carries an example so both that and <ServiceArea> have something real.
+    // The Standard "Where we work" chips (HvacServiceArea). Real onboarding replaces these.
     serviceArea: [
-      'Juneau',
-      'Douglas',
-      'Mendenhall Valley',
-      'Auke Bay',
-      'Lemon Creek',
-      'Thane',
+      'Orlando',
+      'Winter Park',
+      'Kissimmee',
+      'Apopka',
+      'Sanford',
+      'Oviedo',
+      'Lake Mary',
+      'Altamonte Springs',
+      'Clermont',
+      'Longwood',
+      'Maitland',
+      'Casselberry',
     ],
     // decision 29 (Phase 13): the specificity fields. Collected from intake, NEVER seeded with a
     // sample value - a blank is flagged in _meta.missing_fields, not invented.

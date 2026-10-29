@@ -11,9 +11,10 @@ import { lockedReason } from '@/lib/onboardingGate';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Body = { slug?: string; dryRun?: boolean };
+type Body = { slug?: string; dryRun?: boolean; receptionist?: string };
 
 const SLUG_RE = /^[A-Za-z0-9_-]+$/;
+const RECEPTIONIST_MODES = new Set(['forwarded', 'published', 'declined']);
 
 export async function POST(req: Request) {
   let body: Body;
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
   const slug = (body.slug ?? '').trim();
   // Default to a dry run unless the caller explicitly asks for a real one.
   const dryRun = body.dryRun !== false;
+  // Optional operator-supplied receptionist mode. Required (by onboard.js's validateIntake) when
+  // the intake carries no mode; the UI supplies it. Validated below before it reaches the shell.
+  const receptionist = (body.receptionist ?? '').trim();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -35,6 +39,12 @@ export async function POST(req: Request) {
       // Validate before spawning.
       if (!slug || !SLUG_RE.test(slug)) {
         send({ type: 'error', message: 'Invalid or missing client slug.' });
+        controller.close();
+        return;
+      }
+
+      if (receptionist && !RECEPTIONIST_MODES.has(receptionist)) {
+        send({ type: 'error', message: `Invalid receptionist mode "${receptionist}" (expected forwarded|published|declined).` });
         controller.close();
         return;
       }
@@ -66,6 +76,7 @@ export async function POST(req: Request) {
 
       const args = ['run', 'onboard', '--', '--schema', schemaRel];
       if (dryRun) args.push('--dry-run');
+      if (receptionist) args.push('--receptionist', receptionist);
 
       send({ type: 'start', dryRun, command: `npm ${args.join(' ')}` });
 

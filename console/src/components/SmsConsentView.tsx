@@ -83,7 +83,7 @@ export default function SmsConsentView() {
     return (
         <div className="relative z-10 flex h-full flex-col">
             <NavSlot>
-                <Link href="/" className="btn btn-xs">
+                <Link href="/clients" className="btn btn-xs">
                     <ArrowLeft size={12} weight="bold" /> Clients
                 </Link>
             </NavSlot>

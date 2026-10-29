@@ -7,6 +7,7 @@ import { loadIntake, withPlan } from '@/lib/intake';
 import { clientDir } from '@/lib/paths';
 import { readDraft } from '@/lib/draft';
 import { readStudioComposition } from '@/lib/studio-readback';
+import { readCompositionManifest } from '@/lib/composition-manifest';
 import BuildWizard from './BuildWizard';
 
 /**
@@ -32,11 +33,26 @@ export default async function BuildPage({ params }: { params: { slug: string } }
   // loader is typed loosely (RawSite) because it parses arbitrary on-disk files.
   const seed = withPlan(intake?.sites?.[0] ?? null, intake?.plan) as SiteContent | null;
 
-  // What the client's page is ACTUALLY made of, read back out of their exported repo. This
-  // is what lets the studio open a live client showing its real sections instead of a blank
-  // page — the composition used to exist only in whichever browser last built it.
+  // What the client's site is ACTUALLY made of, read out of their exported repo. This is what
+  // lets the studio open a live client showing its real sections instead of a blank page — the
+  // composition used to exist only in whichever browser last built it.
+  //
+  // Two sources, in order of fidelity. The manifest is the whole multi-page composition, written
+  // by the exporter itself. The page parser is a lossy fallback for repos exported before the
+  // manifest existed: it reads only home's page.tsx and cannot represent a second page, so
+  // preferring it would keep collapsing multi-page clients to one page on every reopen.
+  const repoDir = resolve(clientDir(params.slug), 'repo');
+  const manifest = readCompositionManifest(repoDir);
   const composition = readStudioComposition(params.slug);
   const draftBundle = readDraft(params.slug);
 
-  return <BuildWizard slug={params.slug} seed={seed} composition={composition} draftBundle={draftBundle} />;
+  return (
+    <BuildWizard
+      slug={params.slug}
+      seed={seed}
+      manifest={manifest}
+      composition={composition}
+      draftBundle={draftBundle}
+    />
+  );
 }

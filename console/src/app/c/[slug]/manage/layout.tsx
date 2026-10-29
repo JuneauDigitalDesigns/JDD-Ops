@@ -71,7 +71,7 @@ export default async function ManageLayout({
   return (
     <div className="manage-chrome flex h-full min-h-0 flex-col overflow-hidden">
       <ManageProvider ctx={ctx} envMode={envMode ?? 'test'}>
-        <EnvBanner envMode={envMode} envSignals={envSignals} />
+        {/* <EnvBanner envMode={envMode} envSignals={envSignals} /> */}
         <ManageNavChrome />
         <div className="flex min-h-0 flex-1">
           <ManageRail />

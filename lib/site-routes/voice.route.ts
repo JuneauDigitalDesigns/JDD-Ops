@@ -31,10 +31,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Ring window is env-tunable per client; fall back to 15s if unset/invalid (see header
-  // note: longer windows let carrier voicemail beat the Retell handoff).
+  // Ring window is env-tunable per client, but CLAMPED to 5–20s rather than applied verbatim.
+  //
+  // The ceiling is enforced here, at the last possible moment, because the console UI is not
+  // the only way a value reaches production: env can be edited straight in the Vercel
+  // dashboard, pushed by a script, or carried over from an older client. A number above the
+  // ceiling does not fail loudly — it quietly routes callers into the owner's voicemail
+  // instead of the receptionist they are paying for, so the safe behaviour has to be the one
+  // that cannot be configured away.
+  //
+  // These literals are a deliberate copy of RING_SECONDS_* in jdd-ops/lib/client-env.js. This
+  // file is written verbatim into each CLIENT repo, which has no dependency on jdd-ops or
+  // @jdd/schema, so it cannot import them — the same standalone-copy exception that
+  // @jdd/schema's phone.ts documents for its own inline toE164. jdd-ops'
+  // test/ring-window.test.mjs asserts these numbers still match the shared module.
+  const RING_DEFAULT = 15;
+  const RING_MIN = 5;
+  const RING_MAX = 20;
   const ringSecondsRaw = parseInt(process.env.CLIENT_FORWARD_RING_SECONDS ?? '', 10);
-  const ringSeconds = Number.isFinite(ringSecondsRaw) && ringSecondsRaw > 0 ? ringSecondsRaw : 15;
+  const ringSeconds =
+    Number.isFinite(ringSecondsRaw) && ringSecondsRaw > 0
+      ? Math.min(RING_MAX, Math.max(RING_MIN, ringSecondsRaw))
+      : RING_DEFAULT;
+  if (Number.isFinite(ringSecondsRaw) && ringSecondsRaw > RING_MAX) {
+    // Visible in the Vercel function log, so a clamped client is discoverable rather than
+    // merely correct.
+    console.warn(
+      `[voice] CLIENT_FORWARD_RING_SECONDS=${ringSecondsRaw} exceeds the ${RING_MAX}s ceiling; using ${ringSeconds}s. ` +
+        'A longer window lets carrier voicemail answer the forward leg, which Twilio scores as answered — ' +
+        'the no-answer branch never fires and the caller never reaches the agent.',
+    );
+  }
 
   // Originate the forward leg from the JDD-owned Twilio number, not the inbound
   // caller's number. Passing an arbitrary customer caller ID through gets rejected

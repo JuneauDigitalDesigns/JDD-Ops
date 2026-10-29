@@ -58,7 +58,7 @@ export default function OrphansPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/" className="btn btn-xs">Briefing</Link>
+            <Link href="/briefing" className="btn btn-xs">Briefing</Link>
             <button type="button" className="btn btn-xs" onClick={scan} disabled={loading}>
               {loading ? <SpinnerGap size={12} className="animate-spin" /> : <MagnifyingGlass size={12} />}
               {loading ? 'Scanning…' : 'Scan vendors'}

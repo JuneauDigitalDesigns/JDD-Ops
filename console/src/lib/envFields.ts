@@ -74,12 +74,19 @@ export const ENV_FIELDS: EnvField[] = [
     key: 'CLIENT_FORWARD_RING_SECONDS',
     group: 'routing',
     label: 'Ring seconds',
-    help: 'How long the owner’s phone rings before the call falls through to the Retell agent.',
+    help:
+      'How long the owner’s phone rings before the call falls through to the Retell agent. ' +
+      'Capped at 20s — any longer and the owner’s carrier voicemail answers first, Twilio scores ' +
+      'the call as answered, and the caller lands in voicemail instead of the agent.',
     kind: 'int',
     plans: VOICE,
+    // Mirrors RING_SECONDS_MIN/MAX/DEFAULT in jdd-ops/lib/client-env.js. This file is bundled
+    // by Next and imported by client components, so it cannot dynamic-import from the ops root
+    // the way reconcileProbes.ts does — hence the copy, which ring-window.test.mjs pins equal.
+    // The previous max of 60 with a 25s placeholder actively invited a value that breaks routing.
     min: 5,
-    max: 60,
-    placeholder: '25',
+    max: 20,
+    placeholder: '15',
   },
   {
     key: 'AIRTABLE_BASE_ID',

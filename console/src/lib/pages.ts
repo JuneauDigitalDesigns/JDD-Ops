@@ -157,6 +157,23 @@ export function validateComposition(comp: SiteComposition): SiteComposition {
       if (!firstIsHeader) throw new Error(`Page "${page.route}" must open with a page header.`);
     }
 
+    /**
+     * A page needs a body, not just chrome.
+     *
+     * This is the check whose absence shipped a client site that was a nav bar on top of a
+     * footer. Nothing refused it: `validateEntries` counts the flattened component list, which
+     * chrome alone fills with three entries, and this validator — the one that could have
+     * caught it — had no callers at all. A pageHeader doesn't count; it is a title block, so a
+     * page carrying only a header still has nothing on it.
+     */
+    const bodyCount = page.sections.filter((s) => s.categoryId !== 'pageHeader').length;
+    if (bodyCount === 0) {
+      throw new Error(
+        `Page "${page.route || '(home)'}" has no content sections — only site chrome. ` +
+          'Add at least one section in the Studio before exporting.',
+      );
+    }
+
     // Decision 30d: a page whose sections ALL carry one rhythm is uniform padding, the AI-sameness
     // tell. Only enforced once rhythms are set, so a legacy page (no rhythms) is not rejected.
     const rhythms = page.sections.map((s) => s.rhythm);
@@ -172,8 +189,9 @@ export function validateComposition(comp: SiteComposition): SiteComposition {
   return comp;
 }
 
-/** The legacy single-page studio state, as persisted in old bundles and read back from a repo. */
-type LegacyComposition = {
+/** The legacy single-page studio state, as persisted in old bundles and read back from a repo.
+ *  Exported because it appears in `compositionFromBundle`'s public signature. */
+export type LegacyComposition = {
   selections: Record<string, string>;
   skins?: Record<string, SkinId>;
   order: string[];
@@ -206,6 +224,46 @@ export function homeLegacyView(comp: SiteComposition): { selections: Record<stri
   body.forEach(put);
   const order = ['nav', ...body.map((s) => s.categoryId), 'footer'];
   return { selections, skins, order };
+}
+
+/** True when a legacy studio state actually describes a page, rather than merely existing.
+ *
+ *  The distinction is the whole point. `{}` and `[]` are both TRUTHY in JavaScript, so the
+ *  obvious `selections || order` test passes for a bundle that selected nothing — and
+ *  liftLegacyToComposition then happily returns a one-page site with ZERO body sections.
+ *  That is how a client shipped with a home page holding only a nav and a footer. */
+function hasLegacyContent(legacy: Partial<LegacyComposition>): boolean {
+  return (
+    Object.keys(legacy.selections ?? {}).length > 0 || (legacy.order?.length ?? 0) > 0
+  );
+}
+
+/**
+ * Decide which composition a saved wizard bundle should open with.
+ *
+ * Precedence: an explicit `siteComposition` wins; otherwise a legacy single-page state that
+ * genuinely selected something is lifted; otherwise the caller's default (the 4-page site).
+ *
+ * `fallback` is injected rather than imported so this module stays free of a cycle with
+ * page-templates.tsx — and so a test can assert which branch was taken without standing up
+ * the whole template registry.
+ *
+ * The empty-bundle case MUST land on `fallback`, not on an empty lift. Getting that backwards
+ * is what produced a chrome-only export: see hasLegacyContent.
+ */
+export function compositionFromBundle(
+  bundle: Partial<LegacyComposition> & { siteComposition?: SiteComposition },
+  fallback: () => SiteComposition,
+): SiteComposition {
+  if (bundle.siteComposition) return bundle.siteComposition;
+  if (hasLegacyContent(bundle)) {
+    return liftLegacyToComposition({
+      selections: bundle.selections ?? {},
+      skins: bundle.skins,
+      order: bundle.order ?? [],
+    });
+  }
+  return fallback();
 }
 
 /**

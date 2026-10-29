@@ -1,0 +1,117 @@
+{
+  "code": "OK",
+  "response": {
+    "blueprint": {
+      "flow": [
+        {
+          "id": 1,
+          "mapper": {},
+          "module": "gateway:CustomWebHook",
+          "version": 1,
+          "parameters": {
+            "hook": 2421720,
+            "maxResults": 1
+          }
+        },
+        {
+          "id": 2,
+          "filter": {
+            "name": "",
+            "conditions": [
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          },
+          "mapper": {
+            "key": "{{1.call.agent_id}}",
+            "returnWrapped": false
+          },
+          "module": "datastore:GetRecord",
+          "version": 1,
+          "parameters": {
+            "datastore": 101043
+          }
+        },
+        {
+          "id": 8,
+          "mapper": {
+            "base": "appurtlGfg7Z5UuAI",
+            "table": "tbl3YWgGdVXNPz3Eg",
+            "record": {
+              "fld2HEMxzE7SFhniW": "{{1.call.direction}}",
+              "fld2smPri8IPvoNwh": "{{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}",
+              "fld3xCSY4BXXEkdMM": "{{1.call.call_analysis.custom_analysis_data.caller_address}}",
+              "fld7GZx09e7dnHNIU": "{{1.call.call_analysis.custom_analysis_data.caller_email}}",
+              "fld8sG3TSj5Va42yI": "{{parseDate(1.call.start_timestamp; \"x\")}}",
+              "fld9ONpSErMn97LP6": "{{1.call.call_analysis.call_summary}}",
+              "fldMGK569tnD647g2": "{{1.call.call_analysis.custom_analysis_data.caller_name}}",
+              "fldVbJMLbBiDzEvZF": "{{1.call.call_analysis.custom_analysis_data.caller_priority}}",
+              "fldtqHttzKEPSQazh": "{{round(ifempty(1.call.duration_ms; 0) / 1000)}}",
+              "fldxb2nunz4Pt1SJT": "{{1.call.recording_url}}"
+            },
+            "typecast": false,
+            "useColumnId": false
+          },
+          "module": "airtable:ActionCreateRecord",
+          "version": 3,
+          "parameters": {
+            "__IMTCONN__": 9711133
+          }
+        },
+        {
+          "id": 9,
+          "mapper": {
+            "to": "+15005550006",
+            "body": "Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}\n{{newline}}\nStatus:{{1.call.call_analysis.custom_analysis_data.caller_priority}}\n{{newline}}\nPhone: {{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}\n{{newline}}\nAbout: {{1.call.call_analysis.call_summary}}",
+            "from": "+15005550009",
+            "fromType": "phone",
+            "messageBody": "body"
+          },
+          "module": "twilio:SendSMS",
+          "version": 2,
+          "parameters": {
+            "__IMTCONN__": 9736550
+          }
+        }
+      ],
+      "name": "Post Call Webhook Master",
+      "metadata": {
+        "instant": true,
+        "version": 1,
+        "scenario": {
+          "dlq": false,
+          "slots": null,
+          "dataloss": false,
+          "maxErrors": 3,
+          "autoCommit": true,
+          "roundtrips": 1,
+          "sequential": false,
+          "confidential": false,
+          "freshVariables": false,
+          "autoCommitTriggerLast": true
+        },
+        "designer": {
+          "orphans": []
+        }
+      }
+    },
+    "scheduling": {
+      "type": "immediately",
+      "maximum_runs_per_minute": 100
+    },
+    "concept": false,
+    "created": "2026-06-07T15:29:26.744Z",
+    "last_edit": "2026-08-28T20:18:20.308Z",
+    "metadata": {
+      "input_spec": [],
+      "output_spec": []
+    },
+    "idSequence": 10,
+    "version": 38
+  }
+}

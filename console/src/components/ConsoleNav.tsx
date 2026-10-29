@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Gear, RocketLaunch } from '@phosphor-icons/react';
 import JddMark from './shell/JddMark';
+import Breadcrumbs from './shell/Breadcrumbs';
 
 /**
  * The persistent console bar. Lives in the ROOT layout — outside the `.studio-chrome`
@@ -11,8 +12,8 @@ import JddMark from './shell/JddMark';
  *
  * ── THREE ZONES, one job each ───────────────────────────────────────────────────────────
  *
- *   [JDD] [ Build │ Onboard │ Manage ]   arthur-plumbing · growth · ● Live │ ⌘K ↻ ⚙
- *   └──────── NAVIGATE ──────────────┘   └──── CONTEXT (inert) ───────────┘└ UTILITIES ┘
+ *   [JDD] Home / Leads                   arthur-plumbing · growth · ● Live │ ⌘K ↻ ⚙
+ *   └───── NAVIGATE ─────┘                └──── CONTEXT (inert) ───────────┘└ UTILITIES ┘
  *
  * This replaced a bar that mixed all three. On /c/{slug}/build it used to carry the logo,
  * a back link, the brand name, a plan chip, a status badge, three tool tabs, two wizard
@@ -20,9 +21,11 @@ import JddMark from './shell/JddMark';
  * concepts, separated by nothing but `gap-4`. The problem was never density; it was that
  * nothing told you which controls belonged to which scope.
  *
- * So: everything you can navigate with is on the LEFT. The client you're working on is a
- * muted, non-interactive readout in the MIDDLE-RIGHT — visible, never competing. App-level
- * utilities sit past a hairline on the FAR RIGHT.
+ * So: everything you can navigate with is on the LEFT — the mark (home) and a breadcrumb
+ * trail that names where you are and clicks back, plus the per-client tool switcher when a
+ * client is open. The client you're working on is a muted, non-interactive readout in the
+ * MIDDLE-RIGHT — visible, never competing. App-level utilities sit past a hairline on the
+ * FAR RIGHT.
  *
  * Page actions do not live here at all. They moved to <ToolBar>, the strip directly below,
  * where they sit next to the work they act on.
@@ -36,14 +39,11 @@ export default function ConsoleNav() {
       {/* ── NAVIGATE ──────────────────────────────────────────────────────── */}
       <JddMark />
 
-      {/* Static, not a portal target — the roster is reachable from every route, not just
-          the ones that fill #console-tools-slot below. It used to live only as a btn-xs
-          inside the briefing's own header; that made it the quietest interactive thing on
-          the page it's meant to be the main next step from, and unreachable everywhere
-          else. */}
-      <Link href="/clients" className="shrink-0 rounded-[6px] px-2 py-1 text-xs text-fg2 transition-colors hover:bg-[var(--surface-2)] hover:text-fg">
-        Clients
-      </Link>
+      {/* The wayfinding trail — Home / Section. Replaced the standalone "Clients" pill and
+          the briefing's loose link strip: the roster is now a hub card, a crumb on client
+          routes, and a ⌘K target, so it no longer needs a permanent bar link. Empty on the
+          hub itself, where the mark stands alone. */}
+      <Breadcrumbs />
 
       {/* The tool switcher (see <ToolSwitcher>). Empty on / and /leads, which have
           no client selected — there the mark stands alone. */}

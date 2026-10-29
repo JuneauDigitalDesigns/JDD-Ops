@@ -4,7 +4,7 @@ import type { CopyBrief } from '@jdd/schema';
 import { Lock, Minus, Plus } from '@phosphor-icons/react';
 import type { StructureBlock } from '@/lib/copy-brief/types';
 import { setBlockEnabled, setStructureOverride } from '@/lib/copy-brief/mutations';
-import { BlockHeader } from '../BlockPrimitives';
+import { BlockHeader, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
@@ -19,7 +19,7 @@ type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 const MIN_COUNT = 0;
 const MAX_COUNT = 12;
 
-export default function StructureBlockEditor({ block, onUpdate }: { block: StructureBlock; onUpdate: Update }) {
+export default function StructureBlockEditor({ block, onUpdate, variant = 'page' }: { block: StructureBlock; onUpdate: Update; variant?: BlockVariant }) {
   return (
     <div>
       <BlockHeader
@@ -27,6 +27,7 @@ export default function StructureBlockEditor({ block, onUpdate }: { block: Struc
         channel={block.channel}
         enabled={block.enabled}
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, 'structure', v))}
+        variant={variant}
       />
       <p className="mb-4 text-sm text-uiInkSoft">
         How many of each the copywriter is told to write. Locked counts came from the client&rsquo;s

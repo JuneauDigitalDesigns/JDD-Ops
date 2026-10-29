@@ -18,6 +18,7 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#2F7A33",
+      accent2:  "#2E4636",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",
@@ -26,12 +27,12 @@ export const CONTENT: SiteContent = {
       rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "0.005em",
+      headingLineHeight: 1.0,
     },
   },
 
@@ -130,8 +131,9 @@ export const CONTENT: SiteContent = {
   },
 
   finalCta: {
-    eyebrow:  "Ready for a Better Lawn?",
-    headline: "Ready for a Greener Lawn? Let's Talk.",
+    eyebrow:          "Ready for a Better Lawn?",
+    headline:         "Ready for a Greener Lawn? Let's Talk.",
+    headlineEmphasis: null,
     sub:      "Get a free, no-pressure quote for weekly service, seasonal treatments, or a one-time spring clean-up.",
     cta:      "Get a Free Quote",
     secondary: "Call (555) 555-0100",

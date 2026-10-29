@@ -1,6 +1,7 @@
 import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type { ReceptionistMode } from '@jdd/schema';
 import type { Plan, SiteEnv } from './types';
 
 // ── Intake loading ──────────────────────────────────────────────────────────
@@ -40,6 +41,12 @@ export interface RawSite {
   brand?: {
     name?: string;
     short?: string;
+    /**
+     * The number the SITE advertises. Read so the roster can compare it against
+     * `env.TWILIO_NUMBER` and tell "number bought" from "number published" — see
+     * `SiteInfo.brandPhone`.
+     */
+    phone?: string;
     palette?: Record<string, string>;
   };
   seo?: { canonical?: string };
@@ -49,6 +56,12 @@ export interface RawSite {
 
 export interface RawIntake {
   plan: Plan;
+  /**
+   * The client's receptionist activation choice. Present on INTAKE-format schemas (the wizard
+   * writes it); absent on legacy CONTENT files, which predate the field. Undefined is "not yet
+   * stated" — never "declined" — so a pre-feature client keeps the full stack they paid for.
+   */
+  receptionistMode?: ReceptionistMode;
   sites: RawSite[];
 }
 

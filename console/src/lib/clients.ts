@@ -2,9 +2,10 @@ import 'server-only';
 import { cache } from 'react';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isWebOnly, samePhone, type PortalSite } from '@jdd/schema';
 import { clientsDir, clientDir } from './paths';
 import { loadIntake, readEnvLocal, type RawSite } from './intake';
-import type { ClientContext, ClientStatus, Plan, SiteInfo } from './types';
+import type { ClientContext, ClientStatus, SiteInfo } from './types';
 
 // Slug + dir conventions mirror onboard.js (single site = baseSlug; enterprise = baseSlug-N
 // with each site under clients/{baseSlug}/site-N).
@@ -33,23 +34,34 @@ function buildSiteInfo(baseSlug: string, count: number, i: number, site: RawSite
     env,
     missingFields: missingFor(site),
     accent: site?.brand?.palette?.accent ?? null,
+    // The number the SITE advertises, which is not necessarily the number that was bought.
+    // Surfaced so restingPhases can tell "number provisioned" from "number published" —
+    // onboard.js swaps brand.phone to the Twilio number only after the purchase, and for a
+    // long time it never did, leaving every caller bypassing /api/voice.
+    brandPhone: site?.brand?.phone ?? null,
+    // samePhone normalizes both sides through toE164, so a formatting difference between
+    // site.ts and .env.local is not mistaken for a different line. Compared here rather than in
+    // run-plan.ts so that module stays loadable by the tsx test runner — see SiteInfo.
+    numberPublished: Boolean(env.TWILIO_NUMBER) && samePhone(site?.brand?.phone ?? null, env.TWILIO_NUMBER),
   };
 }
 
-function isProvisioned(plan: Plan, s: SiteInfo): boolean {
-  if (plan === 'starter') return Boolean(s.env.VERCEL_PROJECT_NAME);
+// Gated on web-only, not on plan: a Starter WITH a receptionist provisions the full voice stack
+// like Growth, so the only site that is "provisioned" on a Vercel project alone is a declined one.
+function isProvisioned(webOnly: boolean, s: SiteInfo): boolean {
+  if (webOnly) return Boolean(s.env.VERCEL_PROJECT_NAME);
   return Boolean(s.env.RETELL_AGENT_ID && s.env.TWILIO_NUMBER && s.env.AIRTABLE_BASE_ID);
 }
 
-function isCallbackWired(plan: Plan, s: SiteInfo): boolean {
-  if (plan === 'starter') return true; // starter has no Make scenario
+function isCallbackWired(webOnly: boolean, s: SiteInfo): boolean {
+  if (webOnly) return true; // web-only has no Make scenario
   return Boolean(s.env.RETELL_POST_CALL_WEBHOOK_URL); // set by onboard.js after the clone
 }
 
-function deriveStatus(plan: Plan, sites: SiteInfo[]): ClientStatus {
+function deriveStatus(webOnly: boolean, sites: SiteInfo[]): ClientStatus {
   if (sites.some((s) => !s.repoBuilt)) return 'needs-build';
-  if (!sites.every((s) => isProvisioned(plan, s))) return 'ready';
-  if (!sites.every((s) => isCallbackWired(plan, s))) return 'provisioned';
+  if (!sites.every((s) => isProvisioned(webOnly, s))) return 'ready';
+  if (!sites.every((s) => isCallbackWired(webOnly, s))) return 'provisioned';
   return 'portal-pending';
 }
 
@@ -79,10 +91,16 @@ export async function getClientContext(baseSlug: string): Promise<ClientContext 
       schemaPath: `clients/${baseSlug}/site.ts`,
       hasIntake: false,
       sites: [],
+      isWebOnly: false,
+      receptionistModeVerified: false,
     };
   }
 
   const plan = intake.plan;
+  const mode = intake.receptionistMode;
+  // One definition of the rule, shared with onboard.js and the agency app. The cast supplies the
+  // only two fields isWebOnly reads; PortalSite's other required fields are irrelevant here.
+  const webOnly = isWebOnly({ plan, receptionistMode: mode } as PortalSite);
   const count = intake.sites.length;
   const sites = intake.sites.map((site, i) => buildSiteInfo(baseSlug, count, i, site));
   const isEnterprise = plan === 'enterprise' || count > 1;
@@ -98,10 +116,13 @@ export async function getClientContext(baseSlug: string): Promise<ClientContext 
     brandName: sites[0]?.brandName ?? baseSlug,
     isEnterprise,
     repoBuilt: sites.every((s) => s.repoBuilt),
-    detectedStatus: externalManaged ? 'live' : deriveStatus(plan, sites),
+    detectedStatus: externalManaged ? 'live' : deriveStatus(webOnly, sites),
     schemaPath: `clients/${baseSlug}/site.ts`,
     hasIntake,
     sites,
+    receptionistMode: mode,
+    isWebOnly: webOnly,
+    receptionistModeVerified: mode != null,
     externalManaged,
   };
 }
