@@ -93,6 +93,8 @@ import {
   formatCheckLines,
   summarizeChecks,
 } from './lib/onboard-checks.js';
+// Make rate-limits per organization per minute; a 429 is "wait", not "unreachable".
+import { fetchWithRetry } from './lib/make-fetch.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -1972,20 +1974,47 @@ function patchPostCallBlueprint(
  * as "could not check" rather than as a pass.
  */
 let MASTER_RESOURCES;
+/**
+ * Why MASTER_RESOURCES is null, in words an operator can act on. The old warning said "no Make
+ * credentials, or unreachable" for every failure — including a 429, where the credentials were
+ * fine and Make was up. A diagnosis that names the wrong cause is worse than none.
+ */
+let MASTER_RESOURCES_REASON = null;
 async function resolveMasterResources() {
   if (MASTER_RESOURCES !== undefined) return MASTER_RESOURCES;
   MASTER_RESOURCES = null;
 
   const apiKey = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
-  if (!apiKey || !masterId) return MASTER_RESOURCES;
+  if (!apiKey || !masterId) {
+    MASTER_RESOURCES_REASON = 'MAKE_API_KEY or MAKE_POST_CALL_MASTER_SCENARIO_ID is not set in .env';
+    return MASTER_RESOURCES;
+  }
 
   const headers = { Authorization: `Token ${apiKey}` };
+  // Every GET here goes through the retry: one 429 on any of the three used to null the whole
+  // resolution, and every caller of this function — including the live clone — read that as
+  // "Make is unreachable". Retries are announced on stderr so a pause is explained without
+  // changing stdout, which the dry-run recordings are compared against byte for byte.
+  const get = (url) =>
+    fetchWithRetry(url, { headers }, {
+      onRetry: ({ attempt, waitMs }) =>
+        console.warn(`  … Make rate limit reached; waiting ${Math.round(waitMs / 1000)}s before retry ${attempt}`),
+    });
   try {
-    const bres = await fetch(`${MAKE_ZONE}/scenarios/${masterId}/blueprint`, { headers });
-    if (!bres.ok) return MASTER_RESOURCES;
+    const bres = await get(`${MAKE_ZONE}/scenarios/${masterId}/blueprint`);
+    if (!bres.ok) {
+      MASTER_RESOURCES_REASON =
+        bres.status === 429
+          ? 'Make rate limit — the organization request limit was still exceeded after waiting out a full minute'
+          : `Make returned ${bres.status} for the master blueprint`;
+      return MASTER_RESOURCES;
+    }
     const blueprint = (await bres.json())?.response?.blueprint;
-    if (!blueprint?.flow) return MASTER_RESOURCES;
+    if (!blueprint?.flow) {
+      MASTER_RESOURCES_REASON = 'the master blueprint came back with no modules';
+      return MASTER_RESOURCES;
+    }
 
     const masterBaseId =
       blueprint.flow.find((m) => (m.module ?? '').startsWith('airtable'))?.mapper?.base ?? null;
@@ -1995,13 +2024,13 @@ async function resolveMasterResources() {
     let masterHookUrl = null;
     let teamId = null;
     let organizationId = null;
-    const sres = await fetch(`${MAKE_ZONE}/scenarios/${masterId}`, { headers });
+    const sres = await get(`${MAKE_ZONE}/scenarios/${masterId}`);
     const scenario = sres.ok ? (await sres.json())?.scenario : null;
     const hookId = scenario?.hookId ?? null;
     // The scenario record carries teamId directly; the hook record carries both.
     if (typeof scenario?.teamId === 'number') teamId = scenario.teamId;
     if (hookId) {
-      const hres = await fetch(`${MAKE_ZONE}/hooks/${hookId}`, { headers });
+      const hres = await get(`${MAKE_ZONE}/hooks/${hookId}`);
       if (hres.ok) {
         const hook = (await hres.json())?.hook ?? {};
         masterHookUrl = hook.url ?? null;
@@ -2011,8 +2040,9 @@ async function resolveMasterResources() {
     }
 
     MASTER_RESOURCES = { blueprint, masterBaseId, masterHookUrl, hookId, teamId, organizationId };
-  } catch {
+  } catch (err) {
     MASTER_RESOURCES = null; // offline: unknown, not broken
+    MASTER_RESOURCES_REASON = `Make unreachable (${err?.cause?.code ?? err?.code ?? err?.message ?? 'network error'})`;
   }
   return MASTER_RESOURCES;
 }
@@ -2868,7 +2898,7 @@ async function verifyNoMasterResources(intake, baseSlug) {
 
   const master = await resolveMasterResources();
   if (!master) {
-    console.warn('  ⚠ Could not resolve the master scenario (no Make credentials, or unreachable) — not checked. This is not a pass.');
+    console.warn(`  ⚠ Could not resolve the master scenario (${MASTER_RESOURCES_REASON ?? 'reason unknown'}) — not checked. This is not a pass.`);
     return;
   }
   const { masterBaseId, masterHookUrl } = master;

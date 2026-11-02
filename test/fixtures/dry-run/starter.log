@@ -9,6 +9,7 @@
   ✓ Pre-flight passed
 
 [pre-flight] Checking no client is wired to a master resource…
+  ✓ No master resources in use
 
   Receptionist: forwarded
 
@@ -51,7 +52,8 @@
 [step 11] Clone post-call Make scenario + wire Retell webhook
   SMS alerts: OFF (no consent on file) — Twilio module will be removed from the clone
   [dry-run] would clone FROM master scenario 5315889 → new scenario "Post-call: Fixture Electric LLC"
-  [dry-run] would first create a gateway-webhook for this client (master's hook null stays with the master)
+  [dry-run] would first create a gateway-webhook for this client (master's hook 2421720 stays with the master)
+  [dry-run]   POST /scenarios/5315889/clone?organizationId=7633018 body { teamId: 2283785, states: false, hook: { 2421720: <new> } }
   [dry-run] would repoint Airtable module at base=<dry-run-base-id>, remapping its table + field ids by column name
   [dry-run] would REMOVE the vestigial datastore module, carrying its event filter forward
   [dry-run] would REMOVE the Twilio module (no SMS consent on file)
@@ -66,14 +68,14 @@
   ? env.forwardNotSelf — cannot compare "<PHONE>" with "<dry-run-number>" — one is not a dialable number
   ✗ site.publishesTwilioNumber — Twilio number "<dry-run-number>" is not dialable, so the site keeps the owner's number and calls bypass /api/voice
   ✓ site.forwardPreserved — forward target is still the owner's line <PHONE>
-  ? airtable.notMasterBase — master base id unknown
-  ? make.notMasterHook — master hook url unknown (no Make credentials)
+  ✓ airtable.notMasterBase — client base <dry-run-base-id> is distinct from the master
+  ? make.notMasterHook — no post-call webhook wired yet
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
   ? post-call brief sends from the JDD notification number — no SMS consent on file, so no Twilio module is cloned
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  2 passed, 1 failed, 8 not checked
+  3 passed, 1 failed, 7 not checked
 
 [step 14] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Electric LLC" && git push origin main

@@ -1,0 +1,5 @@
+{
+  "_recorded": "2026-11-02, GET /api/v2/scenarios/{masterId}/blueprint on us2.make.com, after the organization's per-minute API budget was spent by back-to-back dry runs. Body is plain text, not JSON.",
+  "status": 429,
+  "body": "Requests limit for organization exceeded, please try again later."
+}
