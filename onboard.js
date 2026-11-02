@@ -2530,6 +2530,11 @@ async function linkPortal(slug, opts = {}) {
   }
 
   const intake = await loadIntake(schemaPath);
+  // Same operator override, and for the same reason, as the main path: an intake predating the
+  // activation step carries no receptionistMode, and validateIntake refuses to guess one. Without
+  // this, --link-portal was unusable for exactly those clients — the legacy-shape ones most
+  // likely to need relinking — and failed on a flag the caller had in fact passed.
+  if (opts.receptionist) intake.receptionistMode = opts.receptionist;
   validateIntake(intake);
 
   // sharedBaseId comes from the primary site's .env.local (written at provision time).
@@ -3007,7 +3012,7 @@ async function main() {
   // Short-circuit: --link-portal links an existing client to the Clerk portal only
   if (args.linkPortal) {
     if (!args.slug) fail(0, '--link-portal requires --slug {slug}');
-    await linkPortal(args.slug, { email: args.email });
+    await linkPortal(args.slug, { email: args.email, receptionist: args.receptionist });
     return;
   }
 
