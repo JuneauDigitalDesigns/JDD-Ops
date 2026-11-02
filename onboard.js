@@ -59,6 +59,8 @@ import {
   attachSiteToAccount,
   detachSiteFromAccount,
   accountStoreConfigured,
+  getAccountRecord,
+  registerLeadIngestToken,
 } from './lib/account-store.js';
 import {
   ensureClientRecord,
@@ -2293,12 +2295,66 @@ async function attachSiteToPortal({ email, plan, receptionistMode, webOnly = fal
   // needs it present (not just absent) to stay true for a declined site on the next read.
   if (receptionistMode) entry.receptionistMode = receptionistMode;
 
+  /**
+   * Values the AGENCY SITE needs and cannot get any other way.
+   *
+   * The portal cannot read `clients/{slug}/.env.local` — it is a different deployment on a
+   * different host. So anything the portal must know has to live on the account record. That is
+   * the same reasoning `retellAgentId` already carries above.
+   *
+   *  - `twilioNumber` — the Customer-lane sender. Without it the review-request and lead-reply
+   *    flows fall back to a pool-picked number, i.e. not the client's own business line.
+   *  - `messagingServiceSid` — the client's OWN Messaging Service, carrying their CUSTOMER_CARE
+   *    campaign. Absent until their A2P registration verifies, which is expected, not an error.
+   *  - `a2pStatus` — what gates `siteFeature(site, 'messaging')`. `not-applicable` is TERMINAL
+   *    for tiers that never register: Starter and web-only send no customer-facing messages, so
+   *    without a distinct state they would sit in `none` forever and every "is registration
+   *    done?" check would read them as perpetually pending. State it, never infer it.
+   */
+  const clientEnv = readEnvLocal(clientDir);
+  entry.twilioNumber = webOnly ? null : clientEnv.TWILIO_NUMBER || null;
+  entry.messagingServiceSid = webOnly ? null : clientEnv.CLIENT_MESSAGING_SERVICE_SID || null;
+
+  // `entry` is rebuilt from scratch every run, so an unconditional write here would reset a
+  // client whose campaign has since VERIFIED back to 'none' — re-locking a working feature with
+  // no error anywhere. Carry the existing value forward; only seed it when there isn't one.
+  const priorA2p = (await getAccountRecord(email))?.sites?.find((s) => s.slug === siteSlug)?.a2pStatus;
+  if (priorA2p) {
+    entry.a2pStatus = priorA2p;
+  } else {
+    // Starter and web-only never send customer-facing messages, so they never register.
+    entry.a2pStatus = !webOnly && plan !== 'starter' ? 'none' : 'not-applicable';
+  }
+
   const account = await attachSiteToAccount(email, entry);
   const n = account.sites.length;
   console.log(`  Linked "${siteSlug}" → ${email} (status ${status}, ${n} site${n === 1 ? '' : 's'} on account)`);
 
   // Record which account owns this site so a later --email re-link can clean up the old one.
   patchEnvLocal(clientDir, 'PORTAL_ACCOUNT_EMAIL', email);
+
+  /**
+   * Register the lead-ingest token NOW, in the same step that establishes which account owns
+   * this site — because that is exactly what the token record encodes.
+   *
+   * It has to happen here rather than at env-write time: the token is minted in step 4, but the
+   * owning account email is not known until this step, and the record maps token → {account,
+   * slug}. Until this runs the deployed `/api/contact` holds a token the ingest endpoint has
+   * never heard of, and every lead 401s.
+   *
+   * Idempotent — `set` overwrites, and the token is carried across re-runs rather than rotated,
+   * so a re-run re-points the same token at the same place. A `--link-portal --email` move to a
+   * different account re-runs this and the leads follow the site, which is the intent.
+   */
+  const ingestToken = clientEnv.LEAD_INGEST_TOKEN || readEnvLocal(clientDir).LEAD_INGEST_TOKEN;
+  if (ingestToken) {
+    await registerLeadIngestToken({ token: ingestToken, email, slug: siteSlug });
+    console.log(`  Registered lead-ingest token for "${siteSlug}" → ${email}`);
+  } else {
+    console.warn(
+      `  ⚠ No LEAD_INGEST_TOKEN in ${siteSlug}/.env.local — web-form leads will 401 at the ingest endpoint until this client is re-run.`,
+    );
+  }
 
   await ensureClientRecordForSite({ email, siteSlug, account });
 }
@@ -2637,10 +2693,17 @@ function preflight(intake) {
 
   const webOnly = intakeIsWebOnly(intake);
 
-  // Email lead delivery. Both Starter variants (receptionist and web-only) hand web-form leads
-  // to the owner by email, so Resend is needed on Starter regardless of the receptionist.
-  if (intake.plan === 'starter' && !process.env.RESEND_API_KEY) {
-    warnings.push('RESEND_API_KEY not set — starter lead emails will not send until configured');
+  // Lead capture is tier-independent now: every client's web form records into the portal, so
+  // this is checked for all of them rather than only Starter. Resend is gone — it used to be
+  // Starter's entire delivery mechanism and failed open, which is the whole reason this moved.
+  //
+  // A warning rather than a hard failure on purpose: the KV write that makes the token usable
+  // happens in step 10 (link portal), so a run with KV unconfigured still produces a working
+  // site — it just cannot receive leads until the token is registered.
+  if (!accountStoreConfigured()) {
+    warnings.push(
+      'KV not configured — the lead-ingest token cannot be registered, so web-form leads will 401 at the ingest endpoint until this client is re-run with KV_REST_API_URL/TOKEN set',
+    );
   }
 
   // The voice + CRM stack. Needed by every client EXCEPT a web-only one. This is the gate that

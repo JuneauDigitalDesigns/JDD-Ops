@@ -1,8 +1,9 @@
 /**
  * The .env.local a client would get — the plan-tier matrix from CLAUDE.md.
  *
- * `LEAD_DELIVERY_MODE` is the ONLY intended runtime difference between a
- * Starter-with-receptionist and a Growth site, which makes it both easy to get wrong and
+ * Every tier now captures web-form leads into the portal (`LEAD_DELIVERY_MODE=portal`), so the
+ * one remaining runtime difference between a Starter-with-receptionist and a Growth site is
+ * `LEAD_CALLBACK` — whether `/api/contact` also dials the lead back. Easy to get wrong and
  * invisible when you do: the client simply stops receiving leads the way they were sold.
  *
  * These assert on `buildClientEnvLines`, which is the function a dry run now also runs — so a
@@ -29,22 +30,62 @@ const build = ({ plan, webOnly, prev = {}, env = {} }) => {
   return { lines, env: envLinesToObject(lines) };
 };
 
-test('starter emails leads; growth and enterprise call them back', () => {
-  assert.equal(build({ plan: 'starter', webOnly: false }).env.LEAD_DELIVERY_MODE, 'email');
-  assert.equal(build({ plan: 'growth', webOnly: false }).env.LEAD_DELIVERY_MODE, 'callback');
-  assert.equal(build({ plan: 'enterprise', webOnly: false }).env.LEAD_DELIVERY_MODE, 'callback');
+test('every tier captures leads in the portal', () => {
+  // The old email-vs-callback split is gone. A lead used to exist only as a Resend email on
+  // Starter and as NOTHING on Growth — the callback path persisted no record at all, so an
+  // unanswered callback (no call_analyzed → no Make run → no Airtable row) lost the lead.
+  for (const plan of ['starter', 'growth', 'enterprise']) {
+    assert.equal(build({ plan, webOnly: false }).env.LEAD_DELIVERY_MODE, 'portal', plan);
+  }
+  assert.equal(build({ plan: 'starter', webOnly: true }).env.LEAD_DELIVERY_MODE, 'portal', 'web-only');
 });
 
-test('a web-only client is still priced as starter, so it still emails leads', () => {
-  // web-only is plan:"starter" + receptionistMode:"declined" — not a fourth tier.
-  assert.equal(build({ plan: 'starter', webOnly: true }).env.LEAD_DELIVERY_MODE, 'email');
+test('only growth and enterprise also dial the lead back', () => {
+  assert.equal(build({ plan: 'starter', webOnly: false }).env.LEAD_CALLBACK, 'off');
+  assert.equal(build({ plan: 'growth', webOnly: false }).env.LEAD_CALLBACK, 'on');
+  assert.equal(build({ plan: 'enterprise', webOnly: false }).env.LEAD_CALLBACK, 'on');
+  // web-only is plan:"starter" + receptionistMode:"declined" — not a fourth tier, and it has no
+  // agent or number to dial with.
+  assert.equal(build({ plan: 'starter', webOnly: true }).env.LEAD_CALLBACK, 'off');
 });
 
-test('starter gets the Resend keys; growth does not', () => {
-  const starter = build({ plan: 'starter', webOnly: false }).env;
-  assert.equal(starter.LEAD_TO_EMAIL, 'owner@example.com');
-  assert.ok('RESEND_FROM_EMAIL' in starter);
-  assert.ok(!('RESEND_FROM_EMAIL' in build({ plan: 'growth', webOnly: false }).env));
+test('Resend is gone from every tier', () => {
+  // It was the whole delivery mechanism for Starter and it failed OPEN: RESEND_API_KEY seeded
+  // empty on a fresh client, syncVercelEnv skips empty values, so the key never reached Vercel
+  // and /api/contact 502'd on every lead until someone set it by hand. $0 cost, 100% loss.
+  for (const [plan, webOnly] of [['starter', false], ['starter', true], ['growth', false], ['enterprise', false]]) {
+    const env = build({ plan, webOnly }).env;
+    for (const k of ['RESEND_API_KEY', 'RESEND_FROM_EMAIL', 'LEAD_TO_EMAIL', 'LEAD_BRAND_NAME']) {
+      assert.ok(!(k in env), `${k} must not be written for ${plan}${webOnly ? ' (web-only)' : ''}`);
+    }
+  }
+});
+
+test('every tier gets an ingest token and URL, on every plan shape', () => {
+  // Tier-independent on purpose: web-only has no Airtable base and no number, so the portal is
+  // the ONLY place its leads can land. An empty token here reproduces the Resend failure above —
+  // syncVercelEnv skips empty values, so it would never reach Vercel and every lead would 401.
+  for (const [plan, webOnly] of [['starter', false], ['starter', true], ['growth', false], ['enterprise', false]]) {
+    const env = build({ plan, webOnly }).env;
+    assert.match(env.LEAD_INGEST_TOKEN, /^[0-9a-f]{64}$/, `${plan} token`);
+    assert.match(env.LEAD_INGEST_URL, /^https:\/\/\S+\/api\/ingest\/lead$/, `${plan} url`);
+  }
+});
+
+test('the ingest token is never rotated on a re-run', () => {
+  // Rotating it would orphan the KV token→{account,slug} record and 401 every subsequent lead,
+  // with nothing failing on the ops side to say so.
+  const token = 'a'.repeat(64);
+  const env = build({ plan: 'growth', webOnly: false, prev: { LEAD_INGEST_TOKEN: token } }).env;
+  assert.equal(env.LEAD_INGEST_TOKEN, token);
+});
+
+test('two tokens from two runs differ', () => {
+  // Guards against a constant or a seeded generator sneaking in — a shared token would let any
+  // client site post leads into any other client's account.
+  const a = build({ plan: 'growth', webOnly: false }).env.LEAD_INGEST_TOKEN;
+  const b = build({ plan: 'growth', webOnly: false }).env.LEAD_INGEST_TOKEN;
+  assert.notEqual(a, b);
 });
 
 test('a web-only client gets NO voice keys at all', () => {
@@ -62,7 +103,7 @@ test('a starter WITH a receptionist gets the full voice stack, like growth', () 
   for (const k of ['RETELL_AGENT_ID', 'TWILIO_NUMBER', 'CLIENT_FORWARD_PHONE', 'AIRTABLE_BASE_ID']) {
     assert.ok(k in env, `${k} must be written for a starter with a receptionist`);
   }
-  assert.equal(env.LEAD_DELIVERY_MODE, 'email', 'the one difference from growth stays');
+  assert.equal(env.LEAD_CALLBACK, 'off', 'the one remaining difference from growth');
 });
 
 test("CLIENT_FORWARD_PHONE is the owner's line, never the Twilio number", () => {
