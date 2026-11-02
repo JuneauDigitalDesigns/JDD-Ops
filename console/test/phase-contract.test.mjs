@@ -61,6 +61,29 @@ function ctxFor(shape) {
   };
 }
 
+/**
+ * A missing recording must fail, not skip.
+ *
+ * Every assertion below is guarded by `t.skip()` on a missing fixture, so with no recordings
+ * this file reported a clean pass having checked nothing — and the recordings were caught by
+ * `.gitignore`'s `*.log` rule, so that was the state on every fresh clone and in CI. CLAUDE.md
+ * calls this contract "the guard run-plan.ts's header asks for, automated"; it was neither
+ * automated nor running, and nothing said so.
+ *
+ * The individual skips stay as a belt-and-braces guard for a partially regenerated set. This
+ * test is what makes the absence itself loud.
+ */
+test('the dry-run recordings the contract needs are present', () => {
+  const missing = SHAPES.map((s) => s.file).filter((f) => !existsSync(resolve(FIXTURES, f)));
+  assert.deepEqual(
+    missing,
+    [],
+    `missing dry-run recording(s): ${missing.join(', ')}. These are tracked in git — if they ` +
+      'are absent, check .gitignore rather than regenerating blindly. Without them every ' +
+      'assertion in this file skips and the contract passes without running.',
+  );
+});
+
 for (const shape of SHAPES) {
   const path = resolve(FIXTURES, shape.file);
 

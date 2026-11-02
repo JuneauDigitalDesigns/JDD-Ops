@@ -76,6 +76,7 @@ function normalize(out) {
 }
 
 let changed = 0;
+let absent = 0;
 mkdirSync(OUT, { recursive: true });
 
 for (const shape of SHAPES) {
@@ -100,18 +101,33 @@ for (const shape of SHAPES) {
     console.log(`  = ${shape.file}`);
     continue;
   }
-  changed++;
+  if (prev === null) absent++;
+  else changed++;
   if (CHECK_ONLY) {
-    console.error(`  ! ${shape.file} WOULD CHANGE — onboard.js's phase output drifted`);
+    // A recording that is ABSENT and one that DRIFTED are different findings, and conflating
+    // them cost real time: the recordings were caught by `.gitignore`'s `*.log`, so CI had none
+    // and reported all four as "phase output drifted" on every run. That reads as a code
+    // regression in onboard.js, which is exactly where you then go looking.
+    console.error(
+      prev === null
+        ? `  ! ${shape.file} MISSING — nothing to compare against. These are tracked; check .gitignore`
+        : `  ! ${shape.file} WOULD CHANGE — onboard.js's phase output drifted`,
+    );
     continue;
   }
   writeFileSync(full, next, 'utf8');
   console.log(`  ${prev ? '~' : '+'} ${shape.file}`);
 }
 
-if (CHECK_ONLY && changed) {
-  console.error(`\n✗ ${changed} recording(s) drifted. Re-run \`npm run fixtures:dry-run\`, then`);
-  console.error('  update PHASE_MAP / expectedPhases in the same commit if phases changed.');
+if (CHECK_ONLY && (changed || absent)) {
+  if (absent) {
+    console.error(`\n✗ ${absent} recording(s) MISSING — the phase contract has nothing to check.`);
+    console.error('  They are tracked on purpose; if git is not showing them, check .gitignore.');
+  }
+  if (changed) {
+    console.error(`\n✗ ${changed} recording(s) drifted. Re-run \`npm run fixtures:dry-run\`, then`);
+    console.error('  update PHASE_MAP / expectedPhases in the same commit if phases changed.');
+  }
   process.exit(1);
 }
 console.log(changed ? `\n✓ ${changed} recording(s) updated — review the diff.` : '\n✓ All recordings current.');

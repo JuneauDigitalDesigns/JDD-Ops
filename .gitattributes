@@ -1,0 +1,6 @@
+# The dry-run recordings are compared byte-for-byte against freshly generated output by
+# `npm run fixtures:dry-run:check`, which CI runs on Linux while they are usually recorded on
+# Windows. Without this they would be committed with CRLF, regenerate with LF, and report as
+# drifted on every CI run — the same false "phase output drifted" failure that the `*.log`
+# ignore rule already caused once, arriving by a different route.
+test/fixtures/dry-run/*.log text eol=lf

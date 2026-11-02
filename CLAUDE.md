@@ -390,6 +390,14 @@ shapes through the real parser and asserts the phases match `expectedPhases()`. 
 guard `run-plan.ts`'s header asks for, automated. Add or reorder a `log()` call in onboard.js
 without updating `PHASE_MAP` and `expectedPhases()` and it fails.
 
+**`test/fixtures/dry-run/*.log` is tracked on purpose** — `.gitignore` carries an explicit
+negation for it, and `.gitattributes` pins it to LF so a Windows recording and a Linux CI run
+compare equal. For a while `*.log` swallowed those files, and the cost was not that the contract
+broke but that it quietly stopped existing: every assertion in the test is guarded by `t.skip()`
+on a missing fixture, so it reported a clean pass having checked nothing, while
+`fixtures:dry-run:check` failed CI claiming "phase output drifted" — a code regression that was
+never there. Both now name the real problem, and a missing recording fails rather than skips.
+
 Check output must never contain the token `FAIL:` — `onboard-parse.ts` treats any line
 carrying it as a fatal run, which would abort the UI's narration over a soft finding.
 
