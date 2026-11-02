@@ -27,8 +27,14 @@ type RatioKey = keyof typeof RATIOS;
  * formats: egress is not the constraint on Vercel Pro (decision 52), but EXPORT DURATION is, and
  * AVIF encode is the slow step. AVIF is reserved for the LCP hero where its compression pays off.
  *
- * KEEP IN LOCKSTEP with packages/ui/src/img.ts's WIDTHS: a width named in a component srcSet that
- * this pipeline never emitted is a 404 on a live client site.
+ * KEEP IN LOCKSTEP with `@jdd/ui`'s `src/img.ts` WIDTHS — the published package this repo pins,
+ * not a copy of it: a width named in a component srcSet that this pipeline never emitted is a 404
+ * on a live client site.
+ *
+ * This used to point at `packages/ui/src/img.ts`, a second clone of that package sitting inside
+ * this repo, gitignored and therefore invisible in `git status`. It had drifted from the real
+ * one in four files — `img.ts` among them — so "keep in lockstep" named the copy that does not
+ * ship. It has been deleted; edit the package in its own repository.
  */
 export const WIDTHS = [640, 1024, 1536, 2048] as const;
 /** The only ratio key that also gets AVIF, keyed by ratio (not path) so every hero slot qualifies. */

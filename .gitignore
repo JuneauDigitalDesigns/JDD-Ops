@@ -25,7 +25,14 @@ console/export/
 # Local Lighthouse runs (raw reports are large; see PERF.md for the record)
 .perf/
 
-# @jdd/ui lives in its own repo (JuneauDigitalDesigns/jdd-ui) and is consumed as a
-# github: dependency. The working copy here is a clone for local development only —
-# tracking it would embed a gitlink that clones of jdd-ops cannot resolve.
-packages/ui/
+# `packages/ui/` is deliberately NOT ignored any more, and should not exist at all.
+#
+# @jdd/ui lives in its own repo (JuneauDigitalDesigns/jdd-ui) and is consumed as a `github:`
+# dependency pinned by tag. A clone of it used to sit here for local development, ignored —
+# and being ignored is what made it dangerous: it drifted from the published package in four
+# files, including LeadForm.tsx and img.ts, while `git status` stayed clean and a comment in
+# image-pipeline.ts told people to keep the pipeline in lockstep with the copy that does not
+# ship. Editing the wrong one is a silent no-op you discover on a live client site.
+#
+# Without a rule here, any future clone shows up as untracked and is at least visible. Edit
+# the package in its own repository.
