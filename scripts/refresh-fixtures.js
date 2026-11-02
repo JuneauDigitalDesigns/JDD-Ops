@@ -31,9 +31,14 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The recorder and the readiness module must never disagree about WHICH policies matter, so
+// the list is imported rather than restated here.
+import { KNOWN_POLICIES } from '../lib/a2p-readiness.js';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = resolve(ROOT, 'test', 'fixtures');
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
+const TRUSTHUB = 'https://trusthub.twilio.com/v1';
 const CHECK_ONLY = process.argv.includes('--check');
 
 let failed = 0;
@@ -129,10 +134,15 @@ async function main() {
   const masterScenario = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
   const airtableKey = process.env.AIRTABLE_API_KEY;
 
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+
   const missing = [
     !makeKey && 'MAKE_API_KEY',
     !masterScenario && 'MAKE_POST_CALL_MASTER_SCENARIO_ID',
     !airtableKey && 'AIRTABLE_API_KEY',
+    !twilioSid && 'TWILIO_ACCOUNT_SID',
+    !twilioToken && 'TWILIO_AUTH_TOKEN',
   ].filter(Boolean);
   if (missing.length) {
     console.error(`✗ Missing required config: ${missing.join(', ')}`);
@@ -193,6 +203,33 @@ async function main() {
     // Only the Call Log table matters, and trimming keeps the fixture reviewable in a diff.
     const callLog = (schema?.tables ?? []).find((t) => t.name === 'Call Log');
     save('airtable/master-schema.json', callLog ? { baseId: masterBaseId, table: callLog } : null);
+  }
+
+  console.log('Twilio Trust Hub:');
+  const tw = { Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64')}` };
+
+  // The policy listing, TRIMMED to the three things the code actually reads: each policy's sid
+  // and friendly_name, plus the pagination cursor. The full response is 113 KiB, ~95% of it
+  // requirement blobs for Alphanumeric Sender ID policies in countries JDD does not operate in.
+  //
+  // What this fixture has to be able to contradict us about is whether the chain's two policies
+  // appear in the listing at all — and on this account they do not, which is the entire reason
+  // resolvePolicies fetches them by SID instead of scanning names. Trimming keeps that provable
+  // and the diff reviewable; keeping 113 KiB would make it neither.
+  const policyList = await getJson(`${TRUSTHUB}/Policies?PageSize=50`, tw, 'policies list');
+  save(
+    'trusthub/policies-list.json',
+    policyList && {
+      meta: { next_page_url: policyList.meta?.next_page_url ?? null },
+      results: (policyList.results ?? []).map((p) => ({ sid: p.sid, friendly_name: p.friendly_name })),
+    },
+  );
+
+  // Each chain policy, captured WHOLE — they are 2.1 KiB and 0.9 KiB, and a change to the
+  // friendly_name is exactly the drift resolvePolicies' name verification exists to catch.
+  for (const known of KNOWN_POLICIES) {
+    const policy = await getJson(`${TRUSTHUB}/Policies/${known.sid}`, tw, `policy ${known.label}`);
+    save(`trusthub/policy-${known.key}.json`, policy);
   }
 
   console.log('');

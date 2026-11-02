@@ -1,0 +1,203 @@
+{
+  "meta": {
+    "next_page_url": null
+  },
+  "results": [
+    {
+      "sid": "RNa64ca53c539ec3524df863da03181aab",
+      "friendly_name": "Alphanumeric Sender ID - Spain"
+    },
+    {
+      "sid": "RNa8ade60e2a607e62a802f4e6facc887a",
+      "friendly_name": "Alphanumeric Sender ID - Australia (v3)"
+    },
+    {
+      "sid": "RN901c655fa6f70c0cc026a295df3399f3",
+      "friendly_name": "AlphaNumericSenderId Finland Registration"
+    },
+    {
+      "sid": "RNaf848b1eeddc4ff715d7ed0781f78cd5",
+      "friendly_name": "Alphanumeric Sender ID - Finland"
+    },
+    {
+      "sid": "RN0a9e1f456519fca539588ace91c446d5",
+      "friendly_name": "Alphanumeric Sender ID - Ethiopia"
+    },
+    {
+      "sid": "RNf76cdd002ec4e56e2cec9c79428673f7",
+      "friendly_name": "Spain Wholesale Provider"
+    },
+    {
+      "sid": "RNb17c625c89df7de2cb604ecc24ac7c5e",
+      "friendly_name": "Alphanumeric Sender ID - Iraq"
+    },
+    {
+      "sid": "RN5c0428f4edcc530222126eb6d188b1cd",
+      "friendly_name": "Alphanumeric Sender ID - Austria"
+    },
+    {
+      "sid": "RN96d6f01f107075e19a37e0a141044d86",
+      "friendly_name": "AlphaNumericSenderId Spain Registration"
+    },
+    {
+      "sid": "RNd72654644c5044998e7ca8cab91138cc",
+      "friendly_name": "Alphanumeric Sender ID - Netherlands"
+    },
+    {
+      "sid": "RNa8adedeae2e77a8af5e1fdc982b807e7",
+      "friendly_name": "Alphanumeric Sender ID - Denmark"
+    },
+    {
+      "sid": "RNab73e5e69961ee280a0995301e6529ec",
+      "friendly_name": "Alphanumeric Sender ID - Denmark"
+    },
+    {
+      "sid": "RN6a11be9ddc604bafcb1b3100d2fb4f44",
+      "friendly_name": "AlphaNumericSenderId Iraq Registration"
+    },
+    {
+      "sid": "RN9c3acde04b7e13f45211ef63024b658c",
+      "friendly_name": "AlphaNumericSenderId Denmark Registration"
+    },
+    {
+      "sid": "RNad541cdd867dfd049cdbfb39f551665d",
+      "friendly_name": "AlphaNumericSenderId Austria Registration"
+    },
+    {
+      "sid": "RN553dbbedaba9ff2fd9c7277cd8cd2637",
+      "friendly_name": "Alphanumeric Sender ID - Jordan"
+    },
+    {
+      "sid": "RNfbc8acd34c7543fea3c94f50a7cb0d40",
+      "friendly_name": "AlphaNumericSenderId Singapore Registration"
+    },
+    {
+      "sid": "RN79395c9a11ebcf951a5b933842f2fdb0",
+      "friendly_name": "AlphanumericSenderId Core Registration"
+    },
+    {
+      "sid": "RNaee8ee2967252a9d68a406ebb62d6a84",
+      "friendly_name": "Alphanumeric Sender ID - Senegal"
+    },
+    {
+      "sid": "RNd67116a611bf445340bb13a1cb3a7e3d",
+      "friendly_name": "Australia: Local - Business"
+    },
+    {
+      "sid": "RNed492ca301e4e08811b36a8acdd134ab",
+      "friendly_name": "Alphanumeric Sender ID - Thailand"
+    },
+    {
+      "sid": "RNa076e7e39231d2864f486866783b035b",
+      "friendly_name": "Alphanumeric Sender ID - Serbia"
+    },
+    {
+      "sid": "RNa59ad1d0adef884f10c2d19413438c39",
+      "friendly_name": "Alphanumeric Sender ID - Romania"
+    },
+    {
+      "sid": "RNdafa8d099ebaa89adc652b43696492f5",
+      "friendly_name": "Alphanumeric Sender ID - Qatar"
+    },
+    {
+      "sid": "RNbd854500aa700af48714b29b3ff6fee1",
+      "friendly_name": "Alphanumeric Sender ID - Philippines"
+    },
+    {
+      "sid": "RN5aa3be0139f1b324a564b368b91a2516",
+      "friendly_name": "Alphanumeric Sender ID - Oman"
+    },
+    {
+      "sid": "RNfe0672810e88691fedb2de4c5fd151d6",
+      "friendly_name": "Alphanumeric Sender ID - Mexico"
+    },
+    {
+      "sid": "RN60e7a66b87b2f2a74336ec961bb5d5c1",
+      "friendly_name": "Alphanumeric Sender ID - Morocco"
+    },
+    {
+      "sid": "RN622457481b679e667c361001e7f5b981",
+      "friendly_name": "Alphanumeric Sender ID - Sri Lanka"
+    },
+    {
+      "sid": "RNb7049d49940817b3efa5f1bce6dcdd07",
+      "friendly_name": "Alphanumeric Sender ID - Ireland"
+    },
+    {
+      "sid": "RN35296fb0e4ff33e5549c0a7af37595fd",
+      "friendly_name": "Alphanumeric Sender ID - Hong Kong"
+    },
+    {
+      "sid": "RNe1ade7cfbd7cb92c8109382b73d2d4c0",
+      "friendly_name": "Alphanumeric Sender ID - United Kingdom"
+    },
+    {
+      "sid": "RNf6e96f5ff7d358fc3f0438d1bb07d4ca",
+      "friendly_name": "Alphanumeric Sender ID - Belarus"
+    },
+    {
+      "sid": "RN92a50c5b4584df2a37a5731c27b6f14b",
+      "friendly_name": "Alphanumeric Sender ID - Benin"
+    },
+    {
+      "sid": "RN05a256e3834a5efc42a76a7e86f756fe",
+      "friendly_name": "Alphanumeric Sender ID - UAE"
+    },
+    {
+      "sid": "RN553dbbedaba9ff2fd9c7277cd8cd2637",
+      "friendly_name": "Alphanumeric Sender ID - Jordan"
+    },
+    {
+      "sid": "RN45a132bd6373b33c63f405063467d517",
+      "friendly_name": "Alphanumeric Sender ID - Kuwait"
+    },
+    {
+      "sid": "RN1c796cb9493b8ceeb9e9165f6b0f62fd",
+      "friendly_name": "Alphanumeric Sender ID - Saudi Arabia"
+    },
+    {
+      "sid": "RNa1ef3f896be9ed19ebd0c05a092621b2",
+      "friendly_name": "Alphanumeric Sender ID - Uzbekistan"
+    },
+    {
+      "sid": "RNb7e5689d06262b87b8bee3ac8bbe824f",
+      "friendly_name": "Alphanumeric Sender ID - Taiwan"
+    },
+    {
+      "sid": "RNe39c8dc335a9e933a40e74a1e910b740",
+      "friendly_name": "Alphanumeric Sender ID - El Salvador"
+    },
+    {
+      "sid": "RN13b94383f5cd91fd4b2285c9c13e9307",
+      "friendly_name": "Alphanumeric Sender ID - Nicaragua"
+    },
+    {
+      "sid": "RN9ecc1cc99b3ce09fbd774427d3bd34f2",
+      "friendly_name": "Alphanumeric Sender ID - Malaysia"
+    },
+    {
+      "sid": "RNb53bf3ba18a677f033a5299f75aac8d4",
+      "friendly_name": "Alphanumeric Sender ID - Myanmar"
+    },
+    {
+      "sid": "RNe624a01d740fa1936b727014691c00d5",
+      "friendly_name": "Alphanumeric Sender ID - Iran"
+    },
+    {
+      "sid": "RN59b90383218d91ad5a0953dd15414bc1",
+      "friendly_name": "Alphanumeric Sender ID - Israel"
+    },
+    {
+      "sid": "RNbef21d4c180dca74c9c3907cc7a2bd82",
+      "friendly_name": "Alphanumeric Sender ID - Honduras"
+    },
+    {
+      "sid": "RNff4a36ced9525a9021b388d46169cddb",
+      "friendly_name": "Alphanumeric Sender ID - Guatemala"
+    },
+    {
+      "sid": "RN2af09c452693febd4c397f25a2a9154f",
+      "friendly_name": "Alphanumeric Sender ID - France"
+    }
+  ]
+}
