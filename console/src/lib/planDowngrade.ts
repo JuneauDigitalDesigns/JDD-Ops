@@ -3,26 +3,35 @@ import { createHash } from 'node:crypto';
 import { getClientContext } from './clients';
 import { loadRetellApiKey, loadTeardownCredentials } from './opsSecrets';
 import { loadTeardownOps } from './teardownOps';
-import { loadIntake } from './intake';
-import { brandContact, planEditError, schemaPathFor } from './planChange';
+import { planEditError } from './planChange';
 
 /**
- * What a growth → starter downgrade would actually destroy, verified rather than assumed.
+ * What a growth → starter downgrade actually changes, verified rather than assumed.
  *
- * Deliberately NOT lib/teardownPlan.ts. That builds a preview for destroying an entire
- * client — GitHub repo, Vercel project, domains, and finally clients/{slug} itself, which
- * it documents as unrecoverable. A downgrade keeps the site: same repo, same deployment,
- * same domain, same content. Only the voice tier goes away, which is two resources:
+ * **A downgrade destroys nothing.** Starter and Growth run the identical voice stack: the
+ * number rings the owner first, the agent picks up on no-answer, the Make webhook fires, the
+ * Airtable row is written and the owner is texted that a lead is waiting in their portal.
+ * Three things differ, and only three:
  *
- *   • the Twilio number  — released back to the pool, cannot be re-acquired
- *   • the Retell agent + its per-client LLM — deleted
+ *   • CRM access — portal-side, gated on `plan` being growth/enterprise
+ *   • web-form behaviour — Growth has the agent call the submitter back and put what it
+ *     collects in the inbox; Starter drops the submission straight into the inbox
+ *   • the included-minutes allowance — `MinuteCaps` is keyed by plan
  *
- * The Airtable base is deliberately KEPT and only reported, never destroyed: it holds the
- * client's call history, which stays worth having after they stop taking AI calls.
+ * Two of those three need no work here: both follow from `PortalSite.plan`, which
+ * `mirrorPlanToPortal` already writes. The only env change is `LEAD_CALLBACK` → `off`.
  *
- * Every field here is a real request, same as teardownPlan.ts and for the same reason —
- * "should exist because .env.local says so" is a different claim from "exists right now",
- * and the gap between them is what a destructive-action preview exists to close.
+ * This file used to describe the opposite, and the code matched the description: it released
+ * the Twilio number ("back to the pool, cannot be re-acquired") and deleted the Retell agent
+ * and its LLM. That was correct before the 2026-10-12 reprice, when Starter had no
+ * receptionist. Afterwards it silently became a flow that strips a paying Starter client of
+ * the receptionist they are entitled to and surrenders a number that cannot be recovered —
+ * the plan table in CLAUDE.md has given Starter ✓ voice agent and ✓ Twilio number since.
+ *
+ * The probes are kept, and `teardownPlan.ts` is still the separate thing that destroys a
+ * whole client. Here they verify that the stack the client keeps is actually healthy, which
+ * is the same reason teardownPlan.ts makes real requests: "should exist because .env.local
+ * says so" is a different claim from "exists right now".
  */
 
 export interface PlanDowngradePreview {
@@ -34,12 +43,20 @@ export interface PlanDowngradePreview {
   capturedAt: string;
   /** sha256 over the resolved resource ids — the execute call must echo this. */
   previewHash: string;
+  /**
+   * The voice stack. All three are reported so the operator can see they SURVIVE.
+   *
+   * This flow used to release the number — "back to the pool, cannot be re-acquired" — and
+   * delete the agent and its LLM, because it was written when Starter had no receptionist.
+   * Since the 2026-10-12 reprice every tier has one, and Starter's is identical to Growth's:
+   * it rings the owner first, falls back to the agent, fires the Make webhook, writes the
+   * Airtable row and texts the owner. Downgrading a paying client used to strip all of that
+   * and surrender a number that cannot be got back.
+   */
   twilio: { number: string | null; owned: boolean | null };
   retell: { agentId: string | null; agentExists: boolean | null; llmId: string | null };
   /** Reported so the operator can see it survives. Never destroyed by this flow. */
   airtable: { baseId: string | null; baseName: string | null; exists: boolean | null };
-  /** Starter lead-email keys that will be written, and whether we can fill them. */
-  leadEmail: { to: string | null; brandName: string | null; resendKeySet: boolean };
   /** Missing credentials or other reasons a resource couldn't be verified. */
   warnings: string[];
 }
@@ -103,19 +120,12 @@ export async function buildPlanDowngradePreview(slug: string): Promise<PlanDowng
       : Promise.resolve({ exists: null, name: null }),
   ]);
 
-  // What the starter lead-email keys will be set to. A growth .env.local has none of
-  // them, so these come from site.ts — the same source onboard.js's starter template uses.
-  const { file, exists } = schemaPathFor(ctx.slug);
-  const brand = brandContact(exists ? (await loadIntake(file))?.sites[0] : undefined);
-  const leadTo = env.LEAD_TO_EMAIL ?? brand.email ?? null;
-  if (!leadTo) {
-    warnings.push('No brand.email in site.ts — LEAD_TO_EMAIL will be left empty and lead emails will have nowhere to go.');
-  }
-  if (!env.RESEND_API_KEY) {
-    warnings.push(
-      'RESEND_API_KEY is not set on this client — starter lead emails will not send until you add it in Environment. (onboard.js never seeds it either; a fresh starter client has the same gap.)',
-    );
-  }
+  // No lead-email keys are computed, because email is not a lead delivery mode. Every tier
+  // captures web-form leads into the client's portal; `LEAD_DELIVERY_MODE` is always `portal`
+  // and `checkEnvTierMatrix` fails a client carrying a Resend leftover. This flow used to
+  // write LEAD_DELIVERY_MODE=email, RESEND_FROM_EMAIL and LEAD_TO_EMAIL, and to warn the
+  // operator that lead emails would not send until they added RESEND_API_KEY — instructing
+  // them, step by step, into the exact state the correctness checks reject.
 
   const identifiers = {
     slug: ctx.slug,
@@ -142,11 +152,6 @@ export async function buildPlanDowngradePreview(slug: string): Promise<PlanDowng
       baseId: env.AIRTABLE_BASE_ID ?? null,
       baseName: base.name,
       exists: base.exists,
-    },
-    leadEmail: {
-      to: leadTo,
-      brandName: brand.name ?? ctx.brandName,
-      resendKeySet: Boolean(env.RESEND_API_KEY),
     },
     warnings,
   };

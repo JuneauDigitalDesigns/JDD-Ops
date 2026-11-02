@@ -2148,7 +2148,12 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
       clientDir,
       extraEnv: {
         NEXT_PUBLIC_BRAND_NAME: content.brand.name,
-        LEAD_DELIVERY_MODE: plan === 'starter' ? 'email' : 'callback',
+        // LEAD_DELIVERY_MODE is deliberately NOT overridden here. It used to be forced to
+        // 'email' or 'callback' by plan, which `extraEnv` pushed to Vercel in preference to
+        // the `.env.local` value — so the file said `portal` while the deployment said
+        // something else, and the console's env-drift check would report that key as dirty
+        // forever. It is always `portal` now, written once by writeClientEnvLocal and synced
+        // from there like every other key. The tier difference lives in LEAD_CALLBACK.
       },
     });
 

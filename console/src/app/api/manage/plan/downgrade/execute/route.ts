@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { getClientContext, siteDirFor } from '@/lib/clients';
 import { loadIntake } from '@/lib/intake';
 import { applyEnvUpdates } from '@/lib/envFile';
-import { loadRetellApiKey, loadTeardownCredentials } from '@/lib/opsSecrets';
-import { loadTeardownOps, type StepResult } from '@/lib/teardownOps';
+import { type StepResult } from '@/lib/teardownOps';
 import { buildPlanDowngradePreview, PlanDowngradeError } from '@/lib/planDowngrade';
 import { appendAudit } from '@/lib/audit';
 import {
@@ -84,24 +83,15 @@ export async function POST(req: Request) {
 
   const site = ctx.sites[0];
 
-  // ── 1. Destroy the voice tier ─────────────────────────────────────────────
-  const ops = await loadTeardownOps();
-  const retellKey = loadRetellApiKey();
-  const { twilioAccountSid, twilioAuthToken } = loadTeardownCredentials();
-
-  const steps: StepResult[] = [
-    await ops.releaseTwilioNumber({
-      accountSid: twilioAccountSid ?? undefined,
-      authToken: twilioAuthToken ?? undefined,
-      phoneNumber: preview.twilio.number ?? undefined,
-    }),
-    await ops.deleteRetellAgent({
-      apiKey: retellKey ?? undefined,
-      agentId: preview.retell.agentId ?? undefined,
-    }),
-    await ops.deleteRetellLlm({ apiKey: retellKey ?? undefined, llmId: preview.retell.llmId }),
-  ];
-  // Note the absence: no ops.deleteAirtableBase. That is the point of this route.
+  // ── 1. Nothing is destroyed ───────────────────────────────────────────────
+  // There used to be three calls here: releaseTwilioNumber, deleteRetellAgent and
+  // deleteRetellLlm. They were right before the 2026-10-12 reprice, when Starter had no
+  // receptionist. Since then Starter runs the same voice stack as Growth, so a downgrade
+  // that released the number and deleted the agent was taking away service the client still
+  // pays for — and the number is unrecoverable, so it could not be undone by downgrading
+  // back. The three differences between the tiers are CRM access, web-form behaviour and the
+  // minutes allowance, and none of them is a vendor resource.
+  const steps: StepResult[] = [];
 
   // ── 2. clients/{slug}/site.ts ─────────────────────────────────────────────
   const { repoRoot, file, exists } = schemaPathFor(slug);
@@ -118,25 +108,20 @@ export async function POST(req: Request) {
   }
 
   // ── 3. clients/{slug}/.env.local ──────────────────────────────────────────
-  // A growth .env.local has none of the starter lead-email keys, so flipping only
-  // LEAD_DELIVERY_MODE would leave /api/contact returning 502 on every lead. Fill in what
-  // onboard.js's starter template writes; RESEND_API_KEY can't be seeded (it isn't in
-  // jdd-ops/.env — onboard.js only preserves it) and is reported as a preview warning.
+  // One key. `LEAD_DELIVERY_MODE` stays `portal`, because email is not a lead delivery mode
+  // on any tier — every client's web-form leads land in their portal inbox. What changes is
+  // whether the agent calls the submitter back first: Growth does, Starter does not.
+  //
+  // Nothing else is touched. RETELL_AGENT_ID, RETELL_LLM_ID and TWILIO_NUMBER used to be
+  // blanked here to match the resources this route deleted; they now describe a voice stack
+  // the client keeps, and blanking them would leave /api/voice unable to reach the agent
+  // while the agent itself sat alive and billing. AIRTABLE_BASE_ID was already deliberately
+  // absent for the same reason.
   const dir = siteDirFor(slug, 1, 0);
-  const brand = brandContact(intake.sites[0]);
 
   const updates: Record<string, string> = {
-    LEAD_DELIVERY_MODE: 'email',
-    LEAD_BRAND_NAME: brand.name ?? ctx.brandName,
-    RESEND_FROM_EMAIL: site.env.RESEND_FROM_EMAIL || 'leads@juneaudigitaldesigns.com',
-    // Cleared, not deleted — see the caveat on the response below.
-    RETELL_AGENT_ID: '',
-    RETELL_LLM_ID: '',
-    TWILIO_NUMBER: '',
+    LEAD_CALLBACK: 'off',
   };
-  if (preview.leadEmail.to) updates.LEAD_TO_EMAIL = preview.leadEmail.to;
-  // AIRTABLE_BASE_ID is deliberately absent from this map — the base survives, so the id
-  // that points at it must too.
 
   const written = applyEnvUpdates(dir, updates);
 

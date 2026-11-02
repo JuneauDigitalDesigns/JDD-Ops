@@ -131,10 +131,12 @@ export const ENV_FIELDS: EnvField[] = [
     help: 'Always “portal” — every tier captures web-form leads into the client’s portal. Resend email delivery was removed.',
     kind: 'select',
     plans: ALL,
-    // 'email' and 'callback' are retained as accepted values ONLY so a client provisioned before
-    // the portal-capture change can still be edited in this UI without tripping validation. New
-    // runs always write 'portal'; re-running onboard.js migrates an old client.
-    options: ['portal', 'callback', 'email'],
+    // Only 'portal'. Email is not a lead delivery mode and 'callback' is not one either —
+    // whether the agent rings the submitter back is LEAD_CALLBACK, below. Offering the old
+    // values here let an operator set a client to something `checkEnvTierMatrix` rejects,
+    // which is a worse outcome than a legacy client showing a value outside the list: that
+    // one is visible and re-running onboard.js migrates it.
+    options: ['portal'],
   },
   {
     key: 'LEAD_CALLBACK',
