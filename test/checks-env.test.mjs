@@ -13,7 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildClientEnvLines } from '../onboard.js';
+import { buildClientEnvLines, isScenarioAlreadyRunning } from '../onboard.js';
 import { checkEnvTierMatrix, checkForwardNotSelf, envLinesToObject } from '../lib/onboard-checks.js';
 import { makeIntake } from './helpers/fixtures.mjs';
 
@@ -197,4 +197,32 @@ test('the forward-loop predicate declines to judge an unparseable number', () =>
 test('an empty forward target is a failure, not a skip', () => {
   const c = checkForwardNotSelf({ lines: ['CLIENT_FORWARD_PHONE='], twilioNumber: '+14075551212' });
   assert.equal(c.ok, false);
+});
+
+test('an adopted scenario that is already running is not a fatal start failure', () => {
+  // The verbatim body a live run recorded, not a hand-written guess at one. `/start` on a
+  // scenario a previous run already activated answers 422 IM306 — and that is the commonest
+  // adoption case there is, because a run dying *after* activation is exactly the failure
+  // adoption recovers from. `if (!res.ok) fail(...)` turned it into a dead run, so the first
+  // run that successfully adopted still died, on the very next line.
+  const alreadyRunning =
+    '{"detail":"Scenario is already running.","message":"Scenario is already running (on start attempt)","code":"IM306"}';
+  assert.equal(isScenarioAlreadyRunning(422, alreadyRunning), true);
+
+  // Everything else must stay loudly fatal. Activating the clone is the step whose silent
+  // failure is worst of all: Make accepts posts to an inactive scenario's webhook and discards
+  // them, so the agent, the number and the webhook all look wired while nothing is ever logged.
+  assert.equal(
+    isScenarioAlreadyRunning(402, '{"message":"Maximum number of active scenarios has been exceeded","code":"IM324"}'),
+    false,
+    'the active-scenario cap must stay fatal — it means the clone is NOT running',
+  );
+  assert.equal(
+    isScenarioAlreadyRunning(422, '{"detail":"The hook already has a scenario assigned.","code":"IM000"}'),
+    false,
+    'other 422s must stay fatal',
+  );
+  assert.equal(isScenarioAlreadyRunning(401, '{"code":"IM306"}'), false, 'only 422 counts');
+  assert.equal(isScenarioAlreadyRunning(422, ''), false);
+  assert.equal(isScenarioAlreadyRunning(422, undefined), false);
 });

@@ -1544,6 +1544,31 @@ async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
 
+/**
+ * Is this `/scenarios/{id}/start` response Make's way of saying "it was already on"?
+ *
+ * Adoption rests on everything after the clone being safe to repeat, and the comment above the
+ * adoption branch used to assert that `/start` on a running scenario is a no-op. It is not.
+ * Make answers:
+ *
+ *   422 {"detail":"Scenario is already running.","message":"Scenario is already running (on
+ *        start attempt)","code":"IM306"}
+ *
+ * which `if (!res.ok) fail(...)` turned into a fatal run. That is the *expected* reply in the
+ * commonest adoption case of all — a run that died after activating the clone, which is
+ * exactly the shape of failure adoption exists to recover from. So the resume fix could not
+ * work until this did: the first run to successfully adopt died on the next line.
+ *
+ * Matched on the `IM306` code rather than the prose, and narrowed to 422, so a genuine refusal
+ * to start (a disabled scenario, a revoked token, an unpayable account) still fails loudly.
+ *
+ * Exported for `test/checks-env.test.mjs`, which asserts it against the verbatim body a live
+ * run recorded — a hand-written one would only encode the belief that produced the bug.
+ */
+export function isScenarioAlreadyRunning(status, body) {
+  return status === 422 && /"code"\s*:\s*"IM306"/.test(String(body ?? ''));
+}
+
 async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag, smsAlerts) {
   log(8, `Clone post-call Make scenario + wire Retell webhook`);
 
@@ -1624,8 +1649,11 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   // scenarios on one Airtable base means duplicate rows for every call.
   //
   // Everything after the clone is safe to repeat, which is what makes adoption sound: patching
-  // the blueprint is idempotent, /start on a running scenario is a no-op, and re-pointing the
-  // agent webhook writes the same value.
+  // the blueprint is idempotent, and re-pointing the agent webhook writes the same value.
+  //
+  // `/start` is the exception, and this comment used to get it wrong by calling it a no-op.
+  // Make returns 422 IM306 "Scenario is already running", which is why the first run that
+  // actually adopted still died — see `isScenarioAlreadyRunning` above.
   let cloneId = readEnvLocal(clientDir).MAKE_POST_CALL_SCENARIO_ID || null;
   let res;
 
@@ -1763,8 +1791,15 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   // accepts posts to an inactive scenario's webhook and discards them, so the agent, the
   // number and the webhook all look wired while no call is ever logged.
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}/start`, { method: 'POST', headers });
-  if (!res.ok) fail(8, `Make start-scenario returned ${res.status}: ${await res.text()}`);
-  console.log(`  Activated clone; webhook ${webhookUrl}`);
+  if (res.ok) {
+    console.log(`  Activated clone; webhook ${webhookUrl}`);
+  } else {
+    const body = await res.text();
+    if (!isScenarioAlreadyRunning(res.status, body)) {
+      fail(8, `Make start-scenario returned ${res.status}: ${body}`);
+    }
+    console.log(`  Clone ${cloneId} was already running — adopted as active; webhook ${webhookUrl}`);
+  }
 
   // 5) Wire the webhook onto the Retell agent's post-call webhook.
   const retell = await fetch(`https://api.retellai.com/update-agent/${agentId}`, {
