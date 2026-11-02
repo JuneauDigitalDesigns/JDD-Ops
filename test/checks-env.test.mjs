@@ -226,3 +226,22 @@ test('an adopted scenario that is already running is not a fatal start failure',
   assert.equal(isScenarioAlreadyRunning(422, ''), false);
   assert.equal(isScenarioAlreadyRunning(422, undefined), false);
 });
+
+test('an operator-corrected forward number survives a re-run', () => {
+  // CLIENT_FORWARD_PHONE used to be written straight from content.brand.phone every run, so a
+  // correction made after provisioning was silently reverted to the intake number on the next
+  // re-run — hop 1 then rings a line the owner has moved off, and the run reports success.
+  // Observed live on _e2e_test_growth, which had to be repaired by hand twice in one session.
+  const prev = { CLIENT_FORWARD_PHONE: '+12077763277' };
+  const { env } = build({ plan: 'growth', webOnly: false, prev });
+  assert.equal(env.CLIENT_FORWARD_PHONE, '+12077763277', 'the corrected number must win');
+
+  // With nothing recorded yet, the intake number is still the right initial value.
+  const fresh = build({ plan: 'growth', webOnly: false });
+  assert.ok(fresh.env.CLIENT_FORWARD_PHONE, 'a first run still gets the intake number');
+
+  // And it stays a voice-only key: carrying it must not leak into a web-only client, which
+  // checkEnvTierMatrix rejects outright for having any voice key at all.
+  const webOnly = build({ plan: 'starter', webOnly: true, prev });
+  assert.equal(webOnly.env.CLIENT_FORWARD_PHONE, undefined, 'web-only must have no forward key');
+});
