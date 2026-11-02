@@ -145,6 +145,24 @@ test('keys written later in the run are carried forward, not dropped', () => {
   assert.ok(lines[0].startsWith('#'), 'the generated-by header stays first');
 });
 
+test('an interrupted run keeps its Make hook + scenario ids, so the next run adopts', () => {
+  // `cloneAndWirePostCall` already handles resumption: it reads MAKE_POST_CALL_SCENARIO_ID and
+  // logs "Adopting scenario N ... (not cloning again)". The bug was never in that logic — it
+  // was that step 5 rebuilt .env.local before step 11 could read it. These two keys are
+  // written by patchEnvLocal mid-step-11, appear in no template above, and were absent from
+  // CARRIED_KEYS, so the rebuild erased them every time.
+  //
+  // The cost was not a failed run, it was a silent leak. Each attempt cloned a SECOND scenario
+  // and created a SECOND webhook, recorded the new pair over the old, and orphaned the
+  // previous one — still active, still billing, still holding one of the account's capped
+  // active-scenario slots, and no longer referenced by anything in the client's env. Two real
+  // runs produced two orphans before anyone noticed.
+  const prev = { MAKE_POST_CALL_HOOK_ID: '3013197', MAKE_POST_CALL_SCENARIO_ID: '6870565' };
+  const { env } = build({ plan: 'growth', webOnly: false, prev });
+  assert.equal(env.MAKE_POST_CALL_HOOK_ID, '3013197', 'hook id must survive the rebuild');
+  assert.equal(env.MAKE_POST_CALL_SCENARIO_ID, '6870565', 'scenario id must survive the rebuild');
+});
+
 test('the tier-matrix predicate passes every legitimate shape', () => {
   for (const [plan, webOnly] of [['starter', false], ['starter', true], ['growth', false], ['enterprise', false]]) {
     const { lines } = build({ plan, webOnly });

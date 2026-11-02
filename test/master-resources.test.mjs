@@ -17,7 +17,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { checkNotMasterBase, checkNotMasterHook } from '../lib/onboard-checks.js';
-import { loadFixture, masterFieldMap } from './helpers/fixtures.mjs';
+import { loadFixture, masterBlueprint, masterFieldMap } from './helpers/fixtures.mjs';
 
 // Taken from the recordings so the test tracks the real master rather than a hardcoded guess.
 const MASTER_BASE = masterFieldMap().baseId;
@@ -115,13 +115,28 @@ test('no master hook resolved is null — absent credentials never read as verif
   assert.equal(c.ok, null, 'without the master hook we cannot know, and must not claim to');
 });
 
-test('the e2e fixture is no longer pointed at the master base', () => {
+test('the e2e fixture is not pointed at the master base', () => {
   // The decoupling itself, pinned. If AIRTABLE_BASE_ID is ever pasted back, this fails here
   // rather than the next provisioning run quietly logging into the shared master base.
+  //
+  // This used to assert the id was EMPTY, as a stand-in for "not the master's". That held only
+  // while the fixture sat decoupled and unprovisioned; the moment it was provisioned properly
+  // and got its OWN base, the stand-in failed the very state it existed to produce. Assert the
+  // real rule, through the same predicate the provisioning run uses.
   const path = fileURLToPath(new URL('../clients/_e2e_test_growth/.env.local', import.meta.url));
   if (!existsSync(path)) return; // fixture client not present in this checkout (e.g. CI)
   const env = readFileSync(path, 'utf8');
   const line = env.split(/\r?\n/).find((l) => l.startsWith('AIRTABLE_BASE_ID='));
-  assert.ok(line !== undefined, 'the key should still be present, just empty');
-  assert.equal(line, 'AIRTABLE_BASE_ID=', `expected an empty base id, got ${JSON.stringify(line)}`);
+  assert.ok(line !== undefined, 'the key should still be present');
+  const clientBaseId = line.slice('AIRTABLE_BASE_ID='.length).trim();
+
+  const masterBaseId = masterBlueprint().flow.find((m) =>
+    (m.module ?? '').startsWith('airtable'),
+  )?.mapper?.base;
+  assert.ok(masterBaseId, 'the recorded master blueprint should name the master base');
+
+  // `ok === false` is the only verdict that means "this IS the master base". An unprovisioned
+  // fixture degrades to null, which is not a pass anywhere else and is not treated as one here.
+  const c = checkNotMasterBase({ clientBaseId, masterBaseId });
+  assert.notEqual(c.ok, false, c.detail);
 });
