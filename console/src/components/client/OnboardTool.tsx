@@ -6,7 +6,7 @@ import { ArrowsClockwise } from '@phosphor-icons/react';
 import { STATUS_ORDER } from '@/lib/types';
 import type { ClientContext, OpsConfig } from '@/lib/types';
 import { useRunbookState } from '@/lib/useRunbookState';
-import RunbookShell from '@/components/RunbookShell';
+import OnboardWizard from '@/components/onboard/OnboardWizard';
 import WarnBanner from '@/components/shell/WarnBanner';
 
 /**
@@ -16,7 +16,7 @@ import WarnBanner from '@/components/shell/WarnBanner';
  *
  * Still reads the full list from /api/runbook/clients and picks its slug out, rather than
  * a per-client endpoint. The list is a handful of folders and the route already assembles
- * exactly the ClientContext + OpsConfig pair RunbookShell wants; a second endpoint would be
+ * exactly the ClientContext + OpsConfig pair OnboardWizard wants; a second endpoint would be
  * a second thing to keep in step with it.
  */
 export default function OnboardTool({ slug }: { slug: string }) {
@@ -143,7 +143,7 @@ export default function OnboardTool({ slug }: { slug: string }) {
 
       {/* Keyed by slug so the step cursor resets per client but survives the post-run
           refetch, which does not remount. */}
-      <RunbookShell
+      <OnboardWizard
         key={ctx.slug}
         ctx={ctx}
         config={config}

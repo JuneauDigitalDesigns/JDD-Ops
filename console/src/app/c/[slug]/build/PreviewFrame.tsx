@@ -125,6 +125,12 @@ export default function PreviewFrame({
       moRef.current = mo;
 
       doc.documentElement.classList.add('studio-chrome');
+      // next/font defines --font-oswald / --font-inter on the parent <html> class list.
+      // The iframe is about:blank, so without these classes font-heading falls through
+      // to the system sans even though the stylesheets were cloned.
+      for (const cls of document.documentElement.classList) {
+        doc.documentElement.classList.add(cls);
+      }
       if (rootClass) doc.documentElement.classList.add(rootClass);
       doc.documentElement.style.margin = '0';
       doc.body.style.margin = '0';

@@ -1,0 +1,62 @@
+# Correctness gate for the provisioning path.
+#
+# This repo is never deployed and holds master credentials, so CI deliberately has NO secrets.
+# Everything below is hermetic: the root suite replays recorded vendor payloads from
+# test/fixtures/, and the vendor-facing predicates return `null` ("could not check") when
+# credentials are absent rather than passing or failing. Live verification stays manual, in
+# `npm run verify-make` / `verify-post-call`, which an operator runs before a real run.
+name: test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22: the test runner is invoked with a glob, which needs >= 21. The console suite
+      # already uses the same form.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # `npm ci` needs a lockfile that matches package.json; the root install also pulls
+      # @jdd/schema straight from GitHub, which is public-read for this org.
+      - name: Install (root)
+        run: npm ci
+
+      - name: Root suite — onboard.js + lib/
+        run: npm test
+
+      - name: Install (console)
+        working-directory: console
+        run: npm ci
+
+      - name: Console suite
+        working-directory: console
+        run: npm test
+
+      # `npm run fixtures:dry-run:check` deliberately does NOT run here.
+      #
+      # It used to, on the belief that "a dry run creates nothing and the phase SEQUENCE does
+      # not depend on credentials". That is wrong, and this job's own first line is why: CI has
+      # no secrets, so there is no .env, so `resolveMasterResources()` cannot run and the whole
+      # step-11 Make block is absent from the output. Measured by regenerating with .env moved
+      # aside — the clone/patch/activate lines vanish, GITHUB_ORG renders as <GITHUB_ORG>, and
+      # the summary goes from "3 passed, 1 failed, 6 not checked" to "2 passed, 1 failed, 7 not
+      # checked". A recording made where credentials exist can never match a run where they do
+      # not, so the step failed every run regardless of the code.
+      #
+      # The guard run-plan.ts's header asks for is still enforced, by the console suite above:
+      # phase-contract.test.mjs REPLAYS the committed recordings through the real parser and
+      # asserts they match expectedPhases(). That reads files and touches no vendor, so it is
+      # credential-free — and it genuinely runs now that test/fixtures/dry-run/*.log is tracked
+      # rather than swallowed by .gitignore, which is what let it report a clean pass while
+      # skipping every assertion.
+      #
+      # Regenerating belongs where credentials are: run `npm run fixtures:dry-run:check`
+      # locally before committing a change to onboard.js's log() calls.

@@ -36,6 +36,7 @@ export const CONTENT: SiteContent = {
     // here on purpose; the derivation in @jdd/ui supplies it.
     palette: {
       accent:  "#1E6FBF",
+      accent2: "#2F4A63",
       bg:      "#FAF7F2",
       bgSoft:  "#F1EBE2",
       ink:     "#1A1512",
@@ -44,12 +45,12 @@ export const CONTENT: SiteContent = {
     },
 
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "0.005em",
+      headingLineHeight: 1.0,
     },
   },
 
@@ -276,11 +277,12 @@ export const CONTENT: SiteContent = {
 
   // ── Final CTA ─────────────────────────────────────────────────────────────
   finalCta: {
-    eyebrow:  "Ready to Get Comfortable?",
-    headline: "Book Your Free Estimate Today",
-    sub:      "No pressure, no obligation, just an honest assessment of what your home needs and what it'll cost.",
-    cta:      "Book a Free Estimate",
-    secondary: "Call (907) 555-0142",
+    eyebrow:          "Ready to Get Comfortable?",
+    headline:         "Book Your Free Estimate Today",
+    headlineEmphasis: null,
+    sub:              "No pressure, no obligation, just an honest assessment of what your home needs and what it'll cost.",
+    cta:              "Book a Free Estimate",
+    secondary:        "Call (907) 555-0142",
     frictionReducers: [
       "Free estimates",
       "Same-day availability",

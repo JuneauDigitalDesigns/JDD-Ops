@@ -1,0 +1,81 @@
+
+=== DRY RUN MODE — read-only: nothing is created, written, or purchased ===
+
+
+[step 1] Intake loaded: plan="starter", 1 site
+  site 1/1: "Fixture Electric LLC" (0 missing fields)
+
+[pre-flight] Validating credentials & ID formats…
+  ✓ Pre-flight passed
+
+[pre-flight] Checking no client is wired to a master resource…
+  ✓ No master resources in use
+  Receptionist: declined (WEBSITE ONLY — no number, no agent)
+
+[step 2] Create empty GitHub repo + use local repo at <ROOT>/clients/fixture-starter/repo
+  [dry-run] would require local repo at <ROOT>/clients/fixture-starter/repo
+  [dry-run] would create empty repo JuneauDigitalDesigns/fixture-starter (auto_init: false)
+  [dry-run] would git init (if needed) + set origin + push (step 8c)
+
+[step 3] Write src/data/site.ts in local repo
+  [dry-run] would splice CONTENT into <ROOT>/clients/fixture-starter/repo/src/data/site.ts (1,199 chars)
+
+[step 4] Write infrastructure API routes (onboard-owned)
+  [dry-run] would write src/app/api/contact/route.ts
+  [dry-run] would write src/app/api/voice/route.ts
+  [dry-run] would write src/app/api/voice/no-answer/route.ts
+
+[step 5] Write .env.local (plan=starter, website-only)
+  [dry-run] would write <ROOT>/clients/fixture-starter/.env.local (preserving any already-provisioned IDs)
+
+[step 6] npm install + npm run build
+  [dry-run] would run npm install + npm run build in <ROOT>/clients/fixture-starter/repo
+
+  Skipping voice provisioning (website-only client, receptionist declined).
+
+[step 7] Correctness checks
+  ✓ env.tierMatrix — LEAD_DELIVERY_MODE=portal, LEAD_CALLBACK=off, ingest token present, voice stack absent (web-only)
+  ? env.forwardNotSelf — no voice stack for this client
+  ? site.publishesTwilioNumber — web-only client has no number to publish
+  ? site.forwardPreserved — web-only client has no forward target
+  1 passed, 0 failed, 3 not checked
+  Note: 3 check(s) could not run (missing credentials or nothing provisioned yet).
+
+[step 8] Commit + push client repo
+  [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Electric LLC" && git push origin main
+
+[step 9] Sync env to Vercel project "fixture-starter"
+  [dry-run] would lookup/create Vercel project "fixture-starter" linked to GitHub repo JuneauDigitalDesigns/fixture-starter
+  [dry-run] would push env vars from <ROOT>/clients/fixture-starter/.env.local + NEXT_PUBLIC_BRAND_NAME="Fixture Electric LLC"
+  [dry-run] would sync Vercel Firewall rules (global 200/60s per-IP → challenge; AI/search-bot 100/60s per-IP → deny)
+
+[step 10] Preview deploy → would create a preview deployment (dry run)
+
+[step 11] Link portal account
+  [dry-run] would upsert site "fixture-starter" (plan starter, status live) into account owner@fixtureelectric.example.com
+  [dry-run] any other sites already on that account would be preserved
+  [dry-run] would ensure the console client record for "fixture-starter" → owner@fixtureelectric.example.com
+
+[step 12] Portal test login
+
+────────────────────────────────────────────────────────────────
+  ONBOARDED: Fixture Electric LLC
+  Plan: starter
+────────────────────────────────────────────────────────────────
+
+  Site 1/1: Fixture Electric LLC
+    Repo          https://github.com/JuneauDigitalDesigns/fixture-starter.git
+    Portal slug   fixture-starter (live)
+    Accent        #b45309
+
+  Portal: https://juneaudigitaldesigns.com/portal
+  Portal account: owner@fixtureelectric.example.com
+
+────────────────────────────────────────────────────────────────
+  Next:
+    1. Verify lead email at owner@fixtureelectric.example.com after a test form submission.
+    2. Verify the deployed Vercel URL renders correctly.
+    3. ? Couldn't check Web Analytics — verify manually:
+         fixture-starter (dry run — not checked)
+
+=== DRY RUN COMPLETE — no resources were created ===

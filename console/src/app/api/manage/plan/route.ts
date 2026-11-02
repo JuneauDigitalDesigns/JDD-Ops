@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getClientContext, siteDirFor } from '@/lib/clients';
 import { loadIntake } from '@/lib/intake';
 import { applyEnvUpdates } from '@/lib/envFile';
+import { loadClientEnv, envLinesToObject } from '@/lib/clientEnv';
 import { loadRetellApiKey } from '@/lib/opsSecrets';
 import { appendAudit } from '@/lib/audit';
 import {
@@ -84,19 +85,43 @@ export async function POST(req: Request) {
   }
 
   // ── 2. clients/{slug}/.env.local ──────────────────────────────────────────
-  // Mirrors onboard.js's growth template (writeClientEnvLocal) for the keys that don't
-  // require provisioning. RETELL_AGENT_ID / TWILIO_NUMBER / AIRTABLE_BASE_ID are the three
-  // that do, and they stay absent — the whole point of the banner.
+  // Derived from onboard.js's OWN template via lib/client-env.js, not re-written here.
+  //
+  // This route used to hand-roll the growth keys, and the copy had drifted: it wrote
+  // CLIENT_FORWARD_RING_SECONDS=25 where onboard.js writes 15. Above ~20s the owner's carrier
+  // voicemail answers the forward leg, Twilio scores the call as answered, the no-answer
+  // branch never fires, and the caller lands in voicemail instead of the receptionist — so
+  // every client upgraded through this route inherited a silently broken ring window.
+  //
+  // Only keys that need no paid API are applied. RETELL_AGENT_ID / TWILIO_NUMBER /
+  // AIRTABLE_BASE_ID are real purchases that onboard.js owns, so they stay absent — that
+  // intermediate state is the whole point of the banner below.
   const site = ctx.sites[0];
   const dir = siteDirFor(slug, 1, 0);
   const brand = brandContact(intake.sites[0]);
 
-  const updates: Record<string, string> = { LEAD_DELIVERY_MODE: 'callback' };
+  const { buildClientEnvLines } = await loadClientEnv();
   const retellKey = loadRetellApiKey();
-  if (retellKey) updates.RETELL_API_KEY = retellKey;
-  if (!site.env.RETELL_SIP_DOMAIN) updates.RETELL_SIP_DOMAIN = 'sip.retellai.com';
-  if (brand.phone && !site.env.CLIENT_FORWARD_PHONE) updates.CLIENT_FORWARD_PHONE = brand.phone;
-  if (!site.env.CLIENT_FORWARD_RING_SECONDS) updates.CLIENT_FORWARD_RING_SECONDS = '25';
+  const template = envLinesToObject(
+    buildClientEnvLines({
+      siteSlug: site.slug,
+      plan: 'growth',
+      content: { brand: { ...intake.sites[0].brand, phone: brand.phone ?? '' } },
+      webOnly: false,
+      // The existing file wins for anything already provisioned, exactly as a re-run would.
+      prev: site.env as Record<string, string>,
+      env: { RETELL_API_KEY: retellKey ?? '' },
+    }).lines,
+  );
+
+  // Provisioned-only keys are onboard.js's to create; an empty value here would overwrite a
+  // real id with a blank on a re-upgrade.
+  const PROVISIONED = new Set(['RETELL_AGENT_ID', 'RETELL_LLM_ID', 'TWILIO_NUMBER', 'AIRTABLE_BASE_ID', 'RETELL_POST_CALL_WEBHOOK_URL']);
+  const updates: Record<string, string> = {};
+  for (const [k, v] of Object.entries(template)) {
+    if (PROVISIONED.has(k) || v === '') continue;
+    updates[k] = v;
+  }
 
   const written = applyEnvUpdates(dir, updates);
 

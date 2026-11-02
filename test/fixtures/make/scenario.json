@@ -1,0 +1,49 @@
+{
+  "scenario": {
+    "id": 5315889,
+    "name": "Post Call Webhook Master",
+    "teamId": 2283785,
+    "hookId": 2421720,
+    "devices": [],
+    "deviceId": null,
+    "deviceScope": null,
+    "concept": false,
+    "description": "",
+    "folderId": 249644,
+    "slots": null,
+    "isinvalid": false,
+    "islinked": true,
+    "islocked": false,
+    "isPaused": false,
+    "usedPackages": [
+      "gateway",
+      "datastore",
+      "airtable",
+      "twilio"
+    ],
+    "lastEdit": "2026-08-28T20:18:20.308Z",
+    "scheduling": {
+      "type": "immediately",
+      "maximum_runs_per_minute": 100
+    },
+    "iswaiting": false,
+    "dlqCount": 0,
+    "allDlqCount": 0,
+    "createdByUser": {
+      "id": 7916667,
+      "name": "Xander Juneau",
+      "email": "xanderjuneau@gmail.com"
+    },
+    "updatedByUser": {
+      "id": 7916667,
+      "name": "Xander Juneau",
+      "email": "xanderjuneau@gmail.com"
+    },
+    "nextExec": null,
+    "created": "2026-06-07T15:29:26.744Z",
+    "chainingRole": "none",
+    "type": "scenario",
+    "isShared": false,
+    "isActive": true
+  }
+}

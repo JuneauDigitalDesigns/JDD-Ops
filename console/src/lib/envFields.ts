@@ -74,12 +74,19 @@ export const ENV_FIELDS: EnvField[] = [
     key: 'CLIENT_FORWARD_RING_SECONDS',
     group: 'routing',
     label: 'Ring seconds',
-    help: 'How long the owner’s phone rings before the call falls through to the Retell agent.',
+    help:
+      'How long the owner’s phone rings before the call falls through to the Retell agent. ' +
+      'Capped at 20s — any longer and the owner’s carrier voicemail answers first, Twilio scores ' +
+      'the call as answered, and the caller lands in voicemail instead of the agent.',
     kind: 'int',
     plans: VOICE,
+    // Mirrors RING_SECONDS_MIN/MAX/DEFAULT in jdd-ops/lib/client-env.js. This file is bundled
+    // by Next and imported by client components, so it cannot dynamic-import from the ops root
+    // the way reconcileProbes.ts does — hence the copy, which ring-window.test.mjs pins equal.
+    // The previous max of 60 with a 25s placeholder actively invited a value that breaks routing.
     min: 5,
-    max: 60,
-    placeholder: '25',
+    max: 20,
+    placeholder: '15',
   },
   {
     key: 'AIRTABLE_BASE_ID',
@@ -121,35 +128,31 @@ export const ENV_FIELDS: EnvField[] = [
     key: 'LEAD_DELIVERY_MODE',
     group: 'leads',
     label: 'Lead delivery',
-    help: '“callback” has the agent dial the lead back; “email” sends the owner a Resend email.',
+    help: 'Always “portal” — every tier captures web-form leads into the client’s portal. Resend email delivery was removed.',
     kind: 'select',
     plans: ALL,
-    options: ['email', 'callback'],
+    // 'email' and 'callback' are retained as accepted values ONLY so a client provisioned before
+    // the portal-capture change can still be edited in this UI without tripping validation. New
+    // runs always write 'portal'; re-running onboard.js migrates an old client.
+    options: ['portal', 'callback', 'email'],
   },
   {
-    key: 'LEAD_TO_EMAIL',
+    key: 'LEAD_CALLBACK',
     group: 'leads',
-    label: 'Lead email recipient',
-    help: 'Where starter lead emails land — normally brand.email from the intake.',
-    kind: 'email',
+    label: 'Retell lead callback',
+    help: '“on” for Growth/Enterprise — /api/contact dials the lead back after recording them. Starter and web-only record only.',
+    kind: 'select',
     plans: ALL,
+    options: ['on', 'off'],
   },
   {
-    key: 'LEAD_BRAND_NAME',
+    key: 'LEAD_INGEST_URL',
     group: 'leads',
-    label: 'Lead email brand name',
-    help: 'Personalizes the lead email subject and heading.',
+    label: 'Lead ingest endpoint',
+    help: 'Where the client site posts captured leads. Point at a preview deploy to test against a branch.',
     kind: 'text',
     plans: ALL,
-  },
-  {
-    key: 'RESEND_FROM_EMAIL',
-    group: 'leads',
-    label: 'Resend from address',
-    help: 'Sender for lead emails. Must be on a Resend-verified domain.',
-    kind: 'email',
-    plans: ALL,
-    placeholder: 'leads@juneaudigitaldesigns.com',
+    placeholder: 'https://www.juneaudigitaldesigns.com/api/ingest/lead',
   },
 ];
 
@@ -281,6 +284,13 @@ export const LOCKED_KEYS = new Set([
   'CLERK_USER_ID', // written by the portal link repair tool
   'RETELL_LLM_ID', // bound to the agent by onboard.js / update-prompt
   'PORTAL_ACCOUNT_EMAIL', // which account owns this site; onboard.js --link-portal moves it
+  // Minted by onboard.js and registered in KV as token → {account, slug}. Editing it here would
+  // leave the two out of sync and 401 every lead the site captures, with no error on this side.
+  'LEAD_INGEST_TOKEN',
+  // The client's OWN Messaging Service, carrying their CUSTOMER_CARE A2P campaign. Written only
+  // once their carrier registration verifies. Not to be confused with the master
+  // TWILIO_MESSAGING_SERVICE_SID, which carries JDD's owner-alert campaign.
+  'CLIENT_MESSAGING_SERVICE_SID',
 ]);
 
 /** A .env.local line the UI shows in the advanced drawer rather than as a curated field. */

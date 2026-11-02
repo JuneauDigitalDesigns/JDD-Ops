@@ -67,10 +67,11 @@ export default function HeroFormFocus({
   const mode = content._meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
-    <section id="top" className={`${s.section} py-10 lg:py-16`}>
-      <div className="mx-auto grid max-w-6xl gap-9 px-5 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:items-start lg:gap-14">
+    <section id="top" className={`${s.section} py-16 lg:py-24`}>
+      <div className="mx-auto grid max-w-6xl gap-9 px-5 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:gap-14">
         <div>
-          <h1 className={`font-heading text-[34px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[42px] lg:text-[54px] ${s.heading}`}>
+          <span className="accent-bar" aria-hidden="true" />
+          <h1 className={`mt-5 font-heading text-[34px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[42px] lg:text-[54px] ${s.heading}`}>
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
           <p className={`mt-4 max-w-[46ch] text-[17px] leading-relaxed sm:text-[18px] ${s.body}`}>

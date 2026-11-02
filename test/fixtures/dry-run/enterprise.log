@@ -1,0 +1,220 @@
+
+=== DRY RUN MODE — read-only: nothing is created, written, or purchased ===
+
+
+[step 1] Intake loaded: plan="enterprise", 2 sites
+  site 1/2: "Fixture Mechanical Orlando" (0 missing fields)
+  site 2/2: "Fixture Mechanical Tampa" (0 missing fields)
+
+[pre-flight] Validating credentials & ID formats…
+  ✓ Pre-flight passed
+
+[pre-flight] Checking no client is wired to a master resource…
+  ✓ No master resources in use
+
+  Receptionist: forwarded
+
+[step 2 site 1/2] Create empty GitHub repo + use local repo at <ROOT>/clients/fixture-enterprise/site-1/repo
+  [dry-run] would require local repo at <ROOT>/clients/fixture-enterprise/site-1/repo
+  [dry-run] would create empty repo JuneauDigitalDesigns/fixture-enterprise-1 (auto_init: false)
+  [dry-run] would git init (if needed) + set origin + push (step 8c)
+
+[step 3 site 1/2] Write src/data/site.ts in local repo
+  [dry-run] would splice CONTENT into <ROOT>/clients/fixture-enterprise/site-1/repo/src/data/site.ts (1,228 chars)
+
+[step 4 site 1/2] Write infrastructure API routes (onboard-owned)
+  [dry-run] would write src/app/api/contact/route.ts
+  [dry-run] would write src/app/api/voice/route.ts
+  [dry-run] would write src/app/api/voice/no-answer/route.ts
+
+[step 5 site 1/2] Write .env.local (plan=enterprise)
+  [dry-run] would write <ROOT>/clients/fixture-enterprise/site-1/.env.local (preserving any already-provisioned IDs)
+
+[step 6 site 1/2] npm install + npm run build
+  [dry-run] would run npm install + npm run build in <ROOT>/clients/fixture-enterprise/site-1/repo
+
+[step 7 site 1/2] Claude → Retell agent prompt
+  [dry-run] would call Anthropic Claude (model claude-sonnet-4-6) to generate agent prompt for "Fixture Mechanical Orlando"
+  [dry-run] would write <ROOT>/clients/fixture-enterprise/site-1/agent-prompt.txt
+
+[step 8 site 1/2] Create Retell AI agent
+  [dry-run] would POST https://api.retellai.com/create-agent for "Fixture Mechanical Orlando"
+  [dry-run] would patch RETELL_agent_<ID> into <ROOT>/clients/fixture-enterprise/site-1/.env.local
+
+[step 9 site 1/2] Provision JDD Twilio number (human-first routing → Retell fallback)
+  [dry-run] would search Twilio for local number (area code from brand.phone) then toll-free
+  [dry-run] would purchase number and set voiceUrl → https://fixture-enterprise-1.vercel.app/api/voice
+  [dry-run] would patch TWILIO_NUMBER into <ROOT>/clients/fixture-enterprise/site-1/.env.local
+
+[step 10 site 1/2] Create Airtable base "Fixture Mechanical Orlando — Calls (2 sites)"
+  [dry-run] would create Airtable base "Fixture Mechanical Orlando — Calls (2 sites)" with Call Log table
+  [dry-run]   + Site singleSelect column with choices: fixture-enterprise-1, fixture-enterprise-2
+  [dry-run] would patch AIRTABLE_BASE_ID into <ROOT>/clients/fixture-enterprise/site-1/.env.local
+  [dry-run] would patch AIRTABLE_SITE_TAG=fixture-enterprise-1 in <ROOT>/clients/fixture-enterprise/site-1/.env.local
+  Site tag: fixture-enterprise-1
+
+[step 11 site 1/2] Clone post-call Make scenario + wire Retell webhook
+  SMS alerts: ON → <E164> (consented 2026-10-20T15:00:00.000Z)
+  [dry-run] would clone FROM master scenario 5315889 → new scenario "Post-call: Fixture Mechanical Orlando"
+  [dry-run] would first create a gateway-webhook for this client (master's hook 2421720 stays with the master)
+  [dry-run]   POST /scenarios/5315889/clone?organizationId=7633018 body { teamId: 2283785, states: false, hook: { 2421720: <new> } }
+  [dry-run] would repoint Airtable module at base=<dry-run-base-id>, remapping its table + field ids by column name
+  [dry-run]   + Site="fixture-enterprise-1" written into mapper.record (not as a top-level mapper key)
+  [dry-run] would REMOVE the vestigial datastore module, carrying its event filter forward
+  [dry-run] would patch Twilio from=undefined, to=<E164>
+  [dry-run] would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent <dry-run-agent-id> webhook_url
+
+[step 12 site 1/2] Publish number on the site (was <PHONE>)
+  [dry-run] would rewrite brand.phone → <PHONE> / phoneHref → tel:<E164> (illustrative — no number provisioned yet)
+  [dry-run] would leave CLIENT_FORWARD_PHONE=<PHONE> untouched as the forward target
+
+[step 13 site 1/2] Correctness checks
+  ✓ env.tierMatrix — LEAD_DELIVERY_MODE=portal, LEAD_CALLBACK=on, ingest token present, voice stack present
+  ? env.forwardNotSelf — cannot compare "<PHONE>" with "<dry-run-number>" — one is not a dialable number
+  ✗ site.publishesTwilioNumber — Twilio number "<dry-run-number>" is not dialable, so the site keeps the owner's number and calls bypass /api/voice
+  ✓ site.forwardPreserved — forward target is still the owner's line <PHONE>
+  ✓ airtable.notMasterBase — client base <dry-run-base-id> is distinct from the master
+  ? make.notMasterHook — no post-call webhook wired yet
+  ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
+  ? blueprint.eventFilter — no credentials to resolve the blueprint
+  ? blueprint.noDatastore — no credentials to resolve the blueprint
+  ? airtable.schemaCovers — no credentials to read one of the base schemas
+  3 passed, 1 failed, 6 not checked
+
+[step 14 site 1/2] Commit + push client repo
+  [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Mechanical Orlando" && git push origin main
+
+[step 15 site 1/2] Sync env to Vercel project "fixture-enterprise-1"
+  [dry-run] would lookup/create Vercel project "fixture-enterprise-1" linked to GitHub repo JuneauDigitalDesigns/fixture-enterprise-1
+  [dry-run] would push env vars from <ROOT>/clients/fixture-enterprise/site-1/.env.local + NEXT_PUBLIC_BRAND_NAME="Fixture Mechanical Orlando"
+  [dry-run] would sync Vercel Firewall rules (global 200/60s per-IP → challenge; AI/search-bot 100/60s per-IP → deny)
+
+[step 16 site 1/2] Preview deploy → would create a preview deployment (dry run)
+
+[step 17 site 1/2] Link portal account
+  [dry-run] would upsert site "fixture-enterprise-1" (plan enterprise, status live) into account orl@example.com
+  [dry-run] any other sites already on that account would be preserved
+  [dry-run] would ensure the console client record for "fixture-enterprise" → orl@example.com
+
+[step 18 site 2/2] Create empty GitHub repo + use local repo at <ROOT>/clients/fixture-enterprise/site-2/repo
+  [dry-run] would require local repo at <ROOT>/clients/fixture-enterprise/site-2/repo
+  [dry-run] would create empty repo JuneauDigitalDesigns/fixture-enterprise-2 (auto_init: false)
+  [dry-run] would git init (if needed) + set origin + push (step 8c)
+
+[step 19 site 2/2] Write src/data/site.ts in local repo
+  [dry-run] would splice CONTENT into <ROOT>/clients/fixture-enterprise/site-2/repo/src/data/site.ts (1,222 chars)
+
+[step 20 site 2/2] Write infrastructure API routes (onboard-owned)
+  [dry-run] would write src/app/api/contact/route.ts
+  [dry-run] would write src/app/api/voice/route.ts
+  [dry-run] would write src/app/api/voice/no-answer/route.ts
+
+[step 21 site 2/2] Write .env.local (plan=enterprise)
+  [dry-run] would write <ROOT>/clients/fixture-enterprise/site-2/.env.local (preserving any already-provisioned IDs)
+
+[step 22 site 2/2] npm install + npm run build
+  [dry-run] would run npm install + npm run build in <ROOT>/clients/fixture-enterprise/site-2/repo
+
+[step 23 site 2/2] Claude → Retell agent prompt
+  [dry-run] would call Anthropic Claude (model claude-sonnet-4-6) to generate agent prompt for "Fixture Mechanical Tampa"
+  [dry-run] would write <ROOT>/clients/fixture-enterprise/site-2/agent-prompt.txt
+
+[step 24 site 2/2] Create Retell AI agent
+  [dry-run] would POST https://api.retellai.com/create-agent for "Fixture Mechanical Tampa"
+  [dry-run] would patch RETELL_agent_<ID> into <ROOT>/clients/fixture-enterprise/site-2/.env.local
+
+[step 25 site 2/2] Provision JDD Twilio number (human-first routing → Retell fallback)
+  [dry-run] would search Twilio for local number (area code from brand.phone) then toll-free
+  [dry-run] would purchase number and set voiceUrl → https://fixture-enterprise-2.vercel.app/api/voice
+  [dry-run] would patch TWILIO_NUMBER into <ROOT>/clients/fixture-enterprise/site-2/.env.local
+  [dry-run] would patch AIRTABLE_BASE_ID=<dry-run-base-id> in <ROOT>/clients/fixture-enterprise/site-2/.env.local
+  Reusing shared Airtable base <dry-run-base-id>
+  [dry-run] would patch AIRTABLE_SITE_TAG=fixture-enterprise-2 in <ROOT>/clients/fixture-enterprise/site-2/.env.local
+  Site tag: fixture-enterprise-2
+
+[step 26 site 2/2] Clone post-call Make scenario + wire Retell webhook
+  SMS alerts: ON → <E164> (consented 2026-10-20T15:00:00.000Z)
+  [dry-run] would clone FROM master scenario 5315889 → new scenario "Post-call: Fixture Mechanical Tampa"
+  [dry-run] would first create a gateway-webhook for this client (master's hook 2421720 stays with the master)
+  [dry-run]   POST /scenarios/5315889/clone?organizationId=7633018 body { teamId: 2283785, states: false, hook: { 2421720: <new> } }
+  [dry-run] would repoint Airtable module at base=<dry-run-base-id>, remapping its table + field ids by column name
+  [dry-run]   + Site="fixture-enterprise-2" written into mapper.record (not as a top-level mapper key)
+  [dry-run] would REMOVE the vestigial datastore module, carrying its event filter forward
+  [dry-run] would patch Twilio from=undefined, to=<E164>
+  [dry-run] would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent <dry-run-agent-id> webhook_url
+
+[step 27 site 2/2] Publish number on the site (was <PHONE>)
+  [dry-run] would rewrite brand.phone → <PHONE> / phoneHref → tel:<E164> (illustrative — no number provisioned yet)
+  [dry-run] would leave CLIENT_FORWARD_PHONE=<PHONE> untouched as the forward target
+
+[step 28 site 2/2] Correctness checks
+  ✓ env.tierMatrix — LEAD_DELIVERY_MODE=portal, LEAD_CALLBACK=on, ingest token present, voice stack present
+  ? env.forwardNotSelf — cannot compare "<PHONE>" with "<dry-run-number>" — one is not a dialable number
+  ✗ site.publishesTwilioNumber — Twilio number "<dry-run-number>" is not dialable, so the site keeps the owner's number and calls bypass /api/voice
+  ✓ site.forwardPreserved — forward target is still the owner's line <PHONE>
+  ✓ airtable.notMasterBase — client base <dry-run-base-id> is distinct from the master
+  ? make.notMasterHook — no post-call webhook wired yet
+  ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
+  ? blueprint.eventFilter — no credentials to resolve the blueprint
+  ? blueprint.noDatastore — no credentials to resolve the blueprint
+  ? airtable.schemaCovers — no credentials to read one of the base schemas
+  3 passed, 1 failed, 6 not checked
+
+[step 29 site 2/2] Commit + push client repo
+  [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Mechanical Tampa" && git push origin main
+
+[step 30 site 2/2] Sync env to Vercel project "fixture-enterprise-2"
+  [dry-run] would lookup/create Vercel project "fixture-enterprise-2" linked to GitHub repo JuneauDigitalDesigns/fixture-enterprise-2
+  [dry-run] would push env vars from <ROOT>/clients/fixture-enterprise/site-2/.env.local + NEXT_PUBLIC_BRAND_NAME="Fixture Mechanical Tampa"
+  [dry-run] would sync Vercel Firewall rules (global 200/60s per-IP → challenge; AI/search-bot 100/60s per-IP → deny)
+
+[step 31 site 2/2] Preview deploy → would create a preview deployment (dry run)
+
+[step 32 site 2/2] Link portal account
+  [dry-run] would upsert site "fixture-enterprise-2" (plan enterprise, status live) into account orl@example.com
+  [dry-run] any other sites already on that account would be preserved
+  [dry-run] would ensure the console client record for "fixture-enterprise" → orl@example.com
+
+[step 33] Portal test login
+
+────────────────────────────────────────────────────────────────
+  ONBOARDED: Fixture Mechanical Orlando (Enterprise — 2 sites)
+  Plan: enterprise
+────────────────────────────────────────────────────────────────
+
+  Site 1/2: Fixture Mechanical Orlando
+    Repo          https://github.com/JuneauDigitalDesigns/fixture-enterprise-1.git
+    Portal slug   fixture-enterprise-1 (live)
+    Retell agent  <dry-run-agent-id>
+    Twilio number <dry-run-number>
+    Accent        #1f6feb
+
+  Site 2/2: Fixture Mechanical Tampa
+    Repo          https://github.com/JuneauDigitalDesigns/fixture-enterprise-2.git
+    Portal slug   fixture-enterprise-2 (live)
+    Retell agent  <dry-run-agent-id>
+    Twilio number <dry-run-number>
+    Accent        #1f6feb
+
+  Airtable base (shared): <dry-run-base-id>
+    Call Log rows are separated by the "Site" column (values = portal slugs above).
+
+  Portal: https://juneaudigitaldesigns.com/portal
+  Portal account: orl@example.com
+
+────────────────────────────────────────────────────────────────
+  Next:
+    1. Checkpoint 1 — review the Vercel preview URL(s).
+    2. Checkpoint 2 — test-call each Twilio number; confirm it rings the owner's
+       real phone FIRST and only reaches the agent on no-answer; tune each agent-prompt.txt.
+         npm run update-prompt -- <dry-run-agent-id> --slug fixture-enterprise/site-1
+         npm run update-prompt -- <dry-run-agent-id> --slug fixture-enterprise/site-2
+    3. Checkpoint 3 — make a test call; confirm the post-call text brief arrives and
+       the call logs an Airtable row.
+    4. Submit a test lead per site; confirm the Retell callback fires
+       (/api/contact → create-phone-call).
+    5. ? Couldn't check Web Analytics — verify manually:
+         fixture-enterprise-1 (dry run — not checked)
+         fixture-enterprise-2 (dry run — not checked)
+
+=== DRY RUN COMPLETE — no resources were created ===

@@ -1,0 +1,17 @@
+{
+  "teams": [
+    {
+      "id": 2283785,
+      "name": "My Team",
+      "organizationId": 7633018,
+      "globalAgentsEnabled": false
+    }
+  ],
+  "pg": {
+    "sortBy": "name",
+    "limit": 10000,
+    "sortDir": "asc",
+    "offset": 0,
+    "returnTotalCount": false
+  }
+}

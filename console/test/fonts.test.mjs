@@ -20,6 +20,12 @@ test('every pairing varName is defined by BOTH loaders', () => {
   for (const p of FONT_PAIRINGS) {
     assert.ok(consoleLoader.includes(`'${p.varName}'`), `console loader is missing ${p.varName}`);
     assert.ok(tplLoader.includes(`'${p.varName}'`), `template loader is missing ${p.varName}`);
+    if (p.displayVarName) {
+      // Two-family pairings load a SEPARATE display family; both loaders must define it too, or
+      // headings silently fall back to the body/system stack.
+      assert.ok(consoleLoader.includes(`'${p.displayVarName}'`), `console loader is missing ${p.displayVarName}`);
+      assert.ok(tplLoader.includes(`'${p.displayVarName}'`), `template loader is missing ${p.displayVarName}`);
+    }
   }
 });
 
@@ -28,7 +34,9 @@ test('the template loader keeps preload:false on every family', () => {
   // See the header of template/src/lib/fonts.loader.ts and PERF.md.
   const tpl = readFileSync(path.join(OPS, 'template/src/lib/fonts.loader.ts'), 'utf8');
   const families = tpl.match(/=\s*[A-Z][A-Za-z_]*\(\{[^}]*\}\)/g) ?? [];
-  assert.equal(families.length, FONT_PAIRINGS.length);
+  // >= not ==: a two-family pairing (e.g. 'oswald') loads two families, so the family count can
+  // exceed the pairing count. The invariant that matters is that EVERY loaded family is preload:false.
+  assert.ok(families.length >= FONT_PAIRINGS.length, `expected at least ${FONT_PAIRINGS.length} families, found ${families.length}`);
   for (const f of families) assert.match(f, /preload:\s*false/, f);
 });
 
@@ -52,7 +60,10 @@ test('typographyFor round-trips through pairingIdFromStack', () => {
   for (const p of FONT_PAIRINGS) {
     const t = typographyFor(p.id);
     assert.equal(pairingIdFromStack(t.fontSans), p.id);
-    assert.equal(t.fontHeading, t.fontSans, 'decision 7: one family, two treatments');
+    assert.equal(t.fontSans, p.stack);
+    // Single-family: heading reuses the body stack. Two-family (e.g. 'oswald'): heading is the
+    // separate display stack. Both cases: fontHeading === displayStack ?? stack.
+    assert.equal(t.fontHeading, p.displayStack ?? p.stack);
   }
   assert.equal(pairingIdFromStack('-apple-system, sans-serif'), null);
 });
@@ -72,18 +83,29 @@ test('every pairing requests only weights its family actually ships', () => {
     '--font-bricolage': 'Bricolage Grotesque',
     '--font-figtree': 'Figtree',
     '--font-archivo': 'Archivo',
+    '--font-oswald': 'Oswald',
+    '--font-inter': 'Inter',
   };
   for (const p of FONT_PAIRINGS) {
-    const family = FAMILY[p.varName];
-    assert.ok(family, `no family name mapped for ${p.varName}`);
-    const entry = data[family];
-    assert.ok(entry, `${family} is not in the installed Next font data`);
-    for (const w of [p.display.weight, p.body.weight]) {
-      assert.ok(
-        entry.weights.includes(String(w)),
-        `${p.id}: ${family} does not ship weight ${w} (has ${entry.weights.join(', ')})`,
-      );
-    }
+    // The display weight is checked against the DISPLAY family (which differs from the body on a
+    // two-family pairing), the body weight against the body family. Asking next/font for a weight
+    // the family does not ship is a build error.
+    const bodyFamily = FAMILY[p.varName];
+    const displayFamily = FAMILY[p.displayVarName ?? p.varName];
+    assert.ok(bodyFamily, `no family name mapped for ${p.varName}`);
+    assert.ok(displayFamily, `no family name mapped for ${p.displayVarName ?? p.varName}`);
+    const bodyEntry = data[bodyFamily];
+    const displayEntry = data[displayFamily];
+    assert.ok(bodyEntry, `${bodyFamily} is not in the installed Next font data`);
+    assert.ok(displayEntry, `${displayFamily} is not in the installed Next font data`);
+    assert.ok(
+      displayEntry.weights.includes(String(p.display.weight)),
+      `${p.id}: ${displayFamily} does not ship display weight ${p.display.weight} (has ${displayEntry.weights.join(', ')})`,
+    );
+    assert.ok(
+      bodyEntry.weights.includes(String(p.body.weight)),
+      `${p.id}: ${bodyFamily} does not ship body weight ${p.body.weight} (has ${bodyEntry.weights.join(', ')})`,
+    );
   }
 });
 

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Northstar Heating &amp; Air — Home · Standard (full page)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens (verbatim from the Northstar Standard mockup) ─────────────────── */
+:root{
+  --ink:#13293F; --ink-soft:#4C5E74; --ink-faint:#8696A8;
+  --bg:#ffffff; --bg-soft:#F4F6F8; --bg-tint:#EAF1F8;
+  --navy:#12263F; --navy-2:#0D1D31;
+  --accent:#E0602C; --accent-fg:#ffffff;
+  --rule:#E2E8F0; --rule-navy:rgba(255,255,255,.14);
+  --steel-1:#8FB2D9; --steel-2:#4A6D96; --steel-3:#1E3A5F;
+  --gold:#F6B54A;
+  --sh-sm:0 1px 2px rgba(19,41,63,.06);
+  --sh-md:0 2px 6px rgba(19,41,63,.07), 0 14px 30px -12px rgba(19,41,63,.22);
+  --sh-lg:0 4px 10px rgba(19,41,63,.08), 0 26px 50px -16px rgba(19,41,63,.30);
+  --sh-navy:0 18px 40px -14px rgba(18,38,63,.55);
+  --maxw:1120px;
+  --font-display:'Oswald',system-ui,sans-serif;
+  --font-sans:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);color:var(--ink);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+.display{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;line-height:1.04;color:var(--ink)}
+.eyebrow{font-family:var(--font-sans);font-size:12.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:var(--accent)}
+.eyebrow.steel{color:var(--steel-2)}
+.bar{height:4px;width:68px;border-radius:999px;background:linear-gradient(90deg,var(--steel-1),var(--steel-2) 55%,var(--steel-3));margin:16px 0 0}
+.band{background:var(--bg)}
+.band-soft{background:var(--bg-soft)}
+.band-tint{background:var(--bg-tint)}
+.band-navy{background:
+   radial-gradient(1100px 380px at 85% -10%, rgba(143,178,217,.12), transparent 60%),
+   linear-gradient(180deg,var(--navy),var(--navy-2));color:#EAF1F8}
+.sec{padding:84px 0}
+.sec-sm{padding:56px 0}
+.lede{color:var(--ink-soft);font-size:17px;line-height:1.65;max-width:52ch}
+.band-navy .lede{color:#B9C6D6}
+.btn{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:16px;border-radius:10px;padding:14px 22px;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.btn-primary{background:var(--accent);color:var(--accent-fg);box-shadow:0 10px 24px -8px rgba(224,96,44,.5)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 30px -10px rgba(224,96,44,.6)}
+.btn-ghost{border:2px solid rgba(19,41,63,.18);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-phone{font-family:var(--font-display);font-size:21px;letter-spacing:.01em;font-weight:600}
+
+/* ── Review-tool caption (not part of the design) ─────────────────────────── */
+.caption{background:#0C1218;color:#AEB9C4;font-family:var(--font-sans);font-size:12px;letter-spacing:.04em;padding:9px 24px;text-align:center}
+.caption b{color:#fff}
+
+/* ════ NAV (NEW — designed in the Northstar look) ═════════════════════════ */
+.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+.nav .inner{display:flex;align-items:center;gap:28px;height:74px}
+.logo{display:flex;align-items:center;gap:11px;font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);letter-spacing:-.01em}
+.logo .mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(145deg,var(--steel-2),var(--steel-3));color:#fff;display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.logo small{display:block;font-family:var(--font-sans);font-weight:500;font-size:11px;letter-spacing:.04em;color:var(--ink-soft);margin-top:-3px}
+.navlinks{display:flex;gap:4px;margin-left:10px}
+.navlinks a{font-size:14.5px;font-weight:600;color:var(--ink-soft);padding:8px 13px;border-radius:8px}
+.navlinks a:hover{color:var(--ink);background:var(--bg-soft)}
+.navlinks a[aria-current]{color:var(--accent)}
+.navcta{margin-left:auto;display:flex;align-items:center;gap:18px}
+.navphone{font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--ink);display:flex;align-items:center;gap:8px}
+.navphone svg{color:var(--accent)}
+@media(max-width:860px){.navlinks{display:none}.navphone span{display:none}}
+
+/* ════ HERO · STANDARD (verbatim) ═════════════════════════════════════════ */
+.hero-std{position:relative;min-height:600px;display:flex;align-items:center;overflow:hidden;background:var(--navy)}
+.hero-std .bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
+  background-image:url('https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=1600&auto=format&fit=crop')}
+.hero-std .scrim{position:absolute;inset:0;background:
+   linear-gradient(90deg,rgba(10,22,38,.86) 0%,rgba(10,22,38,.60) 45%,rgba(10,22,38,.28) 100%),
+   linear-gradient(180deg,rgba(10,22,38,.2),rgba(10,22,38,.55))}
+.hero-std .wrap{position:relative;padding-top:92px;padding-bottom:84px}
+.hero-std .inner{max-width:640px;color:#fff}
+.hero-std .rating{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;margin-bottom:16px;color:#fff}
+.hero-std .stars{color:var(--gold);letter-spacing:2px}
+.hero-std h1{font-family:var(--font-display);font-weight:600;font-size:60px;color:#fff;line-height:1.04;text-shadow:0 3px 18px rgba(0,0,0,.45)}
+.hero-std h1 .em{color:var(--gold)}
+.hero-std p{color:#D7E0EA;font-size:19px;line-height:1.6;margin-top:18px;max-width:46ch}
+.hero-std .cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px}
+.hero-std .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;max-width:520px;margin-top:30px;
+  border-top:1px solid rgba(255,255,255,.18);padding-top:20px}
+.hero-std .fr span{display:flex;gap:9px;align-items:center;font-size:14.5px;font-weight:600;color:#EAF1F8}
+
+/* ════ STAT BAND (verbatim) ═══════════════════════════════════════════════ */
+.statband .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.stat-tile{background:#fff;border:1px solid var(--rule);border-radius:16px;padding:26px 22px;box-shadow:var(--sh-md);position:relative;overflow:hidden}
+.stat-tile::before{content:"";position:absolute;left:24px;top:0;width:44px;height:4px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,var(--steel-2),var(--steel-3))}
+.stat-tile .n{font-family:var(--font-display);font-weight:700;font-size:46px;line-height:1;color:var(--ink);letter-spacing:-.01em}
+.stat-tile .l{font-size:13.5px;font-weight:600;color:var(--ink-soft);margin-top:8px;line-height:1.3}
+
+/* ════ SERVICES GRID (verbatim, EYEBROW REMOVED) ══════════════════════════ */
+.svc-head{max-width:48ch}
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+.svc-card{display:flex;flex-direction:column;background:#fff;border:1px solid var(--rule);border-radius:16px;padding:26px;box-shadow:var(--sh-sm);transition:transform .18s ease,box-shadow .18s ease}
+.svc-card:hover{transform:translateY(-3px);box-shadow:var(--sh-lg)}
+.svc-ic{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#EAF1F8,#DCE8F3);color:var(--steel-3);margin-bottom:18px;box-shadow:inset 0 0 0 1px rgba(30,58,95,.08)}
+.svc-card h3{font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink)}
+.svc-card p{color:var(--ink-soft);font-size:15.5px;line-height:1.6;margin-top:10px}
+.svc-tag{margin-top:auto;padding-top:18px;border-top:1px solid var(--rule);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px}
+.svc-tag::before{content:"";width:18px;height:2px;background:var(--accent);border-radius:2px}
+@media(max-width:900px){.svc-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.svc-grid{grid-template-columns:1fr}}
+
+/* ════ SERVICE AREA (verbatim) ════════════════════════════════════════════ */
+.area{position:relative;overflow:hidden}
+.area .silh{position:absolute;right:-40px;top:50%;transform:translateY(-50%);width:560px;max-width:52%;color:var(--steel-2);opacity:.10;pointer-events:none}
+.area .grid{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:center;position:relative}
+.area h2{font-family:var(--font-display);font-weight:600;font-size:34px;display:flex;align-items:center;gap:12px}
+.area .chips{display:flex;flex-wrap:wrap;gap:10px}
+.area .chip{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:10px 15px;font-weight:700;font-size:15px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:7px;transition:transform .15s ease,box-shadow .15s ease}
+.area .chip:hover{transform:translateY(-2px);box-shadow:var(--sh-md);border-color:rgba(30,58,95,.25)}
+.area .chip svg{color:var(--accent)}
+
+/* ════ FAQ ACCORDION (verbatim) ═══════════════════════════════════════════ */
+.faq{max-width:760px;margin:0 auto}
+.faq details{border:1px solid var(--rule);border-radius:16px;background:#fff;margin-top:12px;overflow:hidden;box-shadow:var(--sh-sm)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 24px;font-weight:700;font-size:16.5px;color:var(--ink)}
+.faq summary::-webkit-details-marker{display:none}
+.faq .ic{flex:none;color:var(--accent);transition:transform .3s ease}
+.faq details[open] .ic{transform:rotate(45deg)}
+.faq .ans{padding:2px 24px 26px;color:var(--ink-soft);line-height:1.72;font-size:15.5px}
+.faq details[open]{border-color:rgba(224,96,44,.35);box-shadow:var(--sh-md)}
+
+/* ════ REVIEWS (NEW — aggregate header + 3-up quote grid) ═════════════════ */
+.rev-head{text-align:center;max-width:640px;margin:0 auto}
+.rev-agg{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:22px;flex-wrap:wrap}
+.rev-agg .score{font-family:var(--font-display);font-weight:700;font-size:52px;line-height:1;color:var(--ink)}
+.rev-agg .bigstars{color:var(--gold);font-size:24px;letter-spacing:3px}
+.rev-agg .src{display:flex;gap:22px;flex-wrap:wrap}
+.rev-agg .src .s{display:flex;flex-direction:column;align-items:flex-start;font-weight:700;color:var(--ink);font-size:14px}
+.rev-agg .src .s small{color:var(--ink-faint);font-weight:600;font-size:12px}
+.rev-agg .sep{width:1px;height:46px;background:var(--rule)}
+.quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+.qcard{display:flex;flex-direction:column;background:#fff;border:1px solid var(--rule);border-radius:16px;padding:28px;box-shadow:var(--sh-sm)}
+.qcard .qstars{color:var(--gold);letter-spacing:2px;font-size:15px}
+.qcard .qtext{margin-top:14px;color:var(--ink);font-size:15.5px;line-height:1.6;flex:1}
+.qcard .who{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid var(--rule)}
+.qcard .ava{width:44px;height:44px;border-radius:50%;background:linear-gradient(145deg,var(--steel-1),var(--steel-3));color:#fff;display:grid;place-items:center;font-family:var(--font-display);font-weight:600;font-size:18px}
+.qcard .who .n{font-weight:700;font-size:15px;color:var(--ink)}
+.qcard .who .r{font-size:13px;color:var(--ink-soft)}
+@media(max-width:900px){.quotes{grid-template-columns:1fr}.rev-agg .sep{display:none}}
+
+/* ════ FINAL CTA (NEW — signature navy band) ═════════════════════════════ */
+.cta-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+.cta-grid h2{font-family:var(--font-display);font-weight:600;font-size:clamp(30px,3.6vw,44px);color:#fff;line-height:1.05}
+.cta-grid h2 .em{color:var(--gold)}
+.cta-grid .fr{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:22px}
+.cta-grid .fr span{display:flex;gap:8px;align-items:center;font-size:14.5px;font-weight:600;color:#DDE6EF}
+.cta-grid .fr svg{color:var(--gold)}
+.cta-form{background:#fff;border-radius:18px;padding:28px;box-shadow:var(--sh-lg)}
+.cta-form .cf-head{font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink)}
+.cta-form .cf-sub{font-size:14px;color:var(--ink-soft);margin-top:6px}
+.cta-form label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:14px 0 5px}
+.cta-form input{width:100%;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;font-size:15px;font-family:inherit;background:var(--bg-soft)}
+.cta-form input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(224,96,44,.14)}
+.cta-form .btn-primary{width:100%;justify-content:center;margin-top:16px}
+.cta-form .cf-fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:var(--ink-soft);margin-top:12px}
+.cta-form .cf-fine svg{color:#2B9C5A}
+@media(max-width:820px){.cta-grid{grid-template-columns:1fr;gap:32px}}
+
+/* ════ FOOTER (NEW — navy) ════════════════════════════════════════════════ */
+footer.site{background:var(--navy-2);color:#B9C6D6;padding:64px 0 32px}
+.fgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1.1fr;gap:40px}
+.fbrand .logo{color:#fff}
+.fblurb{margin-top:16px;font-size:14.5px;line-height:1.6;max-width:34ch;color:#9fb0c4}
+.fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.fbadge{font-size:12px;color:#9fb0c4;border:1px solid var(--rule-navy);border-radius:999px;padding:6px 12px}
+.fcol h4{font-family:var(--font-sans);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#8ea3bb;font-weight:700;margin-bottom:14px}
+.fcol a{display:block;color:#C7D4E2;font-size:14.5px;padding:5px 0}
+.fcol a:hover{color:#fff}
+.fcol .ln{display:flex;align-items:flex-start;gap:9px;color:#C7D4E2;font-size:14.5px;padding:5px 0}
+.fcol .ln svg{color:var(--accent);flex:none;margin-top:3px}
+.fbot{display:flex;justify-content:space-between;gap:16px;margin-top:44px;padding-top:22px;border-top:1px solid var(--rule-navy);font-size:13px;color:#8ea3bb;flex-wrap:wrap}
+@media(max-width:820px){.fgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.fgrid{grid-template-columns:1fr}}
+
+@media(max-width:860px){
+  .statband .grid{grid-template-columns:1fr 1fr}
+  .area .grid{grid-template-columns:1fr}
+  .hero-std h1{font-size:40px}
+}
+</style>
+</head>
+<body>
+
+<div class="caption"><b>Northstar · Home — Standard (full page)</b> &nbsp;·&nbsp; carried over: hero, stat band, services, service-area (eyebrow removed) &nbsp;·&nbsp; NEW: nav, reviews, final CTA, footer</div>
+
+<!-- ════ NAV (new) ════ -->
+<nav class="nav"><div class="wrap inner">
+  <a class="logo"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/><circle cx="12" cy="12" r="3"/></svg></span>
+    <span>Northstar<small>Heating &amp; Air · Central FL</small></span></a>
+  <div class="navlinks">
+    <a aria-current="page">Home</a><a href="#s">Services</a><a href="#r">Reviews</a><a href="#faq">FAQ</a><a href="#c">Contact</a>
+  </div>
+  <div class="navcta">
+    <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(407) 555-0188</span></span>
+    <a class="btn btn-primary" href="#c">Book a visit</a>
+  </div>
+</div></nav>
+
+<!-- ════ HERO · STANDARD (unchanged) ════ -->
+<header class="hero-std">
+  <div class="bgimg"></div><div class="scrim"></div>
+  <div class="wrap"><div class="inner">
+    <div class="rating"><span class="stars">★★★★★</span> 4.9 <span style="font-weight:600;color:#C6D2DE">from 180+ verified reviews</span></div>
+    <h1>Central Florida's <span class="em">24/7</span> heating &amp; air experts.</h1>
+    <p>When the AC quits in July, you need a real person on the line and a tech at the door the same day — not a voicemail. That's all we do.</p>
+    <div class="cta">
+      <a class="btn btn-primary btn-phone" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(407) 555-0188</a>
+      <a class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.4)" href="#c">Book a visit →</a>
+    </div>
+    <div class="fr">
+      <span>✔ Same-day service</span><span>✔ Upfront flat-rate pricing</span>
+      <span>✔ Licensed &amp; insured</span><span>✔ Veteran-owned &amp; local</span>
+    </div>
+  </div></div>
+</header>
+
+<!-- ════ STAT BAND (unchanged) ════ -->
+<div class="band-soft sec-sm"><div class="wrap statband"><div class="grid">
+  <div class="stat-tile"><div class="n">24/7</div><div class="l">Emergency service, real humans</div></div>
+  <div class="stat-tile"><div class="n">18+</div><div class="l">Years serving Central Florida</div></div>
+  <div class="stat-tile"><div class="n">4.9★</div><div class="l">From 180+ verified reviews</div></div>
+  <div class="stat-tile"><div class="n">12</div><div class="l">Towns in our coverage area</div></div>
+</div></div></div>
+
+<!-- ════ SERVICES (unchanged layout; eyebrow removed) ════ -->
+<div class="band sec" id="s"><div class="wrap">
+  <div class="svc-head">
+    <div class="bar" style="margin-top:0"></div>
+    <h2 class="display" style="font-size:40px;margin-top:16px">Repairs, installs, and plans that keep you comfortable.</h2>
+    <p class="lede" style="margin-top:14px">Every job is quoted flat-rate before we start, so the price you hear is the price you pay.</p>
+  </div>
+  <div class="svc-grid">
+    <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/><circle cx="12" cy="12" r="3"/></svg></div><h3>AC Repair</h3><p>Fast diagnosis and repair on every major brand, often same-day.</p><div class="svc-tag">Repair</div></div>
+    <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s4 4 4 8a4 4 0 01-8 0c0-2 2-4 4-8z"/><path d="M12 22a6 6 0 006-6c0-1-.5-2-1-3"/></svg></div><h3>Heating &amp; Furnace</h3><p>Tune-ups and repairs that keep the heat on through every cold snap.</p><div class="svc-tag">Repair</div></div>
+    <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg></div><h3>New Installations</h3><p>Right-sized systems, financing available, installed clean and on time.</p><div class="svc-tag">Install</div></div>
+    <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/><circle cx="12" cy="12" r="4"/></svg></div><h3>Maintenance Plans</h3><p>Two visits a year, priority scheduling, and no overtime fees.</p><div class="svc-tag">Membership</div></div>
+    <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div><h3>Indoor Air Quality</h3><p>Filtration, purifiers, and humidity control for a healthier home.</p><div class="svc-tag">Install</div></div>
+    <div class="svc-card"><div class="svc-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h3>Emergency Service</h3><p>Nights, weekends, holidays — someone answers and someone comes.</p><div class="svc-tag">24/7</div></div>
+  </div>
+</div></div>
+
+<!-- ════ SERVICE AREA (unchanged) ════ -->
+<div class="band-tint sec area">
+  <svg class="silh" viewBox="0 0 200 200" fill="currentColor" aria-hidden="true"><path d="M40 20l30 6 28-10 34 8 26 18-8 30 10 28-20 24-30 6-26-14-28 4-22-20 6-28-14-26 10-28z"/></svg>
+  <div class="wrap"><div class="grid">
+    <div>
+      <h2 class="display"><svg width="28" height="28" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z"/></svg>Where we work</h2>
+      <div class="bar"></div>
+      <p class="lede" style="margin-top:16px">Not on the list? Call and ask — we travel for bigger jobs across the region.</p>
+      <a class="btn-phone" style="color:var(--accent);display:inline-flex;gap:8px;margin-top:16px;font-weight:600" href="#">(407) 555-0188</a>
+    </div>
+    <div class="chips">
+      <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Orlando</span>
+      <span class="chip">Winter Park</span><span class="chip">Kissimmee</span><span class="chip">Apopka</span>
+      <span class="chip">Sanford</span><span class="chip">Oviedo</span><span class="chip">Lake Mary</span>
+      <span class="chip">Altamonte Springs</span><span class="chip">Clermont</span><span class="chip">Longwood</span>
+      <span class="chip">Maitland</span><span class="chip">Casselberry</span>
+    </div>
+  </div></div>
+</div>
+
+<!-- ════ REVIEWS (new) ════ -->
+<div class="band-soft sec" id="r"><div class="wrap">
+  <div class="rev-head">
+    <div class="eyebrow steel">Reviews</div>
+    <h2 class="display" style="font-size:40px;margin-top:12px">Homeowners keep calling us back.</h2>
+    <div class="rev-agg">
+      <div class="score">4.9</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">
+        <div class="bigstars">★★★★★</div>
+        <div style="font-size:13.5px;font-weight:600;color:var(--ink-soft)">Based on 184 verified reviews</div>
+      </div>
+      <div class="sep"></div>
+      <div class="src">
+        <div class="s">Google<small>★ 4.9 · 120</small></div>
+        <div class="s">Facebook<small>★ 5.0 · 41</small></div>
+        <div class="s">Yelp<small>★ 4.8 · 23</small></div>
+      </div>
+    </div>
+  </div>
+  <div class="quotes">
+    <div class="qcard"><div class="qstars">★★★★★</div><p class="qtext">Called at 11pm on a Friday when our furnace died. A tech was at our door within an hour and fixed it that night. Incredible service.</p><div class="who"><div class="ava">M</div><div><div class="n">Michael R.</div><div class="r">Homeowner · Winter Park</div></div></div></div>
+    <div class="qcard"><div class="qstars">★★★★★</div><p class="qtext">Three years of service now — always on time, always honest. When our AC needed a part they sourced it same-day.</p><div class="who"><div class="ava">S</div><div><div class="n">Sandra T.</div><div class="r">Homeowner · Oviedo</div></div></div></div>
+    <div class="qcard"><div class="qstars">★★★★★</div><p class="qtext">Quoted us $800 less than two other companies for a new heat pump. Clean install, and the system has been perfect.</p><div class="who"><div class="ava">J</div><div><div class="n">James O.</div><div class="r">Homeowner · Clermont</div></div></div></div>
+  </div>
+</div></div>
+
+<!-- ════ FAQ (unchanged design) ════ -->
+<div class="band sec" id="faq"><div class="wrap">
+  <div style="text-align:center;max-width:620px;margin:0 auto">
+    <div class="eyebrow">Good to know</div>
+    <h2 class="display" style="font-size:38px;margin-top:12px">Frequently asked questions</h2>
+  </div>
+  <div class="faq" style="margin-top:36px">
+    <details open><summary>Do you really answer 24/7?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Yes. A real person — not a machine — answers every call, including nights, weekends, and holidays. If you need a tech, we dispatch one.</div></details>
+    <details><summary>How does flat-rate pricing work?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">We quote the full price before any work begins, based on the repair — never by the hour. The number you approve is the number you pay.</div></details>
+    <details><summary>Are you licensed and insured?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Fully licensed (CAC1820xxx) and insured, with background-checked technicians. We'll happily show documentation on request.</div></details>
+  </div>
+</div></div>
+
+<!-- ════ FINAL CTA (new — signature navy band) ════ -->
+<div class="band-navy sec" id="c"><div class="wrap"><div class="cta-grid">
+  <div>
+    <div class="eyebrow steel" style="color:var(--steel-1)">Ready when you are</div>
+    <h2 style="margin-top:12px">Comfort back on — <span class="em">the same day you call.</span></h2>
+    <p class="lede" style="margin-top:14px">Book a free, no-obligation estimate. A real person answers, and we'll get a technician scheduled — usually same day.</p>
+    <div class="fr">
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Free estimates</span>
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> Same-day availability</span>
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No hidden fees</span>
+    </div>
+  </div>
+  <div class="cta-form">
+    <div class="cf-head">Book a free estimate</div>
+    <div class="cf-sub">Tell us what's going on — we'll call you right back.</div>
+    <label>Name</label><input placeholder="Your name" />
+    <label>Phone</label><input placeholder="(407) 555-0188" />
+    <a class="btn btn-primary" href="#">Book a free estimate</a>
+    <div class="cf-fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12l5 5L20 6"/></svg> No obligation · same-day callback</div>
+  </div>
+</div></div></div>
+
+<!-- ════ FOOTER (new — navy) ════ -->
+<footer class="site"><div class="wrap">
+  <div class="fgrid">
+    <div class="fbrand">
+      <a class="logo"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/><circle cx="12" cy="12" r="3"/></svg></span><span>Northstar<small style="color:#8ea3bb">Heating &amp; Air · Central FL</small></span></a>
+      <p class="fblurb">Licensed HVAC contractor providing heating, cooling, and air quality services across Central Florida. Emergency service available 24/7.</p>
+      <div class="fbadges"><span class="fbadge">NATE Certified</span><span class="fbadge">EPA 608</span><span class="fbadge">Veteran-Owned</span><span class="fbadge">Licensed &amp; Insured</span></div>
+    </div>
+    <div class="fcol"><h4>Services</h4><a>AC Repair</a><a>Heating &amp; Furnace</a><a>New Installations</a><a>Maintenance Plans</a><a>Emergency Service</a></div>
+    <div class="fcol"><h4>Company</h4><a>About Us</a><a>Reviews</a><a>Service Area</a><a>FAQ</a></div>
+    <div class="fcol"><h4>Contact</h4>
+      <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(407) 555-0188</span>
+      <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>hello@northstarhvac.com</span>
+      <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>Serving Orlando &amp; Central FL</span>
+    </div>
+  </div>
+  <div class="fbot"><span>© 2026 Northstar Heating &amp; Air. All rights reserved.</span><span>Licensed &amp; insured · CAC1820xxx · FL</span></div>
+</div></footer>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "@jdd/ui",
+  "version": "1.0.7",
+  "exports": {
+    "./skins": "./src/skins.ts",
+    "./img": "./src/img.ts",
+    "./motion": { "import": "./src/motion.ts" }
+  }
+}

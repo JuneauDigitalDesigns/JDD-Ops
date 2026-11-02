@@ -2,7 +2,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 /**
- * The JDD mark — the console's home link, and the only branding in the bar.
+ * The JDD mark — the console's home link (to the card hub at /), and the only branding in
+ * the bar.
  *
  * The wordmark that used to sit beside it ("JDD Console", Big Shoulders 18px) is gone. The
  * bar's job is wayfinding, and an app title you can't click through to anything is the one
@@ -20,8 +21,8 @@ export default function JddMark() {
   return (
     <Link
       href="/"
-      aria-label="Briefing"
-      title="Briefing"
+      aria-label="Home"
+      title="Home"
       className="shrink-0 rounded-[5px] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
     >
       <Image

@@ -6,7 +6,7 @@
 // activity trail so corrections stay auditable.
 
 import { useEffect, useRef, useState } from 'react';
-import { CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
+import { CalendarPlus, CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
 import { LEAD_SOURCE_SHORT } from '@/lib/lead-meta';
 import type { DemoCall, PlanInterest, QueuedLead } from '@/lib/leadTypes';
 import { absoluteTime, relativeTime } from '@/lib/relativeTime';
@@ -156,7 +156,7 @@ function PlanPills({
 }
 
 export default function LeadModal({
-  lead, call, siteUrl, onClose, onPatch, onDelete, onConverted, onOpenScript, startEditing,
+  lead, call, siteUrl, onClose, onPatch, onDelete, onConverted, onOpenScript, onAddToCalendar, startEditing,
 }: {
   lead: QueuedLead;
   call: DemoCall | null;
@@ -168,6 +168,8 @@ export default function LeadModal({
   onConverted?: (slug: string) => void;
   /** Opens the call script over this lead. The overlay is owned by LeadsView. */
   onOpenScript: () => void;
+  /** Navigate to /calendar with this lead's details prefilled. Board owns navigation. */
+  onAddToCalendar: () => void;
   /** Set by the board when this lead was just created by hand, so typing can start immediately. */
   startEditing?: 'businessName';
 }) {
@@ -403,6 +405,14 @@ export default function LeadModal({
                 )}
                 <button type="button" onClick={onOpenScript} className="btn btn-sm btn-accent">
                   <Phone size={13} /> Call script
+                </button>
+                <button
+                  type="button"
+                  onClick={onAddToCalendar}
+                  className="btn btn-sm"
+                  title="Schedule a meeting with this lead"
+                >
+                  <CalendarPlus size={13} /> Add to calendar
                 </button>
                 <button
                   type="button"

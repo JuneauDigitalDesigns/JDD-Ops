@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vertical Standard Templates — Home mockups (HVAC reference + 4 verticals)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800&family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   REVIEW SCAFFOLDING — tab bar + per-pane caption. Not part of any design;
+   stripped when a pane becomes a final.html.
+   ═══════════════════════════════════════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0C1218;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+
+.tabbar{position:sticky;top:0;z-index:200;background:#0C1218;border-bottom:1px solid #1D2733;
+  display:flex;gap:2px;padding:10px 16px 0;overflow-x:auto;font-family:'Inter',system-ui,sans-serif}
+.tabbar button{appearance:none;border:0;cursor:pointer;white-space:nowrap;
+  background:transparent;color:#7E8C9C;font-size:13px;font-weight:600;letter-spacing:.02em;
+  padding:11px 16px;border-radius:9px 9px 0 0;border-bottom:2px solid transparent}
+.tabbar button:hover{color:#C6D2DE;background:#131C26}
+.tabbar button[aria-selected="true"]{color:#fff;background:#18222E;border-bottom-color:#5B8FD0}
+.tabbar button .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+
+.caption{background:#0C1218;color:#9DAAB8;font-family:'Inter',system-ui,sans-serif;font-size:12.5px;
+  line-height:1.6;padding:14px 24px;border-bottom:1px solid #1D2733}
+.caption b{color:#fff}
+.caption .k{color:#5B8FD0;font-weight:700}
+.pane{display:none}
+.pane.on{display:block}
+
+/* Behaviour annotation — REVIEW SCAFFOLDING, not design. Used where the behaviour being
+   reviewed is not visible in a static homepage (a CTA's destination, a pre-filled field on
+   another page). Deliberately ugly so it can never be mistaken for part of the template. */
+.annot{display:block;margin-top:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;line-height:1.55;color:#7E8C9C;background:rgba(91,143,208,.07);
+  border:1px dashed rgba(91,143,208,.45);border-radius:5px;padding:7px 10px}
+.annot b{color:#5B8FD0;font-weight:700}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARED SKELETON — the proven local-services layout. Every pane sets its own
+   token values; the structural rules below are what all six have in common.
+   Section ORDER per pane: nav · hero · stat band · services · service area ·
+   proof · FAQ · final CTA · footer (two panes swap proof/FAQ on purpose).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.site{line-height:1.5}
+.site .wrap{max-width:var(--maxw,1120px);margin:0 auto;padding:0 24px}
+.site .sec{padding:var(--sec,84px) 0}
+.site .sec-sm{padding:var(--secsm,56px) 0}
+.site .display{font-family:var(--fd);font-weight:var(--fdw,700);letter-spacing:var(--fdt,-.01em);
+  line-height:var(--fdlh,1.06);color:var(--ink)}
+.site .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:var(--accent)}
+.site .lede{color:var(--ink-soft);font-size:17px;line-height:1.65;max-width:52ch}
+.site .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font-weight:700;font-size:16px;
+  border-radius:var(--rad-btn,10px);padding:14px 22px;transition:transform .18s ease,box-shadow .18s ease,
+  background .18s ease,border-color .18s ease,color .18s ease}
+.site .btn-primary{background:var(--accent);color:var(--accent-fg)}
+.site .btn-primary:hover{transform:translateY(-2px)}
+.site .btn-ghost{border:2px solid var(--ghost-brd,rgba(0,0,0,.18));color:var(--ink)}
+.site .btn-phone{font-family:var(--fd);font-size:21px;font-weight:var(--fdw,600);letter-spacing:.01em}
+.site svg{flex:none}
+.site h1,.site h2,.site h3{font-family:var(--fd)}
+
+/* nav — one structure, themed per pane */
+.site .nav{position:sticky;top:0;z-index:50;background:var(--nav-bg);border-bottom:1px solid var(--nav-brd);
+  backdrop-filter:blur(10px)}
+.site .nav .inner{display:flex;align-items:center;gap:28px;height:var(--nav-h,74px)}
+.site .logo{display:flex;align-items:center;gap:11px;font-family:var(--fd);font-weight:var(--fdw,600);
+  font-size:22px;color:var(--logo-c,var(--ink));letter-spacing:-.01em}
+.site .logo .mark{width:36px;height:36px;border-radius:var(--rad-mark,10px);background:var(--mark-bg);
+  color:var(--mark-fg,#fff);display:grid;place-items:center}
+.site .logo small{display:block;font-family:var(--fb);font-weight:500;font-size:11px;letter-spacing:.04em;
+  color:var(--logo-sub,var(--ink-soft));margin-top:-3px}
+.site .navlinks{display:flex;gap:4px;margin-left:10px}
+.site .navlinks a{font-size:14.5px;font-weight:600;color:var(--nav-link);padding:8px 13px;border-radius:8px}
+.site .navlinks a[aria-current]{color:var(--accent)}
+.site .navcta{margin-left:auto;display:flex;align-items:center;gap:18px}
+.site .navphone{font-family:var(--fd);font-weight:var(--fdw,600);font-size:19px;color:var(--nav-phone,var(--ink));
+  display:flex;align-items:center;gap:8px}
+.site .navphone svg{color:var(--accent)}
+@media(max-width:900px){.site .navlinks{display:none}.site .navphone span{display:none}}
+
+/* hero — shared scaffolding only; each pane re-treats it */
+.site .hero{position:relative;isolation:isolate;overflow:hidden}
+.site .hero .bgimg{position:absolute;inset:0;background-size:cover;background-position:center}
+.site .hero .scrim{position:absolute;inset:0}
+.site .hero .inner{position:relative}
+
+/* services grid */
+.site .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap,18px);margin-top:40px}
+@media(max-width:920px){.site .svc-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.site .svc-grid{grid-template-columns:1fr}}
+
+/* proof grid */
+.site .quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap,18px);margin-top:40px}
+@media(max-width:920px){.site .quotes{grid-template-columns:1fr}}
+
+/* final-CTA two-up */
+.site .cta-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+@media(max-width:860px){.site .cta-grid{grid-template-columns:1fr;gap:32px}}
+.site .cta-form label{display:block;font-size:12.5px;font-weight:600;margin:14px 0 5px}
+.site .cta-form input{width:100%;padding:12px 14px;font-size:15px;font-family:var(--fb);
+  border:1px solid var(--rule);border-radius:var(--rad-inp,10px);background:var(--bg-soft);color:var(--ink)}
+.site .cta-form input:focus{outline:none;border-color:var(--accent)}
+.site .cta-form .btn-primary{width:100%;margin-top:16px}
+
+/* footer */
+.site footer.ftr{padding:64px 0 32px}
+.site .fgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1.1fr;gap:40px}
+.site .fcol h4{font-family:var(--fb);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:14px}
+.site .fcol a,.site .fcol .ln{display:flex;align-items:flex-start;gap:9px;font-size:14.5px;padding:5px 0}
+.site .fbot{display:flex;justify-content:space-between;gap:16px;margin-top:44px;padding-top:22px;
+  border-top:1px solid var(--f-rule);font-size:13px;flex-wrap:wrap}
+@media(max-width:860px){.site .fgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:540px){.site .fgrid{grid-template-columns:1fr}}
+
+/* ─── 6 · HEALTH & WELLNESS — "calm / clinical warmth" ───────────────────────
+   Thesis: every other vertical sells urgency; this one sells CALM. So the
+   urgency devices are removed rather than restyled — no scrim-over-photo hero,
+   no emergency band, no boastful aggregate numeral. Instrument Sans, generous
+   112px sections, 24px radii, pill buttons, and HAIRLINES ONLY — not one
+   shadow on the page. The only template with no dark band above the footer.
+   NOTE: decision 46 says health reuses the trades foundation with no separate
+   research pass. This pane is the first real test of that bet.
+   ─────────────────────────────────────────────────────────────────────────── */
+#health{--maxw:1120px;--fd:'Instrument Sans',system-ui,sans-serif;--fb:'Instrument Sans',system-ui,sans-serif;
+  --fdw:700;--fdt:-.022em;--fdlh:1.08;
+  --ink:#1B2A2E;--ink-soft:#55676C;--ink-faint:#8C9DA1;--bg:#FBFAF8;--bg-soft:#EFF6F4;--bg-tint:#E2EFEB;
+  --accent:#0E9C8A;--accent-fg:#fff;--deep:#1E3A4F;--slate-teal:#16292E;--sand:#E8DCC8;
+  --rule:#DEE8E6;--f-rule:rgba(255,255,255,.12);--rad-btn:999px;--rad-mark:16px;--rad-inp:14px;
+  --nav-bg:rgba(251,250,248,.94);--nav-brd:#DEE8E6;--nav-link:#55676C;--nav-h:80px;
+  --mark-bg:linear-gradient(145deg,#19BDA7,#0E9C8A);--ghost-brd:rgba(27,42,46,.16);--sec:112px;--secsm:64px;--gap:20px;
+  font-family:var(--fb);color:var(--ink);background:var(--bg)}
+#health .band-soft{background:var(--bg-soft)}
+#health .band-tint{background:var(--bg-tint)}
+#health .eyebrow{letter-spacing:.15em}
+#health .btn{font-weight:600}
+#health .lede{font-size:17.5px;line-height:1.7}
+#health .ctr{text-align:center;max-width:58ch;margin:0 auto}
+/* hero — no photo scrim anywhere. A soft tinted ground, copy left, framed photo right. */
+#health .hero{background:linear-gradient(170deg,var(--bg-soft) 0%,var(--bg) 72%);border-bottom:1px solid var(--rule)}
+#health .hero .wrap{padding:88px 24px 96px}
+#health .hero .hgrid{display:grid;grid-template-columns:1.04fr .96fr;gap:64px;align-items:center}
+#health .hero .badge{display:inline-flex;align-items:center;gap:9px;background:var(--bg);border:1px solid var(--rule);
+  border-radius:999px;padding:8px 16px;font-size:13.5px;font-weight:600;color:var(--ink-soft)}
+#health .hero .badge .pulse{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+#health .hero h1{font-size:clamp(38px,4.8vw,56px);margin-top:22px}
+#health .hero h1 .em{color:var(--accent)}
+#health .hero p{color:var(--ink-soft);font-size:18.5px;line-height:1.7;margin-top:18px;max-width:42ch}
+#health .hero .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+#health .hero .note{display:flex;align-items:center;gap:9px;margin-top:22px;font-size:14px;color:var(--ink-faint)}
+#health .hero .frame{border-radius:28px;overflow:hidden;border:1px solid var(--rule);aspect-ratio:4/4.4}
+#health .hero .frame .img{width:100%;height:100%;background-size:cover;background-position:center;
+  background-image:url('https://picsum.photos/seed/jdd-health-hero/1000/1100')}
+@media(max-width:940px){#health .hero .hgrid{grid-template-columns:1fr;gap:40px}
+  #health .hero .frame{aspect-ratio:16/10}}
+/* stat slot — four inline reassurances, hairline-separated, no tiles or borders */
+#health .assure{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+#health .assure .c{padding:4px 28px;border-left:1px solid var(--rule)}
+#health .assure .c:first-child{border-left:0;padding-left:0}
+#health .assure .ic{color:var(--accent);margin-bottom:12px}
+#health .assure .t{font-weight:700;font-size:16px;letter-spacing:-.016em}
+#health .assure p{font-size:14px;line-height:1.6;color:var(--ink-soft);margin-top:6px}
+@media(max-width:920px){#health .assure{grid-template-columns:1fr 1fr;gap:28px 0}
+  #health .assure .c:nth-child(3){border-left:0;padding-left:0}}
+/* services — hairline-only cards, small round icon, SENTENCE-case tag (no shouting) */
+#health .svc-card{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--rule);
+  border-radius:24px;padding:30px 28px;transition:border-color .2s,background .2s}
+#health .svc-card:hover{border-color:rgba(14,156,138,.4);background:var(--bg-soft)}
+#health .svc-ic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;margin-bottom:20px;
+  background:var(--bg-tint);color:var(--accent)}
+#health .svc-card h3{font-size:19.5px;font-weight:700;letter-spacing:-.018em}
+#health .svc-card p{color:var(--ink-soft);font-size:15px;line-height:1.68;margin-top:10px}
+#health .svc-tag{margin-top:auto;padding-top:20px;font-size:13px;font-weight:600;color:var(--accent)}
+/* area — not chips. A "visit us / or don't" two-up: hours table + telehealth note. */
+#health .visit{display:grid;grid-template-columns:1fr 1fr;gap:56px}
+#health .visit h3{font-size:21px;font-weight:700;letter-spacing:-.018em}
+#health .hours{margin-top:20px;border-top:1px solid var(--rule)}
+#health .hours div{display:flex;justify-content:space-between;gap:16px;padding:13px 0;
+  border-bottom:1px solid var(--rule);font-size:15px}
+#health .hours div span:first-child{color:var(--ink-soft)}
+#health .hours div span:last-child{font-weight:600}
+#health .hours div.today span:last-child{color:var(--accent)}
+#health .where{margin-top:20px;font-size:15.5px;line-height:1.75;color:var(--ink-soft)}
+#health .where b{color:var(--ink);font-weight:600}
+#health .tele{margin-top:24px;background:var(--bg);border:1px solid var(--rule);border-radius:20px;padding:24px}
+#health .tele .t{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.016em}
+#health .tele .t svg{color:var(--accent)}
+#health .tele p{font-size:14.5px;line-height:1.68;color:var(--ink-soft);margin-top:10px}
+@media(max-width:920px){#health .visit{grid-template-columns:1fr;gap:44px}}
+/* FAQ — hairline rows, centred head */
+#health .faqrows{max-width:780px;margin:44px auto 0;border-top:1px solid var(--rule)}
+#health .faqrows details{border-bottom:1px solid var(--rule)}
+#health .faqrows summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  gap:18px;padding:24px 2px;font-weight:700;font-size:16.5px;letter-spacing:-.016em}
+#health .faqrows summary::-webkit-details-marker{display:none}
+#health .faqrows .ic{color:var(--accent);transition:transform .3s}
+#health .faqrows details[open] .ic{transform:rotate(45deg)}
+#health .faqrows .ans{padding:0 2px 26px;color:var(--ink-soft);font-size:15.5px;line-height:1.78;max-width:64ch}
+/* proof — calm. Stars and a count, no oversized score. */
+#health .rev-agg{display:inline-flex;align-items:center;gap:12px;margin-top:18px;font-size:14.5px;
+  font-weight:600;color:var(--ink-soft)}
+#health .rev-agg .st{color:#E0A838;letter-spacing:3px;font-size:17px}
+#health .qcard{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--rule);
+  border-radius:24px;padding:30px 28px}
+#health .qcard .qtext{font-size:16px;line-height:1.72;flex:1}
+#health .qcard .who{display:flex;align-items:center;gap:13px;margin-top:24px;padding-top:20px;border-top:1px solid var(--rule)}
+#health .qcard .ava{width:42px;height:42px;border-radius:50%;background:var(--bg-tint);color:var(--accent);
+  display:grid;place-items:center;font-weight:700;font-size:15px}
+#health .qcard .n{font-weight:700;font-size:14.5px}
+#health .qcard .r{font-size:13px;color:var(--ink-faint)}
+/* CTA — a soft tint band, never a dark one. White card, pill button. */
+#health .band-cta{background:var(--bg-tint)}
+#health .band-cta h2{font-size:clamp(29px,3.4vw,42px);line-height:1.08}
+#health .band-cta h2 .em{color:var(--accent)}
+#health .band-cta .fr{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:24px}
+#health .band-cta .fr span{display:flex;gap:9px;align-items:center;font-size:14.5px;font-weight:600;color:var(--ink-soft)}
+#health .band-cta .fr svg{color:var(--accent)}
+#health .cta-form{background:var(--bg);border:1px solid var(--rule);border-radius:26px;padding:32px}
+#health .cta-form .cf-head{font-size:21px;font-weight:700;letter-spacing:-.02em}
+#health .cta-form .cf-sub{font-size:14px;color:var(--ink-soft);margin-top:7px}
+#health .cta-form label{color:var(--ink-soft)}
+#health .cta-form .cf-fine{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;
+  color:var(--ink-faint);margin-top:14px;font-weight:600}
+#health footer.ftr{background:var(--slate-teal);color:#9DB0B3}
+#health footer.ftr .logo{color:#fff}
+#health .fblurb{margin-top:16px;font-size:14.5px;line-height:1.65;max-width:34ch}
+#health .fbadges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+#health .fbadge{font-size:12px;color:#9DB0B3;border:1px solid var(--f-rule);border-radius:999px;padding:6px 13px}
+#health .fcol h4{color:#7F9699}
+#health .fcol a,#health .fcol .ln{color:#C2D2D3}
+#health .fcol .ln svg{color:#4FD3BF;margin-top:3px}
+</style>
+</head>
+<body>
+
+<div class="caption" style="text-align:left">
+  <b style="color:#F6B54A">PARKED — NOT APPROVED, NOT SCHEDULED.</b>
+  This health &amp; wellness homepage was produced speculatively in the same pass as the four
+  approved vertical templates, before it was decided that health gets its own research cycle.
+  <br><br>
+  <b>Why it is parked:</b> <code>src/data/vertical-language.ts</code> records decision 46 — health
+  reuses the trades visual foundation with <i>no separate research pass</i> — and calls that
+  "an UNTESTED BET", with an explicit instruction to escalate rather than widen the type if the
+  first build looks wrong. <code>RESEARCH-local-service-visual-design.md</code> is trades-only
+  evidence. This file was that first build, so the note was escalated and the bet was NOT taken.
+  <br><br>
+  <b>Treat this as input to the research, not as a design to implement.</b> It may turn out to be
+  roughly right, or the research may reject its central assumption (that health is the trades
+  foundation minus the urgency devices). Do not register these components, do not add a health
+  entry to <code>VERTICAL_TEMPLATES</code>, and do not build from this file until
+  <code>HANDOFF-health-vertical-research.md</code> has been worked through.
+  <br><br>
+  Parked 2026-10-28 · see <code>design/HANDOFF-health-vertical-research.md</code>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PANE 6 · HEALTH & WELLNESS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="pane on" id="health">
+  <div class="caption"><b>Health &amp; Wellness — Standard</b> · thesis: <span class="k">every other vertical sells urgency; this one sells calm</span> ·
+    Instrument Sans 700 · accent <b>#0E9C8A</b> teal, warm paper <b>#FBFAF8</b> · <b>112px sections, 24px radii,
+    pill buttons, and not one shadow on the page</b> — hairlines only.
+    <br><b>Differs from HVAC:</b> the urgency devices are <b>removed, not restyled</b> — there is no
+    scrim-over-photo hero (soft tinted ground, copy left, photo in a 28px frame right), no emergency strip, and
+    the aggregate is <b>stars and a count, no oversized score</b> · the stat band becomes four inline
+    <b>reassurances</b> with no tiles or borders · service tags are <b>sentence case</b>, not shouted uppercase ·
+    the area section is replaced by a <b>"visit us / or don't"</b> two-up: an hours table beside a telehealth
+    panel, no town chips · the final CTA is a <b>soft tint band</b> — this is the only template with no dark band
+    anywhere above the footer.
+    <br><b>Flag:</b> decision 46 says health reuses the trades foundation with <i>no separate research pass</i>.
+    This pane is the first real test of that bet — if anything in the set needs its own research, it's this one.</div>
+
+  <div class="site">
+    <nav class="nav"><div class="wrap inner">
+      <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.5-7-9.5A4.5 4.5 0 0112 7a4.5 4.5 0 017 3.5c0 5-7 9.5-7 9.5z"/></svg></span>
+        <span>Still Point<small>Wellness Collective · Boulder</small></span></a>
+      <div class="navlinks"><a aria-current="page">Home</a><a>Services</a><a>About</a><a>Contact</a></div>
+      <div class="navcta">
+        <span class="navphone"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg><span>(303) 555-0151</span></span>
+        <a class="btn btn-primary" href="/contact">Book a first visit</a>
+      </div>
+    </div></nav>
+
+    <header class="hero"><div class="wrap"><div class="hgrid">
+      <div>
+        <span class="badge"><span class="pulse"></span>Accepting new clients this month</span>
+        <h1 class="display">Care that starts by <span class="em">listening.</span></h1>
+        <p>Personalised wellness support for your whole life — attentive practitioners, easy scheduling, and a
+          calm space that doesn't rush you.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="/contact">Book a first visit</a>
+          <a class="btn btn-ghost" href="tel:+13035550151"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(303) 555-0151</a>
+        </div>
+        <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+          Evening and weekend appointments · most insurance accepted</div>
+      </div>
+      <div class="frame"><div class="img"></div></div>
+    </div></div></header>
+
+    <div class="band-soft sec-sm"><div class="wrap"><div class="assure">
+      <div class="c"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l8 4v6c0 5-4 7-8 8-4-1-8-3-8-8V7z"/></svg></div>
+        <div class="t">Licensed &amp; insured</div><p>Every practitioner is fully licensed and committed to your privacy.</p></div>
+      <div class="c"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></div>
+        <div class="t">Easy scheduling</div><p>Book online in a minute, reschedule without a phone call.</p></div>
+      <div class="c"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M17 11h4M19 9v4"/></svg></div>
+        <div class="t">A team that listens</div><p>A judgment-free space where you're heard before anything is suggested.</p></div>
+      <div class="c"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+        <div class="t">Transparent pricing</div><p>Clear costs and options up front — no surprises on the bill.</p></div>
+    </div></div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="ctr">
+        <div class="eyebrow">What we offer</div>
+        <h2 class="display" style="font-size:40px;margin-top:14px">Support designed around your goals, not a template.</h2>
+        <p class="lede" style="margin:16px auto 0">From a first conversation to ongoing care, every plan starts
+          with what you actually want to feel different.</p>
+      </div>
+      <div class="svc-grid">
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+          <h3>Initial Wellness Consultation</h3><p>A relaxed, unhurried first visit to understand where you are and map out a plan together.</p><div class="svc-tag">Consultation</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 11l3 3 7-7"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h8"/></svg></div>
+          <h3>Personalised Care Plans</h3><p>Practical, step-by-step plans built around your lifestyle — things you can actually keep doing.</p><div class="svc-tag">Planning</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 12h4l3 7 4-14 3 7h4"/></svg></div>
+          <h3>Ongoing Wellness Support</h3><p>Regular check-ins to keep you on track and adjust the plan as your life changes.</p><div class="svc-tag">Support</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21s-6-4-6-9a6 6 0 0112 0c0 5-6 9-6 9z"/><circle cx="12" cy="11" r="2"/></svg></div>
+          <h3>Lifestyle &amp; Nutrition Guidance</h3><p>Everyday guidance to build habits that feel sustainable instead of punishing.</p><div class="svc-tag">Lifestyle</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M8 14c1.2 1.3 2.5 2 4 2s2.8-.7 4-2"/></svg></div>
+          <h3>Stress &amp; Recovery Sessions</h3><p>Calming, restorative sessions to help you rest properly and recharge.</p><div class="svc-tag">Recovery</div></div>
+        <div class="svc-card"><div class="svc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="5" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3z"/></svg></div>
+          <h3>Virtual &amp; In-Person Visits</h3><p>Flexible appointment options so care fits your week rather than interrupting it.</p><div class="svc-tag">Telehealth</div></div>
+      </div>
+    </div></div>
+
+    <div class="band-soft sec"><div class="wrap">
+      <div class="visit">
+        <div>
+          <div class="eyebrow">Visit us</div>
+          <h3 style="margin-top:12px">Open evenings and Saturdays.</h3>
+          <div class="hours">
+            <div><span>Monday – Thursday</span><span>8:00am – 7:00pm</span></div>
+            <div class="today"><span>Friday <b>· today</b></span><span>8:00am – 5:00pm</span></div>
+            <div><span>Saturday</span><span>9:00am – 2:00pm</span></div>
+            <div><span>Sunday</span><span>Closed</span></div>
+          </div>
+          <p class="where"><b>Still Point Wellness Collective</b><br>1480 Pearl Street, Suite 200, Boulder, CO 80302<br>
+            Free parking behind the building · on the Pearl Street bus route</p>
+        </div>
+        <div>
+          <div class="eyebrow">Or don't</div>
+          <h3 style="margin-top:12px">Care that reaches you where you are.</h3>
+          <p class="where">We see clients across Boulder, Louisville, Lafayette, Longmont, Superior, Erie, and
+            Broomfield — and virtually anywhere in Colorado.</p>
+          <div class="tele">
+            <div class="t"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3z"/></svg>Telehealth available statewide</div>
+            <p>Most consultations, planning sessions, and check-ins work just as well by video. If a visit needs
+              to be in person, we'll say so when you book — never after.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="sec"><div class="wrap">
+      <div class="ctr">
+        <div class="eyebrow">Good to know</div>
+        <h2 class="display" style="font-size:36px;margin-top:14px">Questions before a first visit</h2>
+      </div>
+      <div class="faqrows">
+        <details open><summary>What happens at a first visit?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Mostly listening. We'll talk through what brought you in, what you've already tried, and what you'd like to feel different — then agree on a first step together. Nothing is decided for you in that room.</div></details>
+        <details><summary>Do you take insurance?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">We accept most major plans and will verify your coverage before the appointment so you know the cost in advance. For anything not covered we offer transparent self-pay rates.</div></details>
+        <details><summary>How soon can I be seen?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Usually within a week, and we hold a small number of evening and Saturday slots for people who can't take time off. If you call, a person will tell you honestly what's actually open.</div></details>
+        <details><summary>Is my information private?<span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></span></summary><div class="ans">Completely. Everything you share stays between you and your practitioner, and we never share records without your written consent.</div></details>
+      </div>
+    </div></div>
+
+    <div class="band-tint sec"><div class="wrap">
+      <div class="ctr">
+        <div class="eyebrow">Client stories</div>
+        <h2 class="display" style="font-size:36px;margin-top:14px">What people say after a few months.</h2>
+        <div class="rev-agg"><span class="st">★★★★★</span>4.9 from 96 client reviews</div>
+      </div>
+      <div class="quotes">
+        <div class="qcard"><p class="qtext">I'd been to three places that handed me a printout. Here someone
+            actually asked what my week looks like, and the plan was built around that. First thing that stuck.</p>
+          <div class="who"><div class="ava">H</div><div><div class="n">Hannah W.</div><div class="r">Client · 8 months</div></div></div></div>
+        <div class="qcard"><p class="qtext">The evening appointments are the only reason this worked for me. Nobody
+            made me feel like an inconvenience for needing a 6pm slot.</p>
+          <div class="who"><div class="ava">T</div><div><div class="n">Theo M.</div><div class="r">Client · 1 year</div></div></div></div>
+        <div class="qcard"><p class="qtext">Calm is the word. The space, the pace of the appointments, the way
+            nothing was ever rushed or upsold. I leave feeling better than when I arrive.</p>
+          <div class="who"><div class="ava">R</div><div><div class="n">Renata S.</div><div class="r">Client · 5 months</div></div></div></div>
+      </div>
+    </div></div>
+
+    <div class="band-cta sec"><div class="wrap"><div class="cta-grid">
+      <div>
+        <div class="eyebrow">Accepting new clients</div>
+        <h2 class="display" style="margin-top:14px">Start with a conversation — <span class="em">no commitment.</span></h2>
+        <p class="lede" style="margin-top:16px">Leave your name and number and we'll call you back to find a time
+          that works. If we're not the right fit, we'll help you find who is.</p>
+        <div class="fr">
+          <span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg> Most insurance accepted</span>
+          <span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg> Evening &amp; Saturday slots</span>
+          <span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg> Telehealth statewide</span>
+        </div>
+      </div>
+      <div class="cta-form">
+        <div class="cf-head">Book a first visit</div>
+        <div class="cf-sub">Tell us how to reach you — we'll call you right back.</div>
+        <label>Name</label><input placeholder="Your name" />
+        <label>Phone</label><input placeholder="(303) 555-0151" />
+        <a class="btn btn-primary">Request a call back</a>
+        <div class="cf-fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0E9C8A" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg> No obligation · your details stay private</div>
+      </div>
+    </div></div></div>
+
+    <footer class="ftr"><div class="wrap">
+      <div class="fgrid">
+        <div>
+          <a class="logo"><span class="mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.5-7-9.5A4.5 4.5 0 0112 7a4.5 4.5 0 017 3.5c0 5-7 9.5-7 9.5z"/></svg></span><span>Still Point<small style="color:#7F9699">Wellness Collective · Boulder</small></span></a>
+          <p class="fblurb">Whole-person wellness care — consultations, personalised plans, and ongoing support,
+            in Boulder and by telehealth across Colorado.</p>
+          <div class="fbadges"><span class="fbadge">Licensed Practitioners</span><span class="fbadge">HIPAA Compliant</span><span class="fbadge">Insured</span></div>
+        </div>
+        <div class="fcol"><h4>Services</h4><a>Consultations</a><a>Care Plans</a><a>Ongoing Support</a><a>Telehealth</a></div>
+        <div class="fcol"><h4>Practice</h4><a>About Us</a><a>Client Stories</a><a>Hours &amp; Location</a><a>FAQ</a></div>
+        <div class="fcol"><h4>Contact</h4>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a1 1 0 00-1-1 11.4 11.4 0 01-3.6-.6 1 1 0 00-1 .2l-1.6 1.6a15 15 0 01-6.6-6.6l1.6-1.6a1 1 0 00.2-1A11.4 11.4 0 016.5 3a1 1 0 00-1-1H3a1 1 0 00-1 1 18 18 0 0018 18 1 1 0 001-1z"/></svg>(303) 555-0151</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>hello@stillpointwellness.com</span>
+          <span class="ln"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z"/></svg>1480 Pearl St, Boulder CO</span>
+        </div>
+      </div>
+      <div class="fbot"><span>© 2026 Still Point Wellness Collective. All rights reserved.</span><span>Licensed &amp; insured · CO</span></div>
+    </div></footer>
+  </div>
+</section>
+
+</body>
+</html>

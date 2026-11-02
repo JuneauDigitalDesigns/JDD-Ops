@@ -4,19 +4,26 @@
 // if the run lived in the launch component, navigating away mid-run would abort the reader
 // and orphan half-created (billable) resources with no log to show for it.
 //
-// Mount this ONCE, in RunbookShell. The stream logic below is the original LaunchPanel
+// Mount this ONCE, in OnboardWizard. The stream logic below is the original LaunchPanel
 // implementation moved unchanged — the only additions are the `running` guard exposed for
-// the beforeunload/back-nav locks.
+// the beforeunload/back-nav locks and the `receptionist` mode passed to the run.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { initRunState, reduceRun, type RunState } from './onboard-parse';
-import type { ClientContext } from './types';
+import type { ClientContext, ReceptionistMode } from './types';
 
 export interface OnboardRun {
   run: RunState | null;
   running: boolean;
   dryRun: boolean;
   setDryRun: (v: boolean) => void;
+  /**
+   * The receptionist mode the run will pass to onboard.js (`--receptionist`). Defaults to the
+   * client's stated mode; undefined when the intake predates the field — onboard.js then refuses
+   * to run until the operator sets one, so the launch UI must collect it first.
+   */
+  receptionist: ReceptionistMode | undefined;
+  setReceptionist: (m: ReceptionistMode) => void;
   launch: () => Promise<void>;
   /** Clear the last run's result (e.g. when leaving the launch screen after a failure). */
   reset: () => void;
@@ -29,6 +36,7 @@ export function useOnboardRun(
   const [dryRun, setDryRun] = useState(true);
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState<RunState | null>(null);
+  const [receptionist, setReceptionist] = useState<ReceptionistMode | undefined>(ctx.receptionistMode);
 
   // onComplete is re-created every render by the caller; hold it in a ref so `launch` stays
   // stable and a re-render mid-run can't swap the callback out from under the finally block.
@@ -57,7 +65,7 @@ export function useOnboardRun(
       const res = await fetch('/api/runbook/onboard', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug: ctx.slug, dryRun }),
+        body: JSON.stringify({ slug: ctx.slug, dryRun, receptionist }),
       });
       if (!res.body) throw new Error('No response stream.');
       const reader = res.body.getReader();
@@ -96,9 +104,9 @@ export function useOnboardRun(
       const ok = acc.onboarded && !acc.failed && (exit === 0 || exit === null);
       completeRef.current({ ok, dryRun });
     }
-  }, [ctx.slug, dryRun]);
+  }, [ctx.slug, dryRun, receptionist]);
 
   const reset = useCallback(() => setRun(null), []);
 
-  return { run, running, dryRun, setDryRun, launch, reset };
+  return { run, running, dryRun, setDryRun, receptionist, setReceptionist, launch, reset };
 }

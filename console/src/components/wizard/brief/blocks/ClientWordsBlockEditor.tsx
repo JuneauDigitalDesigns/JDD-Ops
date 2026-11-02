@@ -3,11 +3,11 @@
 import type { CopyBrief } from '@jdd/schema';
 import type { LinesBlock } from '@/lib/copy-brief/types';
 import { setBlockEnabled, setBlockOverride } from '@/lib/copy-brief/mutations';
-import { BlockHeader, TextPartEditor } from '../BlockPrimitives';
+import { BlockHeader, TextPartEditor, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
-export default function ClientWordsBlockEditor({ block, onUpdate }: { block: LinesBlock; onUpdate: Update }) {
+export default function ClientWordsBlockEditor({ block, onUpdate, variant = 'page' }: { block: LinesBlock; onUpdate: Update; variant?: BlockVariant }) {
   return (
     <div>
       <BlockHeader
@@ -15,6 +15,7 @@ export default function ClientWordsBlockEditor({ block, onUpdate }: { block: Lin
         channel={block.channel}
         enabled={block.enabled}
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, 'clientWords', v))}
+        variant={variant}
       />
       {block.lines.length === 0 ? (
         <p className="text-sm text-uiInkSoft">

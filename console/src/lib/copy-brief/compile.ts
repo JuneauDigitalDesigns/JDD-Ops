@@ -49,7 +49,8 @@ export function brandCopywriterSystem(vertical: VerticalId): string {
 
 export interface SectionCounts {
   pillars: number;
-  stats: number;
+  // NO `stats` — PLAN D4: a statistic is client-supplied only, never something the copywriter
+  // is told a count for (counting implies "write N of these").
   services: number;
   testimonials: number;
   faq: number;
@@ -74,23 +75,27 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
     case 'trust':
       return '- trust: a short label, plus logos[] ONLY for real certifications/affiliations found in the notes or details — omit logos if none are grounded.';
     case 'hero':
-      return `- hero: eyebrow, headline, headlineEmphasis (an EXACT substring of headline to accent, or omit), sub (one sentence), cta (action + outcome), secondaryCta, formLabel, trust (one credibility sentence), badge (short), frictionReducers (exactly ${counts.heroFriction} short bullets), heroBullets (exactly ${counts.heroBullets} of {value, label}).`;
+      return `- hero: eyebrow (2–4 words), headline (6–10 words, the single strongest promise on the site), headlineEmphasis (the ONE number, time indicator, or bold differentiator WITHIN the headline that earns gold/accent treatment — must be a verbatim substring of headline, e.g. "24/7" or "same day"; pick the word or phrase that would make someone stop scrolling; omit only if the headline has no single standout hook), sub (ONE sentence, ≤ 25 words), cta (action + outcome, ≤ 4 words), secondaryCta, formLabel, trust (one credibility sentence, grounded in the facts), badge (≤ 3 words), frictionReducers (exactly ${counts.heroFriction} bullets, ≤ 5 words each, each removing a different objection), heroBullets (exactly ${counts.heroBullets} of {value = a short number or figure, label = what it measures}).`;
     case 'about':
-      return `- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}, and exactly ${counts.stats} stats {n = short value, l = label}. Also write story: 3–4 paragraphs of real company background for the dedicated About page, grounded in the facts (invent no history).`;
+      // Deliberately says nothing about stats (PLAN D4) — they are not in the output schema
+      // at all, so there is nothing to instruct the model about.
+      return `- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}. Also write story: 3–4 paragraphs of real company background for the dedicated About page. Ground every sentence in the facts — do NOT invent founding dates, family history, employee counts, awards, or milestones that are not given to you. If the facts are thin, write shorter paragraphs about the work itself rather than filling space with invented history.`;
     case 'services':
-      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars, tag = short category, detail = 2–3 sentence expansion shown when the card opens on the Services page}.`;
+      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars stating what the CUSTOMER gets (an outcome, not a list of features or equipment), tag = short category, detail = 2–3 sentence expansion shown when the card opens on the Services page}. Each item's d must be distinct — no two services may share a description shape or opening phrase.`;
     case 'work':
       return '- work: eyebrow, title, sub; include projects ONLY if real projects/case studies are grounded in the notes.';
     case 'testimonials':
-      return `- testimonials: eyebrow, title, and exactly ${counts.testimonials} items {q = quote, a = "First L.", r = role, company = optional location/company, stars = 1–5}.`;
+      return counts.testimonials === 0
+        ? `- testimonials: return { eyebrow: "", title: "", items: [] } — no real customer reviews are in the provided facts, so write NOTHING invented here. Leave items empty; the section will be hidden.`
+        : `- testimonials: eyebrow, title, and exactly ${counts.testimonials} items {q = quote, a = "First L.", r = role, company = optional location/company, stars = 1–5}. Each quote must name a SPECIFIC situation and what happened — the problem, the response, the result. Generic praise is a failure: never write a quote whose main content is an adjective ("great", "amazing", "awesome", "professional", "highly recommend"). Vary length and voice between quotes so they do not read as one author.`;
     case 'faq':
-      return `- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs grounded in the facts.`;
+      return `- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs. Write the questions a real customer asks before buying, phrased the way they would phrase them. Answer each in ≤ 2 sentences, grounded strictly in the facts — if a question cannot be answered from the facts, ask a different question rather than speculating. Never state a price, a warranty length, or a response time that is not given to you.`;
     case 'finalCta':
-      return `- finalCta: eyebrow, headline, sub, cta, secondary (short "or call…" style line), frictionReducers (exactly ${counts.ctaFriction} short bullets).`;
+      return `- finalCta: eyebrow, headline, headlineEmphasis (a verbatim substring of the finalCta headline to render in gold accent — the phrase that captures the key offer, e.g. "same day" or "at no cost"; omit if no phrase clearly stands out), sub, cta, secondary (short "or call…" style line), frictionReducers (exactly ${counts.ctaFriction} short bullets).`;
     case 'footer':
       return '- footer.blurb: a 1–2 sentence company blurb.';
     case 'seo':
-      return '- seo: title, description.';
+      return '- seo: title (≤ 60 chars; lead with what the business DOES, then the business name, then the city when known — never just the business name), description (≤ 155 chars; one sentence naming the service and the area served, ending in a reason to click).';
     default:
       return null;
   }
@@ -113,7 +118,6 @@ export function subpagesInstruction(subpages: { route: string; pageType: string;
 export function countsFor(base: SiteContent): SectionCounts {
   return {
     pillars: base.about.pillars.length,
-    stats: base.about.stats.length,
     services: base.services.items.length,
     testimonials: base.testimonials.items.length,
     faq: base.faq.items.length,

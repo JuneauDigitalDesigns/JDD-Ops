@@ -32,7 +32,10 @@ export interface CopyResult {
     body: string;
     story?: string[];
     pillars: { t: string; d: string }[];
-    stats?: { n: string; l: string }[];
+    // NO stats field (PLAN D4, 2026-10-28): a statistic is a fact about the business, supplied
+    // by the client at intake, never something the copywriter originates. Removed from the
+    // model's own output schema rather than merely ignored after the fact, so the model is
+    // never even offered the option — see apply-generated.ts and compile.ts's matching removal.
   };
   services: { eyebrow: string; title: string; sub: string; items: { t: string; d: string; tag: string; detail?: string }[] };
   work: {
@@ -47,7 +50,7 @@ export interface CopyResult {
     items: { q: string; a: string; r: string; company?: string; stars?: number }[];
   };
   faq: { eyebrow: string; title: string; sub: string; items: { q: string; a: string }[] };
-  finalCta: { eyebrow: string; headline: string; sub: string; cta: string; secondary?: string; frictionReducers?: string[] };
+  finalCta: { eyebrow: string; headline: string; headlineEmphasis?: string; sub: string; cta: string; secondary?: string; frictionReducers?: string[] };
   footer: { blurb?: string };
   seo: { title: string; description: string };
   /** Per-subpage header + SEO for a multi-page site. One entry per non-home route; the route
@@ -117,7 +120,7 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
     {
       eyebrow: str, title: str, body: str, story: arr(str),
       pillars: arr(obj({ t: str, d: str }, ['t', 'd'])),
-      stats: arr(obj({ n: str, l: str }, ['n', 'l'])),
+      // stats intentionally absent — see the CopyResult.about comment above (PLAN D4).
     },
     ['eyebrow', 'title', 'body', 'pillars'],
   ),
@@ -141,7 +144,7 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
     ['eyebrow', 'title', 'sub', 'items'],
   ),
   finalCta: obj(
-    { eyebrow: str, headline: str, sub: str, cta: str, secondary: str, frictionReducers: arr(str) },
+    { eyebrow: str, headline: str, headlineEmphasis: str, sub: str, cta: str, secondary: str, frictionReducers: arr(str) },
     ['eyebrow', 'headline', 'sub', 'cta'],
   ),
   footer: obj({ blurb: str }, []),

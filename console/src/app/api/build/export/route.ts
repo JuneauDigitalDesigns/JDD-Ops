@@ -4,6 +4,7 @@ import {
   copySiteData,
   hasStubbedContactRoute,
   mergePackageJson,
+  readRepoSiteContent,
   writeOnboardRoutes,
   writeSiteContent,
   isValidSlug,
@@ -17,18 +18,21 @@ import {
   wirePages,
   collectSectionRefs,
   verifyCatalogImports,
+  verifyUiPinsFor,
   type Entry,
 } from '@/lib/export';
-import { navLinksFor, type SiteComposition } from '@/lib/pages';
+import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
+import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { materializeImages } from '@/lib/image-pipeline';
-import { VERTICAL_PRESETS, type VerticalId } from '@/lib/verticals';
+import { presetFor, type VerticalId } from '@/lib/verticals';
 import { resolveVerticalIds } from '@/lib/verticals-registry';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
 import { loadGithubToken } from '@/lib/opsSecrets';
 import { deleteDraft } from '@/lib/draft';
 import { lockedReason } from '@/lib/onboardingGate';
+import { loadProvisionedFields } from '@/lib/provisionedFields';
 
 /** npm install and next build are both legitimately slow; past this they are stuck, not slow. */
 const NPM_TIMEOUT_MS = 10 * 60_000;
@@ -155,6 +159,20 @@ export async function POST(req: Request) {
         // from preset content and, with `deploy`, push it.
         const lockedMsg = await lockedReason(slug);
         if (lockedMsg) throw new Error(lockedMsg);
+        /**
+         * Structural validation of the composition, SERVER-SIDE, before anything is written.
+         *
+         * `validateEntries` below cannot stand in for this: it checks the flattened component
+         * list against the catalog allowlist, and chrome alone fills that list with three
+         * valid entries. A composition whose pages are empty passes it cleanly — which is how
+         * a client site went live as a nav bar stacked on a footer, with every subpage route
+         * deleted by pruneStaleRoutes on the way out.
+         *
+         * `validateComposition` is the UI's own validator and it had no callers anywhere; the
+         * rules it encodes were being enforced on nobody. Throwing here puts the message on
+         * the NDJSON stream through the catch below, like any other export failure.
+         */
+        if (composition) validateComposition(composition);
         const entries = validateEntries(composition ? collectSectionRefs(composition) : selections);
         const repoRoot = resolveRepoRoot();
 
@@ -178,7 +196,56 @@ export async function POST(req: Request) {
 
         // Multi-page: the site nav becomes route links generated from the composition (Home,
         // Services, …), not the single-page anchor links. Generated routing, not client copy.
-        if (composition && content) content.nav = navLinksFor(composition);
+        if (composition && content) {
+          content.nav = navLinksFor(composition);
+
+          // The rest of the site chrome carries single-page anchors too. On a multi-page site a
+          // footer `#services`/`#about`/… link scrolls to nothing from every page that doesn't
+          // host that section — the same class of dead link the nav regeneration above fixes.
+          // Rewrite each footer link to the route that actually carries its section; refuse the
+          // export when a link points at a section on NO page, so a dead chrome link surfaces in
+          // the deploy dialog (this stream) instead of shipping silently. Runs BEFORE copyTemplate
+          // and the npm steps, so it fails fast; it only edits content.footer (not the
+          // composition or the provisioned-fields snapshot taken below).
+          if (content.footer?.cols?.length) {
+            const { cols, dangling } = remapFooterCols(content.footer, composition);
+            if (dangling.length > 0) {
+              const list = dangling.map((d) => `  • “${d.label}” (${d.href}) in footer column “${d.col}”`).join('\n');
+              throw new Error(
+                `This footer links to ${dangling.length} section${dangling.length === 1 ? '' : 's'} that ${dangling.length === 1 ? 'is' : 'are'} on no page of the site, so ${dangling.length === 1 ? 'it' : 'they'} would scroll to nothing:\n${list}\n\n` +
+                  'Add a page or section that carries that content in the Studio, or remove the link, then export again.',
+              );
+            }
+            content.footer = { ...content.footer, cols };
+          }
+        }
+
+        /**
+         * Snapshot what PROVISIONING put in this repo's site.ts, before anything overwrites it.
+         *
+         * Must happen before `copyTemplate`: `src/data/site.ts` is in TEMPLATE_OWNED_FILES, so
+         * an overwrite export (which is every deploy) reverts it to the template's placeholder
+         * on the very next statement. Read it afterwards and the provisioned values are already
+         * gone — the snapshot would be of the template, and the overlay a no-op.
+         *
+         * The field that matters is `brand.phone`/`phoneHref`. The studio's payload carries the
+         * OWNER'S number from the intake; the repo carries the published JDD Twilio number that
+         * `applyTwilioNumberToSite` wrote. Shipping the payload verbatim republishes the owner's
+         * line, and from then on every inbound caller reaches the owner directly instead of
+         * `/api/voice` — no human-first forward, no Retell fallback, no Airtable row, and
+         * nothing anywhere that reads as an error. See jdd-ops/lib/provisioned-fields.js.
+         */
+        const pf = await loadProvisionedFields();
+        const provisioned = readRepoSiteContent(repoRoot, slug, pf.extractContentObject);
+
+        /** Carry the provisioned fields onto outgoing content, reporting any override made. */
+        const preserveProvisioned = (c: SiteContent): SiteContent => {
+          const { content: merged, applied } = pf.overlayProvisionedFields(c, provisioned);
+          for (const { path, value } of applied) {
+            step(`Keeping the provisioned ${path} (${String(value)}) rather than the value from the studio.`);
+          }
+          return merged;
+        };
 
         // 1. Copy (or reuse) the template repo.
         const existed = repoExists(repoRoot, slug);
@@ -234,15 +301,37 @@ export async function POST(req: Request) {
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
-          writeSiteContent(repoRoot, slug, await materialize(withPlaceholders(resolved, vertical, step)));
-        } else if (vertical) {
           writeSiteContent(
             repoRoot,
             slug,
-            await materialize(withPlaceholders(VERTICAL_PRESETS[vertical], vertical, step)),
+            preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))),
+          );
+        } else if (vertical) {
+          /**
+           * `presetFor`, NOT the raw `VERTICAL_PRESETS[vertical]`.
+           *
+           * VERTICAL_LANGUAGES is the single palette + typography authority for the bespoke
+           * vertical templates (PLAN D12); `presetFor` composes it over the preset, and it is
+           * what the Studio sends as `content` on the branch above. Reading the raw preset here
+           * made this the one path that shipped a vertical's OLD, vestigial palette — invisible
+           * for the verticals whose preset happens to sit close to its language entry, and
+           * illegible for car-detailing, whose components are written for a dark ground while
+           * its preset palette is still a light one.
+           *
+           * Not reachable from the Studio — DeployDialog and LaunchDialog both always post
+           * `content` — so no shipped client site carried this. It is reachable by any direct
+           * API call, which is exactly how the vertical-templates-v1 R6 acceptances drove it.
+           */
+          writeSiteContent(
+            repoRoot,
+            slug,
+            preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step))),
           );
         } else {
-          copySiteData(repoRoot, slug);
+          // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
+          // other two branches — a preset's placeholder phone would otherwise overwrite a
+          // provisioned one just as readily as an edited payload's.
+          copySiteData(repoRoot, slug, preserveProvisioned);
         }
 
         // 2. Place each selected component.
@@ -256,23 +345,30 @@ export async function POST(req: Request) {
         //     console lib than the repo carries is a template problem, and saying so plainly
         //     beats making someone read a build log to work it out.
         step('Checking the components against the site’s shared libraries…');
-        const importProblems = verifyCatalogImports(repoRoot, slug, written);
-        if (importProblems.length > 0) {
+        // Two checks, because the shared libs now live in @jdd/ui behind `export *` shims and
+        // each check covers what the other structurally cannot: the symbol check reads the
+        // console's node_modules, while the repo builds against its own @jdd/ui pin.
+        const pins = verifyUiPinsFor(repoRoot, slug);
+        for (const spec of pins.uncomparable) {
+          step(`Note: “${spec}” is not a version tag, so that @jdd/ui pin could not be compared.`);
+        }
+        const libProblems = [...verifyCatalogImports(repoRoot, slug, written), ...pins.problems];
+        if (libProblems.length > 0) {
           // Two different faults wear the same symptom, and they have different fixes:
           // either the template genuinely lacks the symbol, or this repo is just carrying an
           // older copy of the shared libs (which is what `overwrite: false` preserves).
-          const stale = importProblems.every((p) => p.staleRepo);
+          const stale = libProblems.every((p) => p.staleRepo);
           send({
             type: 'error',
             message: stale
               ? 'This client’s repo is running older shared libraries than the template. Nothing was built or pushed.'
               : 'A component needs something the site template doesn’t provide — the template is out of date. Nothing was built or pushed.',
             detail:
-              importProblems.map((p) => p.message).join('\n') +
+              libProblems.map((p) => p.message).join('\n') +
               '\n\n' +
               (stale
-                ? 'Fix: export again with “overwrite” enabled — that refreshes the repo’s src/lib from template/.'
-                : 'Fix: copy the missing export(s) from console/src/lib into template/src/lib, then export again.'),
+                ? 'Fix: bump "@jdd/ui" in the client repo’s package.json to match template/package.json, then export again with “overwrite” enabled (which refreshes the repo’s src/lib from template/). package.json is not template-owned, so the export will not change the pin for you.'
+                : 'Fix: most shared libs are re-export shims of @jdd/ui — add the missing export there, tag it, and bump the "@jdd/ui" pin in both template/package.json and console/package.json. For a lib that is a real file rather than a shim, copy the missing export(s) from console/src/lib into template/src/lib. Then export again.'),
           });
           return;
         }

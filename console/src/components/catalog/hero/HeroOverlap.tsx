@@ -96,8 +96,11 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
       <div className="absolute inset-0 -z-10 bg-ink/55" />
 
       <div className="mx-auto w-full max-w-6xl px-6 py-20 lg:py-28">
+        {/* SOLID opaque card (was a frosted bg-bg/95 + backdrop-blur, which let the photo bleed
+            through and made the copy hard to read). A solid --bg surface with the brand's own
+            ink/accent text tokens is dead legible over any image. */}
         <motion.div
-          className="max-w-xl rounded-3xl border border-white/15 bg-bg/95 p-8 shadow-2xl backdrop-blur-md lg:p-10"
+          className="max-w-xl rounded-3xl border border-rule bg-bg p-8 shadow-2xl lg:p-10"
           initial={reduce ? false : { opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -109,6 +112,7 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
           )}
 
           <p className="text-sm font-semibold uppercase tracking-widest text-accent"><E p="hero.eyebrow">{hero.eyebrow}</E></p>
+          <span className="accent-bar mt-3" aria-hidden="true" />
           <h1 className="mt-3 font-heading text-4xl leading-tight text-ink md:text-5xl">
             {editing
               ? <E p="hero.headline" fit>{hero.headline}</E>

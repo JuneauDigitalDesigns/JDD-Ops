@@ -11,6 +11,13 @@ node_modules/
 !/clients/.gitkeep
 console/export/
 *.log
+# …except the dry-run recordings, which are FIXTURES rather than logs and are meant to be
+# tracked. `*.log` swallowed them silently, so the phase contract had nothing to compare
+# against on a fresh clone: every CI run failed `fixtures:dry-run:check` claiming "onboard.js's
+# phase output drifted", which sends you hunting for a code regression that does not exist.
+# They are portable by construction — scripts/record-dry-runs.js normalises the repo root,
+# timings, agent/base ids, SIDs and phone numbers out of them before writing.
+!test/fixtures/dry-run/*.log
 *.tsbuildinfo
 **/.state/
 .DS_Store

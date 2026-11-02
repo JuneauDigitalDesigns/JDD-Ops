@@ -20,13 +20,12 @@
  */
 import { getPath } from '@/lib/merge';
 import type { Section } from '@/lib/copy-schema';
-import { FACT_KEY_FOR_PATH } from './facts';
+import { COPY_FACT_PATHS, FACT_KEY_FOR_PATH } from './facts';
 import { compileChipGroup } from './resolve';
 import type {
   BriefContext,
   CopyBriefBlockId,
   CustomBlock,
-  FactsBlock,
   ForbiddenBlock,
   LinesBlock,
   OffersBlock,
@@ -38,7 +37,22 @@ import type {
   WebsiteBlock,
 } from './types';
 
-const RETURN_ONLY_JSON = 'Return ONLY a JSON object that conforms to the provided output schema. No prose, no markdown, no code fences.';
+/**
+ * The output contract.
+ *
+ * Was a single sentence ("Return ONLY a JSON object that conforms to the provided output
+ * schema. No prose, no markdown, no code fences.") which named the requirement without saying
+ * what either failure mode costs. Both are silent: an unrecognised key is dropped at import,
+ * and an omitted key falls through the merge to the vertical preset — so a model that invents
+ * a key or skips a field produces a site that looks successfully generated and is actually
+ * still showing placeholder copy. Stating the consequence is what makes the rule stick.
+ */
+const RETURN_ONLY_JSON = [
+  'Return ONLY a single valid JSON object. No prose before or after it, no markdown, no code fences, no comments, no trailing commas.',
+  'Every key you emit must be one the output schema names. Unknown keys are discarded on import without warning, so an invented key is silently lost work.',
+  'Write every field you are asked for. A field you omit falls back to generic placeholder copy from the industry preset — which ships to the client looking like real output. Omitting is worse than brief.',
+  'Write ONLY the sections you are instructed to write. Do not emit keys for sections not requested in this run; they are being handled separately and your version would overwrite theirs.',
+].join(' ');
 
 const MULTI_PAGE_RULES = 'This is a MULTI-PAGE website, not a single landing page. Copy for one page must never duplicate another page\'s wording — each page stands on its own. The About page carries the detailed company story; the Services page carries per-service detail; every non-home page has a distinct header and its own SEO title and description.';
 
@@ -108,11 +122,22 @@ function siteStructureSegment(ctx: BriefContext): PromptSegment | null {
   };
 }
 
+/**
+ * The business facts paragraph.
+ *
+ * Reads COPY_FACT_PATHS directly rather than going through a resolved `facts` block, because
+ * there is no longer a facts block to go through: the Client intake step edits every one of
+ * these paths, so a block whose only job was to render the same fields was removed rather
+ * than left in the resolved array with no UI behind it.
+ *
+ * The include/exclude capability survives as the raw persisted flag. `brief.blocks.facts` is
+ * now a settings key, not a block — the Client intake step's toggle is what writes it.
+ * Defaults to included when the key was never set, matching resolve.ts's isEnabled().
+ */
 function factsSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment | null {
-  const facts = find<FactsBlock>(blocks, 'facts');
-  if (!facts.enabled) return null;
+  if (ctx.brief.blocks.facts?.enabled === false) return null;
   const out: Record<string, unknown> = {};
-  for (const path of facts.paths) {
+  for (const path of COPY_FACT_PATHS) {
     const key = FACT_KEY_FOR_PATH[path] ?? path;
     const v = getPath(ctx.effective, path);
     const present = Array.isArray(v) ? v.length > 0 : typeof v === 'string' ? v.trim().length > 0 : v != null;
@@ -123,7 +148,7 @@ function factsSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment
   }
   if (!Object.keys(out).length) return null;
   return {
-    blockId: 'facts', label: facts.label,
+    blockId: 'facts', label: 'Business facts',
     text: `Business facts (from the client's onboarding intake / preset):\n${JSON.stringify(out, null, 2)}`,
   };
 }
@@ -144,6 +169,35 @@ function clientWordsSegment(blocks: ResolvedBlock[]): PromptSegment | null {
   return {
     blockId: 'clientWords', label: clientWords.label,
     text: `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone — follow it closely, but invent no facts beyond it:\n${joined}`,
+  };
+}
+
+/**
+ * Tells the model what to DO with the client's words and the positioning chips together.
+ *
+ * Both were already in the prompt, each introduced by its own paragraph, and the model was
+ * left to infer the relationship between them — which it gets wrong in a specific, repeatable
+ * way: it treats the chips (short, abstract, "family-owned", "same-day service") as the voice
+ * to write in, and the client's own sentences as mere facts to summarise. That inverts them.
+ * The chips describe how the business wants to be PERCEIVED; the client's sentences are the
+ * only sample of how they actually TALK, and that's what the copy has to sound like.
+ *
+ * Emitted only when both halves are present — with one side missing there is no relationship
+ * to describe, and the paragraph would be instruction without referent.
+ */
+function voiceSynthesisSegment(blocks: ResolvedBlock[]): PromptSegment | null {
+  const clientWords = find<LinesBlock>(blocks, 'clientWords');
+  const positioning = find<PositioningBlock>(blocks, 'positioning');
+  if (!clientWords.enabled || clientWords.lines.length === 0) return null;
+  if (!positioning.enabled || !positioning.groups.some((g) => compileChipGroup(g))) return null;
+  return {
+    blockId: 'clientWords',
+    label: 'Voice synthesis',
+    text: [
+      'How to combine the two inputs above: the positioning lines state how this business wants to be PERCEIVED; the owner\'s own words are the only evidence of how they actually TALK.',
+      'Write in their voice, not in the positioning\'s voice. Carry through their specific vocabulary, their level of formality, and any term they use for their own work or their customers — if they say "folks" do not write "clients", if they name a process or a product line, use their name for it.',
+      'Do not quote them verbatim and do not repeat their phrasing back as a headline; you are matching a register, not transcribing. Where their words and the positioning conflict, their words win.',
+    ].join(' '),
   };
 }
 
@@ -222,6 +276,9 @@ export function userSegments(ctx: BriefContext, blocks: ResolvedBlock[], section
     websiteSegment(blocks),
     clientWordsSegment(blocks),
     positioningSegment(blocks),
+    // After both inputs it reconciles — an instruction about how to weigh A against B is
+    // unreadable before B has been stated.
+    voiceSynthesisSegment(blocks),
     offersSegment(blocks),
     structureSegment(ctx, blocks),
     sectionsSegment(blocks, sections),

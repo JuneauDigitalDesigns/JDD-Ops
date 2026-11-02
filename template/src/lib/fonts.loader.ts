@@ -29,7 +29,7 @@
 // If a client on a real web font ever shows a swap cost worth fixing, add a targeted
 // <link rel="preload"> in layout.tsx for that one family. Do not re-enable blanket preload.
 
-import { Instrument_Sans, Schibsted_Grotesk, Bricolage_Grotesque, Figtree, Archivo }
+import { Instrument_Sans, Schibsted_Grotesk, Bricolage_Grotesque, Figtree, Archivo, Oswald, Inter }
   from 'next/font/google';
 
 // Explicit weight arrays, not 'variable': the variable axis costs materially more bytes and each
@@ -40,6 +40,9 @@ const schibsted  = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-sch
 const bricolage  = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage', weight: ['400', '800'], display: 'swap', preload: false });
 const figtree    = Figtree({ subsets: ['latin'], variable: '--font-figtree', weight: ['400', '800'], display: 'swap', preload: false });
 const archivo    = Archivo({ subsets: ['latin'], variable: '--font-archivo', weight: ['500', '800'], display: 'swap', preload: false });
+// Two-family 'oswald' pairing: condensed DISPLAY (Oswald, ships 200–700) + humanist BODY (Inter).
+const oswald     = Oswald({ subsets: ['latin'], variable: '--font-oswald', weight: ['600', '700'], display: 'swap', preload: false });
+const inter      = Inter({ subsets: ['latin'], variable: '--font-inter', weight: ['400', '600', '700'], display: 'swap', preload: false });
 
 /**
  * CSS variable name -> the next/font class that defines it.
@@ -55,6 +58,8 @@ const VAR_TO_CLASS: Record<string, string> = {
   '--font-bricolage': bricolage.variable,
   '--font-figtree': figtree.variable,
   '--font-archivo': archivo.variable,
+  '--font-oswald': oswald.variable,
+  '--font-inter': inter.variable,
 };
 
 /**

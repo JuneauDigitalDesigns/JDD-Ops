@@ -49,6 +49,11 @@ export interface PortalSignalInput {
   site: SiteInfo;
   account: PortalAccount | null;
   portalSite: PortalSite | null;
+  /**
+   * Whether this client gets the site and nothing else. Threaded in from ClientContext because
+   * the portal record carries a PLAN, and plan stopped deciding this at the 2026-10-12 reprice.
+   */
+  isWebOnly: boolean;
 }
 
 /**
@@ -60,6 +65,7 @@ export async function portalSignalFindings({
   site,
   account,
   portalSite,
+  isWebOnly,
 }: PortalSignalInput): Promise<Finding[]> {
   const findings: Finding[] = [];
   const siteSlug = site.slug;
@@ -186,9 +192,12 @@ export async function portalSignalFindings({
   // "building" means — so without this both current clients lit up red permanently, which
   // is the third time this exact mistake has been made in this engine. See the rule at the
   // top of the file.
+  // Gated on isWebOnly, not on plan: since the reprice a Starter client keeps a receptionist
+  // unless they declined one, so `plan !== 'starter'` silently excused exactly the clients most
+  // likely to have been provisioned as if they had no voice stack.
   if (
     portalSite?.status === 'live' &&
-    portalSite.plan !== 'starter' &&
+    !isWebOnly &&
     !site.env.RETELL_AGENT_ID
   ) {
     findings.push({

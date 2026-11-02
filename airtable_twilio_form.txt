@@ -1,0 +1,19 @@
+{{parseDate(1.call.start_timestamp; "x")}}
+{{1.call.call_analysis.custom_analysis_data.caller_name}}
+{{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}
+{{1.call.call_analysis.call_summary}}
+{{round(ifempty(1.call.duration_ms; 0) / 1000)}}
+{{1.call.direction}}
+{{1.call.call_analysis.custom_analysis_data.caller_email}}
+{{1.call.call_analysis.custom_analysis_data.caller_address}}
+{{1.call.recording_url}}
+{{1.call.call_analysis.custom_analysis_data.caller_priority}}
+
+
+Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}
+{{newline}}
+Status:{{1.call.call_analysis.custom_analysis_data.caller_priority}}
+{{newline}}
+Phone: {{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}
+{{newline}}
+About: {{1.call.call_analysis.call_summary}}

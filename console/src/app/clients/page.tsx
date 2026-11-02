@@ -23,7 +23,7 @@ export default function ClientsPage() {
   const { envMode, envSignals } = readOpsConfig();
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <EnvBanner envMode={envMode} envSignals={envSignals} />
+      {/* <EnvBanner envMode={envMode} envSignals={envSignals} /> */}
       <div className="onboard-chrome min-h-0 flex-1">
         <div className="dotfield" aria-hidden />
         <ClientIndex />

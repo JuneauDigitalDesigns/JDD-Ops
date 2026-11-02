@@ -298,7 +298,7 @@ export default function FlowCanvas({
                     textAnchor={label.anchor}
                     fill="var(--fg-3)"
                     style={{
-                      fontFamily: 'var(--font-dm-mono), monospace',
+                      fontFamily: 'var(--font-hanken), sans-serif',
                       // Kept narrow deliberately — these sit in the gutter between columns and
                       // must not grow wider than it. See gapFor()'s floor in layout.ts.
                       fontSize: 10,

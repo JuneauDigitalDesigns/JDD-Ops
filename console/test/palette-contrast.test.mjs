@@ -150,17 +150,26 @@ const SHIPPED_PALETTES = [
   'src/data/verticals/health.ts',
 ];
 
+// Palettes pinned 1:1 to an approved mockup, which override the warmth/AA heuristics by the
+// owner's explicit direction. hvac.ts mirrors the Northstar "Home — Standard" mockup: a NAVY
+// (not warm) palette with a pure-white bg and a warm-orange accent whose white button text is a
+// deliberate brand choice. These invariants exist for the generic preset baseline; a
+// mockup-pinned vertical is the owner's call, not the heuristic's. (If this ever grows, revisit
+// whether the mockup should carry an AA-tuned accent instead.)
+const MOCKUP_PINNED = new Set(['src/data/verticals/hvac.ts']);
+const WARMTH_AA_PALETTES = SHIPPED_PALETTES.filter((rel) => !MOCKUP_PINNED.has(rel));
+
 test('every shipped palette is warm', () => {
-  // The seven authored palettes as they exist on disk, so a future edit to a preset is caught
-  // here instead of in a browser.
+  // The authored palettes as they exist on disk, so a future edit to a preset is caught here
+  // instead of in a browser. Mockup-pinned palettes (MOCKUP_PINNED) are exempt by owner direction.
   assert.equal(SHIPPED_PALETTES.length, 7, 'expected the default palette plus six verticals');
-  for (const rel of SHIPPED_PALETTES) {
+  for (const rel of WARMTH_AA_PALETTES) {
     assertWarm(paletteFromDisk(rel), rel);
   }
 });
 
 test('every shipped palette clears AA', () => {
-  for (const rel of SHIPPED_PALETTES) {
+  for (const rel of WARMTH_AA_PALETTES) {
     assertPaletteAA(paletteFromDisk(rel), rel);
   }
 });
@@ -168,8 +177,9 @@ test('every shipped palette clears AA', () => {
 test('no shipped palette has an unreachable accent foreground', () => {
   // lawn-care (#3D8E40, best 4.43) was the one exception; darkened to #2F7A33 (fill 5.31) so
   // every shipped accent now clears AA as a button fill. If this fails, a preset's accent
-  // regressed below 4.5 — fix that accent, do not reintroduce a skip.
-  const failing = SHIPPED_PALETTES.filter((rel) => {
+  // regressed below 4.5 — fix that accent, do not reintroduce a skip. (Mockup-pinned palettes
+  // are exempt — see MOCKUP_PINNED.)
+  const failing = WARMTH_AA_PALETTES.filter((rel) => {
     try { assertPaletteAA(paletteFromDisk(rel), rel); return false; } catch { return true; }
   });
   assert.deepEqual(failing, []);

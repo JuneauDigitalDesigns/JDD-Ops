@@ -29,6 +29,7 @@ import type { Brand } from '@jdd/schema';
  */
 export type SectionStyleLike = {
   accent?: string;
+  accent2?: string;
   bg?: string;
   bgSoft?: string;
   headingWeight?: number;
@@ -52,12 +53,13 @@ export type SectionStyleLike = {
 export function sectionVars(brand: BrandLike, style?: SectionStyleLike | null): CSSProperties {
   if (!style || Object.keys(style).length === 0) return {};
   const out: Record<string, string | number> = {};
-  if (style.accent || style.bg || style.bgSoft) {
+  if (style.accent || style.accent2 || style.bg || style.bgSoft) {
     const merged: BrandLike = {
       ...brand,
       palette: {
         ...brand.palette,
         ...(style.accent ? { accent: style.accent } : {}),
+        ...(style.accent2 ? { accent2: style.accent2 } : {}),
         ...(style.bg ? { bg: style.bg } : {}),
         ...(style.bgSoft ? { bgSoft: style.bgSoft } : {}),
       },

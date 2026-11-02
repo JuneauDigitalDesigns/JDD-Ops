@@ -5,11 +5,11 @@ import type { CopyBrief } from '@jdd/schema';
 import { CaretRight, ArrowCounterClockwise } from '@phosphor-icons/react';
 import type { SectionsBlock } from '@/lib/copy-brief/types';
 import { setBlockEnabled, setBlockOverride, setTickedSections } from '@/lib/copy-brief/mutations';
-import { BlockHeader, OverrideTextarea } from '../BlockPrimitives';
+import { BlockHeader, OverrideTextarea, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
-export default function SectionsBlockEditor({ block, onUpdate }: { block: SectionsBlock; onUpdate: Update }) {
+export default function SectionsBlockEditor({ block, onUpdate, variant = 'page' }: { block: SectionsBlock; onUpdate: Update; variant?: BlockVariant }) {
   const [open, setOpen] = useState<string | null>(null);
   const tickedIds = block.entries.filter((e) => e.ticked).map((e) => e.section);
   const allTicked = block.entries.every((e) => e.ticked);
@@ -21,6 +21,7 @@ export default function SectionsBlockEditor({ block, onUpdate }: { block: Sectio
         channel={block.channel}
         enabled={block.enabled}
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, 'sections', v))}
+        variant={variant}
       />
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm text-uiInkSoft">Ticked sections get generated. Expand one to see or edit its instruction.</p>

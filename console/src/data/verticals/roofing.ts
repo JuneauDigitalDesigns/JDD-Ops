@@ -18,6 +18,7 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#475569",
+      accent2:  "#2A3647",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",
@@ -26,12 +27,12 @@ export const CONTENT: SiteContent = {
       rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "0.005em",
+      headingLineHeight: 1.0,
     },
   },
 
@@ -130,8 +131,9 @@ export const CONTENT: SiteContent = {
   },
 
   finalCta: {
-    eyebrow:  "Ready to Protect Your Home?",
-    headline: "Get Your Free Roof Inspection Today.",
+    eyebrow:          "Ready to Protect Your Home?",
+    headline:         "Get Your Free Roof Inspection Today.",
+    headlineEmphasis: null,
     sub:      "No pressure, no obligation, just an honest assessment of your roof's condition and what it will take to fix it.",
     cta:      "Get a Free Estimate",
     secondary: "Call (555) 555-0100",

@@ -11,125 +11,124 @@ function toE164(raw: string): string | null {
   return null;
 }
 
-// Turn a form field key ("firstName", "phone_number") into a readable label.
-function labelForKey(key: string): string {
-  return key
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-// Escape a value for safe interpolation into the HTML email body.
-function escapeHtml(value: unknown): string {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-// Build the owner-facing lead email (subject + text + html) from arbitrary form
-// fields. Empty/blank values are skipped. brandName is optional.
-function buildLeadEmail(data: Record<string, unknown>, brandName: string) {
-  const entries = Object.entries(data).filter(
-    ([, v]) => v !== null && v !== undefined && String(v).trim() !== '',
-  );
-  const submittedAt = new Date().toLocaleString('en-US', { timeZoneName: 'short' });
-
-  const leadName = typeof data.name === 'string' ? data.name.trim() : '';
-  const subject = `New lead${brandName ? ` — ${brandName}` : ''}${leadName ? `: ${leadName}` : ''}`;
-
-  const textLines = entries.map(([k, v]) => `${labelForKey(k)}: ${String(v).trim()}`);
-  textLines.push('', `Submitted: ${submittedAt}`);
-  const text = textLines.join('\n');
-
-  const rows = entries
-    .map(
-      ([k, v]) =>
-        `<tr>` +
-        `<td style="padding:6px 12px;color:#6b7280;font-size:13px;vertical-align:top;white-space:nowrap;">${escapeHtml(labelForKey(k))}</td>` +
-        `<td style="padding:6px 12px;color:#111827;font-size:14px;font-weight:600;">${escapeHtml(String(v).trim())}</td>` +
-        `</tr>`,
-    )
-    .join('');
-  const html =
-    `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;">` +
-    `<h2 style="font-size:18px;color:#111827;margin:0 0 4px;">New website lead${brandName ? ` — ${escapeHtml(brandName)}` : ''}</h2>` +
-    `<p style="font-size:13px;color:#6b7280;margin:0 0 16px;">Submitted ${escapeHtml(submittedAt)}</p>` +
-    `<table style="border-collapse:collapse;width:100%;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">${rows}</table>` +
-    `</div>`;
-
-  return { subject, text, html };
-}
-
 // Lead delivery. onboard.js writes these env vars (clients/{slug}/.env.local) and
 // syncs them to Vercel:
-//   - LEAD_DELIVERY_MODE = "email" (starter) | "callback" (growth/enterprise)
-//   - email mode:    LEAD_TO_EMAIL, RESEND_API_KEY, RESEND_FROM_EMAIL, LEAD_BRAND_NAME
-//   - callback mode: RETELL_API_KEY, TWILIO_NUMBER, RETELL_AGENT_ID
+//   - LEAD_DELIVERY_MODE = "portal"  (every tier)
+//   - LEAD_INGEST_URL, LEAD_INGEST_TOKEN  — where the lead is recorded, and the bearer
+//     token that identifies this site. The token is per-client; it is NOT a shared secret.
+//   - LEAD_CALLBACK = "on" | "off"   — Growth/Enterprise also dial the lead back
+//   - callback mode also needs: RETELL_API_KEY, TWILIO_NUMBER, RETELL_AGENT_ID
 // Read ONLY these names — never invent new env vars, never expose master secrets.
 //
-// The callback branch does the Retell outbound call and nothing else (no email /
-// notification). The email branch is the starter lead-delivery path, unchanged.
-export async function POST(req: Request) {
-  const data = await req.json().catch(() => ({} as Record<string, unknown>));
-  const mode = process.env.LEAD_DELIVERY_MODE ?? 'email';
+// ── Why the lead is ALWAYS recorded first ───────────────────────────────────────────────────
+// This route used to either email the owner (Starter, via Resend) or place a Retell callback
+// (Growth) — and in the callback case it persisted nothing. Two ways that lost a paying
+// customer's lead with no trace:
+//
+//   1. `create-phone-call` fails (bad number, Retell error, rate limit) → 502, nothing stored.
+//   2. It succeeds but the lead never answers → no `call_analyzed` event → the Make post-call
+//      scenario never fires → no Airtable row. The lead simply evaporates.
+//
+// So the lead is recorded before anything else, on every tier, and the callback becomes an
+// additional action rather than the only one. The portal is then the system of record and the
+// owner can act on a lead the receptionist never reached.
+//
+// Resend is gone entirely. It was the whole delivery mechanism for Starter and it failed open:
+// `RESEND_API_KEY` seeded empty on a fresh client and `syncVercelEnv` skips empty values, so the
+// key never reached Vercel and this route 502'd on every lead until someone noticed by hand.
 
-  try {
-    if (mode === 'callback') {
-      const apiKey = process.env.RETELL_API_KEY;
-      const fromNumber = process.env.TWILIO_NUMBER;
-      const agentId = process.env.RETELL_AGENT_ID;
-      const toNumber = toE164(String((data as { phone?: unknown }).phone ?? ''));
-      if (!apiKey || !fromNumber || !agentId) {
-        return NextResponse.json({ ok: false, error: 'Callback env not set' }, { status: 500 });
-      }
-      if (!toNumber) {
-        return NextResponse.json({ ok: false, error: 'Invalid phone number' }, { status: 400 });
-      }
-      const res = await fetch('https://api.retellai.com/v2/create-phone-call', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_number: fromNumber, to_number: toNumber, override_agent_id: agentId }),
-      });
-      if (!res.ok) {
-        console.error('[contact] Retell create-phone-call failed:', res.status, await res.text());
-        return NextResponse.json({ ok: false, error: 'Callback failed' }, { status: 502 });
-      }
-    } else {
-      const apiKey = process.env.RESEND_API_KEY;
-      const to = process.env.LEAD_TO_EMAIL;
-      const from = process.env.RESEND_FROM_EMAIL ?? 'leads@juneaudigitaldesigns.com';
-      const brandName = process.env.LEAD_BRAND_NAME ?? '';
-      if (!apiKey || !to) {
-        return NextResponse.json({ ok: false, error: 'Resend env not set' }, { status: 500 });
-      }
-      const { subject, text, html } = buildLeadEmail(data as Record<string, unknown>, brandName);
-      // If the lead left an email, let the owner reply straight to them.
-      const leadEmail = String((data as { email?: unknown }).email ?? '').trim();
-      const replyTo = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(leadEmail) ? leadEmail : undefined;
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to,
-          subject,
-          text,
-          html,
-          ...(replyTo ? { reply_to: replyTo } : {}),
-        }),
-      });
-      if (!res.ok) {
-        console.error('[contact] Resend send failed:', res.status, await res.text());
-        return NextResponse.json({ ok: false, error: 'Email delivery failed' }, { status: 502 });
-      }
-    }
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Delivery failed' }, { status: 500 });
+/** Record the lead in the client's portal. Returns true when it was stored. */
+async function recordLead(data: Record<string, unknown>, callbackPlaced: boolean): Promise<boolean> {
+  const url = process.env.LEAD_INGEST_URL;
+  const token = process.env.LEAD_INGEST_TOKEN;
+  if (!url || !token) {
+    console.error('[contact] LEAD_INGEST_URL/LEAD_INGEST_TOKEN not set — lead not recorded');
+    return false;
   }
+  try {
+    // The WHOLE body is forwarded, not a whitelist. That is what lets a new form field — or the
+    // consent object the lead form captures — arrive without this file changing again.
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ ...data, callbackPlaced }),
+    });
+    if (!res.ok) {
+      console.error('[contact] lead ingest failed:', res.status, (await res.text()).slice(0, 300));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[contact] lead ingest threw:', e);
+    return false;
+  }
+}
+
+/** Place the Retell callback. Returns true when Retell accepted the call. */
+async function placeCallback(toNumber: string): Promise<boolean> {
+  const apiKey = process.env.RETELL_API_KEY;
+  const fromNumber = process.env.TWILIO_NUMBER;
+  const agentId = process.env.RETELL_AGENT_ID;
+  if (!apiKey || !fromNumber || !agentId) {
+    console.error('[contact] callback env not set — skipping callback');
+    return false;
+  }
+  try {
+    const res = await fetch('https://api.retellai.com/v2/create-phone-call', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from_number: fromNumber,
+        to_number: toNumber,
+        override_agent_id: agentId,
+      }),
+    });
+    if (!res.ok) {
+      console.error('[contact] Retell create-phone-call failed:', res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[contact] Retell create-phone-call threw:', e);
+    return false;
+  }
+}
+
+export async function POST(req: Request) {
+  const data = await req.json().catch(() => ({}) as Record<string, unknown>);
+
+  const phoneRaw = String((data as { phone?: unknown }).phone ?? '');
+  const emailRaw = String((data as { email?: unknown }).email ?? '').trim();
+  const toNumber = phoneRaw ? toE164(phoneRaw) : null;
+
+  // A submission with no reachable contact is not a lead. Reject before doing any work.
+  if (!toNumber && !emailRaw) {
+    return NextResponse.json(
+      { ok: false, error: 'A phone number or email address is required' },
+      { status: 400 },
+    );
+  }
+
+  // Order matters: dial first so the lead is recorded knowing whether the callback happened.
+  // The caller is waiting on this response, and `create-phone-call` only queues the call, so
+  // the added latency is one API round trip rather than the length of a conversation.
+  let callbackPlaced = false;
+  if (process.env.LEAD_CALLBACK === 'on' && toNumber) {
+    callbackPlaced = await placeCallback(toNumber);
+  }
+
+  const stored = await recordLead(data as Record<string, unknown>, callbackPlaced);
+
+  // 502 when the lead could not be stored AND no callback went out — nothing happened, so the
+  // form must say so and show the phone number as a fallback. If the callback was placed, the
+  // client is already being contacted, so this is a success for the visitor even though we owe
+  // ourselves a log line about the ingest failure.
+  if (!stored && !callbackPlaced) {
+    return NextResponse.json({ ok: false, error: 'Delivery failed' }, { status: 502 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

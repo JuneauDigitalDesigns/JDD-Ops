@@ -172,7 +172,7 @@ export async function reconcileClient(
     // What the client themselves changed. Cheap — KV reads only, no vendor APIs — so it
     // runs on every sweep rather than sitting behind a button.
     findings.push(
-      ...(await portalSignalFindings({ slug: ctx.slug, site, account, portalSite }).catch(() => [])),
+      ...(await portalSignalFindings({ slug: ctx.slug, site, account, portalSite, isWebOnly: ctx.isWebOnly }).catch(() => [])),
     );
     if (portalSite) {
       money.push({
@@ -264,7 +264,16 @@ function expectedLive(ctx: ClientContext): boolean {
 async function reconcileSite(a: SiteSweepArgs): Promise<void> {
   const { site, findings, unreachable, probes, quiet } = a;
   const siteSlug = site.slug;
-  const isStarter = a.ctx.plan === 'starter';
+  /**
+   * The voice stack is gated on the receptionist mode, NEVER on the plan.
+   *
+   * This was `plan === 'starter'`, which stopped being true at the 2026-10-12 reprice: every
+   * tier now includes the receptionist, and what decides whether a client has one is
+   * `receptionistMode`. The stale test meant the reconcile engine silently skipped EVERY voice
+   * and Airtable check for every Starter client who kept their receptionist — the exact
+   * failure mode this engine exists to catch, hidden by the engine itself.
+   */
+  const isWebOnly = a.ctx.isWebOnly;
   const shouldBeLive = expectedLive(a.ctx);
 
   /**
@@ -438,14 +447,14 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
     );
   }
 
-  // ── Voice: Twilio + Retell + Make. Starter has none of it by design. ──────
-  if (!isStarter) {
+  // ── Voice: Twilio + Retell + Make. Web-only has none of it by design. ─────
+  if (!isWebOnly) {
     await reconcileVoice(a, siteSlug, liveHost);
   }
 
   // ── Airtable ──────────────────────────────────────────────────────────────
   const baseId = site.env.AIRTABLE_BASE_ID;
-  if (!isStarter && baseId) {
+  if (!isWebOnly && baseId) {
     const air = await probes.probeAirtableBase({
       apiKey: a.airtableApiKey,
       baseId,

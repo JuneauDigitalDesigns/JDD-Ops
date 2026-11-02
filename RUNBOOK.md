@@ -54,12 +54,21 @@ Open `.env` and fill in:
 > the Make scenario's `from_number`).
 >
 > **Inbound routing (do NOT use Retell SIP trunking / number import).** Calls hit `/api/voice`
-> first, ring `CLIENT_FORWARD_PHONE` for `CLIENT_FORWARD_RING_SECONDS` (default 25), and on
+> first, ring `CLIENT_FORWARD_PHONE` for `CLIENT_FORWARD_RING_SECONDS` (default **15**, clamped
+> to 5–20), and on
 > no-answer `/api/voice/no-answer` calls Retell `POST /v2/register-phone-call` and dials
 > `<Sip>sip:{call_id}@{RETELL_SIP_DOMAIN}</Sip>` (default `sip.retellai.com`). The client
 > `.env.local` therefore also carries `RETELL_API_KEY`, `CLIENT_FORWARD_RING_SECONDS`, and
 > `RETELL_SIP_DOMAIN`. Importing the number into Retell or configuring a Retell SIP trunk
 > bypasses `/api/voice` and breaks the human-first ring.
+>
+> This line previously said "default 25", contradicting `onboard.js`, `voice.route.ts`,
+> CLAUDE.md and the Starter handoff, which all say 15 — and that 25 propagated into the
+> console's plan-upgrade route and the Environment field's placeholder. Above ~20s the owner's
+> carrier voicemail answers the forward leg, Twilio scores the call `completed`, the no-answer
+> branch never fires, and the caller never reaches the agent. The ceiling is now enforced in
+> code (`lib/client-env.js`, `voice.route.ts`, `envFields.ts`) and pinned by
+> `test/ring-window.test.mjs`, so prose can no longer drift the behaviour.
 
 > **`TEMPLATE_REPO` is deprecated/unused.** `onboard.js` no longer clones a GitHub template.
 > Leave it blank.
@@ -248,6 +257,46 @@ checkpoint next-steps.
   deployed Vercel URL. (No voice agent, no Make scenario.)
 - **Growth / Enterprise** → continue to Part D and Part E.
 
+### C-checkpoint. Map the cloned post-call scenario (per Growth/Enterprise site)
+
+> Supersedes the shared-scenario description in A4 for the per-client path: onboard.js clones the
+> post-call master per client, but the clone inherits the master's module settings and must be
+> pointed at this client by hand before the first real call. (A4/Part D/F are stale and pending a
+> separate cleanup.)
+
+1. Make.com → open this client's cloned scenario `Post-call: <brand>`.
+2. **Airtable** module (Create a Record): set **Base** to this client's base, **Table** to `Call Log`.
+   Map each field (leave `Outcome` unmapped — nothing writes it):
+
+   | Call Log field | Expression |
+   |---|---|
+   | Date | `{{parseDate(1.call.start_timestamp; "x")}}` |
+   | Caller name | `{{1.call.call_analysis.custom_analysis_data.caller_name}}` |
+   | Caller number | `{{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}` |
+   | Summary | `{{1.call.call_analysis.call_summary}}` |
+   | Duration (seconds) | `{{round(ifempty(1.call.duration_ms; 0) / 1000)}}` |
+   | Call type | `{{1.call.direction}}` |
+   | Email | `{{1.call.call_analysis.custom_analysis_data.caller_email}}` |
+   | Address | `{{1.call.call_analysis.custom_analysis_data.caller_address}}` |
+   | Recording URL | `{{1.call.recording_url}}` |
+   | Priority | `{{1.call.call_analysis.custom_analysis_data.caller_priority}}` |
+
+3. **Twilio** module (Send a Message): set From to this client's `TWILIO_NUMBER` and To to the
+   owner's consented alert number, body:
+   ```
+   Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}
+   {{newline}}
+   Status:{{1.call.call_analysis.custom_analysis_data.caller_priority}}
+   {{newline}}
+   Phone: {{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}
+   {{newline}}
+   About: {{1.call.call_analysis.call_summary}}
+   ```
+4. Save and confirm the scenario is **Active**.
+
+Enabling SMS on the number is **automatic** — onboard.js adds each local number to the A2P
+Messaging Service pool and reads it back. There is no manual "enable SMS" step.
+
 ---
 
 ## Part D — Wire the lead-callback (per Growth/Enterprise site, Checkpoint 3)
@@ -386,9 +435,11 @@ Clerk dashboard → **Users → Create user** for the client. Set **publicMetada
   ]
   ```
 
-### E3. Invite the client
-Send them the `/portal/sign-in` link (or a Clerk invitation). Confirm the three tabs render
-with real data.
+### E3. Confirm portal sign-in (no invite step)
+The portal account is created **during onboarding** — the client signs up as part of the
+intake, and `onboard.js` step 10 creates/links the Clerk user automatically. There is no
+separate "invite the client" action. Just confirm they can sign in at `/portal/sign-in` and
+that the relevant tabs render with real data (Traffic, Performance, and — non-web-only — Calls).
 
 ---
 

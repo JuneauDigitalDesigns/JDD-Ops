@@ -35,9 +35,13 @@ export const PHASE_LABELS = {
   number: 'Phone number',
   airtable: 'Airtable base',
   callLogging: 'Call logging',
+  publishNumber: 'Publish number',
+  checks: 'Correctness checks',
   push: 'Push repo',
   vercel: 'Vercel deploy',
+  deploy: 'Preview deploy',
   portal: 'Portal',
+  testLogin: 'Portal test login',
 } as const;
 
 export type PhaseLabel = (typeof PHASE_LABELS)[keyof typeof PHASE_LABELS];
@@ -74,6 +78,10 @@ export interface RunState {
   sharedBase?: string;
   portal?: string;
   vercelProject?: string;
+  /** The preview deployment URL onboard.js reports (step 9), for the live deploy-status readout. */
+  previewUrl?: string;
+  /** The preview deployment's readyState as last seen in the log (e.g. 'building', 'ready'). */
+  deployStatus?: string;
   dryRun: boolean;
   onboarded: boolean; // saw the ONBOARDED summary — the terminal success signal
   failed?: { label: string; message: string };
@@ -88,10 +96,15 @@ export function initRunState(): RunState {
   return { phases: [], sites: [], dryRun: false, onboarded: false, log: [], _inSummary: false };
 }
 
-// step marker: `[step 3/10] msg` or enterprise `[step 8/10 site 2/3] msg`
-const STEP_RE = /^\[step (\d+)\/(\d+)(?: site (\d+)\/(\d+))?\]\s*(.*)$/;
+// step marker: `[step 3] msg`, `[step 3/10] msg` (legacy denominator), or enterprise
+// `[step 8 site 2/3] msg`. The denominator is optional — onboard.js dropped the fixed `/10`
+// (it was never accurate) but older logs may still carry it. Group indices are preserved either
+// way: [1]=N, [2]=denominator (ignored), [3]=site i, [4]=site N, [5]=message.
+const STEP_RE = /^\[step (\d+)(?:\/(\d+))?(?: site (\d+)\/(\d+))?\]\s*(.*)$/;
 const PREFLIGHT_RE = /^\[pre-flight\]\s*(.*)$/;
 const VERCEL_RE = /Sync env to Vercel project "([^"]+)"/;
+// `Preview deploy → https://… (building)` — capture the URL and the readyState onboard.js reports.
+const PREVIEW_RE = /Preview deploy → (\S+)(?:\s*\(([^)]+)\))?/;
 
 // Message → short semantic label. First match wins; order mirrors the real run.
 const PHASE_MAP: Array<{ re: RegExp; label: PhaseLabel }> = [
@@ -103,12 +116,24 @@ const PHASE_MAP: Array<{ re: RegExp; label: PhaseLabel }> = [
   { re: /npm install/i, label: PHASE_LABELS.build },
   { re: /Retell agent prompt/i, label: PHASE_LABELS.prompt },
   { re: /Create Retell AI agent/i, label: PHASE_LABELS.agent },
+  // Must stay AHEAD of /Twilio number/i. onboard.js's publish step used to read "Publish
+  // Twilio number on the site", which this map happily folded into the purchase phase — so the
+  // UI showed "Phone number" going running→done→running→done and the publish step had no node
+  // of its own. The message was renamed to "Publish number on the site"; this entry is the
+  // belt to that braces.
+  { re: /Publish number/i, label: PHASE_LABELS.publishNumber },
   { re: /Twilio number/i, label: PHASE_LABELS.number },
   { re: /Airtable base/i, label: PHASE_LABELS.airtable },
   { re: /Make scenario/i, label: PHASE_LABELS.callLogging },
+  { re: /Correctness checks/i, label: PHASE_LABELS.checks },
   { re: /Commit \+ push/i, label: PHASE_LABELS.push },
   { re: /Sync env to Vercel/i, label: PHASE_LABELS.vercel },
+  { re: /Preview deploy/i, label: PHASE_LABELS.deploy },
   { re: /Link portal account/i, label: PHASE_LABELS.portal },
+  // onboard.js has always emitted a second portal step (`log(10, 'Portal test login')`) that
+  // no entry here matched, so it fell through to labelFor's raw-message fallback and rendered
+  // as an `unplanned` node on every single run. Found by the phase-contract test.
+  { re: /Portal test login/i, label: PHASE_LABELS.testLogin },
 ];
 
 function labelFor(message: string): string {
@@ -187,7 +212,13 @@ export function reduceRun(prev: RunState, rawLine: string, at: number = Date.now
     const key = phaseKey(base, siteTag);
     const label = phaseDisplayLabel(base, siteTag);
     const vercel = message.match(VERCEL_RE)?.[1];
-    return openPhase(vercel ? { ...s, vercelProject: vercel } : s, key, label, at);
+    let next = vercel ? { ...s, vercelProject: vercel } : s;
+    const preview = message.match(PREVIEW_RE);
+    if (preview) {
+      const url = /^https?:\/\//.test(preview[1]) ? preview[1] : undefined;
+      next = { ...next, previewUrl: url ?? next.previewUrl, deployStatus: preview[2] ?? next.deployStatus };
+    }
+    return openPhase(next, key, label, at);
   }
 
   return s;

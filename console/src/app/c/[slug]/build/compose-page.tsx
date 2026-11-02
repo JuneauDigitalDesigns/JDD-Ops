@@ -14,8 +14,10 @@ import type { PageHeaderContent } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import { defaultSkin } from '@/lib/skins';
 import PageHeaderSimple from '@/components/catalog/pageHeader/PageHeaderSimple';
+import HvacPageHeader from '@/components/catalog/pageHeader/HvacPageHeader';
+import HvacNav from '@/components/catalog/nav/HvacNav';
 import type { CategoryEntry } from './categories';
-import type { PageInstance, SectionRef, SiteComposition } from '@/lib/pages';
+import { navHref, type PageInstance, type SectionRef, type SiteComposition } from '@/lib/pages';
 
 export type ComposedNode = { key: string; node: ReactNode };
 
@@ -35,9 +37,16 @@ export function renderSection(
   categories: CategoryEntry[],
   effective: SiteContent,
 ): ReactNode {
+  if (ref.name === 'HvacNav') {
+    return <HvacNav content={effective} currentPath={navHref(page.route)} />;
+  }
   if (ref.categoryId === 'pageHeader') {
     const data = effective.subpages?.[page.route]?.header ?? placeholderHeader(page.label);
-    return <PageHeaderSimple data={data} editPrefix={`subpages.${page.route}.header`} />;
+    const editPrefix = `subpages.${page.route}.header`;
+    if (ref.name === 'HvacPageHeader') {
+      return <HvacPageHeader data={data} editPrefix={editPrefix} />;
+    }
+    return <PageHeaderSimple data={data} editPrefix={editPrefix} />;
   }
   const variant = categories
     .find((c) => c.id === ref.categoryId)

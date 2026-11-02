@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  ArrowRight,
   ArrowsClockwise,
   CheckCircle,
   CurrencyDollar,
@@ -16,6 +17,7 @@ import { severityRank, type FindingArea, type Severity } from '@jdd/schema';
 import { relativeTime } from '@/lib/relativeTime';
 import { TICKET_COLOR, TICKET_LABEL } from '@/lib/ticket-meta';
 import type { BriefingPayload } from '@/app/api/briefing/route';
+import NavSlot from '@/components/NavSlot';
 import PageHeader from '@/components/shell/PageHeader';
 import RefreshButton from '@/components/shell/RefreshButton';
 import WarnBanner from '@/components/shell/WarnBanner';
@@ -284,6 +286,24 @@ export default function BriefingView() {
 
   return (
     <>
+      {/* The briefing is the console's front door, so it's the hub for cross-route navigation.
+          This strip (the per-tool bar below the navbar) carries the links that used to live only
+          on /clients. Leads and Finances are intentionally redundant with the Funnel and Money
+          panels below — the strip is wayfinding, the panels are clickable data. */}
+      <NavSlot>
+        <Link href="/leads" className="btn btn-xs">
+          Leads <ArrowRight size={12} weight="bold" />
+        </Link>
+        <Link href="/finances" className="btn btn-xs">
+          Finances <ArrowRight size={12} weight="bold" />
+        </Link>
+        <Link href="/archive" className="btn btn-xs">
+          Archive
+        </Link>
+        <Link href="/sms-consent" className="btn btn-xs">
+          SMS consent
+        </Link>
+      </NavSlot>
       <RefreshButton onClick={sweepAll} busy={sweeping} />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-6">
         <PageHeader
@@ -512,6 +532,28 @@ function RailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** "Oct" from "2026-10". Parsed as local time so the label can't slip to the previous month. */
+function monthShort(month: string): string {
+  return new Date(`${month}-01T00:00:00`).toLocaleString('en-US', { month: 'short' });
+}
+
+/** The tax reserve line: reserved against owed year to date, colored by whether the reserve is
+ *  ahead or behind — the same state colors /finances uses in its reserve panel. */
+function ReserveLine({ reserve }: { reserve: BriefingPayload['finances']['reserve'] }) {
+  const color =
+    reserve.state === 'behind' ? 'var(--danger)' : reserve.state === 'ahead' ? 'var(--ok)' : undefined;
+  return (
+    <p className="meta" style={color ? { color } : undefined}>
+      Reserve {money(reserve.reservedCents)} of {money(reserve.owedCents)} owed
+      {reserve.state === 'behind'
+        ? ` · ${money(reserve.owedCents - reserve.reservedCents)} short`
+        : reserve.state === 'ahead'
+          ? ` · ${money(reserve.reservedCents - reserve.owedCents)} ahead`
+          : ' · on track'}
+    </p>
+  );
+}
+
 function FunnelPanel({ data }: { data: BriefingPayload }) {
   return (
     <section className="panel flex flex-col gap-2 p-5">
@@ -547,7 +589,7 @@ function FunnelPanel({ data }: { data: BriefingPayload }) {
 function MoneyPanel({ data }: { data: BriefingPayload }) {
   return (
     <section className="panel flex flex-col gap-2 p-5">
-      <Link href="/clients" className="group -m-1 flex items-center gap-2 rounded-md p-1">
+      <Link href="/finances" className="group -m-1 flex items-center gap-2 rounded-md p-1">
         <CurrencyDollar size={16} />
         <h2 className="font-display text-[15px] font-semibold tracking-tightish text-fg transition-colors group-hover:text-accent">
           Money
@@ -564,6 +606,22 @@ function MoneyPanel({ data }: { data: BriefingPayload }) {
           </span>
         )}
       </Link>
+
+      {/* The /finances headline — net profit, tax to set aside, net YTD and the tax reserve —
+          so this panel is a true snapshot of the page the heading now links to, computed from
+          the same tax math. The subscription figures below (MRR, renewals) live only here. */}
+      {data.finances.configured ? (
+        <div className="flex flex-col gap-1 border-b pb-2" style={{ borderColor: 'var(--rule)' }}>
+          <RailRow label={`${monthShort(data.finances.month)} net`} value={money(data.finances.netThisMonthCents)} />
+          <RailRow label="To set aside" value={money(data.finances.setAsideThisMonthCents)} />
+          <RailRow label="Net YTD" value={money(data.finances.netYtdCents)} />
+          <ReserveLine reserve={data.finances.reserve} />
+        </div>
+      ) : (
+        <p className="meta border-b pb-2" style={{ color: 'var(--fg-3)', borderColor: 'var(--rule)' }}>
+          Finances not configured. Add STRIPE_READONLY_KEY and KV to jdd-ops/.env.
+        </p>
+      )}
 
       {data.stripe.error ? (
         <p className="meta" style={{ color: 'var(--warn)' }}>

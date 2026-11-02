@@ -18,6 +18,7 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#1E6FA8",
+      accent2:  "#1E3A5F",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",
@@ -26,12 +27,12 @@ export const CONTENT: SiteContent = {
       rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "0.005em",
+      headingLineHeight: 1.0,
     },
   },
 
@@ -130,8 +131,9 @@ export const CONTENT: SiteContent = {
   },
 
   finalCta: {
-    eyebrow:  "Plumbing Problem?",
-    headline: "Plumbing Problem? Call Now, Same Day.",
+    eyebrow:          "Plumbing Problem?",
+    headline:         "Plumbing Problem? Call Now, Same Day.",
+    headlineEmphasis: "Same Day.",
     sub:      "We're dispatching licensed plumbers across the area today. Get the price upfront, job done right, guaranteed.",
     cta:      "Book Same-Day Service",
     secondary: "Call (555) 555-0100",

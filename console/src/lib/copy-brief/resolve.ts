@@ -11,12 +11,10 @@ import { getPath } from '@/lib/merge';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
 import { countsFor, sectionInstructionLine, subpagesInstruction } from './compile';
-import { COPY_FACT_PATHS } from './facts';
 import type {
   BriefContext,
   ChipGroup,
   CustomBlock,
-  FactsBlock,
   ForbiddenBlock,
   LinesBlock,
   OffersBlock,
@@ -99,18 +97,6 @@ function resolveForbidden(ctx: BriefContext): ForbiddenBlock {
     id: 'forbidden', kind: 'forbidden', label: 'Forbidden words & claims', channel: 'system',
     enabled: isEnabled(ctx, 'forbidden'), words, freeText,
     summary: count === 0 ? 'none' : `${count} rule${count === 1 ? '' : 's'}`,
-  };
-}
-
-function resolveFacts(ctx: BriefContext): FactsBlock {
-  const filled = COPY_FACT_PATHS.filter((p) => {
-    const v = getPath(ctx.effective, p);
-    return Array.isArray(v) ? v.length > 0 : String(v ?? '').trim().length > 0;
-  }).length;
-  return {
-    id: 'facts', kind: 'facts', label: 'Business facts', channel: 'user',
-    enabled: isEnabled(ctx, 'facts'), paths: COPY_FACT_PATHS,
-    summary: `${filled} of ${COPY_FACT_PATHS.length} filled`,
   };
 }
 
@@ -207,7 +193,9 @@ function resolveStructure(ctx: BriefContext): StructureBlock {
   const entries: StructureBlock['entries'] = [
     { key: 'services', label: 'Services', count: counts.services, defaultCount: counts.services, locked: servicesLocked },
     { key: 'pillars', label: 'About pillars', count: structureOverrides.pillars ?? counts.pillars, defaultCount: ctx.vertical.structure.pillars ?? counts.pillars, locked: false },
-    { key: 'stats', label: 'Stats', count: structureOverrides.stats ?? counts.stats, defaultCount: ctx.vertical.structure.stats ?? counts.stats, locked: false },
+    // NO 'stats' entry (PLAN D4, 2026-10-28): stats are no longer in the model's output schema
+    // at all, so a count control here would be a dead, misleading slider — adjusting it would
+    // change nothing, since the copywriter is never asked to write stats.
     { key: 'testimonials', label: 'Testimonials', count: structureOverrides.testimonials ?? counts.testimonials, defaultCount: ctx.vertical.structure.testimonials ?? counts.testimonials, locked: false },
     { key: 'faq', label: 'FAQ', count: structureOverrides.faq ?? counts.faq, defaultCount: ctx.vertical.structure.faq ?? counts.faq, locked: false },
     { key: 'heroBullets', label: 'Hero bullets', count: structureOverrides.heroBullets ?? counts.heroBullets, defaultCount: ctx.vertical.structure.heroBullets ?? counts.heroBullets, locked: false },
@@ -233,7 +221,7 @@ function resolveSections(ctx: BriefContext): SectionsBlock {
     const defaultText = section === 'subpages'
       ? subpagesInstruction(subpages)
       : sectionInstructionLine(section, {
-          pillars: counts.pillars, stats: counts.stats, services: counts.services,
+          pillars: counts.pillars, services: counts.services,
           testimonials: counts.testimonials, faq: counts.faq, heroBullets: counts.heroBullets,
           heroFriction: counts.heroFriction, ctaFriction: counts.ctaFriction,
         }) ?? '';
@@ -259,11 +247,16 @@ function resolveCustom(ctx: BriefContext): CustomBlock {
   };
 }
 
+/**
+ * Note the absence of a `facts` block. The Client intake step edits COPY_FACT_PATHS directly,
+ * so a block that only re-rendered the same fields was removed rather than left here with no
+ * UI behind it. compile-brief.ts's factsSegment reads those paths itself and reads the
+ * include/exclude flag straight off `brief.blocks.facts` — which is now a settings key.
+ */
 export function resolveBrief(ctx: BriefContext): ResolvedBlock[] {
   return [
     resolveRole(ctx),
     resolveGuardrails(ctx),
-    resolveFacts(ctx),
     resolveClientWords(ctx),
     resolveWebsite(ctx),
     resolvePositioning(ctx),
@@ -296,8 +289,6 @@ export function blockStatus(block: ResolvedBlock): 'off' | 'edited' | 'default' 
       return block.part.edited ? 'edited' : 'default';
     case 'forbidden':
       return chipGroupEdited(block.words) || block.freeText.edited ? 'edited' : 'default';
-    case 'facts':
-      return 'default';
     case 'lines':
       return block.matchesClient ? 'default' : 'edited';
     case 'website':

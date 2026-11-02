@@ -50,11 +50,15 @@ export default function RunOutcomeCard({ state }: { state: RunState }) {
 
       <div className="flex flex-col gap-2 border-t border-rule pt-3">
         {state.vercelProject && <CopyRow label="Vercel project" value={state.vercelProject} />}
+        {state.previewUrl && <LinkRow label="Preview deploy" href={state.previewUrl} Icon={ArrowSquareOut} />}
         {state.sharedBase && <CopyRow label="Airtable base" value={state.sharedBase} />}
         {state.portal && <LinkRow label="Portal" href={state.portal} Icon={ArrowSquareOut} />}
       </div>
 
-      <p className="text-2xs text-fg3">Status advanced automatically. Continue with the checkpoints below.</p>
+      <p className="text-2xs text-fg3">
+        Status advanced automatically. Review the preview deploy, then promote it to production in
+        the Vercel dashboard. Continue with the checkpoints below.
+      </p>
     </div>
   );
 }

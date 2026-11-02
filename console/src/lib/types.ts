@@ -1,6 +1,10 @@
 // Shared types for the runbook console. Mirrors the shapes onboard.js reads/writes.
 
+import type { ReceptionistMode } from '@jdd/schema';
+
 export type Plan = 'starter' | 'growth' | 'enterprise';
+
+export type { ReceptionistMode };
 
 export interface SiteEnv {
   RETELL_AGENT_ID?: string;
@@ -31,6 +35,26 @@ export interface SiteInfo {
    * site.ts or no palette.
    */
   accent: string | null;
+  /**
+   * `brand.phone` from site.ts — the number the deployed site actually advertises.
+   *
+   * Deliberately distinct from `env.TWILIO_NUMBER`, which is the number JDD bought. onboard.js
+   * swaps the published number to the Twilio one only after the purchase succeeds, so the two
+   * can legitimately disagree mid-provisioning — and for a long time they disagreed
+   * permanently, which meant every real caller dialled the owner directly and bypassed
+   * `/api/voice` entirely. Carried here so the roster can distinguish "number bought" from
+   * "number published" rather than inferring the second from the first.
+   */
+  brandPhone: string | null;
+  /**
+   * Does the site actually advertise the number that was bought?
+   *
+   * Derived in clients.ts with `samePhone`, so "(407) 555-1212" and "+14075551212" count as one
+   * line. Computed there rather than in run-plan.ts because @jdd/schema declares only an
+   * `import` export condition, and a .ts module importing it cannot be loaded by the tsx test
+   * runner. This is the single field `restingPhases` reads for the publish step.
+   */
+  numberPublished: boolean;
 }
 
 export type ClientStatus =
@@ -69,6 +93,24 @@ export interface ClientContext {
   schemaPath: string; // clients/{slug}/site.ts (relative to jdd-ops root)
   hasIntake: boolean;
   sites: SiteInfo[];
+  /**
+   * The client's receptionist activation choice, read from the intake. Undefined when the schema
+   * predates the field (legacy CONTENT). The console never infers it.
+   */
+  receptionistMode?: ReceptionistMode;
+  /**
+   * Whether this client gets the site and nothing else. Mirrors onboard.js: it is the single
+   * gate for the voice stack (agent, number, Airtable, call logging), replacing the stale
+   * `plan === 'starter'` check. True only for Starter + receptionistMode 'declined'. Computed via
+   * `@jdd/schema`'s `isWebOnly`, so there is one definition of the rule across the stack.
+   */
+  isWebOnly: boolean;
+  /**
+   * False when `receptionistMode` was absent from the intake. The UI shows the full stack (never
+   * hides a paid-for service) but badges the mode "unverified", and a provisioning run must be
+   * given a `--receptionist` mode because onboard.js refuses to guess (validateIntake fails).
+   */
+  receptionistModeVerified: boolean;
   /** Non-null when this client paid but hasn't submitted the wizard yet (KV-only, no disk). */
   pendingOnboarding?: PendingOnboardingMeta | null;
   /**

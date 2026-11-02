@@ -18,6 +18,7 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#1A1A2E",
+      accent2:  "#3E5C82",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",
@@ -26,12 +27,12 @@ export const CONTENT: SiteContent = {
       rule:     "#DFD6C9",
     },
     typography: {
-      fontSans:          "var(--font-instrument), system-ui, sans-serif",
-      fontHeading:       "var(--font-instrument), system-ui, sans-serif",
-      headingWeight:     700,
+      fontSans:          "var(--font-inter), system-ui, sans-serif",
+      fontHeading:       "var(--font-oswald), system-ui, sans-serif",
+      headingWeight:     600,
       bodyWeight:        400,
-      headingTracking:   "-0.022em",
-      headingLineHeight: 1.02,
+      headingTracking:   "0.005em",
+      headingLineHeight: 1.0,
     },
   },
 
@@ -130,8 +131,9 @@ export const CONTENT: SiteContent = {
   },
 
   finalCta: {
-    eyebrow:  "Ready to Transform Your Vehicle?",
-    headline: "Book Your Detailing Session Online.",
+    eyebrow:          "Ready to Transform Your Vehicle?",
+    headline:         "Book Your Detailing Session Online.",
+    headlineEmphasis: null,
     sub:      "Select your package, choose mobile or shop service, and pick a time that works for you, all online in under two minutes.",
     cta:      "Book Online",
     secondary: "Call (555) 555-0100",

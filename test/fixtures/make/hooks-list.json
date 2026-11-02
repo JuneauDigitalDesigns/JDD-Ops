@@ -1,0 +1,217 @@
+{
+  "hooks": [
+    {
+      "id": 2332901,
+      "name": "jdd-intake-schemas",
+      "teamId": 2283785,
+      "organizationId": 7633018,
+      "udid": "REDACTED_2332901",
+      "type": "web",
+      "packageName": null,
+      "theme": "#c73a63",
+      "editable": true,
+      "flags": {},
+      "queueCount": 0,
+      "queueLimit": 50,
+      "enabled": true,
+      "gone": false,
+      "typeName": "gateway-webhook",
+      "typeAppName": null,
+      "data": {
+        "authenticationMethod": {
+          "apiKeyHeaderName": "x-make-apikey",
+          "apikey": []
+        },
+        "headers": false,
+        "method": false,
+        "stringify": false,
+        "teamId": 2283785
+      },
+      "scenarioId": null,
+      "scenarioName": null,
+      "scenarioIsActive": null,
+      "relay": null,
+      "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2332901"
+    },
+    {
+      "id": 2333080,
+      "name": "jdd-singup-events",
+      "teamId": 2283785,
+      "organizationId": 7633018,
+      "udid": "REDACTED_2333080",
+      "type": "web",
+      "packageName": null,
+      "theme": "#c73a63",
+      "editable": true,
+      "flags": {},
+      "queueCount": 0,
+      "queueLimit": 50,
+      "enabled": true,
+      "gone": false,
+      "typeName": "gateway-webhook",
+      "typeAppName": null,
+      "data": {
+        "authenticationMethod": {
+          "apiKeyHeaderName": "x-make-apikey",
+          "apikey": []
+        },
+        "headers": false,
+        "method": false,
+        "stringify": false,
+        "teamId": 2283785
+      },
+      "scenarioId": null,
+      "scenarioName": null,
+      "scenarioIsActive": null,
+      "relay": null,
+      "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2333080"
+    },
+    {
+      "id": 2333151,
+      "name": "master-orchestration",
+      "teamId": 2283785,
+      "organizationId": 7633018,
+      "udid": "REDACTED_2333151",
+      "type": "web",
+      "packageName": null,
+      "theme": "#c73a63",
+      "editable": true,
+      "flags": {},
+      "queueCount": 0,
+      "queueLimit": 50,
+      "enabled": true,
+      "gone": false,
+      "typeName": "gateway-webhook",
+      "typeAppName": null,
+      "data": {
+        "authenticationMethod": {
+          "apiKeyHeaderName": "x-make-apikey",
+          "apikey": []
+        },
+        "ip": null,
+        "udt": null,
+        "headers": false,
+        "method": false,
+        "stringify": false,
+        "teamId": 2283785
+      },
+      "scenarioId": null,
+      "scenarioName": null,
+      "scenarioIsActive": null,
+      "relay": null,
+      "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2333151"
+    },
+    {
+      "id": 2333518,
+      "name": "retell-post-call",
+      "teamId": 2283785,
+      "organizationId": 7633018,
+      "udid": "REDACTED_2333518",
+      "type": "web",
+      "packageName": null,
+      "theme": "#c73a63",
+      "editable": true,
+      "flags": {},
+      "queueCount": 0,
+      "queueLimit": 50,
+      "enabled": true,
+      "gone": false,
+      "typeName": "gateway-webhook",
+      "typeAppName": null,
+      "data": {
+        "authenticationMethod": {
+          "apiKeyHeaderName": "x-make-apikey",
+          "apikey": []
+        },
+        "ip": null,
+        "udt": null,
+        "headers": false,
+        "method": false,
+        "stringify": false,
+        "teamId": 2283785
+      },
+      "scenarioId": null,
+      "scenarioName": null,
+      "scenarioIsActive": null,
+      "relay": null,
+      "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2333518"
+    },
+    {
+      "id": 2421578,
+      "name": "e2e_growth_test_orchestration",
+      "teamId": 2283785,
+      "organizationId": 7633018,
+      "udid": "REDACTED_2421578",
+      "type": "web",
+      "packageName": null,
+      "theme": "#c73a63",
+      "editable": true,
+      "flags": {},
+      "queueCount": 0,
+      "queueLimit": 50,
+      "enabled": true,
+      "gone": false,
+      "typeName": "gateway-webhook",
+      "typeAppName": null,
+      "data": {
+        "authenticationMethod": {
+          "apiKeyHeaderName": "x-make-apikey",
+          "apikey": []
+        },
+        "ip": null,
+        "udt": null,
+        "headers": false,
+        "method": false,
+        "stringify": false,
+        "teamId": 2283785
+      },
+      "scenarioId": null,
+      "scenarioName": null,
+      "scenarioIsActive": null,
+      "relay": null,
+      "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2421578"
+    },
+    {
+      "id": 2421720,
+      "name": "e2e2_growth_test - post-call",
+      "teamId": 2283785,
+      "organizationId": 7633018,
+      "udid": "REDACTED_2421720",
+      "type": "web",
+      "packageName": null,
+      "theme": "#c73a63",
+      "editable": true,
+      "flags": {},
+      "queueCount": 0,
+      "queueLimit": 50,
+      "enabled": true,
+      "gone": false,
+      "typeName": "gateway-webhook",
+      "typeAppName": null,
+      "data": {
+        "authenticationMethod": {
+          "apiKeyHeaderName": "x-make-apikey",
+          "apikey": []
+        },
+        "ip": null,
+        "udt": null,
+        "headers": false,
+        "method": false,
+        "stringify": false,
+        "teamId": 2283785
+      },
+      "scenarioId": 5315889,
+      "scenarioName": "Post Call Webhook Master",
+      "scenarioIsActive": true,
+      "relay": null,
+      "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2421720"
+    }
+  ],
+  "pg": {
+    "sortBy": "id",
+    "limit": 50,
+    "sortDir": "asc",
+    "offset": 0,
+    "returnTotalCount": false
+  }
+}

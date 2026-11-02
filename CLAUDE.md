@@ -15,7 +15,10 @@ Two files per client:
 1. `clients/{slug}/site.ts` — the schema (brand, palette, hero, services, etc.).
    Exports `CONTENT` typed as `SiteContent`. This is the single source of truth.
 2. `clients/{slug}/.env.local` — secrets only (`RETELL_AGENT_ID`, `RETELL_API_KEY`,
-   `RETELL_SIP_DOMAIN`, `TWILIO_NUMBER`, `CLIENT_FORWARD_PHONE`,
+   `RETELL_SIP_DOMAIN`, `RETELL_LLM_ID`, `TWILIO_NUMBER`, `CLIENT_FORWARD_PHONE`,
+   `MAKE_POST_CALL_HOOK_ID` + `MAKE_POST_CALL_SCENARIO_ID` (this client's own webhook and its
+   clone — each recorded the instant it exists, so an interrupted run resumes instead of
+   creating a second one),
    `CLIENT_FORWARD_RING_SECONDS`, `AIRTABLE_BASE_ID`, `VERCEL_PROJECT_NAME`).
 
 ## Plan tiers
@@ -96,6 +99,24 @@ a client with SMS consent, the pre-flight hard-fails when the SID is unset or th
 campaign isn't approved, so we never provision a silently-textless client. The
 reconcile engine also flags any live number that isn't in the pool.
 
+**The site must advertise the Twilio number, not the owner's.** Two numbers with two jobs:
+
+| Value | Holds | Job |
+|---|---|---|
+| `brand.phone` / `brand.phoneHref` in `src/data/site.ts` | the JDD Twilio number | what the website shows and what customers dial |
+| `CLIENT_FORWARD_PHONE` in `.env.local` | the owner's real line | where `/api/voice` forwards on hop 1 |
+
+`applyTwilioNumberToSite` performs the swap after the number is purchased and before the
+commit, gated on `!isWebOnly` — **not on plan.** A Starter client with a receptionist owns a
+number and must publish it exactly like Growth. Until this existed the deployed site kept the
+intake number, so every real caller dialed the owner directly and bypassed `/api/voice`
+entirely: no human-first forward, no Retell fallback, no Airtable row. The receptionist worked
+and was simply never reached — a failure with no error anywhere to find.
+
+Order is load-bearing: `writeClientEnvLocal` runs *before* the swap so it captures the owner's
+number as the forward target. Mutate `brand.phone` any earlier and `CLIENT_FORWARD_PHONE`
+becomes the Twilio number — `/api/voice` then forwards to the number that invoked it.
+
 **Inbound call routing (two-hop):**
 1. Caller dials the Twilio number → Twilio POSTs to `/api/voice` on the client site
 2. `/api/voice` normalizes `CLIENT_FORWARD_PHONE` (brand's real phone) to E.164 and
@@ -107,6 +128,25 @@ reconcile engine also flags any live number that isn't in the pool.
    (`DialCallStatus=completed`), the no-answer branch never fires, and the caller
    lands in voicemail instead of the Retell agent. Owners whose voicemail picks up
    earlier than ~15s can still race it — the one case a short window can't cover.
+
+   **This is now enforced, not just documented.** `lib/client-env.js` owns
+   `RING_SECONDS_DEFAULT = 15` / `MIN = 5` / `MAX = 20`, and `/api/voice` clamps whatever it is
+   handed rather than applying it verbatim — env reaches production by routes other than the
+   console UI. Two copies of those numbers are unavoidable and pinned equal by
+   `test/ring-window.test.mjs`: `console/src/lib/envFields.ts` (bundled by Next, so it cannot
+   import from the ops root) and `lib/site-routes/voice.route.ts` (written verbatim into client
+   repos, which have no `@jdd/schema` dependency — the same standalone-copy exception that
+   package documents for its own inline `toE164`).
+
+   The rule used to live only in prose, and the prose disagreed: RUNBOOK.md said "default 25",
+   which propagated into the console's plan-upgrade route and into the Environment field (max
+   60, placeholder 25). Any client upgraded to Growth through `/manage` would have inherited a
+   ring window that can route callers past the receptionist. The ring-window test therefore
+   asserts the **docs** too — prose that can silently steer behaviour is part of the behaviour.
+
+   Note the clamp ships in route code, which only gets rewritten by an `onboard.js` run —
+   `npm run sync-env` pushes env, not routes. Until a client is re-run, the UI cap is its only
+   protection.
 3. If answered: normal call, done
 4. If no-answer / busy / failed: `/api/voice/no-answer` calls Retell's
    `POST https://api.retellai.com/v2/register-phone-call` API (Bearer
@@ -156,7 +196,33 @@ after.
 Base name: `{brand.name} — Calls`
 Table: `Call Log`
 Fields: Date, Caller name, Caller number, Summary, Duration (seconds),
-Call type, Outcome.
+Call type, Email, Address, Recording URL, Priority, Outcome
+(+ `Site` for enterprise).
+
+**This column list is a contract with the Make master scenario, not a preference.** Step 8c
+remaps the cloned blueprint's Airtable module by **column name** (master field id → name →
+client field id), because Airtable table and field ids are *base-scoped* — the master's
+`tbl…`/`fld…` mean nothing in a freshly created client base. A column the master writes but
+`createAirtableBase` doesn't create is silently dropped from every logged call. Run
+`npm run verify-post-call` after touching either side; it diffs them against the live master
+and runs the real `patchPostCallBlueprint`.
+
+Two gotchas worth keeping:
+
+- **`Call type` and `Priority` choices are lowercase on purpose.** The master maps
+  `{{1.call.direction}}` straight in, Retell emits `inbound`/`outbound`, and the module runs
+  with `typecast: false` — so prettier labels like `Inbound` / `Outbound callback` are
+  rejected as an invalid option and fail the **whole row**, not just that cell. `Priority` is
+  `emergency`/`callback` for the same reason.
+- **Nothing writes `Outcome`.** The master has no mapping for it; it exists for the owner to
+  set by hand while triaging, which is why it keeps human-cased labels.
+
+The per-client clone also **drops the master's `datastore:GetRecord` module**, a leftover of
+the superseded one-shared-scenario design that looked the Airtable base up per agent. Each
+clone hardcodes its own base, and no datastore record is ever written for a new agent — a
+GetRecord miss emits no bundle and halts the route before Airtable runs. Its `{{1.event}} =
+call_analyzed` filter is carried forward onto the next module, or the clone would log a row
+for `call_started` and `call_ended` too: three rows per call, two of them empty.
 
 ## Vercel env sync (step 9 / `sync-env`)
 
@@ -230,6 +296,127 @@ Resend send fails rather than silently reporting success. **The `/api/contact`,
 `/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
 (`lib/site-routes/*.ts`) and written into the repo on every run — it is not sourced
 from `template/` or the client repo.
+
+## Never wire a client to a master resource
+
+A client must own its Airtable base and its own clone of the post-call Make scenario. Sharing
+a master resource does not look broken — it looks like a working client whose calls land in
+someone else's log.
+
+`_e2e_test_growth` had exactly this: `AIRTABLE_BASE_ID` set to the master base, and its Retell
+agent's `webhook_url` pointing at the **master scenario's own hook**. So the one client that
+existed to prove the pipeline ran entirely through the master and never once exercised
+`cloneAndWirePostCall`. Five bugs in that function shipped behind it. The fixture was proving
+the master works, which was never the question.
+
+`verifyNoMasterResources` now refuses at pre-flight — before the Twilio purchase, the agent,
+the base and the clone — if any site's `AIRTABLE_BASE_ID` is the master base or its
+`RETELL_POST_CALL_WEBHOOK_URL` is the master's hook. Both are fatal because the corresponding
+create step short-circuits on an existing value and would reuse the master rather than replace
+it.
+
+A **live agent** pointing at the master hook is only a warning: when no webhook is recorded
+yet, the run will clone the master and re-point the agent at that clone, so refusing would
+block the very run that fixes it. The agent is read live because the env file can be silent
+while the agent is wired — which is precisely how the e2e fixture hid.
+
+**The master scenario is never modified.** `cloneAndWirePostCall` GETs the blueprint, clones,
+and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refresh` reporting
+`make/master-blueprint.json` and `make/scenario.json` unchanged is the proof.
+
+**A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
+attach the clone to the master's hook, which already belongs to the master, and refuses with
+`{"detail":"The hook already has a scenario assigned.","code":"IM000"}`. So step 8c creates a
+`gateway-webhook` first and passes `hook: { <masterHookId>: <newHookId> }` in the clone body.
+The new hook mirrors the master's `method`/`headers`/`stringify` (all false) because those
+decide the payload shape every `{{1.call.…}}` mapping reads from.
+
+**Legacy hooks to be aware of.** The team holds five webhooks with no scenario attached, from
+the superseded shared-scenario design. One is still referenced: `retell-post-call` (hook
+`2333518`) appears in the root `.env.local` as a global `RETELL_POST_CALL_WEBHOOK_URL` — which
+Next.js auto-loads for the console — and in `RUNBOOK.md`'s manual setup steps. Nothing is
+listening on it, so anything posting there goes nowhere. Per-client webhooks come from the
+clone now; that global is dead config, not a fallback.
+
+## Testing
+
+**Hard rule: any change to `onboard.js` or `lib/` keeps `npm test` green.** The suite exists
+because seven bugs shipped in the provisioning path and *not one of them produced an error* —
+the number looked configured, the agent looked healthy, and the call log was simply empty.
+
+```
+npm test                      # root suite — onboard.js + lib/, hermetic, ~1s
+npm run fixtures:refresh      # re-capture vendor payloads; drift shows up as a git diff
+npm run fixtures:dry-run      # re-record dry-run output for the phase contract
+cd console && npm test        # console suite (includes the phase contract)
+```
+
+### One predicate module, two callers
+
+`lib/onboard-checks.js` holds the correctness predicates. Both the test suite and
+`onboard.js --dry-run` import *the same functions*:
+
+```
+lib/onboard-checks.js    ← the single implementation
+  ├── test/*.test.mjs        runs them against recorded fixtures   (CI + pre-commit)
+  └── onboard.js --dry-run   runs them against THIS client         (operator + console UI)
+```
+
+A dry run therefore answers **"would this provision correctly?"**, not just "would it run".
+If the dry run had its own copy of the rules it could bless a client the suite would reject —
+the same mistake as a mocked test certifying a 404.
+
+`ok` is `true | false | null`. **`null` means "could not check"** (no credentials, nothing
+provisioned yet) and is never a pass. CI has no secrets, so the vendor-facing checks degrade
+to `null` there and run fully on a machine that has them.
+
+### Why fixtures are recorded, never hand-written
+
+Four of the seven bugs were wrong *beliefs about vendor APIs*. A hand-written fixture encodes
+the belief, so the test certifies the bug — a mock returning `{hooks:[{url}]}` would have made
+the `/scenarios/{id}/hooks` test pass forever while production 404s. Only a recorded response
+can contradict us. `scripts/refresh-fixtures.js` re-captures them read-only and scrubs the
+real call data Make stores in the blueprint (recording URLs, call SID, phone numbers).
+
+The Airtable side is checked differently and deliberately: `CALL_LOG_FIELDS` — the spec
+onboard.js sends to create-base — is compared against a recorded read of the live master. That
+proves what the *next* client base will look like, where a captured client base would only
+prove what one historical base looked like.
+
+### The phase contract
+
+`console/test/phase-contract.test.mjs` replays recorded dry-run stdout for all four client
+shapes through the real parser and asserts the phases match `expectedPhases()`. This is the
+guard `run-plan.ts`'s header asks for, automated. Add or reorder a `log()` call in onboard.js
+without updating `PHASE_MAP` and `expectedPhases()` and it fails.
+
+**`test/fixtures/dry-run/*.log` is tracked on purpose** — `.gitignore` carries an explicit
+negation for it, and `.gitattributes` pins it to LF. For a while `*.log` swallowed those files,
+and the cost was not that the contract broke but that it quietly stopped existing: every
+assertion in the test is guarded by `t.skip()` on a missing fixture, so it reported a clean pass
+having checked nothing. A missing recording now fails rather than skips, and the recorder says
+MISSING rather than blaming `onboard.js` for drift.
+
+**`npm run fixtures:dry-run:check` is a LOCAL guard, not a CI one.** Regenerating a dry run
+needs `.env`: without it `resolveMasterResources()` cannot run, the whole step-11 Make block is
+absent from the output, and the check summary drops from "3 passed, 1 failed, 6 not checked" to
+"2 passed, 1 failed, 7 not checked". CI has no secrets by design, so a recording made here can
+never match one regenerated there — the step failed every run regardless of the code, and has
+been removed from the workflow. Run it yourself before committing a change to `onboard.js`'s
+`log()` calls. What CI enforces is the *replay*: `phase-contract.test.mjs` parses the committed
+recordings, which needs no credentials.
+
+Check output must never contain the token `FAIL:` — `onboard-parse.ts` treats any line
+carrying it as a fatal run, which would abort the UI's narration over a soft finding.
+
+### Conventions (inherited from `console/test/`)
+
+- `node:test` + `node:assert/strict`, files named `*.test.mjs`. No test framework, and the
+  root suite needs no devDependencies at all — root code is plain ESM, so no `tsx`.
+- **Import real implementations, never mocks.**
+- **Every test encodes a bug that actually shipped**, not a hypothetical edge case.
+- A regression test that cannot fail is decoration. When adding one, break the fix and watch
+  it go red before you trust it.
 
 ## When uncertain
 

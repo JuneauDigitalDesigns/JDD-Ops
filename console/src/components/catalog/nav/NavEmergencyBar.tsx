@@ -35,6 +35,11 @@ export default function NavEmergencyBar({
   // brand + CTA bar unchanged. The links wrap below the brand/CTA at narrow widths (this variant
   // has no burger menu), so they stay reachable at 390px. See plan section 9e.
   const showLinks = nav.length > 1;
+  // Same multi-page test drives the "Book now" target: on a multi-page site `#cta` scrolls to
+  // nothing off the page that hosts the final CTA, so point it at the contact route instead; a
+  // single-page site keeps the anchor. Derived from `nav` — no console import (ships to client repos).
+  const multiPage = showLinks;
+  const ctaHref = multiPage ? (nav.find((n) => n.href === '/contact')?.href ?? '/') : '#cta';
   return (
     <header>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-accent px-6 py-2.5 text-center text-sm font-medium text-accentFg">
@@ -58,7 +63,7 @@ export default function NavEmergencyBar({
             ))}
           </div>
         )}
-        <a href="#cta" className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accentFg transition-transform hover:-translate-y-0.5">Book now</a>
+        <a href={ctaHref} className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accentFg transition-transform hover:-translate-y-0.5">Book now</a>
       </nav>
     </header>
   );

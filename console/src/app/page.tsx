@@ -1,25 +1,17 @@
-import BriefingView from '@/components/BriefingView';
+import HubView from '@/components/hub/HubView';
 
 /**
- * The console's front door is a briefing.
+ * The console's front door is a card hub.
  *
- * Three changes got it here, each removing a reason to click before you could think.
+ * It used to be the briefing — a dense triage screen you landed in before you'd decided what
+ * you came to do. Before that it was a tool picker, then a Kanban board, then the client
+ * roster; each front door organised around one job and forced that job on you at the door.
  *
- * First the root stopped being a tool picker — three cards (Build, Onboard, Manage) that
- * each then asked which client you meant, so the first thing you did every session was
- * choose the same client up to three times. The client became the thing you pick once, and
- * the tools became things you do to it inside its shell at /c/{slug}.
- *
- * Then it stopped being a Kanban board. That organised around onboarding status — a phase
- * every client passes through once and then leaves — which made it a weekly-review view,
- * not a front door. The Kanban shape moved to /leads, pointed at prospects, which is the
- * one population it actually fits.
- *
- * Now it stops being the client roster. The roster was genuinely good at "find a client and
- * open them", and it moved to /clients unchanged. What it could never do is answer the
- * question you actually arrive with — what needs doing — because it is sorted for lookup,
- * and a roster of healthy clients looks exactly like a roster nobody has checked. The
- * reconcile engine finally made that question answerable, so the front door asks it.
+ * The hub steps back from all of them: it is a starting place, one card per major section
+ * (see components/hub/HubView), so the app reads as a web you begin from and walk through.
+ * The briefing kept everything it had and moved to /briefing, reached from its own card; the
+ * roster is at /clients, the funnel at /leads, and so on. The bar's breadcrumb carries you
+ * back here (see components/shell/Breadcrumbs).
  */
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +19,7 @@ export default function Home() {
   return (
     <div className="onboard-chrome h-full overflow-y-auto">
       <div className="dotfield" aria-hidden />
-      <BriefingView />
+      <HubView />
     </div>
   );
 }

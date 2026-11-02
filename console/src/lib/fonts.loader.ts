@@ -2,7 +2,7 @@
 // Exposes a combined className of CSS-variable classes to attach to <html> so the families
 // referenced by fonts.ts stacks (var(--font-instrument), …) resolve everywhere.
 
-import { Instrument_Sans, Schibsted_Grotesk, Bricolage_Grotesque, Figtree, Archivo }
+import { Instrument_Sans, Schibsted_Grotesk, Bricolage_Grotesque, Figtree, Archivo, Oswald, Inter }
   from 'next/font/google';
 
 // Explicit weight arrays, not 'variable': loading the variable axis costs materially more bytes
@@ -14,10 +14,14 @@ const schibsted  = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-sch
 const bricolage  = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage', weight: ['400', '800'], display: 'swap' });
 const figtree    = Figtree({ subsets: ['latin'], variable: '--font-figtree', weight: ['400', '800'], display: 'swap' });
 const archivo    = Archivo({ subsets: ['latin'], variable: '--font-archivo', weight: ['500', '800'], display: 'swap' });
+// Two-family 'oswald' pairing: condensed DISPLAY (Oswald, ships 200–700) + humanist BODY (Inter).
+const oswald     = Oswald({ subsets: ['latin'], variable: '--font-oswald', weight: ['600', '700'], display: 'swap' });
+const inter      = Inter({ subsets: ['latin'], variable: '--font-inter', weight: ['400', '600', '700'], display: 'swap' });
 
 // The CONSOLE loads all five unconditionally and WITHOUT preload:false, unlike the template's
 // twin. It is the pairing picker and the preview surface, so every family has to be resolvable at
 // once and the bytes are an operator-machine cost, not a client-site cost. Do not sync the two.
 export const industryFontVars = [
   instrument.variable, schibsted.variable, bricolage.variable, figtree.variable, archivo.variable,
+  oswald.variable, inter.variable,
 ].join(' ');

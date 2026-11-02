@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowsClockwise, ArrowRight } from '@phosphor-icons/react';
+import { ArrowsClockwise } from '@phosphor-icons/react';
 import { STATUS_ORDER, type ClientContext, type OpsConfig, type Plan, type RunbookState } from '@/lib/types';
 import type { ClientHealth } from '@/lib/health';
 import { collectAttention, type AttentionItem } from '@/lib/attention';
@@ -389,21 +389,16 @@ export default function ClientIndex() {
     <div className="relative z-10 flex h-full flex-col">
       {/* The bar used to carry all four of these plus a "Clients" title. Now: the title is a
           real h1 in the page below, Refresh is an icon in the navbar's utility cluster
-          (where every route's refresh lives), and only the cross-route links are left as
-          actions. There is deliberately no "New client" button: every client starts as a
-          lead and is created by Convert on /leads. */}
+          (where every route's refresh lives), and only the roster-adjacent utilities are left
+          here. Leads and Finances moved to the briefing (/), which is the console's front door
+          and the hub for cross-route navigation. There is deliberately no "New client" button:
+          every client starts as a lead and is created by Convert on /leads. */}
       <NavSlot>
         <Link href="/archive" className="btn btn-xs">
           Archive
         </Link>
         <Link href="/sms-consent" className="btn btn-xs">
           SMS consent
-        </Link>
-        <Link href="/leads" className="btn btn-xs">
-          Leads <ArrowRight size={12} weight="bold" />
-        </Link>
-        <Link href="/finances" className="btn btn-xs">
-          Finances <ArrowRight size={12} weight="bold" />
         </Link>
       </NavSlot>
 

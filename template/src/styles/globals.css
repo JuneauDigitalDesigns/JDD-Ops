@@ -23,6 +23,10 @@
   --font-heading: -apple-system, BlinkMacSystemFont, sans-serif;
   --heading-weight: 700;
   --body-weight: 400;
+  /* Two-tone secondary accent + the accent-bar gradient. Pre-hydration / standalone fallbacks;
+     layout.tsx overrides these per client from paletteVars (which derives them from accent2). */
+  --accent-2: #2F4A63;
+  --accent-bar: linear-gradient(90deg, #6C8CAE 0%, #2F4A63 55%, #1E3346 100%);
 }
 
 body {
@@ -35,4 +39,30 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: var(--heading-weight);
+}
+
+/* The premium accent-bar motif. Reads the derived gradient (--accent-bar) from paletteVars, so
+   it recolors with the brand/section accent2 with no per-component change. Width/placement are
+   the component's job; this is the shared material. */
+.accent-bar {
+  display: block;
+  height: 4px;
+  width: 68px;
+  border-radius: 999px;
+  background: var(--accent-bar);
+}
+
+/* Hero entrance — a pure-CSS stagger (no framer-motion, so the hero stays an RSC and the LCP
+   text is never gated behind hydration). animation-fill-mode:both holds the from-state through
+   each element's delay and the to-state after; per-element delay is set inline via
+   style={{ animationDelay }}. The one case an animation never runs is reduced motion (below),
+   which falls back to the element's normal, fully-visible style — never a stranded opacity:0. */
+@keyframes hero-rise  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes hero-slide { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+@keyframes hero-bar   { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.hero-rise  { animation: hero-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.hero-slide { animation: hero-slide 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.hero-bar   { transform-origin: left center; animation: hero-bar 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise, .hero-slide, .hero-bar { animation: none; }
 }

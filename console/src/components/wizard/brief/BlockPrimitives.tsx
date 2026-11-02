@@ -19,6 +19,10 @@ import { ArrowCounterClockwise, Check } from '@phosphor-icons/react';
 import { INPUT_CLS, LABEL_CLS } from '@/components/fields';
 import type { BlockChannel } from '@/lib/copy-brief/types';
 
+/** Whether a block owns its screen (`page`) or shares one as a sub-card (`card`).
+ *  Declared by lib/intake-steps.ts's grouping, resolved by BlockGroupPane. */
+export type BlockVariant = 'page' | 'card';
+
 export function BlockHeader({
   label,
   channel,
@@ -27,6 +31,7 @@ export function BlockHeader({
   edited,
   onRevert,
   revertLabel = 'Revert to default',
+  variant = 'page',
 }: {
   label: string;
   channel: BlockChannel;
@@ -36,10 +41,28 @@ export function BlockHeader({
   edited?: boolean;
   onRevert?: () => void;
   revertLabel?: string;
+  /**
+   * `page` — this block owns the screen: large heading, rule beneath it.
+   * `card` — this block is one of several on a shared screen (Voice & rules is three), so it
+   *   sits inside its own bordered sub-card and must not restate a page-level heading. Three
+   *   `text-xl` headings each with a rule under them read as three separate pages stacked.
+   */
+  variant?: 'page' | 'card';
 }) {
+  const card = variant === 'card';
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-uiCardRule pb-4">
-      <h2 className="font-display text-xl font-semibold text-uiInk">{label}</h2>
+    <div
+      className={
+        card
+          ? 'mb-3 flex flex-wrap items-center gap-3'
+          : 'mb-4 flex flex-wrap items-center gap-3 border-b border-uiCardRule pb-4'
+      }
+    >
+      {card ? (
+        <h3 className="font-display text-base font-semibold text-uiInk">{label}</h3>
+      ) : (
+        <h2 className="font-display text-xl font-semibold text-uiInk">{label}</h2>
+      )}
       <span
         className="mono rounded-full px-2 py-0.5 text-2xs uppercase tracking-wide text-uiInkSoft"
         style={{ background: 'var(--ui-surface)' }}

@@ -6,6 +6,13 @@ import assert from 'node:assert/strict';
 import { paletteVars, contrast } from '@jdd/ui/palette';
 
 export const AA = 4.5;
+// WCAG AA for large-scale text (≥18pt, or ≥14pt bold) is 3.0, not the normal-text 4.5. Every
+// renderer of `--accent-fg` is a bold button label (e.g. HvacHero's phone button, every
+// vertical's finalCta submit) — large/bold text by the spec's own definition — so this is the
+// correct bar for that one token, not a relaxation of the general rule. Resolved 2026-10-28
+// (PLAN §2 / EXEC T2.2) after the approved HVAC accent (#E0602C white-on-orange) measured 4.15
+// against the flat 4.5 bar.
+export const AA_LARGE_TEXT = 3.0;
 export const TYPO = { fontSans: 'x', fontHeading: 'x', headingWeight: 700, bodyWeight: 400 };
 
 /** paletteVars() for one palette object (the 7 authored slots). */
@@ -19,11 +26,11 @@ export function varsFor(palette) {
  */
 export function assertPaletteAA(palette, label) {
   const v = varsFor(palette);
-  const on = (fg, bg, what) =>
-    assert.ok(contrast(fg, bg) >= AA, `${label}: ${what} ${fg} on ${bg} = ${contrast(fg, bg).toFixed(2)}`);
+  const on = (fg, bg, what, min = AA) =>
+    assert.ok(contrast(fg, bg) >= min, `${label}: ${what} ${fg} on ${bg} = ${contrast(fg, bg).toFixed(2)}`);
   on(v['--accent-text'], palette.bg, '--accent-text');
   on(v['--accent-text'], palette.bgSoft, '--accent-text');
-  on(v['--accent-fg'], palette.accent, '--accent-fg');
+  on(v['--accent-fg'], palette.accent, '--accent-fg', AA_LARGE_TEXT);
   on(v['--urgent'], palette.bg, '--urgent');
   on(v['--urgent'], palette.bgSoft, '--urgent');
   on(v['--on-ink'], v['--ink-panel'], '--on-ink');

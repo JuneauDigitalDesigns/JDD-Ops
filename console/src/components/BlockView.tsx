@@ -8,6 +8,9 @@ import { useRunbookCtx } from './RunbookContext';
 import CallRoutingFlow from './flow/CallRoutingFlow';
 import PipelineFlow from './flow/PipelineFlow';
 import PostCallFlow from './flow/PostCallFlow';
+import MakeModulePair from './onboard/MakeModulePair';
+import SiteHero from './onboard/SiteHero';
+import PromptTuner from './onboard/PromptTuner';
 
 const CALLOUT_TONE = {
   info: { color: 'var(--accent)', bg: 'var(--accent-glow)', Icon: Info },
@@ -60,6 +63,24 @@ export default function BlockView({ block }: { block: Block }) {
       const site = (block.siteSlug ? ctx.sites.find((s) => s.slug === block.siteSlug) : ctx.sites[0]) ?? ctx.sites[0];
       if (!site) return null;
       return block.kind === 'call-routing' ? <CallRoutingFlow site={site} /> : <PostCallFlow site={site} />;
+    }
+
+    case 'make-module': {
+      if (!rb) return null;
+      const site = (block.siteSlug ? rb.ctx.sites.find((s) => s.slug === block.siteSlug) : rb.ctx.sites[0]) ?? rb.ctx.sites[0];
+      return site ? <MakeModulePair ctx={rb.ctx} site={site} /> : null;
+    }
+
+    case 'site-hero': {
+      if (!rb) return null;
+      const site = (block.siteSlug ? rb.ctx.sites.find((s) => s.slug === block.siteSlug) : rb.ctx.sites[0]) ?? rb.ctx.sites[0];
+      return site ? <SiteHero site={site} /> : null;
+    }
+
+    case 'prompt-tuner': {
+      if (!rb) return null;
+      const site = (block.siteSlug ? rb.ctx.sites.find((s) => s.slug === block.siteSlug) : rb.ctx.sites[0]) ?? rb.ctx.sites[0];
+      return site ? <PromptTuner ctx={rb.ctx} site={site} /> : null;
     }
 
     case 'verify':

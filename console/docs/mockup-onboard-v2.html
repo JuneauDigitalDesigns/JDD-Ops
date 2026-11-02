@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Onboard wizard v2 — mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ───────── console tokens (mirrors console/src/app/globals.css — light only) ───────── */
+:root{
+  --bg:#f4ecd8; --bg-deep:#ddd0b3;
+  --surface:rgba(20,18,12,.04); --surface-2:rgba(20,18,12,.06);
+  --panel:#fbf5e6; --panel-2:#f0e6cd;
+  --accent:#1f6f78; --accent-2:#d2542f; --accent-ink:#f4ecd8; --on-accent-2:#f4ecd8;
+  --accent-glow:rgba(210,84,47,.28);
+  --fg:#14120c; --fg-1:#2b2820; --fg-2:#43402c; --fg-3:#7a715a;
+  --rule:rgba(20,18,12,.16); --rule-strong:rgba(20,18,12,.28); --rule-weak:rgba(20,18,12,.06);
+  --ok:#3f8f5c; --ok-glow:rgba(63,143,92,.16);
+  --warn:#c8842a; --warn-glow:rgba(200,132,42,.16);
+  --danger:#d2542f; --danger-glow:rgba(210,84,47,.16);
+  --tracking-widest:.14em;
+  --control-h:34px; --control-h-sm:28px; --radius-control:8px;
+  --font-display:'Big Shoulders Display','Hanken Grotesk',sans-serif;
+  --font-body:'Hanken Grotesk',system-ui,sans-serif;
+  --font-mono:'DM Mono',ui-monospace,monospace;
+  --airtable:#2d7ff9; --twilio:#f22f46;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:var(--font-body);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+h1,h2,h3{margin:0}
+button{font-family:inherit;cursor:pointer}
+
+/* ───────── shared utilities ───────── */
+.kicker{font-size:11.5px;font-weight:500;letter-spacing:var(--tracking-widest);text-transform:uppercase;color:var(--fg-3)}
+.meta{font-size:11px;font-weight:500;letter-spacing:.02em;color:var(--fg-3)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 4px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid var(--rule);color:var(--fg-2);background:var(--surface);white-space:nowrap}
+.badge-ok{color:var(--ok);border-color:rgba(63,143,92,.4);background:var(--ok-glow)}
+.badge-ref{color:var(--accent);border-color:rgba(31,111,120,.35);background:rgba(31,111,120,.1)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--control-h);padding:0 14px;border-radius:var(--radius-control);font-weight:500;font-size:14px;border:1px solid var(--rule-strong);background:transparent;color:var(--fg);transition:all .16s var(--ease)}
+.btn:hover:not(:disabled){background:var(--surface-2)}
+.btn:disabled{opacity:.34;cursor:default}
+.btn-primary{background:var(--accent-2);color:var(--on-accent-2);border-color:var(--accent-2);box-shadow:0 12px 40px -14px var(--accent-glow)}
+.btn-primary:hover:not(:disabled){background:var(--fg);color:var(--bg);border-color:var(--fg);transform:translateY(-1px)}
+.btn-accent{border-color:var(--accent);color:var(--accent);font-weight:500}
+.btn-accent:hover:not(:disabled){background:rgba(31,111,120,.1)}
+.btn-sm{min-height:var(--control-h-sm);padding:0 11px;font-size:13px;border-radius:7px}
+.btn-xs{min-height:26px;padding:0 9px;font-size:12.5px;border-radius:6px;gap:6px}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:14px}
+
+/* ───────── app shell ───────── */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* header: identity block REMOVED → the trail gets the full width */
+.wizhead{flex-shrink:0;border-bottom:1px solid var(--rule);padding:10px 24px;background:var(--bg)}
+.wizhead-in{margin:0 auto;max-width:1420px;display:flex;align-items:center;gap:18px}
+.trail{display:flex;align-items:center;gap:3px;flex:1;min-width:0;flex-wrap:wrap}
+.trail-group{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.trail-div{width:1px;height:13px;background:var(--rule);margin:0 5px}
+.crumb{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;border-radius:999px;padding:5px 11px;font-size:12.5px;color:var(--fg-2);white-space:nowrap;transition:background .16s var(--ease)}
+.crumb:hover:not(:disabled){background:var(--surface)}
+.crumb[aria-current]{background:var(--surface);color:var(--fg);font-weight:600}
+.crumb:disabled{color:var(--fg-3);cursor:default}
+.crumb .pip{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:999px;font-size:10px;font-weight:700;background:var(--surface-2);color:var(--fg-3);flex-shrink:0}
+.crumb[aria-current] .pip{background:rgba(31,111,120,.14);color:var(--accent);border:1px solid var(--accent)}
+.crumb.done .pip{background:var(--accent);color:var(--bg)}
+.caret{color:var(--fg-3);font-size:10px;flex-shrink:0}
+.headright{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.progwrap{display:flex;flex-direction:column;gap:4px;min-width:140px}
+.progtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.progpct{font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--accent);line-height:1}
+.progbar{height:3px;border-radius:999px;background:var(--rule);overflow:hidden}
+.progfill{height:100%;border-radius:999px;background:var(--accent);box-shadow:0 0 12px var(--accent-glow);transition:width .5s var(--ease)}
+
+/* sticky nav sub-bar — Back / Next live here now */
+.navbar{flex-shrink:0;position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;
+  padding:9px 24px;border-bottom:1px solid var(--rule);
+  background:rgba(244,236,216,.86);backdrop-filter:blur(12px)}
+.navbar-in{margin:0 auto;max-width:1420px;width:100%;display:flex;align-items:center;gap:14px}
+.navhere{flex:1;min-width:0;display:flex;align-items:center;gap:9px;justify-content:center}
+.navhere .ph{font-size:12px;color:var(--fg-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navhere .dotsep{width:3px;height:3px;border-radius:999px;background:var(--fg-3);flex-shrink:0}
+
+/* stage */
+.stage{flex:1;min-height:0;overflow-y:auto;position:relative}
+.stage::-webkit-scrollbar{width:9px}
+.stage::-webkit-scrollbar-thumb{background:var(--rule);border-radius:9px}
+.step{margin:0 auto;max-width:1420px;padding:26px 24px 80px;animation:rise .32s var(--ease)}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* step header — eyebrow gone; meta inline after the title */
+.stephead{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 14px;margin-bottom:22px}
+.stephead h1{font-family:var(--font-display);font-size:2.05rem;font-weight:600;line-height:1.08;letter-spacing:-.01em}
+.stephead .hmeta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:3px}
+
+/* content region — what the completed overlay dims */
+.content{position:relative;display:flex;flex-direction:column;gap:22px}
+.content.dimmed > .cbody{filter:blur(2.5px) saturate(.5);opacity:.3;pointer-events:none;user-select:none}
+.cbody{display:flex;flex-direction:column;gap:22px;transition:filter .3s var(--ease),opacity .3s var(--ease)}
+
+/* completed overlay */
+.doneveil{position:absolute;inset:-10px;z-index:12;display:flex;align-items:flex-start;justify-content:center;padding-top:54px;animation:fade .25s var(--ease)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.donecard{background:var(--panel);border:1px solid var(--rule-strong);border-radius:16px;padding:28px 34px;text-align:center;
+  box-shadow:0 30px 70px -28px rgba(20,18,12,.4);max-width:430px}
+.donecard .tick{width:46px;height:46px;border-radius:999px;background:var(--ok-glow);color:var(--ok);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:23px;border:1px solid rgba(63,143,92,.38)}
+.donecard h3{font-family:var(--font-display);font-size:1.5rem;font-weight:600;margin-bottom:6px}
+.donecard p{color:var(--fg-2);font-size:13.5px;margin:0 0 20px;line-height:1.55}
+.doneacts{display:flex;flex-direction:column;align-items:center;gap:11px}
+.viewthis{position:absolute;right:0;bottom:-8px;z-index:13}
+
+/* instruction list */
+.doblock{display:flex;flex-direction:column;gap:3px}
+.dohead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.dohead .rule{height:1px;flex:1;background:var(--rule)}
+.dohead .lbl{font-family:var(--font-display);font-size:1.02rem;font-weight:600;letter-spacing:.01em;text-transform:uppercase}
+ol.dolist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;counter-reset:s}
+ol.dolist li{counter-increment:s;display:flex;gap:13px;align-items:flex-start}
+ol.dolist li::before{content:counter(s);flex-shrink:0;width:23px;height:23px;border-radius:999px;background:var(--surface-2);color:var(--fg-2);
+  font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+ol.dolist .txt{font-size:14.5px;color:var(--fg-1);line-height:1.5;max-width:82ch}
+ol.dolist .sub{display:block;margin-top:3px;font-size:12.5px;color:var(--fg-3);line-height:1.5}
+
+/* callouts + verify */
+.callout{border:1px solid var(--rule);border-left-width:3px;border-radius:10px;padding:13px 16px;font-size:13.5px;line-height:1.55;color:var(--fg-1);max-width:92ch}
+.callout .ct{display:block;font-weight:700;margin-bottom:3px;font-size:13px}
+.callout.info{border-left-color:var(--accent);background:rgba(31,111,120,.07)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-glow)}
+.callout.danger{border-left-color:var(--danger);background:var(--danger-glow)}
+.verify{border:1px solid var(--rule);border-radius:12px;padding:15px 18px;background:var(--surface);max-width:92ch}
+.verify .vt{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ok);margin-bottom:9px}
+.verify ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.verify li{display:flex;gap:10px;font-size:13.5px;color:var(--fg-1);line-height:1.5}
+.verify li .chk{color:var(--ok);flex-shrink:0;font-weight:700}
+
+/* ───────── MAKE REPLICAS — faithful to Make's real UI (always light) ───────── */
+.makewrap{display:flex;flex-direction:column;gap:14px}
+.makerow{display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:0}
+@media(max-width:1180px){.makerow{grid-template-columns:1fr;gap:18px}.dottrail{transform:rotate(90deg);height:46px}}
+
+/* the dot trail: Airtable blue → Twilio red */
+.dottrail{display:flex;align-items:center;justify-content:center;gap:7px;padding:0 10px}
+.dottrail i{display:block;width:7px;height:7px;border-radius:999px;animation:pulse 2.4s var(--ease) infinite}
+.dottrail i:nth-child(1){background:#2d7ff9;animation-delay:0s}
+.dottrail i:nth-child(2){background:#5a6fc4;animation-delay:.12s}
+.dottrail i:nth-child(3){background:#874fa0;animation-delay:.24s}
+.dottrail i:nth-child(4){background:#b43f73;animation-delay:.36s}
+.dottrail i:nth-child(5){background:#f22f46;animation-delay:.48s}
+@keyframes pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+
+.makemod{position:relative;display:flex;align-items:stretch;gap:0}
+.modbadge{position:relative;flex-shrink:0;width:74px;display:flex;align-items:center;justify-content:center}
+.modbadge .halo{width:74px;height:74px;border-radius:999px;background:#eef0f3;display:flex;align-items:center;justify-content:center;position:relative}
+.modbadge .core{width:54px;height:54px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:21px}
+.modbadge .num{position:absolute;right:-1px;top:7px;background:#fff;border:1px solid #d6dae0;color:#4a5159;font-size:10px;font-weight:700;border-radius:999px;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.modbadge .cap{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:5px;text-align:center;white-space:nowrap}
+.modbadge .cap b{display:block;font-size:11px;color:#2b3137;font-weight:600}
+.modbadge .cap span{display:block;font-size:9.5px;color:#868d96}
+
+/* Make panel */
+.mkpanel{flex:1;min-width:0;background:#fff;border:1px solid #dfe3e8;border-radius:5px;
+  box-shadow:0 10px 34px -16px rgba(16,24,40,.3);display:flex;flex-direction:column;
+  font-family:'Hanken Grotesk',system-ui,sans-serif;color:#2b3137;max-height:530px}
+.mkhead{display:flex;align-items:center;justify-content:space-between;padding:13px 15px 10px;flex-shrink:0}
+.mkhead h4{font-size:16px;font-weight:600;color:#1e242b}
+.mkicons{display:flex;align-items:center;gap:13px;color:#7b838c;font-size:14px}
+.mkicons span{cursor:default;line-height:1}
+.mkunder{height:2px;margin:0 15px;flex-shrink:0;border-radius:2px}
+.mkbody{overflow-y:auto;padding:14px 15px 16px;display:flex;flex-direction:column;gap:13px;flex:1}
+.mkbody::-webkit-scrollbar{width:11px}
+.mkbody::-webkit-scrollbar-thumb{background:#c9ced4;border-radius:9px;border:3px solid #fff}
+.mkbody::-webkit-scrollbar-track{background:#f3f5f7}
+
+.mkfield{display:flex;flex-direction:column;gap:5px}
+.mkflabel{display:flex;align-items:center;gap:6px;font-size:13px;color:#2b3137}
+.mkflabel .car{color:#7b838c;font-size:9px;width:10px;display:inline-block}
+.mkflabel .req{color:#e0384c;font-weight:700}
+.mkflabel .map{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:#868d96}
+.mkswitch{width:26px;height:14px;border-radius:999px;background:#d4d9df;position:relative;flex-shrink:0}
+.mkswitch::after{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:999px;background:#fff}
+.mkctl{display:flex;align-items:center;gap:7px}
+.mkselect{flex:1;min-width:0;border:1px solid #d0d5db;border-radius:3px;background:#fff;padding:7px 10px;font-size:13px;color:#2b3137;
+  display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mkselect .cv{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkselect .cv.ph{color:#9aa1a9}
+.mkselect .arrow{color:#7b838c;font-size:9px;flex-shrink:0}
+.mkadd{border:1px solid #d0d5db;border-radius:3px;background:#fff;font-size:13px;padding:7px 14px;color:#2b3137}
+.mkhelp{font-size:11.5px;color:#868d96;line-height:1.45}
+.mkhelp a{color:#2d7ff9;text-decoration:none}
+.mkhelp .ic{margin-right:5px}
+.mkrefresh{font-size:11.5px;color:#2d7ff9;margin-left:auto;display:flex;align-items:center;gap:4px}
+.mkgroup{font-size:13px;color:#2b3137;display:flex;align-items:center;gap:6px;margin-top:2px}
+.mkgroup .car{color:#7b838c;font-size:9px}
+.mkindent{padding-left:15px;display:flex;flex-direction:column;gap:13px}
+
+/* value boxes — click to copy */
+.mkval{border:1px solid #d0d5db;border-radius:3px;background:#fff;padding:7px 9px;min-height:33px;
+  display:flex;align-items:center;flex-wrap:wrap;gap:4px;cursor:pointer;position:relative;transition:border-color .15s,box-shadow .15s,background .15s}
+.mkval:hover{border-color:#2d7ff9;box-shadow:0 0 0 3px rgba(45,127,249,.1)}
+.mkval.multi{align-items:flex-start;flex-direction:column;gap:3px;padding:9px}
+.mkval .ln{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.mkval.copied{border-color:#2f9e5e;background:#f2fbf5}
+.mkval .ctag{position:absolute;right:7px;top:50%;transform:translateY(-50%);background:#2f9e5e;color:#fff;font-size:9.5px;font-weight:700;
+  padding:2px 7px;border-radius:999px;opacity:0;transition:opacity .2s;pointer-events:none;letter-spacing:.03em}
+.mkval.copied .ctag{opacity:1}
+.mkval.multi .ctag{top:9px;transform:none}
+.mkval .hintcopy{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:9.5px;color:#9aa1a9;opacity:0;transition:opacity .15s;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+.mkval:hover .hintcopy{opacity:1}
+.mkval.copied:hover .hintcopy{opacity:0}
+.mkval.unmapped{background:#f7f8f9;cursor:default;border-style:dashed}
+.mkval.unmapped:hover{border-color:#d0d5db;box-shadow:none}
+
+/* Make expression pills */
+.pill{display:inline-flex;align-items:center;border-radius:3px;font-size:11.5px;font-weight:500;padding:2px 6px;line-height:1.45;white-space:nowrap;font-family:'Hanken Grotesk',sans-serif}
+.pill.var{background:#b4295c;color:#fff}
+.pill.varlt{background:#fdeef4;color:#b4295c;border:1px solid #f3bed3}
+.pill.op{background:#3fae6a;color:#fff}
+.pill.fn{background:#eceef1;color:#4a5159}
+.pill.nl{background:#d9c9f2;color:#5b3c96}
+.pill.txt{color:#2b3137;font-size:12.5px;padding:2px 1px}
+.pill.lit{color:#2b3137;font-size:12.5px;padding:2px 3px}
+
+.mkfoot{display:flex;align-items:center;gap:12px;padding:11px 15px;border-top:1px solid #e6e9ed;flex-shrink:0;background:#fff;border-radius:0 0 5px 5px}
+.mkfoot .adv{display:flex;align-items:center;gap:8px;font-size:12px;color:#5b636b;margin-right:auto}
+.mkbtn{border:1px solid #d0d5db;background:#fff;border-radius:3px;padding:7px 17px;font-size:13px;color:#2b3137}
+.mkbtn.save{border:0;color:#fff}
+
+/* ───────── deployed-site hero ───────── */
+.sitehero{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:stretch}
+@media(max-width:1080px){.sitehero{grid-template-columns:1fr}}
+.urlcard{background:var(--panel);border:1px solid var(--rule);border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;justify-content:center;gap:16px}
+.urlcard .lbl{font-size:11.5px;font-weight:600;letter-spacing:var(--tracking-widest);text-transform:uppercase;color:var(--fg-3)}
+.urlcard .theurl{font-family:var(--font-display);font-size:2.35rem;font-weight:600;line-height:1.05;letter-spacing:-.015em;word-break:break-all}
+.urlcard .theurl .proto{color:var(--fg-3);font-weight:500}
+.urlcard .theurl .host{color:var(--accent)}
+.urlacts{display:flex;flex-wrap:wrap;gap:9px}
+.urlnote{font-size:12.5px;color:var(--fg-3);line-height:1.5}
+.browser{border:1px solid var(--rule);border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column;min-height:320px;box-shadow:0 20px 50px -26px rgba(20,18,12,.4)}
+.bchrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel-2);border-bottom:1px solid var(--rule)}
+.bdot{width:9px;height:9px;border-radius:999px}
+.burl{flex:1;background:#fff;border:1px solid var(--rule);border-radius:999px;padding:4px 12px;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bview{flex:1;position:relative;overflow:hidden;background:#fff}
+.bview .live{position:absolute;right:9px;top:9px;z-index:3;background:rgba(63,143,92,.14);color:#2f7a4c;border:1px solid rgba(63,143,92,.4);font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.05em;text-transform:uppercase}
+/* miniature render of the client site */
+.mini{transform-origin:top left;font-family:system-ui,sans-serif}
+.mininav{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #e8e8e8}
+.mininav b{font-size:13px;color:#14304d;letter-spacing:-.01em}
+.mininav .lnks{display:flex;gap:12px}
+.mininav .lnks i{display:block;width:34px;height:5px;background:#dfe4ea;border-radius:3px}
+.mininav .cta{background:#14304d;color:#fff;font-size:9px;padding:5px 10px;border-radius:4px}
+.minihero{padding:26px 18px;background:linear-gradient(135deg,#eef3f8,#fff)}
+.minihero h5{font-size:19px;color:#14304d;margin:0 0 7px;line-height:1.15;max-width:15ch}
+.minihero p{font-size:10px;margin:0 0 12px;max-width:34ch;line-height:1.5;color:#6b7684}
+.minihero .btns{display:flex;gap:7px}
+.minihero .b1{background:#c7562c;color:#fff;font-size:9px;padding:6px 12px;border-radius:4px}
+.minihero .b2{border:1px solid #c3cbd4;color:#14304d;font-size:9px;padding:6px 12px;border-radius:4px}
+.minisvc{display:flex;gap:9px;padding:16px 18px}
+.minisvc div{flex:1;border:1px solid #e8ecf0;border-radius:6px;padding:10px}
+.minisvc i{display:block;width:20px;height:20px;border-radius:5px;background:#eaf0f6;margin-bottom:7px}
+.minisvc b{display:block;height:5px;width:70%;background:#dfe4ea;border-radius:3px;margin-bottom:5px}
+.minisvc s{display:block;height:4px;width:100%;background:#eef1f4;border-radius:3px;text-decoration:none}
+
+/* ───────── prompt tuner ───────── */
+.tuner{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px}
+@media(max-width:1120px){.tuner{grid-template-columns:1fr}}
+.tunerbox{background:var(--panel);border:1px solid var(--rule);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.tunerhead{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.tunerhead .t{font-family:var(--font-display);font-size:1.05rem;font-weight:600}
+.syncpill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid}
+.syncpill.ok{color:var(--ok);border-color:rgba(63,143,92,.4);background:var(--ok-glow)}
+.syncpill.drift{color:var(--warn);border-color:rgba(200,132,42,.45);background:var(--warn-glow)}
+.prompted{border:0;outline:0;resize:none;width:100%;min-height:290px;padding:15px;background:#fffdf7;
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.65;color:var(--fg-1)}
+.tunerfoot{display:flex;align-items:center;gap:9px;padding:11px 15px;border-top:1px solid var(--rule);flex-wrap:wrap}
+.tunerfoot .chars{margin-left:auto;font-size:11px;color:var(--fg-3);font-family:var(--font-mono)}
+.vlist{display:flex;flex-direction:column;overflow:hidden}
+.vscroll{overflow-y:auto;max-height:300px;display:flex;flex-direction:column}
+.vitem{display:flex;gap:11px;padding:11px 15px;border-bottom:1px solid var(--rule-weak);align-items:flex-start;text-align:left;background:transparent;border-left:0;border-right:0;border-top:0;width:100%;transition:background .15s}
+.vitem:hover{background:var(--surface)}
+.vitem.sel{background:rgba(31,111,120,.09)}
+.vdot{width:9px;height:9px;border-radius:999px;margin-top:5px;flex-shrink:0}
+.vdot.push{background:var(--accent-2)}
+.vdot.save{background:var(--fg-3)}
+.vdot.gen{background:var(--accent)}
+.vmeta{min-width:0;flex:1}
+.vmeta b{display:block;font-size:12.5px;font-weight:600;color:var(--fg);margin-bottom:2px}
+.vmeta span{display:block;font-size:11px;color:var(--fg-3);font-family:var(--font-mono)}
+.vdelta{font-size:11px;font-weight:600;font-family:var(--font-mono);flex-shrink:0;margin-top:1px}
+.vdelta.up{color:var(--ok)} .vdelta.dn{color:var(--danger)}
+.diffbox{border-top:1px solid var(--rule);padding:12px 15px;background:var(--surface);max-height:190px;overflow-y:auto}
+.diffline{font-family:var(--font-mono);font-size:11.5px;line-height:1.6;padding:1px 7px;border-radius:3px;white-space:pre-wrap}
+.diffline.add{background:rgba(63,143,92,.14);color:#2c6b45}
+.diffline.del{background:rgba(210,84,47,.13);color:#9c3a1c}
+.diffline.ctx{color:var(--fg-3)}
+
+/* copy chips + cmd */
+.cmd{display:flex;align-items:center;gap:10px;background:#14120c;border-radius:10px;padding:11px 14px;max-width:92ch}
+.cmd code{font-family:var(--font-mono);font-size:12.5px;color:#e9e2cf;flex:1;overflow-x:auto;white-space:nowrap}
+.cmd .cwd{font-size:10.5px;color:#8d8471}
+.copychip{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--rule);border-radius:10px;padding:10px 13px;background:var(--panel);max-width:92ch}
+.copychip .cl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3)}
+.copychip .cvv{font-family:var(--font-mono);font-size:14px;color:var(--fg)}
+
+/* ───────── reference rail + slide-over ───────── */
+.refrail{position:fixed;right:0;top:0;bottom:0;width:46px;z-index:40;background:var(--panel-2);border-left:1px solid var(--rule);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;transition:background .18s var(--ease)}
+.refrail:hover{background:var(--surface-2)}
+.refrail .vert{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11.5px;font-weight:600;letter-spacing:var(--tracking-widest);text-transform:uppercase;color:var(--fg-2)}
+.refrail .ic{color:var(--accent);font-size:15px}
+.app{padding-right:46px}
+
+.refpanel{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;background:var(--bg);
+  transform:translateX(100%);transition:transform .42s var(--ease);display:flex;flex-direction:column;box-shadow:-30px 0 70px -30px rgba(20,18,12,.45)}
+.refpanel.open{transform:translateX(0)}
+.refclose{position:absolute;left:0;top:0;bottom:0;width:46px;background:var(--panel-2);border-right:1px solid var(--rule);border-top:0;border-bottom:0;border-left:0;
+  display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:17px;transition:background .18s var(--ease)}
+.refclose:hover{background:var(--surface-2)}
+.refinner{margin-left:46px;flex:1;overflow-y:auto;padding:26px 30px 70px}
+.refinner-in{max-width:1100px;margin:0 auto}
+.reftabs{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 22px;border-bottom:1px solid var(--rule);padding-bottom:13px}
+.reftab{border:1px solid var(--rule);background:transparent;border-radius:999px;padding:6px 14px;font-size:13px;color:var(--fg-2);transition:all .16s var(--ease)}
+.reftab:hover{background:var(--surface)}
+.reftab.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.refsec{display:none;flex-direction:column;gap:18px}
+.refsec.on{display:flex}
+
+/* routing diagram */
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:20px}
+.fnode{flex:1;min-width:140px;border:1px solid var(--rule);border-radius:11px;padding:13px;background:var(--bg);display:flex;flex-direction:column;gap:5px}
+.fnode .fn{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3)}
+.fnode .fb{font-size:13.5px;font-weight:600;color:var(--fg);line-height:1.3}
+.fnode .fs{font-family:var(--font-mono);font-size:11px;color:var(--fg-2)}
+.fnode.hot{border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,111,120,.1)}
+.farrow{display:flex;align-items:center;justify-content:center;padding:0 10px;color:var(--fg-3);font-size:16px;flex-shrink:0}
+.farrow small{position:absolute;margin-top:34px;font-size:9.5px;color:var(--fg-3);white-space:nowrap}
+.kvtable{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--rule);border-radius:12px;overflow:hidden;font-size:13px}
+.kvtable th{text-align:left;padding:9px 14px;background:var(--surface-2);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);font-weight:600}
+.kvtable td{padding:9px 14px;border-top:1px solid var(--rule-weak);color:var(--fg-1);vertical-align:top}
+.kvtable td.k{font-family:var(--font-mono);font-size:12px;color:var(--accent);white-space:nowrap}
+.secttl{font-family:var(--font-display);font-size:1.25rem;font-weight:600;margin-bottom:-4px}
+
+/* mockup ribbon */
+.ribbon{position:fixed;left:0;bottom:0;z-index:60;background:var(--fg);color:var(--bg);font-size:10.5px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;padding:5px 14px;border-radius:0 8px 0 0;font-family:var(--font-body)}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,16px);z-index:70;background:var(--fg);color:var(--bg);
+  padding:9px 18px;border-radius:999px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:all .25s var(--ease)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ── header: no identity block; the trail owns the width ── -->
+  <header class="wizhead">
+    <div class="wizhead-in">
+      <nav class="trail" id="trail"></nav>
+      <div class="headright">
+        <span class="badge" id="statusPill">● Provisioning</span>
+        <div class="progwrap">
+          <div class="progtop"><span class="meta" id="progTxt">0/6</span><span class="progpct" id="progPct">0%</span></div>
+          <div class="progbar"><div class="progfill" id="progFill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── sticky nav sub-bar ── -->
+  <div class="navbar">
+    <div class="navbar-in">
+      <button class="btn btn-sm" id="backBtn">← Back</button>
+      <div class="navhere">
+        <span class="ph" id="navPhase"></span>
+        <span class="dotsep"></span>
+        <span class="ph" id="navPos"></span>
+      </div>
+      <button class="btn btn-sm btn-primary" id="nextBtn">Done, next →</button>
+    </div>
+  </div>
+
+  <main class="stage" id="stage"></main>
+</div>
+
+<!-- ── reference rail ── -->
+<div class="refrail" id="refRail" title="Open reference">
+  <span class="ic">◧</span>
+  <span class="vert">Reference</span>
+</div>
+
+<!-- ── reference slide-over ── -->
+<aside class="refpanel" id="refPanel">
+  <button class="refclose" id="refClose" title="Collapse reference">→</button>
+  <div class="refinner">
+    <div class="refinner-in">
+      <h2 style="font-family:var(--font-display);font-size:2rem;font-weight:600;letter-spacing:-.01em">Reference</h2>
+      <p style="color:var(--fg-2);font-size:14px;margin:7px 0 0;max-width:72ch">
+        Everything you read rather than do. Pulled out of the step flow so each step is only ever
+        “do this” — open it any time without losing your place.
+      </p>
+      <div class="reftabs">
+        <button class="reftab on" data-ref="routing">Call routing</button>
+        <button class="reftab" data-ref="pipeline">Provisioning pipeline</button>
+        <button class="reftab" data-ref="ids">IDs &amp; env</button>
+        <button class="reftab" data-ref="trouble">Troubleshooting</button>
+      </div>
+
+      <section class="refsec on" data-sec="routing">
+        <div class="secttl">How inbound calls route — human-first, AI fallback over SIP</div>
+        <div class="flow">
+          <div class="fnode"><span class="fn">1 · caller</span><span class="fb">Dials the Twilio number</span><span class="fs">+1 (407) 555-0188</span></div>
+          <div class="farrow">→</div>
+          <div class="fnode hot"><span class="fn">2 · client site</span><span class="fb">POST /api/voice</span><span class="fs">harborline-plumbing.vercel.app</span></div>
+          <div class="farrow">→<small>rings 15s</small></div>
+          <div class="fnode"><span class="fn">3 · owner</span><span class="fb">Forward leg to the real line</span><span class="fs">CLIENT_FORWARD_PHONE</span></div>
+          <div class="farrow">→<small>no answer</small></div>
+          <div class="fnode hot"><span class="fn">4 · retell</span><span class="fb">register-phone-call → SIP</span><span class="fs">sip:{call_id}@sip.retellai.com</span></div>
+        </div>
+        <div class="callout danger"><span class="ct">Never import this number into Retell</span>
+          A Retell-managed / SIP-trunked number bypasses <code>/api/voice</code> entirely, which kills the
+          human-first ring — every call would go straight to the AI. The number must stay JDD/Twilio-owned
+          with its <code>voiceUrl</code> pointed at <code>/api/voice</code>, which onboard.js sets automatically.</div>
+        <div class="callout warn"><span class="ct">Keep the ring window under ~20s</span>
+          If the forward rings long enough for the owner’s carrier voicemail to answer, Twilio scores that as
+          answered and the no-answer branch never fires — the caller lands in voicemail instead of the agent.
+          <code>lib/client-env.js</code> clamps it to 5–20s (default 15).</div>
+        <div class="callout warn"><span class="ct">Only works once deployed</span>
+          Twilio has to reach <code>/api/voice</code> at the .vercel.app URL, so routing is dead until the repo is
+          deployed with env synced. To change the ring window set <code>CLIENT_FORWARD_RING_SECONDS</code> and re-sync.</div>
+        <div class="callout info"><span class="ct">If the AI leg 500s after the ring</span>
+          <code>/api/voice/no-answer</code> needs <code>RETELL_API_KEY</code> and <code>RETELL_SIP_DOMAIN</code> at
+          runtime. onboard.js writes both and Vercel sync pushes them — if it fails, confirm the key actually
+          exists on the Vercel project.</div>
+      </section>
+
+      <section class="refsec" data-sec="pipeline">
+        <div class="secttl">What onboard.js does, in order</div>
+        <table class="kvtable">
+          <tr><th style="width:62px">Step</th><th>Action</th><th>Leaves behind</th></tr>
+          <tr><td class="k">1–2</td><td>Read intake · create the GitHub repo from TEMPLATE_REPO</td><td class="k">github.com/{org}/{slug}</td></tr>
+          <tr><td class="k">3–4</td><td>Write <code>src/data/site.ts</code> · build</td><td class="k">site.ts</td></tr>
+          <tr><td class="k">5</td><td>Buy a <b>local</b> Twilio number, add it to the A2P sender pool</td><td class="k">TWILIO_NUMBER</td></tr>
+          <tr><td class="k">6</td><td>Generate the prompt · create the per-client Retell LLM + agent</td><td class="k">RETELL_AGENT_ID · RETELL_LLM_ID</td></tr>
+          <tr><td class="k">7</td><td>Create the Airtable base <i>“{brand} — Calls”</i></td><td class="k">AIRTABLE_BASE_ID</td></tr>
+          <tr><td class="k">8</td><td>Clone the post-call Make scenario + its gateway webhook</td><td class="k">MAKE_POST_CALL_*</td></tr>
+          <tr><td class="k">9</td><td>Swap <code>brand.phone</code> to the Twilio number · commit · push · sync env</td><td class="k">VERCEL_PROJECT_NAME</td></tr>
+          <tr><td class="k">10</td><td>Create the Clerk portal user with publicMetadata</td><td class="k">CLERK_USER_ID</td></tr>
+        </table>
+        <div class="callout info"><span class="ct">Re-running is safe</span>
+          onboard.js is idempotent — it reuses already-provisioned IDs from <code>.env.local</code>, so a re-run
+          after a FAIL won’t double-charge or duplicate resources.</div>
+      </section>
+
+      <section class="refsec" data-sec="ids">
+        <div class="secttl">Which number does which job</div>
+        <table class="kvtable">
+          <tr><th>Value</th><th>Holds</th><th>Job</th></tr>
+          <tr><td class="k">brand.phone</td><td>the JDD Twilio number</td><td>What the website shows and what customers dial</td></tr>
+          <tr><td class="k">CLIENT_FORWARD_PHONE</td><td>the owner’s real line</td><td>Where <code>/api/voice</code> forwards on hop 1</td></tr>
+        </table>
+        <div class="secttl" style="margin-top:8px">This client’s IDs</div>
+        <table class="kvtable">
+          <tr><th style="width:230px">Key</th><th>Value</th></tr>
+          <tr><td class="k">TWILIO_NUMBER</td><td>+14075550188</td></tr>
+          <tr><td class="k">CLIENT_FORWARD_PHONE</td><td>+12075550143</td></tr>
+          <tr><td class="k">CLIENT_FORWARD_RING_SECONDS</td><td>15</td></tr>
+          <tr><td class="k">RETELL_AGENT_ID</td><td>agent_7f2c9a41be5d0c83</td></tr>
+          <tr><td class="k">RETELL_LLM_ID</td><td>llm_3a81d60fc2e749b5</td></tr>
+          <tr><td class="k">AIRTABLE_BASE_ID</td><td>appK2r9XqLmT4vBhD</td></tr>
+          <tr><td class="k">VERCEL_PROJECT_NAME</td><td>harborline-plumbing</td></tr>
+          <tr><td class="k">LEAD_DELIVERY_MODE</td><td>callback</td></tr>
+        </table>
+      </section>
+
+      <section class="refsec" data-sec="trouble">
+        <div class="secttl">Nothing arrived — walk it backwards</div>
+        <table class="kvtable">
+          <tr><th style="width:190px">Check</th><th>Looking for</th></tr>
+          <tr><td class="k">Retell call log</td><td>Did the call complete and produce a <code>call_analyzed</code> event?</td></tr>
+          <tr><td class="k">Make → History</td><td>Did the webhook fire? Did the <code>call_analyzed</code> filter pass? Any module errors?</td></tr>
+          <tr><td class="k">Airtable</td><td>An invalid select option fails the <b>whole row</b> — <code>Call type</code> and <code>Priority</code> are lowercase on purpose.</td></tr>
+          <tr><td class="k">Twilio → Messaging</td><td>Is the number in the Messaging Service sender pool yet? Otherwise every text 30034s.</td></tr>
+        </table>
+        <div class="callout warn"><span class="ct">Three rows per call?</span>
+          The clone’s <code>{{1.event}} = call_analyzed</code> filter got dropped. Without it the scenario logs
+          <code>call_started</code> and <code>call_ended</code> too — two of the three rows empty.</div>
+        <div class="callout danger"><span class="ct">Calls landing in someone else’s log</span>
+          The client is wired to a master resource. <code>AIRTABLE_BASE_ID</code> must never be the master base and
+          the agent’s <code>webhook_url</code> must never be the master scenario’s hook.</div>
+      </section>
+    </div>
+  </div>
+</aside>
+
+<div class="ribbon">Mockup · onboard v2</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════ mock client ═══════════════ */
+const C = {
+  brand:'Harborline Plumbing', slug:'harborline-plumbing', plan:'growth',
+  twilio:'+1 (407) 555-0188', owner:'+1 (207) 555-0143', ring:15,
+  agent:'agent_7f2c9a41be5d0c83', base:'Harborline Plumbing — Calls'
+};
+
+/* ═══════════════ Make expression pills ═══════════════
+   token: [kind, text] — var | varlt | op | fn | nl | txt | lit            */
+const P = (k,t)=>`<span class="pill ${k}">${t}</span>`;
+function pills(tokens){ return tokens.map(([k,t])=>P(k,t)).join(''); }
+
+/* a clickable Make value box; copies the RAW {{…}} text */
+function mkval(raw, tokens, multi){
+  const lines = multi
+    ? tokens.map(ln=>`<span class="ln">${pills(ln)}</span>`).join('')
+    : pills(tokens);
+  return `<div class="mkval${multi?' multi':''}" data-copy="${raw.replace(/"/g,'&quot;')}">
+      ${lines}<span class="hintcopy">copy</span><span class="ctag">✓ copied</span></div>`;
+}
+function unmapped(note){ return `<div class="mkval unmapped"><span class="pill txt" style="color:#9aa1a9">${note}</span></div>`; }
+function fieldRow(label, inner, help, req){
+  return `<div class="mkfield">
+    <span class="mkflabel"><span class="car">∨</span>${label}${req?'<span class="req">*</span>':''}</span>
+    ${inner}${help?`<div class="mkhelp">${help}</div>`:''}</div>`;
+}
+function sel(value, extra){
+  return `<div class="mkctl"><div class="mkselect"><span class="cv">${value}</span><span class="arrow">∨</span></div>${extra||''}</div>`;
+}
+
+/* ── Airtable module replica ── */
+function airtableModule(){
+  const F = [
+    ['Date', '{{parseDate(1.call.start_timestamp; "x")}}',
+      [['fn','parseDate('],['var','1. call: start_timestamp'],['fn',';'],['fn','x'],['fn',')']],
+      '<span class="ic">🌐</span>Time zone: America/New_York<br><span class="ic">🕐</span>For more information on supported date formats, see the <a href="#">online Help</a>.'],
+    ['Caller name', '{{1.call.call_analysis.custom_analysis_data.caller_name}}',
+      [['var','1. call: call_analysis: custom_analysis_data: caller_name']]],
+    ['Caller number', '{{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}',
+      [['fn','if('],['var','1. call: direction'],['op','='],['lit','inbound'],['fn',';'],['var','1. call: from_number'],['fn',';'],['var','1. call: to_number'],['fn',')']]],
+    ['Summary', '{{1.call.call_analysis.call_summary}}',
+      [['var','1. call: call_analysis: call_summary']]],
+    ['Duration (seconds)', '{{round(ifempty(1.call.duration_ms; 0) / 1000)}}',
+      [['fn','round('],['fn','ifempty('],['var','1. call: duration_ms'],['fn',';'],['lit','0'],['fn',')'],['lit','/'],['lit','1000'],['fn',')']]],
+    ['Call type', '{{1.call.direction}}', [['var','1. call: direction']],
+      '<b style="color:#b4295c">Lowercase on purpose</b> — the module runs with <code>typecast: false</code>, so “Inbound” is rejected and fails the whole row.'],
+    ['Email', '{{1.call.call_analysis.custom_analysis_data.caller_email}}',
+      [['var','1. call: call_analysis: custom_analysis_data: caller_email']]],
+    ['Address', '{{1.call.call_analysis.custom_analysis_data.caller_address}}',
+      [['var','1. call: call_analysis: custom_analysis_data: caller_address']]],
+    ['Recording URL', '{{1.call.recording_url}}', [['var','1. call: recording_url']]],
+    ['Priority', '{{1.call.call_analysis.custom_analysis_data.caller_priority}}',
+      [['var','1. call: call_analysis: custom_analysis_data: caller_priority']]],
+  ];
+  const rows = F.map(([l,raw,tok,help])=>fieldRow(l, mkval(raw,tok), help)).join('');
+  return `
+  <div class="makemod">
+    <div class="modbadge">
+      <div class="halo"><div class="core" style="background:#2d7ff9">▦</div><span class="num">8</span></div>
+      <div class="cap"><b>Airtable</b><span>Create a record</span></div>
+    </div>
+    <div class="mkpanel">
+      <div class="mkhead"><h4>Airtable</h4>
+        <div class="mkicons"><span>⋮</span><span>⤢</span><span>?</span><span>✕</span></div></div>
+      <div class="mkunder" style="background:#2d7ff9"></div>
+      <div class="mkbody">
+        ${fieldRow('Connection', sel('JDD Airtable PAT','<button class="mkadd">Add</button>'),
+          'For more information on how to create a connection to Airtable, see the <a href="#">online Help</a>.', true)}
+        ${fieldRow('Base', sel('<b>'+C.base+'</b>'),
+          '<b style="color:#b4295c">Change this</b> — the clone still points at the master’s base.', true)}
+        ${fieldRow('Table', sel('Call Log','<span class="mkrefresh">⟳ Refresh</span>'), '', true)}
+        <div class="mkgroup"><span class="car">∨</span>Record</div>
+        <div class="mkindent">
+          ${rows}
+          ${fieldRow('Outcome', unmapped('— leave unmapped —'),
+            'Nothing writes <b>Outcome</b>. It exists for the owner to set by hand while triaging.')}
+        </div>
+      </div>
+      <div class="mkfoot">
+        <span class="adv"><span class="mkswitch"></span>Show advanced settings</span>
+        <button class="mkbtn">Cancel</button>
+        <button class="mkbtn save" style="background:#6b4ee6">Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── Twilio module replica ── */
+function twilioModule(){
+  const bodyRaw =
+'Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}\n{{newline}}\n'+
+'Status:{{1.call.call_analysis.custom_analysis_data.caller_priority}}\n{{newline}}\n'+
+'Phone: {{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}\n{{newline}}\n'+
+'About: {{1.call.call_analysis.call_summary}}';
+  const bodyLines = [
+    [['txt','Name:'],['var','1. call: call_analysis: custom_analysis_data: caller_name']],
+    [['nl','newline']],
+    [['txt','Status:'],['varlt','1.call.call_analysis.custom_analysis_data.caller_priority']],
+    [['nl','newline']],
+    [['txt','Phone:'],['fn','if('],['var','1. call: direction'],['op','='],['lit','inbound'],['fn',';'],['var','1. call: from_number'],['fn',';'],['var','1. call: to_number'],['fn',')']],
+    [['nl','newline']],
+    [['txt','About:'],['var','1. call: call_analysis: call_summary']],
+  ];
+  const mapTog = '<span class="map">Map<span class="mkswitch"></span></span>';
+  return `
+  <div class="makemod">
+    <div class="modbadge">
+      <div class="halo"><div class="core" style="background:#f22f46">✆</div><span class="num">10</span></div>
+      <div class="cap"><b>Twilio</b><span>Create a Message</span></div>
+    </div>
+    <div class="mkpanel">
+      <div class="mkhead"><h4>Twilio</h4>
+        <div class="mkicons"><span>⋮</span><span>⤢</span><span>?</span><span>✕</span></div></div>
+      <div class="mkunder" style="background:#f22f46"></div>
+      <div class="mkbody">
+        ${fieldRow('Connection', sel('JDD','<button class="mkadd">Add</button>'),
+          'For more information on how to create a connection to Twilio, see the <a href="#">online Help</a>.', true)}
+        <div class="mkfield">
+          <span class="mkflabel"><span class="car">∨</span>Send a message from<span class="req">*</span>${mapTog}</span>
+          ${sel('phone number')}
+        </div>
+        <div class="mkfield">
+          <span class="mkflabel"><span class="car">∨</span>Phone number<span class="req">*</span>${mapTog}</span>
+          ${sel('<b>'+C.twilio+'</b>')}
+          <div class="mkhelp"><b style="color:#b4295c">From = this client’s TWILIO_NUMBER.</b> It must be in the A2P sender pool or every text 30034s.</div>
+        </div>
+        ${fieldRow('To', `<div class="mkval" data-copy="${C.owner.replace(/[^\d+]/g,'')}"><span class="pill lit">${C.owner.replace(/[^\d+]/g,'')}</span><span class="hintcopy">copy</span><span class="ctag">✓ copied</span></div>`,
+          'The destination phone number in <a href="#">E.164</a> format for SMS/MMS or <a href="#">Channel user address</a> for other 3rd-party channels. <b style="color:#b4295c">To = the owner’s consented alert number.</b>', true)}
+        <div class="mkfield">
+          <span class="mkflabel"><span class="car">∨</span>Message Body<span class="req">*</span>${mapTog}</span>
+          ${sel('Create a Body')}
+        </div>
+        ${fieldRow('Body', mkval(bodyRaw, bodyLines, true),
+          'The <code>newline</code> tokens are Make functions — copy the block whole, don’t retype it.', true)}
+      </div>
+      <div class="mkfoot">
+        <span class="adv"><span class="mkswitch"></span>Show advanced settings</span>
+        <button class="mkbtn">Cancel</button>
+        <button class="mkbtn save" style="background:#f22f46">Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ═══════════════ shared block helpers ═══════════════ */
+const doList = (head, items)=>`
+  <div class="doblock">
+    <div class="dohead"><span class="lbl">${head}</span><span class="rule"></span></div>
+    <ol class="dolist">${items.map(([t,s])=>`<li><span class="txt">${t}${s?`<span class="sub">${s}</span>`:''}</span></li>`).join('')}</ol>
+  </div>`;
+const callout=(tone,title,body)=>`<div class="callout ${tone}">${title?`<span class="ct">${title}</span>`:''}${body}</div>`;
+const verify=(title,items)=>`<div class="verify"><div class="vt">${title}</div><ul>${items.map(i=>`<li><span class="chk">✓</span><span>${i}</span></li>`).join('')}</ul></div>`;
+const cmd=(c,cwd)=>`<div class="cmd"><code>${c}</code>${cwd?`<span class="cwd">${cwd}</span>`:''}</div>`;
+const chip=(l,v)=>`<div class="copychip" data-copy="${v}"><div><div class="cl">${l}</div><div class="cvv">${v}</div></div><button class="btn btn-xs">Copy</button></div>`;
+
+/* ═══════════════ the six steps ═══════════════ */
+const STEPS = [
+  {
+    id:'run-onboard', phase:'Provision the stack', group:'Onboarding', launch:true,
+    title:'Launch onboard.js',
+    body:()=>`
+      ${doList('Do this',[
+        ['Confirm the intake is complete — the schema is the single source of truth and the run reads it once.','Anything in <code>_meta.missingFields</code> ships as a placeholder on the live site.'],
+        ['Press <b>Open the provisioning run</b> and rehearse with <b>Dry run</b> first.','A dry run executes the same correctness predicates the test suite uses — it answers “would this provision correctly?”, not just “would it run”.'],
+        ['Read the dry-run report. Resolve every <b>FAIL</b> before the real run.'],
+        ['Run it for real and watch to <code>[step 10/10]</code>.']
+      ])}
+      <div style="display:flex;gap:11px;flex-wrap:wrap">
+        <button class="btn btn-primary">⚡ Open the provisioning run</button>
+        <button class="btn btn-accent">Dry run first</button>
+      </div>
+      ${callout('warn','Re-running is safe','If a step FAILs: fix the cause in <code>jdd-ops/.env</code> and re-run. onboard.js is idempotent — it reuses already-provisioned IDs from <code>.env.local</code>, so re-runs won’t double-charge or duplicate resources.')}
+      ${verify('A clean run ends with',[
+        'The log reaching <code>[step 10/10]</code> and printing an <b>ONBOARDED</b> summary, with no FAIL or ✗ lines.',
+        'A new repo at <code>github.com/juneau-digital-designs/'+C.slug+'</code> with <code>src/data/site.ts</code> committed.',
+        'A local Twilio number purchased and added to the A2P sender pool.',
+        '<code>.env.local</code> carrying <code>RETELL_AGENT_ID</code>, <code>AIRTABLE_BASE_ID</code> and both <code>MAKE_POST_CALL_*</code> ids.'
+      ])}`
+  },
+  {
+    id:'make-fieldmap', phase:'Map the call log (Make)', group:'Onboarding',
+    title:'Map the cloned call-log scenario',
+    body:()=>`
+      ${doList('Do this',[
+        ['Open Make.com → this client’s cloned scenario <b>“Post-call: '+C.brand+'”</b>.'],
+        ['In the <b>Airtable</b> module set <b>Base</b> to this client’s base and <b>Table</b> to <b>Call Log</b>.','The clone carries the master’s module settings — it still points at the master base until you change it.'],
+        ['Map each Call Log field to the expression shown below. Click any box to copy it.','Column names are a contract with the master scenario. A column the master writes but the base doesn’t have is silently dropped from every logged call.'],
+        ['In the <b>Twilio</b> module set <b>From</b> to this client’s number and <b>To</b> to the owner’s consented alert number, then paste the message body.'],
+        ['Save both modules, then confirm the scenario is <b>Active</b>.']
+      ])}
+      <div class="makewrap">
+        <div class="makerow">
+          ${airtableModule()}
+          <div class="dottrail"><i></i><i></i><i></i><i></i><i></i></div>
+          ${twilioModule()}
+        </div>
+      </div>
+      ${callout('danger','Never wire this client to a master resource','A client must own its Airtable base and its own clone of the scenario. Sharing a master resource does not look broken — it looks like a working client whose calls land in someone else’s log.')}`
+  },
+  {
+    id:'enable-web-analytics', phase:'Enable analytics', group:'Onboarding',
+    title:'Enable Web Analytics',
+    body:()=>`
+      ${doList('Do this',[
+        ['Vercel → the <b>'+C.slug+'</b> project → <b>Analytics</b> → <b>Enable Web Analytics</b>.','<code>@vercel/analytics</code> is already in the template root layout, so no code change or redeploy is needed.'],
+        ['Visit the live site once and confirm data appears within ~30s.'],
+        ['Verify it rather than trusting the toggle.']
+      ])}
+      ${cmd('npm run audit-analytics','jdd-ops/')}
+      ${callout('info','','Exit <b>0</b> = every live site collecting · <b>1</b> = at least one is off (it names the project) · <b>2</b> = could not check. onboard.js also reports this at the end of a run.')}
+      ${callout('info','Why this still exists','The portal’s <b>Traffic</b> tab reads page views from the Vercel Web Analytics API keyed by <code>vercelProjectId</code>. PageSpeed powers the separate <b>Performance</b> section — it does not cover Traffic.')}`
+  },
+  {
+    id:'checkpoint-1', phase:'Review the site', group:'Review',
+    title:'Review the deployed site',
+    body:()=>`
+      <div class="sitehero">
+        <div class="urlcard">
+          <span class="lbl">The live site</span>
+          <div class="theurl"><span class="proto">https://</span><span class="host">${C.slug}</span><span class="proto">.vercel.app</span></div>
+          <div class="urlacts">
+            <button class="btn btn-primary">Open site ↗</button>
+            <button class="btn btn-sm" data-copy="https://${C.slug}.vercel.app">Copy URL</button>
+            <button class="btn btn-sm">Deployments</button>
+          </div>
+          <p class="urlnote">Vercel keeps <code>.vercel.app</code> URLs live permanently, so this stays the client’s
+            address even after a custom domain is attached. Vercel <b>removes</b> characters that aren’t valid in a
+            DNS label rather than substituting hyphens — so an underscored slug would serve at a different host.</p>
+        </div>
+        <div class="browser">
+          <div class="bchrome">
+            <span class="bdot" style="background:#e4705f"></span>
+            <span class="bdot" style="background:#e3b341"></span>
+            <span class="bdot" style="background:#6cbf73"></span>
+            <span class="burl">https://${C.slug}.vercel.app</span>
+          </div>
+          <div class="bview">
+            <span class="live">● live</span>
+            <div class="mini">
+              <div class="mininav"><b>${C.brand}</b><span class="lnks"><i></i><i></i><i></i></span><span class="cta">${C.twilio}</span></div>
+              <div class="minihero">
+                <h5>Emergency plumbing, answered day or night.</h5>
+                <p>Licensed, insured and local. Call now and speak to someone — or book a visit online in under a minute.</p>
+                <span class="btns"><span class="b1">Call ${C.twilio}</span><span class="b2">Book a visit</span></span>
+              </div>
+              <div class="minisvc">
+                <div><i></i><b></b><s></s></div><div><i></i><b></b><s></s></div><div><i></i><b></b><s></s></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${doList('Check these',[
+        ['Hero, services and the contact form carry this client’s real copy — not <code>TODO</code> placeholders.','Placeholders mean the intake still has unfilled fields.'],
+        ['The number on the page is the <b>Twilio</b> number '+C.twilio+', not the owner’s line.','If it shows the owner’s number, every caller bypasses <code>/api/voice</code> — no human-first forward, no AI fallback, no Airtable row, and no error anywhere to find.'],
+        ['The page holds up at mobile width; nav and footer render.']
+      ])}`
+  },
+  {
+    id:'checkpoint-2', phase:'Test-call the agent', group:'Review',
+    title:'Test-call &amp; tune the agent',
+    body:()=>`
+      ${chip('Call this number', C.twilio)}
+      ${doList('Do this',[
+        ['Call from a phone that is <b>not</b> the client’s, and let their real line ring out for ~'+C.ring+'s.','Answering inside the ring window connects a normal call and the AI never engages.'],
+        ['Run a fake lead: ask about a service, give a name and a callback number, mention a timeline.'],
+        ['Note anything off — wrong hours, missing services, awkward phrasing, quoting a price.'],
+        ['Fix it in the editor below and press <b>Push to Retell</b>, then call again.','Every save and push is versioned, so any change is reversible.']
+      ])}
+      <div class="tuner">
+        <div class="tunerbox">
+          <div class="tunerhead">
+            <span class="t">Agent prompt</span>
+            <span class="meta" style="font-family:var(--font-mono)">${C.agent}</span>
+            <span class="syncpill ok" style="margin-left:auto">● In sync with Retell</span>
+          </div>
+          <textarea class="prompted" spellcheck="false">You are the receptionist for ${C.brand}, a licensed plumbing company serving the greater Portland area.
+
+GREETING
+Open with: "Thanks for calling ${C.brand}, this is Riley — how can I help?"
+
+WHAT YOU DO
+- Find out what the caller needs and how urgent it is.
+- Collect: name, callback number, service address, and a one-line description.
+- Flag anything involving active flooding, no water, or gas smell as EMERGENCY.
+
+WHAT YOU NEVER DO
+- Never quote a price. Say: "Pricing depends on what we find — the owner will confirm."
+- Never invent hours, services, or availability. If it isn't in the FAQ, say you'll have someone confirm.
+
+HOURS
+Mon-Fri 7am-6pm. 24/7 emergency callout.</textarea>
+          <div class="tunerfoot">
+            <button class="btn btn-sm">💾 Save to disk</button>
+            <button class="btn btn-sm btn-primary">↑ Push to Retell</button>
+            <span class="chars">842 chars · saved 4m ago</span>
+          </div>
+        </div>
+        <div class="tunerbox vlist">
+          <div class="tunerhead"><span class="t">Versions</span><span class="meta" style="margin-left:auto">6 kept</span></div>
+          <div class="vscroll">
+            ${[
+              ['push','Pushed to Retell','2026-10-29 14:02','+118','up',1],
+              ['save','Saved to disk','2026-10-29 13:58','+64','up',0],
+              ['push','Pushed to Retell','2026-10-29 13:31','−42','dn',0],
+              ['save','Saved to disk','2026-10-29 13:22','+203','up',0],
+              ['push','Pushed to Retell','2026-10-28 17:40','+95','up',0],
+              ['gen','Generated by onboard.js','2026-10-28 16:04','v1','up',0],
+            ].map(([k,t,ts,d,dir,sel])=>`
+              <button class="vitem${sel?' sel':''}">
+                <span class="vdot ${k}"></span>
+                <span class="vmeta"><b>${t}</b><span>${ts}</span></span>
+                <span class="vdelta ${dir}">${d}</span>
+              </button>`).join('')}
+          </div>
+          <div class="diffbox">
+            <div class="meta" style="margin-bottom:7px">Diff vs. current — 13:58 → 14:02</div>
+            <div class="diffline ctx">  - Collect: name, callback number, service address.</div>
+            <div class="diffline del">- Never quote a price.</div>
+            <div class="diffline add">+ Never quote a price. Say: "Pricing depends on what we</div>
+            <div class="diffline add">+ find — the owner will confirm."</div>
+            <div class="diffline ctx">  HOURS</div>
+          </div>
+          <div class="tunerfoot">
+            <button class="btn btn-xs">Preview full</button>
+            <button class="btn btn-xs btn-accent">Restore into editor</button>
+          </div>
+        </div>
+      </div>
+      ${verify('You should hear',[
+        'A warm greeting using the exact business name.',
+        'FAQ answers drawn only from the intake — nothing invented.',
+        'Pricing deferred to the owner — the agent should never quote a price.',
+        'The agent collecting a name and a callback number.'
+      ])}`
+  },
+  {
+    id:'checkpoint-postcall', phase:'Verify call logging', group:'Review',
+    title:'Post-call log + owner SMS',
+    body:()=>`
+      ${doList('Do this',[
+        ['Trigger an AI-handled call: submit the form with your number, or call '+C.twilio+' and let it ring past '+C.ring+'s.'],
+        ['Finish the call and hang up — the log is written from the <code>call_analyzed</code> event, not at hangup.'],
+        ['Within ~30s confirm a new Airtable <b>Call Log</b> row <b>and</b> a brief SMS to '+C.owner+'.']
+      ])}
+      ${verify('Within ~30 seconds',[
+        'Exactly <b>one</b> new row in this client’s Airtable Call Log — not three.',
+        'Every mapped column populated; <code>Outcome</code> empty by design.',
+        'A brief SMS to '+C.owner+' with name, status, phone and summary.'
+      ])}
+      ${callout('warn','If nothing arrives','Walk it backwards: Retell call log → Make “Post-call: '+C.brand+'” History → Twilio Messaging logs. The full checklist is in <b>Reference → Troubleshooting</b>.')}`
+  },
+];
+
+/* ═══════════════ state ═══════════════ */
+let cursor = 1;                       // open on the Make step
+const done = new Set(['run-onboard']); // step 1 pre-completed so the overlay is demoable
+let revealed = null;                   // step id whose dim was lifted for THIS visit
+
+/* ═══════════════ render ═══════════════ */
+function renderTrail(){
+  const phases=[];
+  STEPS.forEach((s,i)=>{
+    const last=phases[phases.length-1];
+    if(last && last.phase===s.phase) last.idx.push(i);
+    else phases.push({phase:s.phase,group:s.group,idx:[i]});
+  });
+  const here = STEPS[cursor].phase;
+  const activeP = phases.findIndex(p=>p.phase===here);
+  document.getElementById('trail').innerHTML = phases.map((p,i)=>{
+    const complete = p.idx.every(j=>done.has(STEPS[j].id));
+    const active = p.phase===here;
+    const reach = i<=activeP || p.idx.some(j=>done.has(STEPS[j].id));
+    const grpChanged = i===0 || phases[i-1].group!==p.group;
+    const lead = grpChanged
+      ? `<span class="trail-group">${i>0?'<span class="trail-div"></span>':''}<span class="kicker">${p.group}</span></span>`
+      : `<span class="caret">›</span>`;
+    return `${lead}<button class="crumb ${complete?'done':''}" ${active?'aria-current="step"':''} ${reach?'':'disabled'} data-goto="${p.idx[0]}">
+        <span class="pip">${complete?'✓':i+1}</span><span>${p.phase}</span></button>`;
+  }).join('');
+}
+function renderProgress(){
+  const total=STEPS.length, c=STEPS.filter(s=>done.has(s.id)).length;
+  const pct=Math.round(c/total*100);
+  document.getElementById('progTxt').textContent=`${c}/${total}`;
+  document.getElementById('progPct').textContent=`${pct}%`;
+  document.getElementById('progFill').style.width=pct+'%';
+  const pill=document.getElementById('statusPill');
+  pill.textContent = c===total ? '● Live' : c>=4 ? '● In review' : '● Provisioning';
+  pill.className = 'badge' + (c===total?' badge-ok':'');
+}
+function render(){
+  const s=STEPS[cursor];
+  const isDone=done.has(s.id);
+  const dim = isDone && revealed!==s.id;
+
+  document.getElementById('navPhase').textContent = `${s.group} · ${s.phase}`;
+  document.getElementById('navPos').textContent = `Step ${cursor+1} of ${STEPS.length}`;
+  document.getElementById('backBtn').disabled = cursor===0;
+  const nb=document.getElementById('nextBtn');
+  if(cursor===STEPS.length-1 && isDone){ nb.textContent='Finish ✓'; }
+  else nb.textContent = isDone ? 'Next →' : 'Done, next →';
+
+  document.getElementById('stage').innerHTML = `
+    <article class="step">
+      <header class="stephead">
+        <h1>${s.title}</h1>
+        <span class="hmeta">
+          <span class="meta">Step ${cursor+1} of ${STEPS.length}</span>
+          ${isDone?'<span class="badge badge-ok">✓ Done</span>':'<span class="badge">To do</span>'}
+        </span>
+      </header>
+      <div class="content ${dim?'dimmed':''}">
+        <div class="cbody">${s.body()}</div>
+        ${dim?`
+          <div class="doneveil">
+            <div class="donecard">
+              <div class="tick">✓</div>
+              <h3>Step Completed</h3>
+              <p>You finished <b>${s.title.replace(/&amp;/g,'&')}</b>. Nothing here needs doing again — carry on, or reopen it if something changed.</p>
+              <div class="doneacts">
+                <button class="btn btn-primary" data-act="next">Next →</button>
+                <button class="btn btn-sm" data-act="undo">Mark incomplete</button>
+              </div>
+            </div>
+          </div>
+          <div class="viewthis"><button class="btn btn-sm" data-act="reveal">View this step</button></div>`:''}
+      </div>
+    </article>`;
+  renderTrail(); renderProgress();
+  document.getElementById('stage').scrollTop=0;
+}
+
+/* ═══════════════ interaction ═══════════════ */
+function go(i){ if(i<0||i>=STEPS.length) return; cursor=i; revealed=null; render(); }
+document.getElementById('backBtn').onclick=()=>go(cursor-1);
+document.getElementById('nextBtn').onclick=()=>{
+  const s=STEPS[cursor];
+  if(!done.has(s.id)){ done.add(s.id); toast('Step marked complete'); }
+  if(cursor<STEPS.length-1) go(cursor+1); else render();
+};
+document.addEventListener('click',e=>{
+  const goto=e.target.closest('[data-goto]');
+  if(goto) return go(+goto.dataset.goto);
+
+  const act=e.target.closest('[data-act]');
+  if(act){
+    const a=act.dataset.act;
+    if(a==='next') return go(cursor+1);
+    if(a==='undo'){ done.delete(STEPS[cursor].id); revealed=null; toast('Marked incomplete'); return render(); }
+    if(a==='reveal'){ revealed=STEPS[cursor].id; return render(); }
+  }
+
+  const cp=e.target.closest('[data-copy]');
+  if(cp){
+    const v=cp.dataset.copy;
+    navigator.clipboard?.writeText(v).catch(()=>{});
+    if(cp.classList.contains('mkval')) cp.classList.add('copied');
+    toast('Copied — paste it into Make');
+  }
+});
+/* reference panel */
+const panel=document.getElementById('refPanel');
+document.getElementById('refRail').onclick=()=>panel.classList.add('open');
+document.getElementById('refClose').onclick=()=>panel.classList.remove('open');
+document.querySelectorAll('.reftab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.reftab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.refsec').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  document.querySelector(`.refsec[data-sec="${t.dataset.ref}"]`).classList.add('on');
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') panel.classList.remove('open');
+  if(e.target.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowLeft') go(cursor-1);
+  if(e.key==='ArrowRight') go(cursor+1);
+});
+/* toast */
+let tt;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('on');
+  clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('on'),1600);
+}
+render();
+</script>
+</body>
+</html>

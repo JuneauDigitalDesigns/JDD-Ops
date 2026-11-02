@@ -1,3 +1,9 @@
+'use client';
+// Required: this component imports @phosphor-icons/react, whose module scope calls
+// React.createContext. Imported into a SERVER component that call resolves against the
+// react-server build, where createContext does not exist, and `next build` dies collecting
+// page data with `(0 , l.createContext) is not a function`. Every pageHeader is rendered on a
+// SUBPAGE, so this only ever broke multi-page exports — which had never successfully run.
 // ─────────────────────────────────────────────────────────────────────────────
 // PageHeaderSimple — the lightweight header that opens a non-home page (Services,
 // About, Contact, …). Eyebrow + page title + one-line intro + optional CTA on a

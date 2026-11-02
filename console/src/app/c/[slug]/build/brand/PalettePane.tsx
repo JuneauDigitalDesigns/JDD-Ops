@@ -12,6 +12,7 @@ import { contrast, readableOn } from '@/lib/palette';
 const TOKENS = [
   { path: 'brand.palette.accent', label: 'Accent' },
   { path: 'brand.palette.accentFg', label: 'Accent text' },
+  { path: 'brand.palette.accent2', label: 'Accent 2' },
   { path: 'brand.palette.bg', label: 'Background' },
   { path: 'brand.palette.bgSoft', label: 'Background soft' },
   { path: 'brand.palette.ink', label: 'Ink' },

@@ -73,15 +73,19 @@ export default function ServicesGrid({
           {items.map((item, i) => (
             <li
               key={item.n ?? i}
-              className={`flex flex-col rounded-xl border p-6 transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 ${
+              className={`flex flex-col rounded-2xl border p-6 transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 ${
                 dark
                   ? 'border-ruleInk bg-inkPanel2 shadow-[0_14px_30px_-12px_rgba(0,0,0,.5)] hover:shadow-[0_22px_42px_-14px_rgba(0,0,0,.6)]'
                   : 'border-rule/70 bg-bg shadow-[0_1px_2px_rgba(28,16,9,.05),0_14px_30px_-12px_rgba(28,16,9,.22)] hover:shadow-[0_2px_4px_rgba(28,16,9,.06),0_22px_42px_-14px_rgba(28,16,9,.28)]'
               }`}
             >
+              {/* Icon tile: a cool structural (accent2) gradient tile, so the card leads with the
+                  two-tone premium look rather than a flat accent100 square. */}
+              {/* Icon tile: a flat cool structural (accent2) tint, so the card leads with the
+                  two-tone premium look rather than a flat accent100 square. */}
               <span
                 className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl ${
-                  dark ? 'bg-white/10 text-onInk' : 'bg-accent100 text-ink'
+                  dark ? 'bg-white/10 text-onInk' : 'bg-[var(--accent-2-soft)] text-[color:var(--accent-2)]'
                 }`}
               >
                 <Ico p={`services.items.${i}.icon`} icon={serviceIcon(item.icon, item.tag)} size={26} />
@@ -99,8 +103,11 @@ export default function ServicesGrid({
               {/* `tag` is real schema data, so it is shown as-is. There is no per-service
                   availability field, and inventing "same-day" copy here would put a promise
                   on the page that the client never made. */}
+              {/* `mt-auto` pins the tag to the card's bottom edge, so every card's tag sits on a
+                  shared baseline across the grid regardless of title/description length. */}
               {item.tag && (
-                <p className={`mt-5 border-t pt-4 text-[14px] font-bold ${dark ? 'border-ruleInk text-accent200' : 'border-rule text-accent'}`}>
+                <p className={`mt-auto flex items-center gap-2 border-t pt-5 text-[14px] font-bold ${dark ? 'border-ruleInk text-accent200' : 'border-rule text-accent'}`}>
+                  <span className="h-0.5 w-4 rounded-full bg-current" aria-hidden="true" />
                   <E p={`services.items.${i}.tag`}>{item.tag}</E>
                 </p>
               )}

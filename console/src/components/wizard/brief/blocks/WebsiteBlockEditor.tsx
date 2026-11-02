@@ -7,7 +7,7 @@ import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import type { WebsiteBlock } from '@/lib/copy-brief/types';
 import { setBlockEnabled, setBlockOverride, setWebsiteUrl } from '@/lib/copy-brief/mutations';
-import { BlockHeader, FieldLabel, OverrideInput, OverrideTextarea } from '../BlockPrimitives';
+import { BlockHeader, FieldLabel, OverrideInput, OverrideTextarea, type BlockVariant } from '../BlockPrimitives';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
@@ -29,12 +29,13 @@ type ScanState =
   | { kind: 'error'; message: string };
 
 export default function WebsiteBlockEditor({
-  block, content, setField, onUpdate,
+  block, content, setField, onUpdate, variant = 'page',
 }: {
   block: WebsiteBlock;
   content: SiteContent;
   setField: SetField;
   onUpdate: Update;
+  variant?: BlockVariant;
 }) {
   const [scan, setScan] = useState<ScanState>({ kind: 'idle' });
   const [facts, setFacts] = useState<Record<string, string> | null>(null);
@@ -80,6 +81,7 @@ export default function WebsiteBlockEditor({
         channel={block.channel}
         enabled={block.enabled}
         onToggleEnabled={(v) => onUpdate((b) => setBlockEnabled(b, 'website', v))}
+        variant={variant}
       />
       <div className="mb-4">
         <FieldLabel>

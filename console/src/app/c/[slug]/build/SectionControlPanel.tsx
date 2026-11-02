@@ -21,11 +21,9 @@ import { PALETTE_PRESETS } from '@jdd/schema';
 import type { SiteContent, SectionStyle } from '@/data/site';
 import type { SkinId } from '@/lib/skins';
 import { getPath } from '@/lib/merge';
-import { contrast } from '@/lib/palette';
 import type { VariantEntry } from './categories';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const WEIGHTS = [400, 500, 600, 700, 800];
 
 /** Distinct accent swatches from the named presets (deduped, brand accent pinned first). */
 function accentPresets(brandAccent: string): string[] {
@@ -33,17 +31,6 @@ function accentPresets(brandAccent: string): string[] {
   const push = (h: string) => { if (HEX.test(h) && !out.includes(h)) out.push(h); };
   push(brandAccent);
   for (const p of PALETTE_PRESETS) push(p.source.accent);
-  return out.slice(0, 8);
-}
-
-/** Background swatches: white + the brand's own bg/bgSoft + a few preset backgrounds. */
-function bgPresets(brandBg: string, brandBgSoft: string): string[] {
-  const out: string[] = [];
-  const push = (h: string) => { if (HEX.test(h) && !out.includes(h)) out.push(h); };
-  push('#ffffff');
-  push(brandBg);
-  push(brandBgSoft);
-  for (const p of PALETTE_PRESETS) push(p.palette.bg);
   return out.slice(0, 8);
 }
 
@@ -135,11 +122,12 @@ export default function SectionControlPanel({
 }) {
   const cur = (getPath(content, `sectionStyles.${styleKey}`) as SectionStyle | undefined) ?? {};
   const palette = content.brand.palette;
-  const ink = palette.ink;
 
   const accents = useMemo(() => accentPresets(palette.accent), [palette.accent]);
-  const bgs = useMemo(() => bgPresets(palette.bg, palette.bgSoft), [palette.bg, palette.bgSoft]);
+  const accent2s = useMemo(() => accentPresets(palette.accent2 ?? palette.accent), [palette.accent2, palette.accent]);
 
+  // Retained for the skin/variant rows below, which are gated off (category is not passed) now
+  // that whole-site templates own structure — a section's only per-section edit is its accent.
   const variant = category?.variants.find((v) => v.name === variantName);
   const skins = variant?.skins ?? [];
 
@@ -152,9 +140,6 @@ export default function SectionControlPanel({
     });
     setField(`sectionStyles.${styleKey}`, next);
   };
-
-  const chosenBg = cur.bg && HEX.test(cur.bg) ? cur.bg : palette.bg;
-  const aa = HEX.test(ink) && HEX.test(chosenBg) ? contrast(ink, chosenBg) : null;
 
   return (
     <div
@@ -175,48 +160,12 @@ export default function SectionControlPanel({
           onChange={(hex) => write({ accent: hex })} onClear={() => write({ accent: undefined })}
         />
         <SlotEditor
-          label="Background" value={cur.bg} global={palette.bg} presets={bgs}
-          onChange={(hex) => write({ bg: hex })} onClear={() => write({ bg: undefined })}
+          label="Accent 2" value={cur.accent2} global={palette.accent2 ?? palette.accent} presets={accent2s}
+          onChange={(hex) => write({ accent2: hex })} onClear={() => write({ accent2: undefined })}
         />
-        <SlotEditor
-          label="Background soft" value={cur.bgSoft} global={palette.bgSoft} presets={bgs}
-          onChange={(hex) => write({ bgSoft: hex })} onClear={() => write({ bgSoft: undefined })}
-        />
-        {aa !== null && (
-          <p className={[
-            'font-chromeMono text-2xs',
-            aa >= 4.5 ? 'text-fg3' : 'rounded bg-amber-100 px-1 py-0.5 text-amber-800',
-          ].join(' ')}>
-            Ink on background {aa.toFixed(1)}:1 {aa >= 4.5 ? 'AA' : 'below AA'}
-          </p>
-        )}
-
-        <Row label="Heading weight">
-          <select
-            value={cur.headingWeight ?? ''}
-            onChange={(e) => write({ headingWeight: e.target.value ? Number(e.target.value) : undefined })}
-            className="w-full rounded border border-rule bg-transparent px-1.5 py-1 text-xs text-fg2"
-          >
-            <option value="">Global</option>
-            {WEIGHTS.map((w) => <option key={w} value={w}>{w}</option>)}
-          </select>
-        </Row>
-
-        <Row label={`Section scale · ${(cur.scale ?? 1).toFixed(2)}×`}>
-          <div className="flex items-center gap-1.5">
-            <input
-              type="range" min={0.85} max={1.2} step={0.05}
-              value={cur.scale ?? 1}
-              onChange={(e) => { const n = Number(e.target.value); write({ scale: n === 1 ? undefined : n }); }}
-              className="w-full accent-fg"
-            />
-            {cur.scale !== undefined && (
-              <button type="button" onClick={() => write({ scale: undefined })} title="Revert to global" className="rounded p-0.5 text-fg3 hover:text-fg">
-                <ArrowCounterClockwise size={12} />
-              </button>
-            )}
-          </div>
-        </Row>
+        {/* Per-section background / heading-weight / scale controls were removed: a whole-site
+            template owns the palette and structure, so the only per-section edit is the accent.
+            This is also what stops a section from diverging into an off-template background. */}
 
         {skins.length >= 2 && (
           <Row label="Surface">
