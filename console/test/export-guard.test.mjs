@@ -23,6 +23,7 @@ import {
   pinnedTag,
   compareTags,
   verifyUiPins,
+  verifyUiLock,
 } from '../src/lib/libExports.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -249,4 +250,114 @@ test('the REAL template and console libs read as non-empty', () => {
     assert.deepEqual(unresolved, [], `${lib}: @jdd/ui must resolve from console/node_modules`);
     assert.ok(names?.has(symbol), `template/src/lib/${lib} must provide ${symbol}`);
   }
+});
+
+// ─── the lockfile must resolve the tag the pin names ──────────────────────────
+//
+// These encode the near-miss of 2026-11-02. Bumping @jdd/ui to v1.3.0 (the SMS consent
+// disclosure) and running `npm install` left BOTH lockfiles resolving v1.2.0's commit, and
+// `node_modules/@jdd/ui/src/` with no lead-consent-text.ts in it. Every package.json claimed
+// v1.3.0 while the old form — the one with no disclosure — was what would have built. npm does
+// not re-resolve a `github:` ref when only the tag moves.
+//
+// The two commit shas below are real: `b55deff` is what v1.3.0 points at and `16eabee` is
+// v1.2.0, both read off the repository. Invented shas would make these tests agree with
+// themselves about a shape the vendor never produced.
+
+const V130 = 'b55deff4a4c6494db63ad6f43b456dd9a8f1a7f4';
+const V120 = '16eabee3348cfed0aa62cff0b5262407b7458d3b';
+const TAGS = { 'v1.3.0': V130, 'v1.2.0': V120 };
+
+test('a lockfile that resolves the pinned tag is silent', () => {
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-good.json'),
+    tagCommits: TAGS,
+  });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(uncheckable, []);
+});
+
+test('a lockfile still resolving the PREVIOUS commit is a problem', () => {
+  // THE NEAR-MISS. The lock agrees about the tag and resolves the old commit anyway, which is
+  // precisely what `npm install` leaves behind, and what no other check here would notice.
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-stale-resolved.json'),
+    tagCommits: TAGS,
+    label: 'console',
+  });
+  assert.equal(problems.length, 1, `expected one problem, got ${JSON.stringify(problems)}`);
+  assert.match(problems[0].message, /v1\.3\.0/);
+  assert.match(problems[0].message, /b55deff/, 'must name the commit the tag points at');
+  assert.match(problems[0].message, /16eabee/, 'and the commit actually installed');
+  assert.match(problems[0].message, /npm install/, 'and how to fix it');
+  assert.match(problems[0].message, /^console: /, 'and which lockfile');
+  assert.deepEqual(uncheckable, []);
+});
+
+test('a lockfile never regenerated at all is reported as such', () => {
+  // The lock still records the old SPEC, not just the old commit. Worth its own message: the
+  // fix is the same but the diagnosis is "you edited package.json and nothing else".
+  const { problems } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-stale-spec.json'),
+    tagCommits: TAGS,
+  });
+  assert.ok(problems.length >= 1);
+  assert.match(problems[0].message, /not regenerated/);
+});
+
+test('no mapping for the tag is uncheckable, never a pass', () => {
+  // The tri-state. Without `git ls-remote` output there is nothing to compare against, and
+  // that must not read as "the lock is fine".
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-stale-resolved.json'),
+    tagCommits: { 'v1.0.7': 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' },
+  });
+  assert.deepEqual(problems, [], 'an unknown tag is not a failure');
+  assert.equal(uncheckable.length, 1, 'but it must not be silent either');
+  assert.match(uncheckable[0], /no commit known for v1\.3\.0/);
+});
+
+test('a lockfile with no resolved commit is a problem, not a shrug', () => {
+  const { problems } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-no-resolved.json'),
+    tagCommits: TAGS,
+  });
+  assert.equal(problems.length, 1);
+  assert.match(problems[0].message, /no resolved commit/);
+});
+
+test('a branch pin is uncheckable rather than wrong', () => {
+  // Pinning a branch is a deliberate choice during development. There is no tag to compare a
+  // commit to, so this says so instead of inventing a verdict.
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('repo-branch.json'),
+    lockPath: pin('lock-good.json'),
+    tagCommits: TAGS,
+  });
+  assert.deepEqual(problems, []);
+  assert.match(uncheckable[0], /not a vX\.Y\.Z tag/);
+});
+
+test('an abbreviated sha on either side still compares equal', () => {
+  const { problems } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-good.json'),
+    tagCommits: { 'v1.3.0': V130.slice(0, 7) },
+  });
+  assert.deepEqual(problems, [], 'a 7-char tag sha must match the 40-char resolved one');
+});
+
+test('an unreadable lockfile is uncheckable, never a pass', () => {
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('no-such-lock.json'),
+    tagCommits: TAGS,
+  });
+  assert.deepEqual(problems, []);
+  assert.match(uncheckable[0], /could not read/);
 });

@@ -1,0 +1,14 @@
+{
+  "name": "jdd-console",
+  "lockfileVersion": 3,
+  "packages": {
+    "": {
+      "dependencies": {
+        "@jdd/ui": "github:JuneauDigitalDesigns/jdd-ui#v1.3.0"
+      }
+    },
+    "node_modules/@jdd/ui": {
+      "version": "1.3.0"
+    }
+  }
+}
