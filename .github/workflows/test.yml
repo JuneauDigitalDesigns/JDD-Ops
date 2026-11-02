@@ -40,9 +40,23 @@ jobs:
         working-directory: console
         run: npm test
 
-      # Fails if a recorded dry run no longer matches what onboard.js emits. This is the guard
-      # run-plan.ts's header asks for: add or reorder a log() call without updating PHASE_MAP
-      # and expectedPhases, and the UI silently mis-narrates every run. Needs no credentials —
-      # a dry run creates nothing and the phase SEQUENCE does not depend on them.
-      - name: Dry-run phase contract is current
-        run: npm run fixtures:dry-run:check
+      # `npm run fixtures:dry-run:check` deliberately does NOT run here.
+      #
+      # It used to, on the belief that "a dry run creates nothing and the phase SEQUENCE does
+      # not depend on credentials". That is wrong, and this job's own first line is why: CI has
+      # no secrets, so there is no .env, so `resolveMasterResources()` cannot run and the whole
+      # step-11 Make block is absent from the output. Measured by regenerating with .env moved
+      # aside — the clone/patch/activate lines vanish, GITHUB_ORG renders as <GITHUB_ORG>, and
+      # the summary goes from "3 passed, 1 failed, 6 not checked" to "2 passed, 1 failed, 7 not
+      # checked". A recording made where credentials exist can never match a run where they do
+      # not, so the step failed every run regardless of the code.
+      #
+      # The guard run-plan.ts's header asks for is still enforced, by the console suite above:
+      # phase-contract.test.mjs REPLAYS the committed recordings through the real parser and
+      # asserts they match expectedPhases(). That reads files and touches no vendor, so it is
+      # credential-free — and it genuinely runs now that test/fixtures/dry-run/*.log is tracked
+      # rather than swallowed by .gitignore, which is what let it report a clean pass while
+      # skipping every assertion.
+      #
+      # Regenerating belongs where credentials are: run `npm run fixtures:dry-run:check`
+      # locally before committing a change to onboard.js's log() calls.

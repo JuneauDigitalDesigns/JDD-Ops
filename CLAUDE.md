@@ -391,12 +391,20 @@ guard `run-plan.ts`'s header asks for, automated. Add or reorder a `log()` call 
 without updating `PHASE_MAP` and `expectedPhases()` and it fails.
 
 **`test/fixtures/dry-run/*.log` is tracked on purpose** — `.gitignore` carries an explicit
-negation for it, and `.gitattributes` pins it to LF so a Windows recording and a Linux CI run
-compare equal. For a while `*.log` swallowed those files, and the cost was not that the contract
-broke but that it quietly stopped existing: every assertion in the test is guarded by `t.skip()`
-on a missing fixture, so it reported a clean pass having checked nothing, while
-`fixtures:dry-run:check` failed CI claiming "phase output drifted" — a code regression that was
-never there. Both now name the real problem, and a missing recording fails rather than skips.
+negation for it, and `.gitattributes` pins it to LF. For a while `*.log` swallowed those files,
+and the cost was not that the contract broke but that it quietly stopped existing: every
+assertion in the test is guarded by `t.skip()` on a missing fixture, so it reported a clean pass
+having checked nothing. A missing recording now fails rather than skips, and the recorder says
+MISSING rather than blaming `onboard.js` for drift.
+
+**`npm run fixtures:dry-run:check` is a LOCAL guard, not a CI one.** Regenerating a dry run
+needs `.env`: without it `resolveMasterResources()` cannot run, the whole step-11 Make block is
+absent from the output, and the check summary drops from "3 passed, 1 failed, 6 not checked" to
+"2 passed, 1 failed, 7 not checked". CI has no secrets by design, so a recording made here can
+never match one regenerated there — the step failed every run regardless of the code, and has
+been removed from the workflow. Run it yourself before committing a change to `onboard.js`'s
+`log()` calls. What CI enforces is the *replay*: `phase-contract.test.mjs` parses the committed
+recordings, which needs no credentials.
 
 Check output must never contain the token `FAIL:` — `onboard-parse.ts` treats any line
 carrying it as a fatal run, which would abort the UI's narration over a soft finding.
