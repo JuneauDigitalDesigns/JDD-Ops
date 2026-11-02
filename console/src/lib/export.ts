@@ -20,11 +20,16 @@ import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { findOpsRoot } from '@/lib/opsRoot';
 import {
   verifyLibImports,
   verifyUiPins,
+  verifyUiLock,
+  parseLsRemoteTags,
   type LibImportProblem,
+  type LockResult,
   type UiPinResult,
 } from '@/lib/libExports';
 import { isValidSkin, supportsSkin } from '@/lib/skins';
@@ -888,4 +893,67 @@ export function resolveUploads(
     return v;
   };
   return { content: walk(content) as SiteContent, missing: [...missing] };
+}
+
+/**
+ * The @jdd/ui lockfiles checked against the tag their own package.json pins.
+ *
+ * Sits beside verifyUiPinsFor because it covers the half THAT check structurally cannot: the
+ * pin comparison reads package.json, and a package.json can say v1.3.0 while the lockfile next
+ * to it still resolves the previous commit — which is what `npm install` leaves behind when
+ * only a tag moved. The export is the right place for it: a stale lock is harmless sitting on
+ * disk and dangerous at exactly the moment code reaches a client repo.
+ *
+ * The console and template locks are what get checked. The client repo has no lockfile of its
+ * own until the export installs one, and it installs it FROM these pins.
+ *
+ * Network, so it is async and fails soft: `lookup` returning {} makes every tag uncheckable,
+ * which is reported and is never a pass. An offline operator is not a reason to block an export.
+ */
+export async function verifyUiLockFor(
+  repoRoot: string,
+  lookup: (remote: string) => Promise<Record<string, string>> = lsRemoteTags,
+): Promise<LockResult> {
+  const tagCommits = await lookup(UI_REMOTE);
+  const results = [
+    verifyUiLock({
+      pkgPath: resolve(process.cwd(), 'package.json'),
+      lockPath: resolve(process.cwd(), 'package-lock.json'),
+      tagCommits,
+      label: 'console',
+    }),
+    verifyUiLock({
+      pkgPath: resolve(repoRoot, 'template', 'package.json'),
+      lockPath: resolve(repoRoot, 'template', 'package-lock.json'),
+      tagCommits,
+      label: 'template',
+    }),
+  ];
+  return {
+    problems: results.flatMap((r) => r.problems),
+    uncheckable: results.flatMap((r) => r.uncheckable),
+  };
+}
+
+const UI_REMOTE = 'https://github.com/JuneauDigitalDesigns/jdd-ui.git';
+
+/**
+ * `git ls-remote --tags` for the @jdd/ui remote, as tag -> commit.
+ *
+ * Returns {} on ANY failure — no git, no network, a timeout, a private-repo prompt. The caller
+ * turns that into "uncheckable", so the worst case is the export losing one check rather than
+ * an operator being blocked by their own wifi. `--tags` with an explicit URL never touches the
+ * working tree, and a 10s cap stops a hung connection from stalling a build.
+ */
+async function lsRemoteTags(remote: string): Promise<Record<string, string>> {
+  try {
+    const { stdout } = await promisify(execFile)('git', ['ls-remote', '--tags', remote], {
+      timeout: 10_000,
+      // Refuse any credential prompt rather than hanging an export waiting on stdin.
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    });
+    return parseLsRemoteTags(stdout);
+  } catch {
+    return {};
+  }
 }

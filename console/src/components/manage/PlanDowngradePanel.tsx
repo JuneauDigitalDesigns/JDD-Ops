@@ -238,22 +238,22 @@ export default function PlanDowngradePanel({
                     : 'No Airtable base on this client.'}
                 </span>
                 <span className="text-xs text-fg2">
-                  The site, its repo, the Vercel project, and the domain are untouched. Only the
-                  voice tier is removed.
+                  Nothing is destroyed. The site, its repo, the Vercel project, the domain, the
+                  Twilio number and the Retell agent are all untouched — Starter runs the same
+                  voice stack as Growth.
                 </span>
               </section>
 
               <section className="flex flex-col gap-1">
-                <span className="kicker">Lead capture becomes</span>
-                <span className="text-xs text-fg2">
-                  Resend email to{' '}
-                  {preview.leadEmail.to ? (
-                    <code className="codechip">{preview.leadEmail.to}</code>
-                  ) : (
-                    <span style={{ color: 'var(--warn)' }}>nowhere — no brand.email in site.ts</span>
-                  )}
-                  {!preview.leadEmail.resendKeySet && ' (once RESEND_API_KEY is set in Environment)'}.
-                </span>
+                <span className="kicker">What actually changes</span>
+                <ul className="text-xs text-fg2 flex flex-col gap-1">
+                  <li>
+                    Web forms drop straight into the portal inbox — the agent no longer calls the
+                    submitter back first.
+                  </li>
+                  <li>CRM access is withdrawn; the Inbox stays.</li>
+                  <li>The included-minutes allowance moves to the Starter cap.</li>
+                </ul>
               </section>
 
               <div className="flex items-center justify-between gap-2">

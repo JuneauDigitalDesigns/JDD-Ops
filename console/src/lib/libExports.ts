@@ -392,3 +392,160 @@ export function verifyUiPins(args: {
 
   return { problems, uncomparable };
 }
+
+// ─── does the lockfile actually resolve the tag the pin names? ────────────────
+//
+// `verifyUiPins` above compares the three package.json pins against each other. That is a real
+// check and it catches a half-done bump. It cannot catch the one that nearly shipped the SMS
+// consent disclosure as a no-op on 2026-11-02:
+//
+//   package.json    "@jdd/ui": "github:JuneauDigitalDesigns/jdd-ui#v1.3.0"
+//   package-lock    "resolved": "…/jdd-ui.git#16eabee…"      <- v1.2.0's commit
+//   node_modules    @jdd/ui/src/ has no lead-consent-text.ts at all
+//
+// npm does not re-resolve a `github:` ref when only the tag moves. Editing the pin and running
+// `npm install` updates the lock's declared SPEC and leaves `resolved` where it was, so every
+// file on disk claims the new version while the previous component is what actually builds.
+// Nothing errors anywhere. It takes `npm install github:owner/repo#vX.Y.Z` explicitly.
+//
+// This is the worst shape a failure can take in this repo, and it is the inverse of a false
+// red: a false GREEN, reporting success while serving the old behaviour. For the consent work
+// specifically it meant a client site collecting phone numbers with no disclosure, which is
+// the exact thing that work exists to prevent.
+//
+// The tag -> commit mapping is an ARGUMENT, never derived here. Same reason probeTwilioNumber
+// is handed the host Vercel actually reports instead of re-deriving it from the slug: a
+// predicate that computes the truth it checks against can only ever agree with itself. The
+// caller reads the mapping from `git ls-remote --tags` or a local clone.
+
+export interface LockResult {
+  problems: PinProblem[];
+  /**
+   * Why no comparison could be made — no tag pin, no mapping for that tag, an unreadable lock.
+   *
+   * Reported separately and never folded into `problems`, because "could not check" is not a
+   * pass and is not a failure either. Same tri-state the onboard checks use.
+   */
+  uncheckable: string[];
+}
+
+/** One commit is the other, allowing either side to be abbreviated. */
+function sameCommit(a: string, b: string): boolean {
+  const [x, y] = [a.toLowerCase(), b.toLowerCase()];
+  const n = Math.min(x.length, y.length);
+  return n >= 7 && x.slice(0, n) === y.slice(0, n);
+}
+
+function uiLockEntry(lockPath: string): { spec?: string; commit?: string; resolved?: string; read: boolean } {
+  try {
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as {
+      packages?: Record<string, { resolved?: string; dependencies?: Record<string, string> }>;
+    };
+    const packages = lock.packages ?? {};
+    const resolved = packages[`node_modules/${UI_DEP}`]?.resolved;
+    const commit = resolved ? /#([0-9a-fA-F]{7,40})$/.exec(resolved)?.[1] : undefined;
+    return { spec: packages['']?.dependencies?.[UI_DEP], commit, resolved, read: true };
+  } catch {
+    return { read: false };
+  }
+}
+
+/**
+ * Check one package.json against its own lockfile: the lock must resolve the commit that the
+ * pinned tag points at, and must agree with package.json about which tag that is.
+ *
+ * @param args.tagCommits tag -> commit sha. A tag absent from it is `uncheckable`, not a pass.
+ */
+export function verifyUiLock(args: {
+  pkgPath: string;
+  lockPath: string;
+  tagCommits?: Record<string, string>;
+  /** Shown in messages so an operator knows WHICH lockfile ("console", "template"). */
+  label?: string;
+}): LockResult {
+  const problems: PinProblem[] = [];
+  const uncheckable: string[] = [];
+  const where = args.label ? `${args.label}: ` : '';
+
+  const spec = depSpec(args.pkgPath);
+  const tag = pinnedTag(spec);
+  const entry = uiLockEntry(args.lockPath);
+
+  if (!entry.read) {
+    uncheckable.push(`${where}could not read ${args.lockPath}.`);
+    return { problems, uncheckable };
+  }
+  if (spec === undefined) {
+    uncheckable.push(`${where}package.json has no "${UI_DEP}" dependency to check the lock against.`);
+    return { problems, uncheckable };
+  }
+  if (tag === null) {
+    // A branch or commit pin is a deliberate choice, not drift. Nothing to compare a tag to.
+    uncheckable.push(`${where}${UI_DEP} is pinned to ${spec}, which is not a vX.Y.Z tag.`);
+    return { problems, uncheckable };
+  }
+
+  // The lock's own idea of the spec. When this disagrees, the lock was never regenerated at
+  // all — which is a problem on its own, and the most common way the resolved commit is stale.
+  if (entry.spec !== undefined && entry.spec !== spec) {
+    problems.push({
+      message: `${where}package.json pins ${UI_DEP} ${spec}, but the lockfile still records ${entry.spec} — the lockfile was not regenerated.`,
+      staleRepo: false,
+    });
+  }
+
+  if (!entry.commit) {
+    problems.push({
+      message: `${where}the lockfile has no resolved commit for ${UI_DEP}${
+        entry.resolved ? ` (resolved: ${entry.resolved})` : ''
+      }, so there is no way to tell which code installs.`,
+      staleRepo: false,
+    });
+    return { problems, uncheckable };
+  }
+
+  const want = args.tagCommits?.[tag];
+  if (!want) {
+    uncheckable.push(
+      `${where}no commit known for ${tag}; pass tagCommits from \`git ls-remote --tags\` to compare it against the lock's ${entry.commit.slice(0, 7)}.`,
+    );
+    return { problems, uncheckable };
+  }
+
+  if (!sameCommit(entry.commit, want)) {
+    problems.push({
+      message: `${where}package.json pins ${UI_DEP} ${tag} (${want.slice(0, 7)}), but the lockfile resolves ${entry.commit.slice(0, 7)} — the build installs different code than the pin claims. Run \`npm install "${spec}"\` to re-resolve it.`,
+      staleRepo: false,
+    });
+  }
+
+  return { problems, uncheckable };
+}
+
+/**
+ * `git ls-remote --tags <remote>` output as tag -> COMMIT sha.
+ *
+ * The peeled line is the whole point. An ANNOTATED tag emits two rows:
+ *
+ *   cb2e28d…  refs/tags/v1.3.0        <- the tag OBJECT
+ *   b55deff…  refs/tags/v1.3.0^{}     <- the commit it points at
+ *
+ * npm records the commit in `resolved`, so taking the first row would compare a tag-object
+ * sha against a commit sha and report drift for every annotated tag in the repository — and
+ * jdd-ui's tags are annotated. That would turn a check written to catch a false GREEN into a
+ * generator of false reds, which is the worse of the two failures.
+ *
+ * Lightweight tags emit only the unpeeled row, and for those it IS the commit. So: take the
+ * unpeeled sha, and let a peeled row overwrite it.
+ */
+export function parseLsRemoteTags(stdout: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of String(stdout).split('\n')) {
+    const m = /^([0-9a-fA-F]{40})\s+refs\/tags\/(.+?)(\^\{\})?$/.exec(line.trim());
+    if (!m) continue;
+    const [, sha, tag, peeled] = m;
+    // Unpeeled only fills a gap; peeled always wins, whichever order the rows arrive in.
+    if (peeled || out[tag] === undefined) out[tag] = sha.toLowerCase();
+  }
+  return out;
+}

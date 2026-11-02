@@ -4,3 +4,11 @@
 # drifted on every CI run — the same false "phase output drifted" failure that the `*.log`
 # ignore rule already caused once, arriving by a different route.
 test/fixtures/dry-run/*.log text eol=lf
+
+# The JSON fixtures have exactly the same problem, arriving a third time. `save()` in
+# scripts/refresh-fixtures.js writes `JSON.stringify(...) + '\n'` and compares the result to
+# the file on disk, so with core.autocrlf=true a fresh clone checks them out as CRLF and
+# `npm run fixtures:check` reports EVERY ONE as "vendor payload drifted" — a full screen of
+# red caused by nothing but line endings. A check that cries wolf on a clean clone is worse
+# than no check: it is what teaches you to stop reading the output.
+test/fixtures/**/*.json text eol=lf

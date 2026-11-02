@@ -142,6 +142,9 @@ async function main() {
         accountSid: process.env.TWILIO_ACCOUNT_SID,
         authToken: process.env.TWILIO_AUTH_TOKEN,
         phoneNumber: s.env.TWILIO_NUMBER,
+        // Without these the release is refused — see releaseTwilioNumber.
+        kvUrl: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+        kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
       }),
       'Twilio number',
     );

@@ -12,7 +12,7 @@
     "folderId": 249644,
     "slots": null,
     "isinvalid": false,
-    "islinked": true,
+    "islinked": false,
     "islocked": false,
     "isPaused": false,
     "usedPackages": [
@@ -44,6 +44,6 @@
     "chainingRole": "none",
     "type": "scenario",
     "isShared": false,
-    "isActive": true
+    "isActive": false
   }
 }

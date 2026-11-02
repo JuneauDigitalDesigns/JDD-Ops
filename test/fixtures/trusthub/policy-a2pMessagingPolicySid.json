@@ -1,0 +1,37 @@
+{
+  "friendly_name": "A2P Messaging: Local - Business",
+  "requirements": {
+    "end_user": [
+      {
+        "fields": [
+          "company_type",
+          "stock_exchange",
+          "stock_ticker",
+          "brand_contact_email"
+        ],
+        "name": "US A2P Messaging Profile General Business Information",
+        "requirement_name": "us_a2p_messaging_profile_information",
+        "type": "us_a2p_messaging_profile_information",
+        "url": "/EndUserTypes/us_a2p_messaging_profile_information"
+      }
+    ],
+    "supporting_customer_profiles": [
+      {
+        "name": "Primary Customer Profile Bundle Proof",
+        "requirement_name": "customer_profile",
+        "type": "primary_customer_profile_type_business"
+      },
+      {
+        "name": "Secondary Customer Profile Bundle Proof",
+        "requirement_name": "customer_profile",
+        "type": "secondary_customer_profile_type_business"
+      }
+    ],
+    "supporting_document": [
+      []
+    ],
+    "supporting_trust_products": []
+  },
+  "sid": "RNb0d4771c2c98518d916a3d4cd70a8f8b",
+  "url": "https://trusthub.twilio.com/v1/Policies/RNb0d4771c2c98518d916a3d4cd70a8f8b"
+}

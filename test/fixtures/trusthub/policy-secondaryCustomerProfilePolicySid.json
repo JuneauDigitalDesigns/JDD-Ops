@@ -1,0 +1,92 @@
+{
+  "friendly_name": "Secondary Customer Profile of type Business",
+  "requirements": {
+    "end_user": [
+      {
+        "fields": [
+          "business_type",
+          "business_registration_number",
+          "business_name",
+          "business_registration_identifier",
+          "business_identity",
+          "business_industry",
+          "website_url",
+          "business_regions_of_operation",
+          "social_media_profile_urls"
+        ],
+        "name": "Business Information",
+        "requirement_name": "customer_profile_business_information",
+        "type": "customer_profile_business_information",
+        "url": "/EndUserTypes/customer_profile_business_information"
+      },
+      {
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "phone_number",
+          "business_title",
+          "job_position"
+        ],
+        "name": "Authorized Representative #1",
+        "requirement_name": "authorized_representative_1",
+        "type": "authorized_representative_1",
+        "url": "/EndUserTypes/authorized_representative_1"
+      },
+      {
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "phone_number",
+          "business_title",
+          "job_position"
+        ],
+        "name": "Authorized Representative #2",
+        "requirement_name": "authorized_representative_2",
+        "type": "authorized_representative_2",
+        "url": "/EndUserTypes/authorized_representative_2"
+      }
+    ],
+    "supporting_customer_profiles": [
+      {
+        "name": "Primary Customer Profile Bundle",
+        "requirement_name": "primary_customer_profile",
+        "type": "primary_customer_profile_type_business"
+      },
+      {
+        "name": "Primary Nonprofit Customer Profile Bundle",
+        "requirement_name": "primary_customer_profile",
+        "type": "primary_customer_profile_type_nonprofit"
+      },
+      {
+        "name": "Primary Government Customer Profile Bundle",
+        "requirement_name": "primary_customer_profile",
+        "type": "primary_customer_profile_type_government"
+      }
+    ],
+    "supporting_document": [
+      [
+        {
+          "accepted_documents": [
+            {
+              "fields": [
+                "address_sids"
+              ],
+              "name": "Physical Business Address",
+              "type": "customer_profile_address",
+              "url": "/SupportingDocumentTypes/customer_profile_address"
+            }
+          ],
+          "description": "Customer Profile HQ Physical Address",
+          "name": "Physical Business Address",
+          "requirement_name": "customer_profile_address",
+          "type": "document"
+        }
+      ]
+    ],
+    "supporting_trust_products": []
+  },
+  "sid": "RNdfbf3fae0e1107f8aded0e7cead80bf5",
+  "url": "https://trusthub.twilio.com/v1/Policies/RNdfbf3fae0e1107f8aded0e7cead80bf5"
+}

@@ -30,16 +30,34 @@ site alone. Everyone else gets the full stack.
 
 | Plan       | Site(s) | Voice agent | Twilio number | Airtable base | Lead delivery |
 |------------|---------|-------------|---------------|---------------|---------------|
-| starter    | 1       | ✓           | ✓             | ✓ (1)         | Resend email to `brand.email` (`LEAD_DELIVERY_MODE=email`) |
-| growth     | 1       | ✓           | ✓             | ✓ (1)         | Site `/api/contact` → Retell `create-phone-call` (callback) |
-| enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Site `/api/contact` → Retell `create-phone-call` (callback) |
-| *web-only* | 1       | —           | —             | —             | Resend email to `brand.email` |
+| starter    | 1       | ✓           | ✓             | ✓ (1)         | Straight into the portal inbox (`LEAD_CALLBACK=off`) |
+| growth     | 1       | ✓           | ✓             | ✓ (1)         | Agent calls the submitter back, then into the inbox (`LEAD_CALLBACK=on`) + CRM |
+| enterprise | N (2–3) | ✓ per site  | ✓ per site    | ✓ (1 shared with `Site` column) | Same as growth, per site |
+| *web-only* | 1       | —           | —             | —             | Straight into the portal inbox |
+
+**Email is not a lead delivery mode.** `LEAD_DELIVERY_MODE` is `portal` on every tier,
+always — every client's web-form leads land in that client's portal inbox. Resend is
+agency-side transactional mail only. Anything describing a Starter lead email is pre-portal
+and wrong.
 
 **Web-only is not a plan.** It is `plan: "starter"` + `receptionistMode: "declined"`, priced
 identically to Starter, offered only when a client refuses AI on their line. onboard.js gates
-the voice stack on `isWebOnly` (from `@jdd/schema`), never on `plan === 'starter'`. The only
-provisioning difference between a Starter-with-receptionist and a Growth site is
-`LEAD_DELIVERY_MODE`: Starter reports web-form leads by email, Growth calls them back.
+the voice stack on `isWebOnly` (from `@jdd/schema`), never on `plan === 'starter'`.
+
+**Starter and Growth run the identical stack front to back** — number rings the owner, agent
+picks up on no-answer, Make webhook fires, Airtable row is written, owner is texted that a
+lead is waiting. Three things differ, and only three:
+
+1. **Web-form behaviour.** Starter drops the submission straight into the portal inbox.
+   Growth has the agent call the submitter back, collect details, and put *that* in the
+   inbox. This is `LEAD_CALLBACK=on|off`, the one provisioning difference in `.env.local`.
+2. **CRM access.** Growth and Enterprise only; gated portal-side on `PortalSite.plan`.
+3. **Included minutes.** `MinuteCaps` is keyed by plan.
+
+A growth → starter downgrade is therefore **non-destructive**: it keeps the number, the
+agent and the LLM, flips `LEAD_CALLBACK` to `off`, and lets the plan field carry the CRM gate
+and the allowance. It used to release the number and delete the agent, which was correct
+before the 2026-10-12 reprice and silently became a way to strip a paying client afterwards.
 
 **The receptionist mode must be stated, never inferred.** onboard.js refuses to run without it
 (the intake carries it, or pass `--receptionist forwarded|published|declined`), because the

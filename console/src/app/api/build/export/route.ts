@@ -19,6 +19,7 @@ import {
   collectSectionRefs,
   verifyCatalogImports,
   verifyUiPinsFor,
+  verifyUiLockFor,
   type Entry,
 } from '@/lib/export';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
@@ -351,6 +352,29 @@ export async function POST(req: Request) {
         const pins = verifyUiPinsFor(repoRoot, slug);
         for (const spec of pins.uncomparable) {
           step(`Note: “${spec}” is not a version tag, so that @jdd/ui pin could not be compared.`);
+        }
+        // A third check, for what the two above structurally cannot see: the LOCKFILES. A
+        // package.json can pin v1.3.0 while the lock beside it still resolves the previous
+        // commit, and then this export installs code the pin does not name. Network, so it
+        // fails soft — an unreachable remote makes every tag uncheckable, never a pass.
+        const locks = await verifyUiLockFor(repoRoot);
+        for (const why of locks.uncheckable) {
+          step(`Note: ${why}`);
+        }
+        if (locks.problems.length > 0) {
+          // Its own error branch rather than folded into libProblems below, because that
+          // branch's two fix texts are about a missing export and about stale repo libs, and
+          // neither is the fix here. Wrong fix advice is expensive: it sends you reading the
+          // wrong file, which is the whole reason this check exists.
+          send({
+            type: 'error',
+            message:
+              'A lockfile does not resolve the @jdd/ui version its package.json pins, so this export would install different code than the pin claims. Nothing was built or pushed.',
+            detail:
+              locks.problems.map((p) => p.message).join('\n') +
+              '\n\nnpm does not re-resolve a github: dependency when only the tag moves, so editing the pin and running "npm install" is not enough — the spec has to be passed explicitly.',
+          });
+          return;
         }
         const libProblems = [...verifyCatalogImports(repoRoot, slug, written), ...pins.problems];
         if (libProblems.length > 0) {

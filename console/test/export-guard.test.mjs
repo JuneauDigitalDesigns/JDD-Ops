@@ -15,6 +15,7 @@
 // Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -23,6 +24,8 @@ import {
   pinnedTag,
   compareTags,
   verifyUiPins,
+  verifyUiLock,
+  parseLsRemoteTags,
 } from '../src/lib/libExports.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -249,4 +252,164 @@ test('the REAL template and console libs read as non-empty', () => {
     assert.deepEqual(unresolved, [], `${lib}: @jdd/ui must resolve from console/node_modules`);
     assert.ok(names?.has(symbol), `template/src/lib/${lib} must provide ${symbol}`);
   }
+});
+
+// ─── the lockfile must resolve the tag the pin names ──────────────────────────
+//
+// These encode the near-miss of 2026-11-02. Bumping @jdd/ui to v1.3.0 (the SMS consent
+// disclosure) and running `npm install` left BOTH lockfiles resolving v1.2.0's commit, and
+// `node_modules/@jdd/ui/src/` with no lead-consent-text.ts in it. Every package.json claimed
+// v1.3.0 while the old form — the one with no disclosure — was what would have built. npm does
+// not re-resolve a `github:` ref when only the tag moves.
+//
+// The two commit shas below are real: `b55deff` is what v1.3.0 points at and `16eabee` is
+// v1.2.0, both read off the repository. Invented shas would make these tests agree with
+// themselves about a shape the vendor never produced.
+
+const V130 = 'b55deff4a4c6494db63ad6f43b456dd9a8f1a7f4';
+const V120 = '16eabee3348cfed0aa62cff0b5262407b7458d3b';
+const TAGS = { 'v1.3.0': V130, 'v1.2.0': V120 };
+
+test('a lockfile that resolves the pinned tag is silent', () => {
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-good.json'),
+    tagCommits: TAGS,
+  });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(uncheckable, []);
+});
+
+test('a lockfile still resolving the PREVIOUS commit is a problem', () => {
+  // THE NEAR-MISS. The lock agrees about the tag and resolves the old commit anyway, which is
+  // precisely what `npm install` leaves behind, and what no other check here would notice.
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-stale-resolved.json'),
+    tagCommits: TAGS,
+    label: 'console',
+  });
+  assert.equal(problems.length, 1, `expected one problem, got ${JSON.stringify(problems)}`);
+  assert.match(problems[0].message, /v1\.3\.0/);
+  assert.match(problems[0].message, /b55deff/, 'must name the commit the tag points at');
+  assert.match(problems[0].message, /16eabee/, 'and the commit actually installed');
+  assert.match(problems[0].message, /npm install/, 'and how to fix it');
+  assert.match(problems[0].message, /^console: /, 'and which lockfile');
+  assert.deepEqual(uncheckable, []);
+});
+
+test('a lockfile never regenerated at all is reported as such', () => {
+  // The lock still records the old SPEC, not just the old commit. Worth its own message: the
+  // fix is the same but the diagnosis is "you edited package.json and nothing else".
+  const { problems } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-stale-spec.json'),
+    tagCommits: TAGS,
+  });
+  assert.ok(problems.length >= 1);
+  assert.match(problems[0].message, /not regenerated/);
+});
+
+test('no mapping for the tag is uncheckable, never a pass', () => {
+  // The tri-state. Without `git ls-remote` output there is nothing to compare against, and
+  // that must not read as "the lock is fine".
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-stale-resolved.json'),
+    tagCommits: { 'v1.0.7': 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' },
+  });
+  assert.deepEqual(problems, [], 'an unknown tag is not a failure');
+  assert.equal(uncheckable.length, 1, 'but it must not be silent either');
+  assert.match(uncheckable[0], /no commit known for v1\.3\.0/);
+});
+
+test('a lockfile with no resolved commit is a problem, not a shrug', () => {
+  const { problems } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-no-resolved.json'),
+    tagCommits: TAGS,
+  });
+  assert.equal(problems.length, 1);
+  assert.match(problems[0].message, /no resolved commit/);
+});
+
+test('a branch pin is uncheckable rather than wrong', () => {
+  // Pinning a branch is a deliberate choice during development. There is no tag to compare a
+  // commit to, so this says so instead of inventing a verdict.
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('repo-branch.json'),
+    lockPath: pin('lock-good.json'),
+    tagCommits: TAGS,
+  });
+  assert.deepEqual(problems, []);
+  assert.match(uncheckable[0], /not a vX\.Y\.Z tag/);
+});
+
+test('an abbreviated sha on either side still compares equal', () => {
+  const { problems } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('lock-good.json'),
+    tagCommits: { 'v1.3.0': V130.slice(0, 7) },
+  });
+  assert.deepEqual(problems, [], 'a 7-char tag sha must match the 40-char resolved one');
+});
+
+test('an unreadable lockfile is uncheckable, never a pass', () => {
+  const { problems, uncheckable } = verifyUiLock({
+    pkgPath: pin('pkg-v130.json'),
+    lockPath: pin('no-such-lock.json'),
+    tagCommits: TAGS,
+  });
+  assert.deepEqual(problems, []);
+  assert.match(uncheckable[0], /could not read/);
+});
+
+// ─── git ls-remote parsing: the annotated-tag trap ────────────────────────────
+//
+// `test/helpers/lib-fixtures/pins/ls-remote-tags.txt` is RECORDED from the real jdd-ui remote,
+// and it is recorded because the shape is the whole point. Every jdd-ui tag is annotated, so
+// each emits two rows:
+//
+//   c58422c…  refs/tags/v1.2.0        <- the tag object
+//   16eabee…  refs/tags/v1.2.0^{}     <- the commit it points at
+//
+// npm records the COMMIT in `resolved`. A parser that took the first row would compare a
+// tag-object sha against a commit sha and report drift for every annotated tag in the repo —
+// turning a check written to catch a false green into a machine for false reds, which is the
+// worse of the two. A hand-written fixture would most likely have had one row per tag and
+// certified exactly that bug.
+
+test('ls-remote parsing prefers the peeled commit over the tag object', () => {
+  const tags = parseLsRemoteTags(readFileSync(pin('ls-remote-tags.txt'), 'utf8'));
+  // The values npm actually puts in `resolved` — not the tag objects cb2e28d / c58422c.
+  assert.equal(tags['v1.3.0'], V130, 'v1.3.0 must map to its commit, not its tag object');
+  assert.equal(tags['v1.2.0'], V120);
+  assert.ok(!Object.keys(tags).some((t) => t.endsWith('^{}')), 'no peel suffix should survive as a key');
+});
+
+test('the recorded remote really does use annotated tags', () => {
+  // Pins the premise. If jdd-ui ever switches to lightweight tags the peel rows vanish, and
+  // this says so rather than letting the preference quietly stop mattering.
+  const raw = readFileSync(pin('ls-remote-tags.txt'), 'utf8');
+  assert.match(raw, /refs\/tags\/v1\.3\.0\^\{\}/, 'v1.3.0 should have a peeled row');
+  assert.match(raw, /^cb2e28d\w*\s+refs\/tags\/v1\.3\.0$/m, 'and a distinct tag-object row');
+});
+
+test('a lightweight tag is taken from its only row', () => {
+  const tags = parseLsRemoteTags(`${V130}\trefs/tags/v9.9.9\n`);
+  assert.equal(tags['v9.9.9'], V130);
+});
+
+test('a peeled row wins whichever order the rows arrive in', () => {
+  // ls-remote sorts them, but nothing in the format guarantees it, and getting this backwards
+  // would be invisible: the wrong sha is still a valid-looking sha.
+  const reversed = `${V130}\trefs/tags/vX^{}\n${'c'.repeat(40)}\trefs/tags/vX\n`;
+  assert.equal(parseLsRemoteTags(reversed)['vX'], V130);
+});
+
+test('ls-remote noise and short shas are ignored', () => {
+  const tags = parseLsRemoteTags(
+    ['From https://github.com/JuneauDigitalDesigns/jdd-ui.git', 'deadbeef\trefs/tags/short', ''].join('\n'),
+  );
+  assert.deepEqual(tags, {}, 'only full 40-char sha rows count');
 });
