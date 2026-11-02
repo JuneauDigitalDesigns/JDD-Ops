@@ -80,7 +80,7 @@ test('checkEnvTierMatrix accepts a freshly minted token and rejects near-misses'
     'LEAD_DELIVERY_MODE=portal',
     'LEAD_CALLBACK=off',
     `LEAD_INGEST_TOKEN=${token}`,
-    'LEAD_INGEST_URL=https://juneaudigitaldesigns.com/api/ingest/lead',
+    'LEAD_INGEST_URL=https://www.juneaudigitaldesigns.com/api/ingest/lead',
   ];
   const run = (token) => checkEnvTierMatrix({ lines: lines(token), plan: 'starter', webOnly: true });
 
@@ -102,7 +102,7 @@ test('checkEnvTierMatrix rejects a Resend leftover', () => {
       'LEAD_DELIVERY_MODE=portal',
       'LEAD_CALLBACK=off',
       `LEAD_INGEST_TOKEN=${newIngestToken()}`,
-      'LEAD_INGEST_URL=https://juneaudigitaldesigns.com/api/ingest/lead',
+      'LEAD_INGEST_URL=https://www.juneaudigitaldesigns.com/api/ingest/lead',
       'RESEND_API_KEY=re_live_123',
     ],
     plan: 'starter',
@@ -127,4 +127,33 @@ test('checkEnvTierMatrix rejects an http or wrong-path ingest URL', () => {
   assert.equal(build('http://juneaudigitaldesigns.com/api/ingest/lead').ok, false, 'plaintext');
   assert.equal(build('https://juneaudigitaldesigns.com/api/contact').ok, false, 'wrong path');
   assert.equal(build('https://preview-abc.vercel.app/api/ingest/lead').ok, true, 'preview host is fine');
+});
+
+test('checkEnvTierMatrix rejects the redirecting apex ingest host', () => {
+  // Measured against production on 2026-11-02, not reasoned about: POST to the apex with a
+  // valid token returns 401 after following the 307 to www, because a cross-host redirect
+  // drops the Authorization header. The same token posted to www returns 200.
+  //
+  // Every default shipped the apex — .env.example, the console placeholder, and the template
+  // in lib/client-env.js — so every client provisioned before this would have lost every web
+  // lead, with a live endpoint, a valid token and nothing failing anywhere visible.
+  const build = (url) =>
+    checkEnvTierMatrix({
+      lines: [
+        'LEAD_DELIVERY_MODE=portal',
+        'LEAD_CALLBACK=off',
+        `LEAD_INGEST_TOKEN=${newIngestToken()}`,
+        `LEAD_INGEST_URL=${url}`,
+      ],
+      plan: 'starter',
+      webOnly: true,
+    });
+
+  const apex = build('https://juneaudigitaldesigns.com/api/ingest/lead');
+  assert.equal(apex.ok, false, 'the apex host must be rejected');
+  assert.match(apex.detail, /apex/i);
+
+  assert.equal(build('https://www.juneaudigitaldesigns.com/api/ingest/lead').ok, true, 'www is the canonical host');
+  // The rule stays narrow: pointing a test client at a branch deploy is supported.
+  assert.equal(build('https://preview-abc.vercel.app/api/ingest/lead').ok, true, 'preview host still fine');
 });

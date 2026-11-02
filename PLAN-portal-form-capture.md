@@ -484,7 +484,7 @@ Lines 83–88 currently branch Resend-vs-callback. The new shape:
 ```
 LEAD_DELIVERY_MODE=portal           # every tier — replaces email|callback
 LEAD_INGEST_TOKEN=<64 hex>          # every tier, never empty
-LEAD_INGEST_URL=https://juneaudigitaldesigns.com/api/ingest/lead
+LEAD_INGEST_URL=https://www.juneaudigitaldesigns.com/api/ingest/lead
 CLIENT_MESSAGING_SERVICE_SID=MG…    # Growth/Enterprise only, after A2P verifies (§1d)
 ```
 

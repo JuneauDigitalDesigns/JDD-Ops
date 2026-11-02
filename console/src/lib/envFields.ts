@@ -152,7 +152,7 @@ export const ENV_FIELDS: EnvField[] = [
     help: 'Where the client site posts captured leads. Point at a preview deploy to test against a branch.',
     kind: 'text',
     plans: ALL,
-    placeholder: 'https://juneaudigitaldesigns.com/api/ingest/lead',
+    placeholder: 'https://www.juneaudigitaldesigns.com/api/ingest/lead',
   },
 ];
 
