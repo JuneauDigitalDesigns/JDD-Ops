@@ -521,3 +521,31 @@ export function verifyUiLock(args: {
 
   return { problems, uncheckable };
 }
+
+/**
+ * `git ls-remote --tags <remote>` output as tag -> COMMIT sha.
+ *
+ * The peeled line is the whole point. An ANNOTATED tag emits two rows:
+ *
+ *   cb2e28d…  refs/tags/v1.3.0        <- the tag OBJECT
+ *   b55deff…  refs/tags/v1.3.0^{}     <- the commit it points at
+ *
+ * npm records the commit in `resolved`, so taking the first row would compare a tag-object
+ * sha against a commit sha and report drift for every annotated tag in the repository — and
+ * jdd-ui's tags are annotated. That would turn a check written to catch a false GREEN into a
+ * generator of false reds, which is the worse of the two failures.
+ *
+ * Lightweight tags emit only the unpeeled row, and for those it IS the commit. So: take the
+ * unpeeled sha, and let a peeled row overwrite it.
+ */
+export function parseLsRemoteTags(stdout: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of String(stdout).split('\n')) {
+    const m = /^([0-9a-fA-F]{40})\s+refs\/tags\/(.+?)(\^\{\})?$/.exec(line.trim());
+    if (!m) continue;
+    const [, sha, tag, peeled] = m;
+    // Unpeeled only fills a gap; peeled always wins, whichever order the rows arrive in.
+    if (peeled || out[tag] === undefined) out[tag] = sha.toLowerCase();
+  }
+  return out;
+}

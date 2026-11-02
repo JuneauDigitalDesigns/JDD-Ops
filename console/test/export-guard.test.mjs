@@ -15,6 +15,7 @@
 // Run: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -24,6 +25,7 @@ import {
   compareTags,
   verifyUiPins,
   verifyUiLock,
+  parseLsRemoteTags,
 } from '../src/lib/libExports.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -360,4 +362,54 @@ test('an unreadable lockfile is uncheckable, never a pass', () => {
   });
   assert.deepEqual(problems, []);
   assert.match(uncheckable[0], /could not read/);
+});
+
+// ─── git ls-remote parsing: the annotated-tag trap ────────────────────────────
+//
+// `test/helpers/lib-fixtures/pins/ls-remote-tags.txt` is RECORDED from the real jdd-ui remote,
+// and it is recorded because the shape is the whole point. Every jdd-ui tag is annotated, so
+// each emits two rows:
+//
+//   c58422c…  refs/tags/v1.2.0        <- the tag object
+//   16eabee…  refs/tags/v1.2.0^{}     <- the commit it points at
+//
+// npm records the COMMIT in `resolved`. A parser that took the first row would compare a
+// tag-object sha against a commit sha and report drift for every annotated tag in the repo —
+// turning a check written to catch a false green into a machine for false reds, which is the
+// worse of the two. A hand-written fixture would most likely have had one row per tag and
+// certified exactly that bug.
+
+test('ls-remote parsing prefers the peeled commit over the tag object', () => {
+  const tags = parseLsRemoteTags(readFileSync(pin('ls-remote-tags.txt'), 'utf8'));
+  // The values npm actually puts in `resolved` — not the tag objects cb2e28d / c58422c.
+  assert.equal(tags['v1.3.0'], V130, 'v1.3.0 must map to its commit, not its tag object');
+  assert.equal(tags['v1.2.0'], V120);
+  assert.ok(!Object.keys(tags).some((t) => t.endsWith('^{}')), 'no peel suffix should survive as a key');
+});
+
+test('the recorded remote really does use annotated tags', () => {
+  // Pins the premise. If jdd-ui ever switches to lightweight tags the peel rows vanish, and
+  // this says so rather than letting the preference quietly stop mattering.
+  const raw = readFileSync(pin('ls-remote-tags.txt'), 'utf8');
+  assert.match(raw, /refs\/tags\/v1\.3\.0\^\{\}/, 'v1.3.0 should have a peeled row');
+  assert.match(raw, /^cb2e28d\w*\s+refs\/tags\/v1\.3\.0$/m, 'and a distinct tag-object row');
+});
+
+test('a lightweight tag is taken from its only row', () => {
+  const tags = parseLsRemoteTags(`${V130}\trefs/tags/v9.9.9\n`);
+  assert.equal(tags['v9.9.9'], V130);
+});
+
+test('a peeled row wins whichever order the rows arrive in', () => {
+  // ls-remote sorts them, but nothing in the format guarantees it, and getting this backwards
+  // would be invisible: the wrong sha is still a valid-looking sha.
+  const reversed = `${V130}\trefs/tags/vX^{}\n${'c'.repeat(40)}\trefs/tags/vX\n`;
+  assert.equal(parseLsRemoteTags(reversed)['vX'], V130);
+});
+
+test('ls-remote noise and short shas are ignored', () => {
+  const tags = parseLsRemoteTags(
+    ['From https://github.com/JuneauDigitalDesigns/jdd-ui.git', 'deadbeef\trefs/tags/short', ''].join('\n'),
+  );
+  assert.deepEqual(tags, {}, 'only full 40-char sha rows count');
 });
