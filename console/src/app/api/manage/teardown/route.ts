@@ -10,6 +10,7 @@ import {
   loadGithubToken,
   loadMakeApiKey,
   loadTeardownCredentials,
+  loadKvCredentials,
 } from '@/lib/opsSecrets';
 import { loadTeardownOps, type Outcome } from '@/lib/teardownOps';
 import { detachSiteFromAccount, getAccount } from '@/lib/accountStore';
@@ -236,6 +237,9 @@ export async function POST(req: Request) {
         const githubToken = loadGithubToken();
         const makeKey = loadMakeApiKey();
         const { twilioAccountSid, twilioAuthToken, airtableApiKey, clerkSecretKey } = loadTeardownCredentials();
+        // Copies KV_* from the ops root into process.env. releaseTwilioNumber refuses to
+        // release a number it cannot first un-index, so without this every release is skipped.
+        loadKvCredentials();
 
         // ── Phase 1: revoke access ──────────────────────────────────────────
         if (plan.portal.configured && plan.portal.email) {
@@ -320,7 +324,13 @@ export async function POST(req: Request) {
             ops.stopAndDeleteMakeScenario({ apiKey: makeKey ?? undefined, zone: 'https://us2.make.com/api/v2', scenarioId: site.make.scenarioId }),
           );
           await runStep(record, `Release Twilio number (${site.siteSlug})`, () =>
-            ops.releaseTwilioNumber({ accountSid: twilioAccountSid ?? undefined, authToken: twilioAuthToken ?? undefined, phoneNumber: site.twilio.number ?? undefined }),
+            ops.releaseTwilioNumber({
+              accountSid: twilioAccountSid ?? undefined,
+              authToken: twilioAuthToken ?? undefined,
+              phoneNumber: site.twilio.number ?? undefined,
+              kvUrl: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+              kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+            }),
           );
           await runStep(record, `Delete Retell agent (${site.siteSlug})`, () =>
             ops.deleteRetellAgent({ apiKey: retellKey ?? undefined, agentId: site.retell.agentId ?? undefined }),

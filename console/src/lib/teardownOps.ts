@@ -52,6 +52,9 @@ interface TeardownOpsModule {
     accountSid: string | undefined;
     authToken: string | undefined;
     phoneNumber: string | undefined;
+    /** Required: the release is refused unless portal:number-owner can be cleared first. */
+    kvUrl: string | undefined;
+    kvToken: string | undefined;
   }): Promise<StepResult>;
   deleteRetellAgent(args: { apiKey: string | undefined; agentId: string | undefined }): Promise<StepResult>;
   deleteRetellLlm(args: { apiKey: string | undefined; llmId: string | null | undefined }): Promise<StepResult>;
