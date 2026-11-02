@@ -86,6 +86,7 @@ import {
   checkBlueprintFieldsResolve,
   checkBlueprintEventFilter,
   checkBlueprintNoDatastore,
+  checkAccountLaneSender,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
   checkNotMasterHook,
@@ -1580,7 +1581,21 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
 
   const apiKey   = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
-  const fromNum  = readEnvLocal(clientDir).TWILIO_NUMBER;      // this client's provisioned number
+  // The owner brief sends from the ACCOUNT-lane number: a JDD-owned sender on JDD's own
+  // approved ACCOUNT_NOTIFICATION campaign, never from this client's number.
+  //
+  // This was `readEnvLocal(clientDir).TWILIO_NUMBER`, which delivers today — onboard.js puts
+  // every client number in the master pool, and pool membership is what registers a number
+  // with a campaign (the account's own history shows one number going 30034 -> delivered when
+  // the campaign was approved, with messaging_service_sid null throughout). It is wrong
+  // anyway: a campaign binds to a Messaging Service and a number sits in exactly one, so a
+  // client number used for owner alerts can never join that client's own CUSTOMER_CARE
+  // service later. It also breaks outright the moment client numbers stop joining the master
+  // pool, which is the point of the two-lane migration.
+  //
+  // Patching the master blueprint cannot fix this: patchPostCallBlueprint stamps `from` onto
+  // every clone, so the value has to be right here.
+  const fromNum  = (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim();
 
   // The SMS destination now comes from the owner's recorded consent, not from
   // content.brand.phone. brand.phone is the number printed on the client's website — a
@@ -2029,7 +2044,10 @@ async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir 
   patchPostCallBlueprint(copy, {
     baseId,
     siteTag,
-    fromNum: readEnvLocal(clientDir).TWILIO_NUMBER,
+    // The same Account-lane sender the live clone uses — see the note at its definition. A
+    // preview showing the client number while the run writes the notification number would
+    // make the dry run bless something different from what provisions.
+    fromNum: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
     toNum: smsEnabled ? (toE164(smsAlerts?.phone) ?? '') : '',
     smsEnabled,
     masterMap,
@@ -2071,6 +2089,12 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
       checkBlueprintFieldsResolve({ blueprint: preview?.blueprint ?? null, clientMap: preview?.clientMap ?? null, siteTag }),
       checkBlueprintEventFilter({ blueprint: preview?.blueprint ?? null }),
       checkBlueprintNoDatastore({ blueprint: preview?.blueprint ?? null }),
+      checkAccountLaneSender({
+        blueprint: preview?.blueprint ?? null,
+        notificationNumber: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
+        clientNumber: twilioNumber,
+        smsEnabled: smsAlerts?.consented === true && Boolean(smsAlerts?.phone),
+      }),
       checkAirtableSchemaCovers({
         masterMap: preview?.masterMap ?? null,
         clientMap: preview?.clientMap ?? null,
@@ -2787,6 +2811,19 @@ function preflight(intake) {
         );
       } else {
         fmt('TWILIO_MESSAGING_SERVICE_SID', 'MG');
+      }
+
+      // And a sender for the owner brief. Without one the cloned Twilio module carries an
+      // empty `from`, which errors on every run until Make auto-disables the scenario, taking
+      // the Airtable call log down with it. So a missing number is fatal, not a warning.
+      if (!process.env.TWILIO_NOTIFICATION_NUMBER) {
+        errors.push(
+          'SMS alerts are consented but TWILIO_NOTIFICATION_NUMBER is not set — the owner brief ' +
+          'has no Account-lane sender. Buy one LOCAL number, add it to the TWILIO_MESSAGING_SERVICE_SID ' +
+          'sender pool, leave its voiceUrl unset, and record it in .env. It is agency-wide, bought once.',
+        );
+      } else {
+        fmt('TWILIO_NOTIFICATION_NUMBER', '+1');
       }
     }
   }
