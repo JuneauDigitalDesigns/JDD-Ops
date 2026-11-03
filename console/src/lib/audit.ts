@@ -54,7 +54,10 @@ export type AuditAction =
   | 'firewall.apply'
   | 'ticket.status'
   | 'ticket.reply'
-  | 'ticket.delete';
+  | 'ticket.delete'
+  // A2P registration: the step id and a SID-only summary, never a field value.
+  | 'a2p.step'
+  | 'a2p.intake';
 
 export interface AuditEntry {
   /** ISO timestamp. */

@@ -16,6 +16,7 @@ export type SectionId =
   | 'deployments'
   | 'domain'
   | 'voice-agent'
+  | 'messaging'
   | 'portal'
   | 'featured'
   | 'danger';
@@ -26,7 +27,7 @@ export interface ManageSection {
   /** One line under the section title. */
   lede: string;
   /** Key into ManageRail's icon map. */
-  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'portal' | 'warning' | 'quotes';
+  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'chat' | 'portal' | 'warning' | 'quotes';
   /** Which plans get this section. */
   plans: Plan[];
   /** Rendered visually apart, after a spacer and rule, with a danger-toned icon. */
@@ -36,6 +37,13 @@ export interface ManageSection {
 const ALL: Plan[] = ['starter', 'growth', 'enterprise'];
 /** Starter clients have no voice agent, no Twilio number, and no Retell prompt. */
 const VOICE: Plan[] = ['growth', 'enterprise'];
+/**
+ * Plans that register a per-client A2P brand. Its own constant rather than VOICE: the two
+ * happen to match today, but the voice gate is about the receptionist and has already moved
+ * once (every tier has one since the 2026-10-12 reprice), while this one is about who texts
+ * their own customers — Growth and Enterprise only (lib/a2p-register.js REGISTERING_PLANS).
+ */
+const A2P: Plan[] = ['growth', 'enterprise'];
 
 export const MANAGE_SECTIONS: ManageSection[] = [
   {
@@ -72,6 +80,13 @@ export const MANAGE_SECTIONS: ManageSection[] = [
     lede: 'The prompt the Retell agent answers with.',
     icon: 'microphone',
     plans: VOICE,
+  },
+  {
+    id: 'messaging',
+    label: 'Messaging & A2P',
+    lede: 'Register this client’s own texting brand and campaign with the carriers.',
+    icon: 'chat',
+    plans: A2P,
   },
   {
     id: 'portal',
