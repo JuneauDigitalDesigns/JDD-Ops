@@ -1,7 +1,7 @@
 import 'server-only';
 import { accountStoreConfigured, getAccountEmailByUserId, patchSite } from './accountStore';
 import type { ClientContext } from './types';
-import { loadIdentity, loadRegister, loadStore } from './a2pChain';
+import { loadIdentity, loadRegister, loadStore, type A2pBatchForm, type A2pBatchStepResult } from './a2pChain';
 import { loadA2pEnv } from './opsSecrets';
 import { appendAudit } from './audit';
 
@@ -157,4 +157,71 @@ function audit(
     return;
   }
   appendAudit(entry);
+}
+
+/**
+ * The confirmed batch — the sales-call close's one Submit (or Save) button.
+ *
+ * One typed-slug confirm for the whole sequence: approved by the operator in chat on 2026-11-03
+ * as an exception to decision 3. Every step still runs through `runStep`'s guards; the batch
+ * validates all input first, stops at the first failure and skips what is already done (see
+ * `runBatch` in lib/a2p-register.js). Each step is audited exactly like a single click.
+ *
+ * Never log `request`: it may carry an EIN and a person's details, for this one call only.
+ */
+export async function runA2pBatchForClient(
+  ctx: ClientContext,
+  request: { mode?: 'submit' | 'save'; form?: A2pBatchForm; confirm?: boolean; confirmSlug?: string },
+): Promise<{ status: number; json: Record<string, unknown> }> {
+  if (request.confirm !== true || request.confirmSlug !== ctx.slug) {
+    return { status: 400, json: { error: `Type the client slug (${ctx.slug}) to confirm.` } };
+  }
+  const mode = request.mode === 'save' ? 'save' : 'submit';
+  const form = request.form;
+  if (!form || (form.registrationPath !== 'standard' && form.registrationPath !== 'sole-proprietor')) {
+    return { status: 400, json: { error: 'Choose a registration type.' } };
+  }
+  const submitted = collectStrings(form).filter((v) => v.trim().length >= 4);
+
+  const [register, store, identity] = await Promise.all([loadRegister(), loadStore(), loadIdentity()]);
+  const clean = (message: string) =>
+    identity.findTaxIdPaths(message).length ? 'Step failed (message withheld: it contained a tax-ID-shaped value).' : scrubSubmitted(message, submitted);
+
+  try {
+    const before = await store.readRegistration({ slug: ctx.slug });
+    const statusBefore = register.portalStatusFor(before);
+    const out = await register.runBatch({
+      mode,
+      form,
+      slug: ctx.slug,
+      plan: ctx.plan,
+      record: before,
+      siteSlugs: Object.keys(siteNumbers(ctx)),
+      env: loadA2pEnv(),
+      persist: (patch, current) => store.writeRegistration({ slug: ctx.slug, patch, current }),
+      onStep: (r) =>
+        audit(store, {
+          slug: ctx.slug,
+          ok: r.status === 'done',
+          summary: `A2P batch ${r.step}: ${r.status === 'done' ? r.summary ?? 'done' : clean(r.error ?? 'failed')}`,
+          step: r.step,
+        }),
+    });
+    const results: A2pBatchStepResult[] = out.results.map((r) => (r.error ? { ...r, error: clean(r.error) } : r));
+    const statusAfter = register.portalStatusFor(out.record);
+    const portal = statusAfter !== statusBefore ? await syncPortalStatus(ctx, statusAfter) : [];
+    return {
+      status: out.ok ? 200 : out.invalid ? 400 : 502,
+      json: { ok: out.ok, invalid: out.invalid, results, record: out.record, portalStatus: statusAfter, portal },
+    };
+  } catch (err) {
+    return { status: 409, json: { ok: false, error: clean(err instanceof Error ? err.message : 'Batch failed.') } };
+  }
+}
+
+/** Every string inside the form, for scrubbing. Never logged. */
+function collectStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') out.push(value);
+  else if (value && typeof value === 'object') for (const v of Object.values(value)) collectStrings(v, out);
+  return out;
 }

@@ -38,6 +38,7 @@ import {
   submitProfile,
   createBusinessEndUser,
   A2pStepRefused,
+  runBatch,
 } from '../lib/a2p-register.js';
 import { KNOWN_POLICIES } from '../lib/a2p-readiness.js';
 import {
@@ -493,4 +494,81 @@ test('a mock registration never reports verified, and neither does a campaign wi
   assert.equal(portalStatusFor({ ...verified, numbers: { s: { ...verified.numbers.s, inService: false } } }), 'campaign-pending');
   assert.equal(portalStatusFor({ ...verified, statuses: { brand: 'FAILED' } }), 'failed');
   assert.equal(portalStatusFor(null), 'none');
+});
+
+// ── The confirmed batch (sales-call close; one typed-slug confirm, approved 2026-11-03) ──────
+
+const FORM = {
+  registrationPath: 'standard',
+  legalBusinessName: "Arthur's Plumbing LLC",
+  businessType: 'Limited Liability Corporation',
+  businessIndustry: 'CONSUMER',
+  websiteUrl: 'https://arthursplumbing.com',
+  ein: EIN,
+  rep: { firstName: 'Arthur', lastName: 'Reyes', jobPosition: 'CEO', email: 'arthur@arthursplumbing.com', phone: '+14075550123' },
+  address: { street: '1200 Main St', city: 'Orlando', region: 'FL', postalCode: '32801', country: 'US' },
+};
+
+function batchHarness({ fetchImpl = twilio(), redis = redisSpy(), slug = 'arthurs-plumbing' } = {}) {
+  let clock = Date.parse('2026-11-03T12:00:00Z');
+  const now = () => new Date((clock += 1000));
+  return {
+    fetchImpl,
+    redis,
+    run: async (mode, form = FORM) =>
+      runBatch({
+        mode, form, slug, plan: 'growth', record: await redis.get(a2pRegistrationKey(slug)), env: ENV, fetchImpl, now,
+        persist: (patch, current) => writeRegistration({ slug, patch, current, redis, now }),
+      }),
+  };
+}
+
+test('the submit batch files both bundles in one run, with the EIN in exactly one request', async () => {
+  const b = batchHarness();
+  const out = await b.run('submit');
+  assert.equal(out.ok, true, JSON.stringify(out.results));
+  assert.deepEqual(out.results.map((r) => r.status), Array(10).fill('done'));
+  assert.equal(out.record.statuses.profile, 'pending-review');
+  assert.equal(out.record.statuses.trustProduct, 'pending-review');
+  const carrying = b.fetchImpl.calls.filter((c) => c.body.includes(encodeURIComponent(EIN)) || c.body.includes(EIN));
+  assert.equal(carrying.length, 1);
+  assert.ok(!allStrings(b.redis.writes.map((w) => w.value)).join(' ').includes(EIN));
+});
+
+test('"Add later" saves without the EIN, and the same button finishes the job once it is typed', async () => {
+  const b = batchHarness();
+  const saved = await b.run('save', { ...FORM, ein: EIN }); // an EIN in the form must still not go out
+  assert.deepEqual(saved.results.map((r) => [r.step, r.status]), [['profile.create', 'done'], ['rep.create', 'done'], ['address.create', 'done']]);
+  assert.equal(b.fetchImpl.calls.filter((c) => c.body.includes(encodeURIComponent(EIN))).length, 0, 'save sent the EIN');
+
+  const before = b.fetchImpl.calls.length;
+  const done = await b.run('submit');
+  assert.equal(done.ok, true);
+  assert.deepEqual(
+    done.results.filter((r) => r.status === 'skipped').map((r) => r.step),
+    ['profile.create', 'rep.create', 'address.create'],
+    'resume skips what the record already holds',
+  );
+  const creates = b.fetchImpl.calls.slice(before).filter((c) => c.method === 'POST' && c.path === '/v1/CustomerProfiles');
+  assert.equal(creates.length, 0, 'no second profile');
+});
+
+test('the batch validates every input before its first write', async () => {
+  const b = batchHarness();
+  const out = await b.run('submit', { ...FORM, rep: { ...FORM.rep, jobPosition: 'Owner' }, address: { ...FORM.address, postalCode: '' } });
+  assert.equal(out.ok, false);
+  assert.deepEqual(out.invalid.sort(), ['address.postalCode', 'rep.jobPosition']);
+  assert.equal(b.fetchImpl.calls.filter((c) => c.method !== 'GET').length, 0, 'nothing may be written');
+});
+
+test('a noncompliant evaluation stops the batch before anything is submitted', async () => {
+  const b = batchHarness({ fetchImpl: twilio({ evaluation: EVAL_FAILING }) });
+  const out = await b.run('submit');
+  assert.equal(out.ok, false);
+  const byStep = Object.fromEntries(out.results.map((r) => [r.step, r]));
+  assert.equal(byStep['profile.evaluate'].status, 'failed');
+  assert.match(byStep['profile.evaluate'].error, /authorized_representative_1\.job_position/);
+  for (const step of ['profile.submit', 'trust.create', 'trust.evaluate', 'trust.submit']) assert.equal(byStep[step].status, 'not-run');
+  const submits = b.fetchImpl.calls.filter((c) => c.method === 'POST' && /^\/v1\/(CustomerProfiles|TrustProducts)\/BU[0-9a-f]+$/.test(c.path));
+  assert.equal(submits.length, 0, 'nothing was submitted');
 });

@@ -39,6 +39,33 @@ body. **The slug is the only thing that may go in the URL.** Never log the body.
 Reads: `GET /api/manage/a2p?slug=` (record, steps, availability, intake, what the client still owes)
 and `GET /api/manage/a2p/readiness`.
 
+**C. The close-wizard variant + the confirmed batch** (PLAN decision 12, approved 2026-11-03):
+
+```tsx
+<A2pRegistrationPanel
+  slug={slug}
+  enums={await loadA2pEnums()}          // server component
+  variant="close-wizard"
+  vertical="hvac"                        // preselects the TCR industry
+  prefill={{ legalBusinessName, websiteUrl, repFirstName, repLastName, repEmail, repPhone, address /* string, shown not parsed */ }}
+  onResult={({ ok, results }) => …}     // optional; the panel draws its own checklist
+/>
+```
+
+It posts `POST /api/manage/a2p/batch?slug=` with `{ mode: 'submit' | 'save', form, confirm: true, confirmSlug }`
+(server: `runA2pBatchForClient`; core: `runBatch` in `lib/a2p-register.js`). Response: `{ ok, invalid?,
+results: [{ step, status: 'done'|'skipped'|'failed'|'not-run', summary?, error? }], record, portalStatus }`.
+- `submit`: profile.create → business.create (standard) → rep.create → address.create → profile.attach →
+  profile.evaluate → profile.submit → trust.create → trust.evaluate → trust.submit.
+- `save` ("Add later"): profile.create → rep.create → address.create. Never sends an EIN, even if one is in
+  the form. Pressing Submit later skips those three and carries on.
+- Everything is validated before the first write; `invalid` lists group-prefixed field names
+  (`rep.jobPosition`, `address.postalCode`).
+- **Unverified, and likely on a real filing:** `trust.evaluate` may fail on the secondary-profile proof
+  until Twilio moves the just-submitted profile to `in-review`. The batch then stops with the profile filed
+  and the trust product created; pressing Submit again later resumes at `trust.evaluate`. Design the
+  close step so "Business profile submitted ✓, messaging registration pending" is a normal outcome.
+
 ## 2. Steps, inputs, gates
 
 Every step except `status.refresh` is a Twilio write: it needs `confirm: true` and re-runs Phase 0

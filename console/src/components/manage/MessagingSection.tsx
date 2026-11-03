@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowClockwise, CheckCircle, Circle, Lock, SpinnerGap, Warning, XCircle } from '@phosphor-icons/react';
 import { useManage } from './ManageContext';
 import SectionHeader from './SectionHeader';
+import A2pCloseWizard, { type CloseWizardPrefill } from './A2pCloseWizard';
 import type {
+  A2pBatchStepResult,
   A2pEnums,
   A2pIntakeRecord,
   A2pRegistrationRecord,
@@ -103,7 +105,26 @@ export default function MessagingSection({ enums }: { enums: A2pEnums }) {
  * `embedded` drops the page header and width; everything else, the confirm dialog included,
  * is identical. The host must pass `enums` from a server component (`loadA2pEnums()`).
  */
-export function A2pRegistrationPanel({ slug, enums, embedded = false }: { slug: string; enums: A2pEnums; embedded?: boolean }) {
+export function A2pRegistrationPanel(props: {
+  slug: string;
+  enums: A2pEnums;
+  embedded?: boolean;
+  /**
+   * `close-wizard` — the sales-call close's SMS step: one form, one typed-slug confirm, a
+   * three-item checklist (A2pCloseWizard.tsx). Same chain, same retention rules.
+   */
+  variant?: 'stepper' | 'close-wizard';
+  prefill?: CloseWizardPrefill;
+  vertical?: string;
+  onResult?: (result: { ok: boolean; results: A2pBatchStepResult[] }) => void;
+}) {
+  if (props.variant === 'close-wizard') {
+    return <A2pCloseWizard slug={props.slug} enums={props.enums} prefill={props.prefill} vertical={props.vertical} onResult={props.onResult} />;
+  }
+  return <A2pStepper slug={props.slug} enums={props.enums} embedded={props.embedded} />;
+}
+
+function A2pStepper({ slug, enums, embedded = false }: { slug: string; enums: A2pEnums; embedded?: boolean }) {
   const ctx = { slug };
   const Shell = embedded ? EmbeddedShell : PageShell;
   const [data, setData] = useState<SectionData | null>(null);

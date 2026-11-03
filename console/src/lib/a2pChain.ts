@@ -126,6 +126,40 @@ interface RegisterModule {
     env?: Record<string, string | undefined>;
   }): Promise<{ record: A2pRegistrationRecord; summary: string }>;
   A2pStepRefused: new (message: string) => Error;
+  batchSteps(mode: 'submit' | 'save', path: A2pPath): string[];
+  runBatch(args: {
+    mode: 'submit' | 'save';
+    form: A2pBatchForm;
+    slug: string;
+    plan: string;
+    record: A2pRegistrationRecord | null;
+    siteSlugs?: string[];
+    persist: (patch: Partial<A2pRegistrationRecord>, current: A2pRegistrationRecord | null) => Promise<A2pRegistrationRecord>;
+    onStep?: (result: A2pBatchStepResult) => void;
+    env?: Record<string, string | undefined>;
+  }): Promise<{ ok: boolean; invalid?: string[]; results: A2pBatchStepResult[]; record: A2pRegistrationRecord | null }>;
+}
+
+/** Mirrors `BatchForm` in lib/a2p-register.js — the close wizard's one form. */
+export interface A2pBatchForm {
+  registrationPath: A2pPath;
+  legalBusinessName?: string;
+  businessType?: string;
+  businessIndustry?: string;
+  websiteUrl?: string;
+  /** Standard + submit only. Sent to Twilio once, never stored. */
+  ein?: string;
+  rep: { firstName: string; lastName: string; jobPosition?: string; email: string; phone: string };
+  address: { street: string; city: string; region: string; postalCode: string; country: string };
+  brandName?: string;
+  vertical?: string;
+}
+
+export interface A2pBatchStepResult {
+  step: string;
+  status: 'done' | 'skipped' | 'failed' | 'not-run';
+  summary?: string;
+  error?: string;
 }
 
 interface StoreModule {
