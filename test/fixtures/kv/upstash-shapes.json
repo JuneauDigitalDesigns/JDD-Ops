@@ -1,0 +1,9 @@
+{
+  "_recorded": "2026-11-02 against the production Upstash KV (tolerant-pug), read-only, via POST in path form. VALUES are scrubbed; the SHAPES are what matters and are exactly as returned.",
+  "scan": { "result": ["0", []] },
+  "getTokenRecord": {
+    "_note": "result is a JSON STRING, not an object: @upstash/redis serialises objects on set and REST returns the raw string. acctScope was 16 lowercase hex chars; replaced here.",
+    "result": "{\"acctScope\":\"0123456789abcdef\",\"slug\":\"_e2e_test_growth\"}"
+  },
+  "exists": { "result": 0 }
+}

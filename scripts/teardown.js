@@ -36,6 +36,7 @@ import {
   deleteRetellAgent,
   deleteVercelProject,
   deleteAirtableBase,
+  purgePortalSiteData,
 } from '../lib/teardown-ops.js';
 
 function fail(msg, err) {
@@ -147,6 +148,19 @@ async function main() {
         kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
       }),
       'Twilio number',
+    );
+    // Leads, CRM records and the ingest token. Teardown used to leave all three: customer
+    // names and numbers sitting in KV with nothing left to find them by, and a token that was
+    // still a live credential. Purges only this site — see isSiteScopedKey for the sibling trap.
+    report(
+      await purgePortalSiteData({
+        kvUrl: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+        kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+        siteSlug: s.slug,
+        accountEmail: s.env.PORTAL_ACCOUNT_EMAIL,
+        ingestToken: s.env.LEAD_INGEST_TOKEN,
+      }),
+      'Portal data',
     );
     report(await deleteRetellAgent({ apiKey: process.env.RETELL_API_KEY, agentId: s.env.RETELL_AGENT_ID }), 'Retell agent');
   }
