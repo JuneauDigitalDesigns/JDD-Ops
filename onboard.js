@@ -95,6 +95,9 @@ import {
 } from './lib/onboard-checks.js';
 // Make rate-limits per organization per minute; a 429 is "wait", not "unreachable".
 import { fetchWithRetry } from './lib/make-fetch.js';
+// stdout is narrated into the console UI and pasted into chats; nothing printed may carry a
+// credential. See lib/secrets.js for the run that printed two.
+import { redactUrlCredentials, gitAuthEnv } from './lib/secrets.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -174,10 +177,11 @@ function dryLog(msg) {
 
 function run(cmd, opts = {}) {
   if (DRY_RUN) {
-    dryLog(`would run: ${cmd}`);
+    dryLog(`would run: ${redactUrlCredentials(cmd)}`);
     return;
   }
-  console.log(`  $ ${cmd}`);
+  // Redacted as a second line of defence — the first is never putting a credential in a command.
+  console.log(`  $ ${redactUrlCredentials(cmd)}`);
   execSync(cmd, { stdio: 'inherit', ...opts });
 }
 
@@ -2169,10 +2173,15 @@ function commitAndPush(repoDir, brandName) {
   }
   const safeMsg = brandName.replace(/['`$\\]/g, '');
   run(`git commit -m "feat: initial provisioning for ${safeMsg}"`, { cwd: repoDir });
-  const token = process.env.GITHUB_TOKEN;
   const remoteUrl = execSync('git remote get-url origin', { cwd: repoDir }).toString().trim();
-  const authed = remoteUrl.replace('https://', `https://${token}@`);
-  run(`git -c credential.helper= push ${authed} HEAD:main`, { cwd: repoDir });
+  // The token goes in an auth header set through GIT_CONFIG_* env, never in the URL. It used to be
+  // `https://${token}@github.com/…`, which run() echoed on every push — and which git itself would
+  // also print on any failed push, past any redaction of our own. `credential.helper=` keeps a
+  // machine-wide credential helper from being used instead, so the header is the only auth path.
+  run(`git -c credential.helper= push ${remoteUrl} HEAD:main`, {
+    cwd: repoDir,
+    env: { ...process.env, ...gitAuthEnv(process.env.GITHUB_TOKEN) },
+  });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -2513,7 +2522,7 @@ async function provisionPortalTestLogin({ email, useTestLogin, testPassword, pri
   if (existingUserId) {
     try {
       await clerk.users.updateUser(existingUserId, { password: testPassword, skipPasswordChecks: true });
-      console.log(`  Portal test login → ${email} / ${testPassword}`);
+      console.log(`  Portal test login → ${email} (password: PORTAL_TEST_PASSWORD in jdd-ops/.env)`);
       return existingUserId;
     } catch (err) {
       console.warn(`  ⚠ Saved CLERK_USER_ID ${existingUserId} did not update (${err?.message ?? err}); resolving by email…`);
@@ -2543,7 +2552,7 @@ async function provisionPortalTestLogin({ email, useTestLogin, testPassword, pri
     }
   }
 
-  console.log(`  Portal test login → ${email} / ${testPassword} (user ${user.id})`);
+  console.log(`  Portal test login → ${email} (password: PORTAL_TEST_PASSWORD in jdd-ops/.env; user ${user.id})`);
   patchEnvLocal(primaryClientDir, 'CLERK_USER_ID', user.id);
   return user.id;
 }
