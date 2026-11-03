@@ -321,7 +321,7 @@ function siteReviewPhase(ctx: ClientContext): Phase {
                 {
                   t: 'callout',
                   tone: 'info',
-                  body: `This is a web-only client (receptionist declined) — no voice agent or Make scenario. Submit the contact form with a test message and confirm the lead appears in ${primary?.brandName ?? 'the client'}’s portal inbox. There is no lead email on any tier: LEAD_DELIVERY_MODE is always “portal”.`,
+                  body: `This is a web-only client (receptionist declined) — no voice agent or Make scenario. Submit the contact form with a test message and confirm the lead appears in ${primary?.brandName ?? 'the client'}’s portal inbox. If the owner has text alerts on, they also get “New lead from … — open your portal.” from JDD’s notification number. There is no lead email on any tier: LEAD_DELIVERY_MODE is always “portal”.`,
                 } as Block,
               ])
             : []),
@@ -404,7 +404,9 @@ function callLoggingReviewStepsForSite(ctx: ClientContext, s: SiteInfo, config: 
         {
           t: 'substeps',
           items: [
-            { text: `Trigger an AI-handled call: submit the form with your number, or call ${twilio.value} and let it ring past ${ring}s so the AI answers.` },
+            ctx.plan === 'starter'
+              ? { text: `Trigger an AI-handled call: call ${twilio.value} and let it ring past ${ring}s so the AI answers.`, detail: 'Not the web form — Starter runs with LEAD_CALLBACK=off, so a submission lands in the portal inbox and no call is placed.' }
+              : { text: `Trigger an AI-handled call: submit the form with your number (the agent calls you back), or call ${twilio.value} and let it ring past ${ring}s so the AI answers.`, detail: 'A form lead may also send the owner a “New lead from …” text at submit. Agency PR #30 drops that for callback leads, leaving the end-of-call brief as their only text; until it merges, two texts is expected.' },
             { text: 'Finish the call and hang up.' },
             { text: 'Within ~30s confirm a new Airtable Call Log row AND a brief SMS to the owner’s SMS-consent number.', detail: 'That is the number the owner ticked consent beside at intake — not necessarily the line calls forward to. No consent on file means no SMS, by design: the clone has no Twilio module.' },
           ],
@@ -524,7 +526,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
       {
         id: 'a-make-post-build',
         title: 'Prepare the post-call master (Webhook → filter → Airtable → Twilio SMS)',
-        why: 'onboard.js clones this master per client and patches the copy: the Airtable base, table and field ids, and the Twilio From/To. The master itself never runs and is never modified.',
+        why: 'onboard.js clones this master per client and patches the copy: the Airtable base, table and field ids, and the Twilio From/To. The master itself never runs, and onboard.js never writes to it — any change to the master is a deliberate, operator-approved edit (re-record its fixtures afterwards) that only clones made later inherit.',
         blocks: [
           {
             t: 'substeps',
@@ -608,7 +610,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
       {
         id: 'a-twilio-notification-number',
         title: 'The JDD notification number (owner-alert sender)',
-        why: 'Owner alerts send from this one JDD number for every client — today that is the post-call brief; new-lead alerts are meant to join it. It already sits in JDD’s approved campaign pool, so a new client needs no SMS registration for the owner to get texts. Agency-wide, bought once.',
+        why: 'Every owner alert sends from this one JDD number, for every client: the post-call brief (Make clone) and the “New lead from …” web-form alert (agency site, every tier including web-only). It already sits in JDD’s approved campaign pool, so a new client needs no SMS registration for the owner to get texts. Agency-wide, bought once.',
         blocks: [
           {
             t: 'context',
@@ -663,6 +665,10 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
               { text: 'PAGESPEED_API_KEY — PageSpeed Insights API key (still Google; one global key powers the Performance tab).' },
               { text: 'Upstash Redis: provision (Vercel → Storage) and confirm the env names match Redis.fromEnv() (UPSTASH_REDIS_REST_URL/_TOKEN).' },
               { text: 'AIRTABLE_API_KEY — the same JDD key; the portal reads each client’s Call Log.' },
+              {
+                text: 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_MESSAGING_SERVICE_SID + TWILIO_NOTIFICATION_NUMBER — the same JDD values as jdd-ops/.env, on the agency’s Vercel project too.',
+                detail: 'They send the owner’s “New lead from …” text. Missing any one, the alert logs and sends nothing while the lead itself still lands in the portal — so a gap here is silent. The agency site refuses to send without TWILIO_NOTIFICATION_NUMBER rather than letting Twilio pick a client’s number from the pool.',
+              },
             ],
           },
           { t: 'env', file: 'juneau-digital-designs/.env', vars: [
@@ -671,6 +677,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             { key: 'PAGESPEED_API_KEY', value: 'PageSpeed Insights — score + CrUX real-user field data' },
             { key: 'AIRTABLE_API_KEY', value: 'same JDD key — reads each client Call Log' },
             { key: 'UPSTASH_REDIS_REST_URL + _TOKEN', value: 'cache + rate-limit (Redis.fromEnv())' },
+            { key: 'TWILIO_ACCOUNT_SID + _AUTH_TOKEN + _MESSAGING_SERVICE_SID + _NOTIFICATION_NUMBER', value: 'same JDD values — the owner’s new-lead text (account lane)' },
           ] },
           {
             t: 'callout',
