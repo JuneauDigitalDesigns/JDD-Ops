@@ -6,6 +6,7 @@
 // activity trail so corrections stay auditable.
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { CalendarPlus, CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
 import { LEAD_SOURCE_SHORT } from '@/lib/lead-meta';
 import type { DemoCall, PlanInterest, QueuedLead } from '@/lib/leadTypes';
@@ -402,6 +403,13 @@ export default function LeadModal({
                       <Copy size={13} /> {phoneCopied ? 'Copied' : 'Copy'}
                     </button>
                   </>
+                )}
+                {/* Close on a call: order, terms, payment link, setup. The wizard opens at the
+                    first unfinished step, so this is also Resume for a close left part-way. */}
+                {!converted && !isLost && (
+                  <Link href={`/leads/${lead.id}/close`} className="btn btn-sm btn-primary">
+                    Close on call
+                  </Link>
                 )}
                 <button type="button" onClick={onOpenScript} className="btn btn-sm btn-accent">
                   <Phone size={13} /> Call script

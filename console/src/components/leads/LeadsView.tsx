@@ -133,6 +133,18 @@ export default function LeadsView() {
     load();
   }, [load]);
 
+  // A client closed on a call who paid later from their link is fulfilled by the agency on its
+  // own, but only the console can create their clients/ folder. Finish any such close now, and
+  // reload if one turned a lead into a client.
+  useEffect(() => {
+    fetch('/api/sales/sweep', { method: 'POST' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.converted) && d.converted.length) load();
+      })
+      .catch(() => {});
+  }, [load]);
+
   // Deep-link: /leads?open={id} opens that lead once it has loaded — the back-link a meeting's
   // "View lead" uses. Waits for the leads to arrive so the id can resolve, then strips the query
   // so a later refresh or close doesn't reopen it. One-shot via the ref guard.

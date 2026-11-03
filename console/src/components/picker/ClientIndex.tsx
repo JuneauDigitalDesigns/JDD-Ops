@@ -219,12 +219,25 @@ export default function ClientIndex() {
     }
   }, []);
 
+  /** Readiness lights for clients closed on a call, keyed by slug. Supplementary, like health. */
+  const [readiness, setReadiness] = useState<Record<string, React.ComponentProps<typeof ClientCard>['readiness']>>({});
+  const loadReadiness = useCallback(async () => {
+    try {
+      const res = await fetch('/api/sales/readiness', { cache: 'no-store' });
+      const data = await res.json();
+      setReadiness(data.readiness ?? {});
+    } catch {
+      /* supplementary — failure just leaves the cards without lights */
+    }
+  }, []);
+
   useEffect(() => {
     if (!prefsRead) return;
     load();
     loadHealth();
     loadPending();
-  }, [prefsRead, load, loadHealth, loadPending]);
+    loadReadiness();
+  }, [prefsRead, load, loadHealth, loadPending, loadReadiness]);
 
   const toggleFixtures = useCallback(() => {
     setShowFixtures((prev) => {
@@ -331,10 +344,15 @@ export default function ClientIndex() {
             (plans.size === 0 || plans.has(it.plan)),
         );
 
+    // A client closed on a call keeps its slug from the call onwards, so its pending-onboarding
+    // record and its clients/ folder share one slug. The folder is the real client; without
+    // this the same client showed twice, once as each.
+    const clientSlugs = new Set(clients.map((c) => c.slug));
     const visiblePending = attentionOnly
       ? []
       : pendingOnboard.filter(
           (p) =>
+            !clientSlugs.has(p.slug) &&
             matchesQuery(p.name, p.slug, q) &&
             (plans.size === 0 || plans.has(p.plan as Plan)),
         );
@@ -492,6 +510,7 @@ export default function ClientIndex() {
                     lastTouched={activity[c.slug]}
                     attention={attentionBySlug.get(c.slug)}
                     highlight={c.slug === highlightSlug}
+                    readiness={readiness[c.slug]}
                     onSelect={() => router.push(`/c/${c.slug}`)}
                   />
                 );

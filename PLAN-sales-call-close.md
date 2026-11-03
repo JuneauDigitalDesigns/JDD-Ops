@@ -360,3 +360,21 @@ last item is "EIN still needed".
 - **O4** Rollback: everything new is behind the new endpoints and `order_id` metadata. Self-serve sessions
   never carry `order_id`, so reverting the agency PR leaves self-serve exactly as it is. The one shared
   edit is the dispatch line in `provisionPaidSession`.
+
+## 12. As built (2026-11-03): where the build differs from this plan
+
+| Plan said | Built | Why |
+|---|---|---|
+| Order step per mockup | Adds **Entity type**, **Business address**, **Title** | The agreement PDF names the client as "a {entity} located at {address}" and prints the signer's title. The mockup didn't collect them, and they can't be invented. |
+| Console shows prices | New agency `GET /api/ops/orders/prices` (from Schedule A) + console `/api/sales/prices` | The console has no price source, and a copy would drift. |
+| Expired link releases the Site ID | The claim is **kept** on expiry, and released only by Cancel | A lapsed link is a client who hasn't paid yet, not one who said no. |
+| Welcome email sent by the webhook | The operator path sends it from inside fulfilment, behind the same NX claim | Only the first fulfilling caller holds the invite URL (it isn't stored). |
+| "Read the full Terms of Service" link | **Removed** | The agency has no public terms page. `/agreement` is the signing flow. The terms are emailed on acceptance. |
+| LeadModal shows "Resume" for an open order | One **Close on call** button | The lead record doesn't carry order state. The wizard opens at the resume step either way. Client cards do show **Resume**. |
+| ClientIndex: check for a duplicate card (O2) | Confirmed, and **fixed in the roster**: a pending entry is hidden when a client folder has the same slug | |
+| Welcome email unchanged "byte-for-byte" for self-serve | Same content and markup. Whitespace around the steps differs. | Not snapshot-tested: the agency suite is `.mjs` only and can't import TS. |
+| Agency tests | None added. The order rules (`canTransition`, `resumeStepFor`, `readinessFor`, `slugLocked` round-trip) are tested in `@jdd/schema` | The agency's test runner is plain `node --test` over `.mjs`. |
+| jdd-ops branch `feat/sales-call-close` | Built on **`claude/sales-close-design-0f5f8d`**, rebased onto a2p-chain's tip | A guard stops this session from writing to another worktree. |
+| Pin bump to v1.31.0 | **Not done yet** | It needs the `v1.31.0` tag pushed to GitHub (Xander's go-ahead). Typechecks/builds ran against the local schema build copied into `node_modules`. |
+| Phase 8 Stripe test-mode run | **Not done** | It needs `OPS_ORDERS_SECRET`, Stripe test keys, the Stripe CLI and a Clerk dev instance on localhost. Xander runs it or approves it. |
+| SMS step | Embeds `A2pRegistrationPanel` as it is | R1/R2 were sent to a2p-chain. Until then it's the full stepper. |
