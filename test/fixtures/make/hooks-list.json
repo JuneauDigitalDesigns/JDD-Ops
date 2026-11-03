@@ -260,7 +260,7 @@
       },
       "scenarioId": 6870565,
       "scenarioName": "Post-call: Your HVAC Co.",
-      "scenarioIsActive": false,
+      "scenarioIsActive": true,
       "relay": null,
       "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_3013197"
     }
