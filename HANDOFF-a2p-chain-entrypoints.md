@@ -94,6 +94,21 @@ Your working assumption is right, with one timing caveat that matters for "file 
   `lib/a2p-identity.js`, exposed in `enums.defaultIndustryByVertical`) maps it. The panel currently
   shows that map as a hint because `/manage` has no vertical; the wizard could preselect it.
 
+## 3a. Two things the sales-call flow needs, and how they already work
+
+- **Resume later when the client has no EIN to hand.** Nothing to build. Steps are independent
+  clicks gated only by the record: run `profile.create`, `rep.create` and `address.create` on the
+  call, and leave `business.create` (the only EIN step) for later. The record keeps the SIDs; the EIN
+  was never there, so resuming is simply opening the panel again and filling that one step.
+  `profile.attach` stays locked until the business EndUser exists. Do not hold the EIN in wizard
+  state "until the client finds it" — that is the retention the whole design exists to avoid.
+- **Read-only status for client cards.** Server-side: `(await loadStore()).readRegistration({ slug })`
+  then `(await loadRegister()).portalStatusFor(record)` (`none | profile-pending | profile-approved |
+  brand-pending | brand-approved | campaign-pending | verified | failed`), plus `record.mock`,
+  `record.statuses.brand` and `record.statuses.campaign` for detail. Both loaders live in
+  `@/lib/a2pChain`. Or `GET /api/manage/a2p?slug=` → `portalStatus` + `record`. Both are reads of our
+  own record: no Twilio call. Fresh vendor state needs a human `status.refresh` (no poller, decision 2).
+
 ## 4. Record shape (`jdd:a2p-registration:{slug}`, base client slug, no TTL)
 
 Fixed key list: `REGISTRATION_KEYS` in `lib/a2p-registration-store.js` — writes naming any other key,
