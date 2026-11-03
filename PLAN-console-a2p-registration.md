@@ -384,12 +384,24 @@ with fake identity data. The first evaluation failed on `job_position: "Owner"`,
    value to read. The console does not write `PortalSite.messagingServiceSid`; it only pushes `a2pStatus`.
 3. **Reconcile.** `lib/reconcile-probes.js` still checks only the MASTER pool; once `number.attach` moves
    a number into the client's service, reconcile will flag it. Invert per the sibling handoff §5.
-4. **Teardown** must delete `jdd:a2p-registration:{slug}` and its TrustHub objects only when registration
-   never completed (sid-store correction §5).
+4. **Teardown — done** (2026-11-03, `lib/a2p-teardown.js`, wired into `scripts/teardown.js` and
+   /manage → Danger). A never-completed registration is deleted object by object, then its record; a
+   live one (real brand not FAILED, or a real campaign not FAILED, or a status that cannot be read) is
+   kept with its record and reported with the monthly-billing warning. Numbers leave the client's
+   Messaging Service before release. **Verified live** on the `_e2e_test_growth` drafts: `DELETE`
+   returns 204 then 404 for `/v1/CustomerProfiles`, `/v1/EndUsers`, `/v1/SupportingDocuments` and
+   `/2010-04-01/Accounts/{AC}/Addresses/{AD}.json`. **Still unverified:** `DELETE` on a TrustProduct,
+   a Messaging Service and a Usa2p campaign — no never-completed object of those kinds has existed.
+   Side finding, not changed: `scripts/teardown.js` only accepts slugs starting `_e2e-` (hyphen), so
+   it refuses `_e2e_test_growth`; that client can only be torn down from the console.
 5. **`next dev -p 3040` names no `-H`.** The middleware's loopback check reads the `Host` header, which a
    LAN client can set. Consider `-H 127.0.0.1` in `console/package.json` (§6's last invariant).
 6. **Restart the console after editing any `lib/a2p-*.js`** — see the comment in `console/src/lib/a2pChain.ts`.
-7. The `_e2e_test_growth` drafts are kept for inspection (operator's choice); remove them in the teardown work.
+7. **The `_e2e_test_growth` drafts — removed** 2026-11-03 with the operator's OK, after a dry run
+   listed exactly what would go: profile BU3782f8…, two EndUsers, the address document and address,
+   then `jdd:a2p-registration:_e2e_test_growth`. Every object re-read 404. The teardown fixtures
+   recorded from them are frozen (`E2E_TEARDOWN_FROZEN` in the recorder), and so is
+   `evaluation-customer-profile-noncompliant.json`, whose source profile no longer exists.
 8. **`profile.reset`** (requested 2026-11-03 by the sales-call close design, `DESIGN-sales-call-close.md`
    §8c, relayed as approved by the operator): let the registration path change before submission. Rules
    as requested — allowed only while `statuses.profile` is not filed (no submit has run), needs
