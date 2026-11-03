@@ -385,12 +385,6 @@ export default function LeadsView() {
             if (openLead.phone) p.set('phone', openLead.phone);
             router.push(`/calendar?${p.toString()}`);
           }}
-          // The roster reads `?new=` to scroll to and flash the card this just created.
-          onConverted={(slug) => {
-            setOpenId(null);
-            setFreshId(null);
-            router.push(`/clients?new=${encodeURIComponent(slug)}`);
-          }}
         />
       )}
 
