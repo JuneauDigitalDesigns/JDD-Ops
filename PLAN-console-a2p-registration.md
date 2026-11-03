@@ -5,7 +5,7 @@
 **Supersedes:** the client-driven design in `juneau-digital-designs/HANDOFF-a2p-onboarding-identity-step.md`
 **Reads with:** `~/Desktop/JDD-a2p-isv-runbook.html` (the chain), `HANDOFF-console-onboarding-a2p.md`
 (the console's own A2P context — **§6 of it is now wrong, see Phase 6**), `PLAN-portal-form-capture.md` §1b
-**Status:** plan, approved decisions recorded in §2, no work started
+**Status:** Phases 1–4 and 6.1–6.2 built on branch `claude/a2p-registration-chain-ad797f` (2026-11-02); Phase 5 (agency strip) is PR #29 in the agency repo; 6.3–6.5 are follow-ups — see §12. Nothing has been filed for any client.
 
 ---
 
@@ -35,15 +35,24 @@ exist anywhere yet. **This plan is therefore half migration, half first build of
 | 5 | **The A2P SIDs stay in the Redis record** `jdd:a2p-registration:{slug}`. The console reads and writes that record; a follow-up corrects `/manage` and the sibling handoff, which planned `.env.local` keys instead (Phase 6). |
 | 6 | **The portal shows progress with no timeframe.** The console advances `PortalSite.a2pStatus` at each gate. |
 | 7 | **The agency commit is stripped, not reverted.** The `.mjs` modules and the test move into `jdd-ops`; the wizard keeps a plain intake form with no EIN field. |
+| 8 | *(2026-11-02)* **Build the sole-proprietor path too, the way Twilio actually defines it.** It is not "the EIN path minus the EIN": it is a *Starter* customer profile (policy `RN806dd6…`, a `starter_customer_profile_information` EndUser), a *Sole Proprietor* trust product (policy `RN670d5d…`, a `sole_proprietor_information` EndUser carrying the owner's mobile), `BrandType=SOLE_PROPRIETOR`, an SMS OTP the owner must answer YES to, and `UsAppToPersonUsecase=SOLE_PROPRIETOR`. Both policies were read live and are recorded under `test/fixtures/trusthub/`. Enterprise is refused this path (one number per sole-prop campaign). |
+| 9 | *(2026-11-02)* **Business industry is console-only (closes §9.1).** The wizard stops collecting it; the operator picks it in the console, defaulted from the vertical via `DEFAULT_INDUSTRY_BY_VERTICAL`. One copy of the TCR enum, in `lib/a2p-identity.js`, so there is nothing to pin. |
+| 12 | *(2026-11-03, operator in chat)* **One typed-slug confirm may run the whole filing sequence** for the sales-call close (`POST /api/manage/a2p/batch`, `runBatch`): profile → identity objects → attach → evaluate → submit → trust product → evaluate → submit. An exception to decision 3 for that one button. Every step keeps its own guards, all input is validated before the first write, the run stops at the first failure (a noncompliant evaluation included) and resumes by skipping what is done. "Add later" saves the steps that need no EIN. |
+| 11 | *(2026-11-03)* **The agency site collects no registration details at all** — no EIN (as before), and now also no legal name, business type, website or address. The operator types them on the sales call in the console. `jdd:a2p-intake:{slug}` stays, with the console's intake card as its only writer. Reason: while the wizard runs the site slug is a `pending-<session>` placeholder renamed at final submit, so a record written mid-wizard would be keyed by a slug nothing reads; fixing that meant a change in `app/api/portal/onboarding/route.ts`, and the sales-call flow already has the operator collecting these details live. |
+| 10 | *(2026-11-02)* **The live run uses the `_e2e_test_growth` client** ("Your HVAC Co"), not a brand against JDD's own bundles — and it **stops before submit**. `Mock=true` exists only on the brand; the profile and trust-product submits before it are real compliance reviews, and that client's `site.ts` is a placeholder. So the run goes profile → identity objects → attach → evaluate (free, files nothing) and no further, until a real client exists. Every write in it is click-gated. The run used a temporary copy of `jdd-ops/.env` in the worktree, deleted afterwards. |
 
 ---
 
 ## 3. Facts this plan rests on (verified, not assumed)
 
-1. **Phase 0 is not done.** `TWILIO_PRIMARY_PROFILE_SID` is absent from `jdd-ops/.env`. The runbook:
-   omit the primary-profile link and the secondary profile "evaluates as a direct business and the
-   whole ISV posture collapses." **No correct per-client registration is possible until this is
-   fixed by hand in the Twilio console.** Phase 1 below makes that visible rather than silent.
+1. **Phase 0 is done (corrected 2026-11-02 — this fact originally read "not done").** The primary
+   profile `BU09473483d4fd6808a200190e84309592` is `twilio-approved` with
+   `business_identity: isv_reseller_or_partner`, it is recorded in `jdd-ops/.env` as
+   `TWILIO_PRIMARY_PROFILE_SID`, and `node scripts/a2p-readiness.js` reports READY on all six checks.
+   The two chain policies are **absent from `GET /v1/Policies`** on this account (49 results, all
+   Alphanumeric Sender ID), so `lib/a2p-readiness.js` resolves them by SID and verifies them by name.
+   Phase 1's "discover from the listing" design is superseded by that; do not reintroduce it. The
+   readiness gate itself still blocks every per-client write.
 2. **The whole chain is API-driven.** Runbook phases 1–5 are all tagged `Automatable`; 2.7, 3.2 and
    4.2 are `AutomatableWait` (file, then wait on review) and only 5.2 — one real test message — is
    `Manual`. There is no step that forces the operator into the Twilio dashboard. The dashboard
@@ -299,6 +308,21 @@ defensively and that is stated in its comment rather than assumed away.
 
 ## 9. Open items to settle before building
 
+> **Resolved 2026-11-02.** 1 → decision 9 (console-only industry). 2 → **merges**: a live
+> `POST /v1/EndUsers/{sid}` carrying only `business_name` updated that one key and left the other
+> five intact (throwaway EndUser, fake data, no EIN, deleted after — `DELETE` returned 204 and a
+> re-read 404). A correction therefore never needs the EIN retyped. 3 → moot: the sole-prop path
+> does not use a business EndUser at all (decision 8); that same live call did confirm TrustHub
+> *accepts* a business EndUser with no registration number at create time, though it was never
+> evaluated. 4 → deferred to the orchestrator's §6 item 5; the registration record carries
+> `messagingServiceSid` for it to read. 5 → done (§3 fact 1).
+>
+> **One more vendor fact the docs got wrong.** Twilio's ISV guide documents an evaluation's
+> per-requirement results as `valid[]` / `invalid[]`. Every recorded evaluation on this account
+> (`test/fixtures/trusthub/evaluation-*.json`) carries `results[].fields[]` with a `passed` boolean
+> per field instead. The parser reads the recorded shape and treats the documented one as a
+> fallback.
+
 1. **The shared industry enum.** Two repos now need the TCR list. Pin them with a test, or keep one
    copy and have the agency wizard fetch the enum from... nowhere — it is a separate deployment.
    Most likely answer: duplicate it and pin with a test, as `test/ring-window.test.mjs` already does
@@ -335,3 +359,61 @@ stays a manual operator step; `runbook-content.ts` copy, owned by the sibling ha
 scenario and notification-number work from `PLAN-portal-form-capture.md`; anything under
 `app/components/portal/Crm*`, `app/lib/portal-crm.ts`, `app/lib/crm-contacts.ts` or
 `app/api/portal/{crm,customers,inbox,messages}` in the agency repo, which are mid-rewrite.
+
+---
+
+## 12. Build record (2026-11-02)
+
+**Built.** `lib/a2p-identity.js`, `lib/a2p-trusthub.js`, `lib/a2p-registration-store.js` (moved and
+reshaped), `lib/a2p-register.js` (the chain, both paths, plus `business.update` / `rep.update`
+corrections), `scripts/record-a2p-fixtures.js` (`npm run fixtures:a2p`, Twilio-only, never Make),
+`/manage → Messaging & A2P`, its three routes under `/api/manage/a2p`, the Overview line, and the
+`envFields.ts` comment. Root suite 192, console suite 413, console `tsc` clean.
+
+**Live run** (decision 10): `_e2e_test_growth` was taken to a compliant evaluation through the
+console, then stopped. Draft profile `BU3782f82c2f2f0c8fce2850d86ed2e932` exists on Twilio, unsubmitted,
+with fake identity data. The first evaluation failed on `job_position: "Owner"`, which is an enum
+(`A2P_JOB_POSITIONS`); that response is now a recorded fixture.
+
+**Follow-ups, not done here:**
+1. **Agency strip (Phase 5) — done** in JuneauDigitalDesigns/Juneau-Digital-Designs PR #29 (branch
+   `claude/a2p-agency-strip`, open, not merged): identity route, Trust Hub and store modules deleted,
+   the wizard's whole registration step removed, `a2p-identity.mjs` reduced to `tax-id-guard.mjs`. No
+   intake route, by decision 11.
+2. **`CLIENT_MESSAGING_SERVICE_SID` (orchestrator §6 item 5).** The record's `messagingServiceSid` is the
+   value to read. The console does not write `PortalSite.messagingServiceSid`; it only pushes `a2pStatus`.
+3. **Reconcile.** `lib/reconcile-probes.js` still checks only the MASTER pool; once `number.attach` moves
+   a number into the client's service, reconcile will flag it. Invert per the sibling handoff §5.
+4. **Teardown — done** (2026-11-03, `lib/a2p-teardown.js`, wired into `scripts/teardown.js` and
+   /manage → Danger). A never-completed registration is deleted object by object, then its record; a
+   live one (real brand not FAILED, or a real campaign not FAILED, or a status that cannot be read) is
+   kept with its record and reported with the monthly-billing warning. Numbers leave the client's
+   Messaging Service before release. **Verified live** on the `_e2e_test_growth` drafts: `DELETE`
+   returns 204 then 404 for `/v1/CustomerProfiles`, `/v1/EndUsers`, `/v1/SupportingDocuments` and
+   `/2010-04-01/Accounts/{AC}/Addresses/{AD}.json`. **Still unverified:** `DELETE` on a TrustProduct,
+   a Messaging Service and a Usa2p campaign — no never-completed object of those kinds has existed.
+   Side finding, not changed: `scripts/teardown.js` only accepts slugs starting `_e2e-` (hyphen), so
+   it refuses `_e2e_test_growth`; that client can only be torn down from the console.
+5. **`next dev -p 3040` names no `-H`.** The middleware's loopback check reads the `Host` header, which a
+   LAN client can set. Consider `-H 127.0.0.1` in `console/package.json` (§6's last invariant).
+6. **Restart the console after editing any `lib/a2p-*.js`** — see the comment in `console/src/lib/a2pChain.ts`.
+7. **The `_e2e_test_growth` drafts — removed** 2026-11-03 with the operator's OK, after a dry run
+   listed exactly what would go: profile BU3782f8…, two EndUsers, the address document and address,
+   then `jdd:a2p-registration:_e2e_test_growth`. Every object re-read 404. The teardown fixtures
+   recorded from them are frozen (`E2E_TEARDOWN_FROZEN` in the recorder), and so is
+   `evaluation-customer-profile-noncompliant.json`, whose source profile no longer exists.
+8. **`profile.reset`** (requested 2026-11-03 by the sales-call close design, `DESIGN-sales-call-close.md`
+   §8c, relayed as approved by the operator): let the registration path change before submission. Rules
+   as requested — allowed only while `statuses.profile` is not filed (no submit has run), needs
+   `confirm: true`, deletes the draft's TrustHub objects and clears their SIDs from the record, keeps
+   `jdd:a2p-intake:{slug}`; the UI then runs `profile.create` on the other path (sole-prop still refused
+   on Enterprise); rep details are re-entered. Two notes before building:
+   - **Only `DELETE /v1/EndUsers/{sid}` is verified live.** Deleting a draft CustomerProfile, a
+     SupportingDocument, an Address and EntityAssignments is believed supported but unexercised —
+     verify each once (on the `_e2e_test_growth` drafts, with the operator's yes) before the step
+     relies on it, and make the step tolerate 404 as already-gone.
+   - **The address and its document can survive a reset.** Both policies accept a
+     `customer_profile_address` document (recorded), so only the profile, the business/rep EndUsers
+     and the assignments must go. Delete order: assignments → profile → EndUsers; keep `addressSid` /
+     `addressDocSid` unless the operator also corrects the address.
+

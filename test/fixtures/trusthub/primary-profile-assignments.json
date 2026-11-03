@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "customer_profile_sid": "BU09473483d4fd6808a200190e84309592",
+      "date_created": "2026-05-13T01:24:49Z",
+      "object_sid": "RDd73361f1c79c9dbff1b080cc139924ad",
+      "sid": "BVf8b7a54cd3a4736b8e0e83558bb85e9f"
+    },
+    {
+      "customer_profile_sid": "BU09473483d4fd6808a200190e84309592",
+      "date_created": "2026-05-13T01:24:49Z",
+      "object_sid": "IT464836d44421398314258cf89a70ea83",
+      "sid": "BV68e5eb4ca9429062ccddf2db0318e5a8"
+    },
+    {
+      "customer_profile_sid": "BU09473483d4fd6808a200190e84309592",
+      "date_created": "2026-05-13T01:24:49Z",
+      "object_sid": "IT3660d6717ee400692c2cc46d15194f02",
+      "sid": "BVa36582db000b963c78745d934e0a2df7"
+    }
+  ],
+  "meta": {
+    "next_page_url": null
+  }
+}

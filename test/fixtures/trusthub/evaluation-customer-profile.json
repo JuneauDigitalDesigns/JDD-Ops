@@ -1,0 +1,207 @@
+{
+  "customer_profile_sid": "BU09473483d4fd6808a200190e84309592",
+  "date_created": "2026-08-03T14:38:43Z",
+  "policy_sid": "RN6433641899984f951173ef1738c3bdd0",
+  "results": [
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Type",
+          "object_field": "business_type",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Registration Number",
+          "object_field": "business_registration_number",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Name",
+          "object_field": "business_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Registration Type",
+          "object_field": "business_registration_identifier",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Identity",
+          "object_field": "business_identity",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Industry",
+          "object_field": "business_industry",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Website URL",
+          "object_field": "website_url",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Regions of Operation",
+          "object_field": "business_regions_of_operation",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Social Media Profile URL",
+          "object_field": "social_media_profile_urls",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Business Information",
+      "object_type": "customer_profile_business_information",
+      "passed": true,
+      "requirement_friendly_name": "Customer Profile Business Information",
+      "requirement_name": "customer_profile_business_information"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "First Name",
+          "object_field": "first_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Last Name",
+          "object_field": "last_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Email Address",
+          "object_field": "email",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Phone Number",
+          "object_field": "phone_number",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Title",
+          "object_field": "business_title",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Level",
+          "object_field": "job_position",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Authorized Representative #1",
+      "object_type": "authorized_representative_1",
+      "passed": true,
+      "requirement_friendly_name": "Authorized Representative #1",
+      "requirement_name": "authorized_representative_1"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "First Name",
+          "object_field": "first_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Last Name",
+          "object_field": "last_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Email address",
+          "object_field": "email",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Phone Number",
+          "object_field": "phone_number",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Title",
+          "object_field": "business_title",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Level",
+          "object_field": "job_position",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Authorized Representative #2",
+      "object_type": "authorized_representative_2",
+      "passed": true,
+      "requirement_friendly_name": "Authorized Representative #2",
+      "requirement_name": "authorized_representative_2"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "address sids",
+          "object_field": "address_sids",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Physical Business Address",
+      "object_type": "customer_profile_address",
+      "passed": true,
+      "requirement_friendly_name": "Physical Business Address",
+      "requirement_name": "customer_profile_address"
+    }
+  ],
+  "sid": "EL14048f2c9bf2629929cdccd877a75acc",
+  "status": "compliant"
+}

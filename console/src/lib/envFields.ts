@@ -293,6 +293,11 @@ export const LOCKED_KEYS = new Set([
   // once their carrier registration verifies. Not to be confused with the master
   // TWILIO_MESSAGING_SERVICE_SID, which carries JDD's owner-alert campaign.
   'CLIENT_MESSAGING_SERVICE_SID',
+  // Deliberately NO `A2P_*` keys here or anywhere in this file, despite
+  // HANDOFF-console-onboarding-a2p.md §6 planning them as read-only fields. The registration
+  // chain's ~10 SIDs, its evaluations and its statuses are STATE, not config: they live in the
+  // Redis record `jdd:a2p-registration:{slug}` (lib/a2p-registration-store.js) and surface only
+  // in /manage → Messaging & A2P. See HANDOFF-a2p-sid-store-correction.md before adding one.
 ]);
 
 /** A .env.local line the UI shows in the advanced drawer rather than as a curated field. */

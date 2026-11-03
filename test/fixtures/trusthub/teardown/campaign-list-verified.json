@@ -1,0 +1,11 @@
+{
+  "compliance": [
+    {
+      "sid": "QE2c6890da8086d771620e9b13fadeba0b",
+      "campaign_status": "VERIFIED",
+      "brand_registration_sid": "BN6051caf4a60936c690c106d5a72f2de9",
+      "mock": false,
+      "us_app_to_person_usecase": "ACCOUNT_NOTIFICATION"
+    }
+  ]
+}

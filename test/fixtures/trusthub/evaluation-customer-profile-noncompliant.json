@@ -1,0 +1,225 @@
+{
+  "customer_profile_sid": "BU3782f82c2f2f0c8fce2850d86ed2e932",
+  "date_created": "2026-11-03T00:44:29Z",
+  "policy_sid": "RNdfbf3fae0e1107f8aded0e7cead80bf5",
+  "results": [
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Type",
+          "object_field": "business_type",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Registration Number",
+          "object_field": "business_registration_number",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Name",
+          "object_field": "business_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Registration Type",
+          "object_field": "business_registration_identifier",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Business Identity",
+          "object_field": "business_identity",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Industry",
+          "object_field": "business_industry",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Website URL",
+          "object_field": "website_url",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Regions of Operation",
+          "object_field": "business_regions_of_operation",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Social Media Profile URL",
+          "object_field": "social_media_profile_urls",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Business Information",
+      "object_type": "customer_profile_business_information",
+      "passed": true,
+      "requirement_friendly_name": "Customer Profile Business Information",
+      "requirement_name": "customer_profile_business_information"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "First Name",
+          "object_field": "first_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Last Name",
+          "object_field": "last_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Email Address",
+          "object_field": "email",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Phone Number",
+          "object_field": "phone_number",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Title",
+          "object_field": "business_title",
+          "passed": true
+        },
+        {
+          "error_code": 22218,
+          "failure_reason": "Job Level is invalid.",
+          "friendly_name": "Job Level",
+          "object_field": "job_position",
+          "passed": false
+        }
+      ],
+      "friendly_name": "Authorized Representative #1",
+      "object_type": "authorized_representative_1",
+      "passed": false,
+      "requirement_friendly_name": "Authorized Representative #1",
+      "requirement_name": "authorized_representative_1"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "First Name",
+          "object_field": "first_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Last Name",
+          "object_field": "last_name",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Email address",
+          "object_field": "email",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Phone Number",
+          "object_field": "phone_number",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Title",
+          "object_field": "business_title",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Job Level",
+          "object_field": "job_position",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Authorized Representative #2",
+      "object_type": "authorized_representative_2",
+      "passed": true,
+      "requirement_friendly_name": "Authorized Representative #2",
+      "requirement_name": "authorized_representative_2"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "address sids",
+          "object_field": "address_sids",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Physical Business Address",
+      "object_type": "customer_profile_address",
+      "passed": true,
+      "requirement_friendly_name": "Physical Business Address",
+      "requirement_name": "customer_profile_address"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Supporting Bundle Status",
+          "object_field": "bundle_sid",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Primary Customer Profile Bundle",
+      "object_type": "primary_customer_profile_type_business",
+      "passed": true,
+      "requirement_friendly_name": "Primary Customer Profile",
+      "requirement_name": "primary_customer_profile"
+    }
+  ],
+  "sid": "EL87e6bbfc17a5f6efe8890c4a31e992c5",
+  "status": "noncompliant"
+}

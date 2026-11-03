@@ -23,6 +23,7 @@ import type { ReconcileResult } from '@jdd/schema';
 import FindingsList from './FindingsList';
 import RecentRepairs from './RecentRepairs';
 import { useManage } from './ManageContext';
+import A2pOverviewTile from './A2pOverviewTile';
 import PlanControl from './PlanControl';
 import SectionHeader from './SectionHeader';
 
@@ -382,6 +383,8 @@ export default function OverviewSection() {
           </div>
         </div>
       )}
+
+      {(ctx.plan === 'growth' || ctx.plan === 'enterprise') && <A2pOverviewTile slug={ctx.slug} />}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile

@@ -218,6 +218,26 @@ export function loadPortalOpsConfig(): { baseUrl: string | null; secret: string 
 }
 
 /**
+ * What the A2P registration chain (lib/a2p-register.js) reads, as a plain map handed to it as
+ * `env` — deliberately NOT copied into process.env. The chain takes its env as an argument so a
+ * test can drive it, and keeping these out of process.env means nothing else in the console
+ * process starts depending on them by accident.
+ */
+export function loadA2pEnv(): Record<string, string | undefined> {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const keys = [
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+    'TWILIO_PRIMARY_PROFILE_SID',
+    'TWILIO_MESSAGING_SERVICE_SID',
+    'A2P_OPS_EMAIL',
+    'A2P_INBOUND_URL',
+    'A2P_STATUS_CALLBACK',
+  ];
+  return Object.fromEntries(keys.map((key) => [key, process.env[key] ?? ops[key]]));
+}
+
+/**
  * Every other credential teardown needs and this module doesn't already load:
  * TWILIO_ACCOUNT_SID/AUTH_TOKEN, AIRTABLE_API_KEY, CLERK_SECRET_KEY. Grouped because
  * teardown always wants the full set at once, unlike the single-purpose loaders above.

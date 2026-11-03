@@ -19,6 +19,7 @@ import { clearReconcileState } from '@/lib/reconcileStore';
 import { deleteClientState } from '@/lib/state';
 import { appendAudit } from '@/lib/audit';
 import { buildTeardownPlan, readAllEnvLocalVerbatim } from '@/lib/teardownPlan';
+import { a2pTeardownCreds, loadA2pTeardown } from '@/lib/a2pTeardown';
 import {
   createArchiveRecord,
   writeArchiveRecord,
@@ -343,6 +344,11 @@ export async function POST(req: Request) {
           await runStep(record, `Stop Make scenario (${site.siteSlug})`, () =>
             ops.stopAndDeleteMakeScenario({ apiKey: makeKey ?? undefined, zone: 'https://us2.make.com/api/v2', scenarioId: site.make.scenarioId }),
           );
+          // Out of the client's own Messaging Service BEFORE the release, whatever the
+          // registration's state — a released number must not linger as a campaign sender.
+          await runStep(record, `Remove number from client Messaging Service (${site.siteSlug})`, async () =>
+            (await loadA2pTeardown()).detachA2pNumber({ slug, phoneNumber: site.twilio.number ?? undefined, ...a2pTeardownCreds() }),
+          );
           await runStep(record, `Release Twilio number (${site.siteSlug})`, () =>
             ops.releaseTwilioNumber({
               accountSid: twilioAccountSid ?? undefined,
@@ -364,6 +370,14 @@ export async function POST(req: Request) {
           await runStep(record, `Delete GitHub repo (${site.siteSlug})`, () =>
             ops.deleteGitHubRepo({ token: githubToken ?? undefined, org: process.env.GITHUB_ORG, repo: site.siteSlug }),
           );
+        }
+
+        // ── Phase 6b: A2P registration — after every number is out and released ─
+        // Re-planned live rather than taken from the preview: a registration that went live
+        // between preview and confirm is kept, never deleted on a stale reading.
+        {
+          const a2pOut = await (await loadA2pTeardown()).teardownA2pRegistration({ slug, ...a2pTeardownCreds() });
+          for (const r of a2pOut.steps) await runStep(record, `A2P: ${r.resource.replace(/^a2p\./, '')}`, async () => r);
         }
 
         // ── Phase 7: Airtable — last remote step, skipped entirely if shared ─

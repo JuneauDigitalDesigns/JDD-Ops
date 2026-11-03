@@ -9,6 +9,8 @@ import EnvironmentSection from '@/components/manage/EnvironmentSection';
 import DeploymentsSection from '@/components/manage/DeploymentsSection';
 import DomainSection from '@/components/manage/DomainSection';
 import VoiceAgentSection from '@/components/manage/VoiceAgentSection';
+import MessagingSection from '@/components/manage/MessagingSection';
+import { loadA2pEnums } from '@/lib/a2pChain';
 import PortalSection from '@/components/manage/PortalSection';
 import FeaturedSection from '@/components/manage/FeaturedSection';
 import DangerSection from '@/components/manage/DangerSection';
@@ -94,6 +96,10 @@ export default async function ManageSectionPage({
       return <DomainSection />;
     case 'voice-agent':
       return <VoiceAgentSection />;
+    case 'messaging':
+      // The enums are loaded HERE, server-side, from the ops root and handed down as props —
+      // a client component cannot import lib/a2p-identity.js, and a copy would drift.
+      return <MessagingSection enums={await loadA2pEnums()} />;
     case 'portal':
       return <PortalSection />;
     case 'featured':

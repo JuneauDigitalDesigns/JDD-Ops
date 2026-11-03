@@ -261,6 +261,24 @@ export default function DangerSection() {
             )}
           </div>
         )}
+        {/* A2P: a registration that never completed is deleted object by object; a live one is
+            kept — it is the one thing a teardown can leave billing, and it says so. */}
+        {plan.a2p && plan.a2p.state !== 'none' && (
+          <div className="flex flex-col gap-1">
+            <span className="kicker">A2P registration</span>
+            <span className="text-xs" style={{ color: plan.a2p.state === 'never-completed' ? 'var(--fg-2)' : 'var(--warn)' }}>
+              {plan.a2p.detail}
+            </span>
+            {plan.a2p.toDelete.map((o) => (
+              <ResourceRow key={o.sid} label={o.kind} name={`${o.sid}${o.status ? ` (${o.status})` : ''}`} exists={o.exists} />
+            ))}
+            {plan.a2p.kept.map((k) => (
+              <span key={k.sid} className="flex items-start gap-2 text-xs" style={{ color: 'var(--warn)' }}>
+                <Warning size={12} className="mt-0.5 shrink-0" /> {k.kind} {k.sid} kept — {k.reason}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <span className="kicker">Local</span>
           <span className="text-xs text-fg2">
