@@ -5,7 +5,7 @@
 **Supersedes:** the client-driven design in `juneau-digital-designs/HANDOFF-a2p-onboarding-identity-step.md`
 **Reads with:** `~/Desktop/JDD-a2p-isv-runbook.html` (the chain), `HANDOFF-console-onboarding-a2p.md`
 (the console's own A2P context — **§6 of it is now wrong, see Phase 6**), `PLAN-portal-form-capture.md` §1b
-**Status:** Phases 1–4 and 6.1–6.2 built on branch `claude/a2p-registration-chain-ad797f` (2026-11-02); Phase 5 (agency strip) and 6.3–6.5 are follow-ups — see §12. Nothing has been filed for any client.
+**Status:** Phases 1–4 and 6.1–6.2 built on branch `claude/a2p-registration-chain-ad797f` (2026-11-02); Phase 5 (agency strip) is PR #29 in the agency repo; 6.3–6.5 are follow-ups — see §12. Nothing has been filed for any client.
 
 ---
 
@@ -37,6 +37,7 @@ exist anywhere yet. **This plan is therefore half migration, half first build of
 | 7 | **The agency commit is stripped, not reverted.** The `.mjs` modules and the test move into `jdd-ops`; the wizard keeps a plain intake form with no EIN field. |
 | 8 | *(2026-11-02)* **Build the sole-proprietor path too, the way Twilio actually defines it.** It is not "the EIN path minus the EIN": it is a *Starter* customer profile (policy `RN806dd6…`, a `starter_customer_profile_information` EndUser), a *Sole Proprietor* trust product (policy `RN670d5d…`, a `sole_proprietor_information` EndUser carrying the owner's mobile), `BrandType=SOLE_PROPRIETOR`, an SMS OTP the owner must answer YES to, and `UsAppToPersonUsecase=SOLE_PROPRIETOR`. Both policies were read live and are recorded under `test/fixtures/trusthub/`. Enterprise is refused this path (one number per sole-prop campaign). |
 | 9 | *(2026-11-02)* **Business industry is console-only (closes §9.1).** The wizard stops collecting it; the operator picks it in the console, defaulted from the vertical via `DEFAULT_INDUSTRY_BY_VERTICAL`. One copy of the TCR enum, in `lib/a2p-identity.js`, so there is nothing to pin. |
+| 11 | *(2026-11-03)* **The agency site collects no registration details at all** — no EIN (as before), and now also no legal name, business type, website or address. The operator types them on the sales call in the console. `jdd:a2p-intake:{slug}` stays, with the console's intake card as its only writer. Reason: while the wizard runs the site slug is a `pending-<session>` placeholder renamed at final submit, so a record written mid-wizard would be keyed by a slug nothing reads; fixing that meant a change in `app/api/portal/onboarding/route.ts`, and the sales-call flow already has the operator collecting these details live. |
 | 10 | *(2026-11-02)* **The live run uses the `_e2e_test_growth` client** ("Your HVAC Co"), not a brand against JDD's own bundles — and it **stops before submit**. `Mock=true` exists only on the brand; the profile and trust-product submits before it are real compliance reviews, and that client's `site.ts` is a placeholder. So the run goes profile → identity objects → attach → evaluate (free, files nothing) and no further, until a real client exists. Every write in it is click-gated. The run used a temporary copy of `jdd-ops/.env` in the worktree, deleted afterwards. |
 
 ---
@@ -374,13 +375,10 @@ with fake identity data. The first evaluation failed on `job_position: "Owner"`,
 (`A2P_JOB_POSITIONS`); that response is now a recorded fixture.
 
 **Follow-ups, not done here:**
-1. **Agency strip (Phase 5).** In `juneau-digital-designs`: delete `app/api/onboarding/a2p-identity/route.ts`,
-   `app/lib/a2p-trusthub.mjs`, `app/lib/a2p-registration-store.mjs`; drop `app/lib/a2p-identity.mjs`
-   to an intake-only module without the industry enum (decision 9); add `app/api/onboarding/a2p-intake/route.ts`
-   writing `jdd:a2p-intake:{slug}` with exactly the keys in `INTAKE_KEYS` (`lib/a2p-registration-store.js`)
-   and refusing any `ein` key or tax-ID-shaped value; remove the wizard's EIN, sole-prop and
-   representative fields **and its industry select**; cut `test/a2p-identity-retention.test.mjs` to the
-   draft-store half. Key the intake by the client's **base** slug — the record is per client.
+1. **Agency strip (Phase 5) — done** in JuneauDigitalDesigns/Juneau-Digital-Designs PR #29 (branch
+   `claude/a2p-agency-strip`, open, not merged): identity route, Trust Hub and store modules deleted,
+   the wizard's whole registration step removed, `a2p-identity.mjs` reduced to `tax-id-guard.mjs`. No
+   intake route, by decision 11.
 2. **`CLIENT_MESSAGING_SERVICE_SID` (orchestrator §6 item 5).** The record's `messagingServiceSid` is the
    value to read. The console does not write `PortalSite.messagingServiceSid`; it only pushes `a2pStatus`.
 3. **Reconcile.** `lib/reconcile-probes.js` still checks only the MASTER pool; once `number.attach` moves

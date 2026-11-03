@@ -124,6 +124,8 @@ gates, createdAt, updatedAt`.
 
 Intake (`jdd:a2p-intake:{slug}`, `INTAKE_KEYS`): `legalBusinessName, businessType, websiteUrl,
 address{street,city,region,postalCode,country}` + timestamps. No EIN, no rep, no industry.
+Only the operator writes it (the console intake card) — the agency wizard collects none of this
+(PLAN decision 11), so on a sales call it starts empty and the operator fills it in.
 
 ## 5. Rules you inherit by calling in
 
