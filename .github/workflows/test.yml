@@ -45,6 +45,15 @@ jobs:
       # node_modules for 20+ minutes. next.config.js turns tracing off; this keeps the build
       # able to finish. It also type-checks the console, which `npm test` does not. Needs no
       # secrets: the 2m38s measurement was taken in a checkout with no .env at all.
+      # The console build compiles template-owned files (tailwind.config.ts imports
+      # template/src/styles/rhythm.plugin.ts, which imports `tailwindcss/plugin`), and Node
+      # resolves those imports from template/, not console/. An operator's checkout has
+      # template/node_modules; without this the build fails with "Cannot find module
+      # 'tailwindcss/plugin'".
+      - name: Install (template)
+        working-directory: template
+        run: npm ci
+
       - name: Console build
         working-directory: console
         timeout-minutes: 15
