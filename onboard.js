@@ -2164,15 +2164,23 @@ function commitAndPush(repoDir, brandName) {
     return;
   }
   run('git add -A', { cwd: repoDir });
+  let staged = true;
   try {
     execSync(`git diff --cached --quiet`, { cwd: repoDir });
-    console.log(`  Nothing to commit — skipping push.`);
-    return;
+    staged = false;
   } catch {
     // diff has staged changes — proceed
   }
-  const safeMsg = brandName.replace(/['`$\\]/g, '');
-  run(`git commit -m "feat: initial provisioning for ${safeMsg}"`, { cwd: repoDir });
+  if (staged) {
+    const safeMsg = brandName.replace(/['`$\\]/g, '');
+    run(`git commit -m "feat: initial provisioning for ${safeMsg}"`, { cwd: repoDir });
+  } else {
+    // Still push. "Nothing to commit" says nothing about the remote: a run whose commit landed but
+    // whose push failed leaves HEAD ahead of origin, and returning here stranded that commit on
+    // this machine — every later run saw a clean tree and skipped the push again. Pushing an
+    // up-to-date HEAD is a no-op.
+    console.log(`  Nothing new to commit — pushing anyway, in case an earlier push failed.`);
+  }
   const remoteUrl = execSync('git remote get-url origin', { cwd: repoDir }).toString().trim();
   // The token goes in an auth header set through GIT_CONFIG_* env, never in the URL. It used to be
   // `https://${token}@github.com/…`, which run() echoed on every push — and which git itself would
