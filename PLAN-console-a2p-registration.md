@@ -5,7 +5,7 @@
 **Supersedes:** the client-driven design in `juneau-digital-designs/HANDOFF-a2p-onboarding-identity-step.md`
 **Reads with:** `~/Desktop/JDD-a2p-isv-runbook.html` (the chain), `HANDOFF-console-onboarding-a2p.md`
 (the console's own A2P context — **§6 of it is now wrong, see Phase 6**), `PLAN-portal-form-capture.md` §1b
-**Status:** plan, approved decisions recorded in §2, no work started
+**Status:** Phases 1–4 and 6.1–6.2 built on branch `claude/a2p-registration-chain-ad797f` (2026-11-02); Phase 5 (agency strip) and 6.3–6.5 are follow-ups — see §12. Nothing has been filed for any client.
 
 ---
 
@@ -357,3 +357,38 @@ stays a manual operator step; `runbook-content.ts` copy, owned by the sibling ha
 scenario and notification-number work from `PLAN-portal-form-capture.md`; anything under
 `app/components/portal/Crm*`, `app/lib/portal-crm.ts`, `app/lib/crm-contacts.ts` or
 `app/api/portal/{crm,customers,inbox,messages}` in the agency repo, which are mid-rewrite.
+
+---
+
+## 12. Build record (2026-11-02)
+
+**Built.** `lib/a2p-identity.js`, `lib/a2p-trusthub.js`, `lib/a2p-registration-store.js` (moved and
+reshaped), `lib/a2p-register.js` (the chain, both paths, plus `business.update` / `rep.update`
+corrections), `scripts/record-a2p-fixtures.js` (`npm run fixtures:a2p`, Twilio-only, never Make),
+`/manage → Messaging & A2P`, its three routes under `/api/manage/a2p`, the Overview line, and the
+`envFields.ts` comment. Root suite 192, console suite 413, console `tsc` clean.
+
+**Live run** (decision 10): `_e2e_test_growth` was taken to a compliant evaluation through the
+console, then stopped. Draft profile `BU3782f82c2f2f0c8fce2850d86ed2e932` exists on Twilio, unsubmitted,
+with fake identity data. The first evaluation failed on `job_position: "Owner"`, which is an enum
+(`A2P_JOB_POSITIONS`); that response is now a recorded fixture.
+
+**Follow-ups, not done here:**
+1. **Agency strip (Phase 5).** In `juneau-digital-designs`: delete `app/api/onboarding/a2p-identity/route.ts`,
+   `app/lib/a2p-trusthub.mjs`, `app/lib/a2p-registration-store.mjs`; drop `app/lib/a2p-identity.mjs`
+   to an intake-only module without the industry enum (decision 9); add `app/api/onboarding/a2p-intake/route.ts`
+   writing `jdd:a2p-intake:{slug}` with exactly the keys in `INTAKE_KEYS` (`lib/a2p-registration-store.js`)
+   and refusing any `ein` key or tax-ID-shaped value; remove the wizard's EIN, sole-prop and
+   representative fields **and its industry select**; cut `test/a2p-identity-retention.test.mjs` to the
+   draft-store half. Key the intake by the client's **base** slug — the record is per client.
+2. **`CLIENT_MESSAGING_SERVICE_SID` (orchestrator §6 item 5).** The record's `messagingServiceSid` is the
+   value to read. The console does not write `PortalSite.messagingServiceSid`; it only pushes `a2pStatus`.
+3. **Reconcile.** `lib/reconcile-probes.js` still checks only the MASTER pool; once `number.attach` moves
+   a number into the client's service, reconcile will flag it. Invert per the sibling handoff §5.
+4. **Teardown** must delete `jdd:a2p-registration:{slug}` and its TrustHub objects only when registration
+   never completed (sid-store correction §5).
+5. **`next dev -p 3040` names no `-H`.** The middleware's loopback check reads the `Host` header, which a
+   LAN client can set. Consider `-H 127.0.0.1` in `console/package.json` (§6's last invariant).
+6. **Restart the console after editing any `lib/a2p-*.js`** — see the comment in `console/src/lib/a2pChain.ts`.
+7. The `_e2e_test_growth` drafts are kept for inspection (operator's choice); remove them in the teardown work.
+

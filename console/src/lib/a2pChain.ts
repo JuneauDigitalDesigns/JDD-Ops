@@ -10,6 +10,13 @@ import { loadKvCredentials } from './opsSecrets';
  * a2p-identity.js, a2p-readiness.js. Same webpackIgnore'd, mtime-keyed dynamic import as
  * teardownOps.ts: they live outside the console app's root and must never be bundled.
  *
+ * **The mtime key only refreshes the ENTRY module.** a2p-register.js imports a2p-identity.js,
+ * a2p-trusthub.js and a2p-readiness.js statically; those resolve to their plain URLs, which
+ * Node's ESM cache holds forever. Edit a2p-identity.js under a running `next dev` and the fresh
+ * a2p-register.js imports the STALE identity module — seen for real as "does not provide an
+ * export named A2P_JOB_POSITIONS" and a 500 on the section. Restart the console after editing
+ * any lib/a2p-*.js; there is no way to evict an ES module.
+ *
  * One copy of every rule, in the ops root (PLAN-console-a2p-registration.md §3 fact 5). The only
  * piece the console's CLIENT bundle needs — the industry / business-type / vertical enums — is
  * loaded here by the section's server component and passed down as props, never copied into
