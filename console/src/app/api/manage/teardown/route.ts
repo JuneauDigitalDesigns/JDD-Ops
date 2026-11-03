@@ -319,6 +319,26 @@ export async function POST(req: Request) {
           }
         }
 
+        // ── Phase 1b: purge each site's portal data ─────────────────────────
+        // Leads, CRM records and the lead-ingest token, scoped to this site and no other. Teardown
+        // used to leave all of it: customers' names and numbers in KV with nothing left to find
+        // them by, and a token that stayed a live credential. Its own phase rather than inside the
+        // portal block above, because the token record alone identifies a site's data — a client
+        // whose portal email is unresolved still has leads to purge. The token is read here, on
+        // the server, from the client context; it is a credential and never travels in the plan.
+        for (const site of plan.sites) {
+          const siteEnv = ctx.sites.find((s) => s.slug === site.siteSlug)?.env ?? {};
+          await runStep(record, `Purge portal data (${site.siteSlug})`, () =>
+            ops.purgePortalSiteData({
+              kvUrl: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+              kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+              siteSlug: site.siteSlug,
+              accountEmail: plan.portal.email ?? siteEnv.PORTAL_ACCOUNT_EMAIL,
+              ingestToken: siteEnv.LEAD_INGEST_TOKEN,
+            }),
+          );
+        }
+
         // ── Phases 2–6: per site — stop traffic, then destroy compute ───────
         for (const site of plan.sites) {
           await runStep(record, `Stop Make scenario (${site.siteSlug})`, () =>

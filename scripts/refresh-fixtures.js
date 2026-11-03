@@ -232,6 +232,50 @@ async function main() {
     save(`trusthub/policy-${known.key}.json`, policy);
   }
 
+  // Retell: every distinct call OUTCOME this account has actually produced. The post-call
+  // scenario's trigger filter decides which calls are logged and briefed by matching on these
+  // four fields, so the filter is tested against real combinations rather than the ones we
+  // believe Retell sends. That belief was already wrong once: voicemail on these agents is
+  // `ended` + an ordinary hangup + `in_voicemail: true`, never `voicemail_reached`.
+  //
+  // Only the four fields, one example call_id each, no counts (they would churn the diff on
+  // every refresh). No numbers, names, transcripts or recordings.
+  console.log('Retell:');
+  if (process.env.RETELL_API_KEY) {
+    try {
+      const res = await fetch('https://api.retellai.com/v2/list-calls', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.RETELL_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 1000, sort_order: 'descending' }),
+      });
+      const calls = res.ok ? await res.json() : null;
+      if (!Array.isArray(calls)) {
+        console.error(`  ✗ list-calls: HTTP ${res.status}`);
+        failed++;
+      } else {
+        const shapes = new Map();
+        for (const c of calls) {
+          const shape = {
+            direction: c.direction ?? null,
+            call_status: c.call_status ?? null,
+            disconnection_reason: c.disconnection_reason ?? null,
+            in_voicemail: c.call_analysis?.in_voicemail ?? null,
+          };
+          const key = JSON.stringify(shape);
+          const prev = shapes.get(key);
+          // The smallest id, so the example is stable across refreshes as new calls arrive.
+          if (!prev || c.call_id < prev.example_call_id) shapes.set(key, { ...shape, example_call_id: c.call_id });
+        }
+        save('retell/call-outcomes.json', [...shapes.values()].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+      }
+    } catch (e) {
+      console.error(`  ✗ list-calls: ${e?.message ?? e}`);
+      failed++;
+    }
+  } else {
+    console.warn('  ? RETELL_API_KEY not set — retell/call-outcomes.json not refreshed');
+  }
+
   console.log('');
   if (failed) {
     console.error(`✗ ${failed} fetch(es) failed — fixtures may be incomplete.`);

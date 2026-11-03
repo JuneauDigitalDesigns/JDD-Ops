@@ -4,7 +4,7 @@
  * working post-call scenario BEFORE a client run creates one.
  *
  * Background: `cloneAndWirePostCall` clones the Make master scenario and rewrites its
- * Airtable + Twilio modules for one client. Everything that can go wrong there goes wrong
+ * Airtable + HTTP modules for one client. Everything that can go wrong there goes wrong
  * silently — a clone with a stale table id, a dropped column, or a missing event filter
  * still looks like a healthy scenario in the Make UI, and the only symptom is a call log
  * that never fills. Every failure of this kind costs a real client real leads before anyone
@@ -34,7 +34,17 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
 
-import { patchPostCallBlueprint, airtableFieldMap } from '../onboard.js';
+import { patchPostCallBlueprint, airtableFieldMap, CALL_LOG_FIELDS } from '../onboard.js';
+import {
+  checkAnalysisCoversBlueprint,
+  checkSelectMappingsTotal,
+  checkOwnerBriefViaAgency,
+  checkConnectedCallsOnly,
+} from '../lib/onboard-checks.js';
+import { buildPostCallAnalysisData } from '../lib/voice-consent.js';
+import { CALL_OUTCOME_CASES, shouldLog } from '../lib/call-outcomes.js';
+
+const SIM_TOKEN = 'f'.repeat(64);
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
 
@@ -49,12 +59,9 @@ const problems = [];
 const note = (m) => console.log(m);
 const bad = (m) => { problems.push(m); console.error(`  ✗ ${m}`); };
 
-// The columns createAirtableBase creates today. Kept here so the verifier can run with no
-// client base at all and still catch a master/onboard.js schema divergence.
-const EXPECTED_COLUMNS = [
-  'Date', 'Caller name', 'Caller number', 'Summary', 'Duration (seconds)',
-  'Call type', 'Email', 'Address', 'Recording URL', 'Priority', 'Outcome',
-];
+// The columns createAirtableBase creates today — read from the shared spec, not restated, so the
+// verifier cannot pass against a column list onboard.js no longer creates.
+const EXPECTED_COLUMNS = CALL_LOG_FIELDS.map((f) => f.name);
 
 async function main() {
   const apiKey = process.env.MAKE_API_KEY;
@@ -128,21 +135,27 @@ async function main() {
     note(`✓ Every master column exists in the client base`);
   }
 
+  // Every singleSelect mapping must be unable to emit an invalid option — a bare analysis field
+  // that comes back "" fails the whole row (2026-11-03). Checked on the master, before the patch
+  // mutates it, against the master's own base: every clone inherits these expressions.
+  const selects = checkSelectMappingsTotal({ blueprint, fieldMap: masterMap });
+  if (selects.ok) note(`✓ ${selects.detail}`);
+  else bad(selects.detail);
+
   // 4) Run the real patch.
   const before = JSON.stringify(blueprint);
   patchPostCallBlueprint(blueprint, {
     baseId: clientMap === null ? null : (clientBaseArg ?? 'appSIMULATED'),
     siteTag,
-    fromNum: '+15005550006',
-    toNum: '+15005550009',
-    smsEnabled: true,
+    // A throwaway token of the right shape. The real one is a client credential and this script
+    // never needs it: the check asks whether the header carries the token it was handed.
+    ingestToken: SIM_TOKEN,
     masterMap,
     clientMap,
   });
   if (JSON.stringify(blueprint) === before) bad('patchPostCallBlueprint made no changes at all.');
 
   const patchedAirtable = blueprint.flow.find((m) => (m.module ?? '').startsWith('airtable'));
-  const patchedTwilio = blueprint.flow.find((m) => (m.module ?? '').startsWith('twilio'));
 
   console.log('\nPatched Airtable module:');
   if (patchedAirtable?.mapper?.table !== clientMap.tableId) {
@@ -186,12 +199,23 @@ async function main() {
     bad(`Airtable module has no call_analyzed filter (${guard}) — every Retell event would log a row.`);
   }
 
-  console.log('\nPatched Twilio module:');
-  if (patchedTwilio?.mapper?.from !== '+15005550006' || patchedTwilio?.mapper?.to !== '+15005550009') {
-    bad(`from/to not applied (from=${patchedTwilio?.mapper?.from}, to=${patchedTwilio?.mapper?.to}).`);
-  } else {
-    note('  ✓ from/to applied');
-  }
+  // Every custom_analysis_data field the scenario reads must be one the agent extracts, or that
+  // cell is blank on every call. Same predicate the dry run and the suite use.
+  const analysis = checkAnalysisCoversBlueprint({ blueprint, analysisData: buildPostCallAnalysisData('') });
+  if (analysis.ok) note(`  ✓ ${analysis.detail}`);
+  else bad(analysis.detail);
+
+  // The owner brief goes through the agency now: no Twilio module, one HTTP module posting to
+  // /api/ingest/call with the site's token. Same predicate the dry run uses.
+  // Only a callback that reached a person continues past the trigger (operator rule, 2026-11-03).
+  const gated = checkConnectedCallsOnly({ blueprint, cases: CALL_OUTCOME_CASES, shouldLog });
+  if (gated.ok) note(`  ✓ ${gated.detail}`);
+  else bad(gated.detail);
+
+  console.log('\nOwner brief (HTTP module):');
+  const brief = checkOwnerBriefViaAgency({ blueprint, ingestToken: SIM_TOKEN });
+  if (brief.ok) note(`  ✓ ${brief.detail}`);
+  else bad(brief.detail);
 
   if (problems.length) {
     console.error(`\n✗ ${problems.length} problem(s) — step 8c would produce a scenario that does not log calls correctly.`);

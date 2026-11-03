@@ -1,0 +1,65 @@
+[
+  {
+    "direction": "inbound",
+    "call_status": "ended",
+    "disconnection_reason": "agent_hangup",
+    "in_voicemail": false,
+    "example_call_id": "call_08b986d4bd4e10af997d6bd8f10"
+  },
+  {
+    "direction": "inbound",
+    "call_status": "ended",
+    "disconnection_reason": "inactivity",
+    "in_voicemail": false,
+    "example_call_id": "call_4da030b6df5d2279c3e28625ef2"
+  },
+  {
+    "direction": "inbound",
+    "call_status": "ended",
+    "disconnection_reason": "user_hangup",
+    "in_voicemail": false,
+    "example_call_id": "call_052462463c307b123f15b27bc0e"
+  },
+  {
+    "direction": "outbound",
+    "call_status": "ended",
+    "disconnection_reason": "agent_hangup",
+    "in_voicemail": false,
+    "example_call_id": "call_0e657a20dc03c1f7be6136d981e"
+  },
+  {
+    "direction": "outbound",
+    "call_status": "ended",
+    "disconnection_reason": "agent_hangup",
+    "in_voicemail": true,
+    "example_call_id": "call_3485b67f9013ec6f3b4327fd9cc"
+  },
+  {
+    "direction": "outbound",
+    "call_status": "ended",
+    "disconnection_reason": "user_hangup",
+    "in_voicemail": false,
+    "example_call_id": "call_6444328c8c82adc4e719df1b2e2"
+  },
+  {
+    "direction": "outbound",
+    "call_status": "ended",
+    "disconnection_reason": "user_hangup",
+    "in_voicemail": true,
+    "example_call_id": "call_6adc708f444566a0138df1c1fb5"
+  },
+  {
+    "direction": "outbound",
+    "call_status": "ended",
+    "disconnection_reason": "voicemail_reached",
+    "in_voicemail": true,
+    "example_call_id": "call_646008ddd550bf43ae889add8dd"
+  },
+  {
+    "direction": null,
+    "call_status": "ended",
+    "disconnection_reason": "user_hangup",
+    "in_voicemail": false,
+    "example_call_id": "call_2844cf5e25aece862c298fe1338"
+  }
+]

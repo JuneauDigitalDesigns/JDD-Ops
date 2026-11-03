@@ -96,6 +96,30 @@
         },
         "id": "fldVbJMLbBiDzEvZF",
         "name": "Priority"
+      },
+      {
+        "type": "singleSelect",
+        "options": {
+          "choices": [
+            {
+              "id": "selQxGD8F7SeiGtU9",
+              "name": "granted",
+              "color": "grayLight2"
+            },
+            {
+              "id": "selgvuM2QN8BGeYct",
+              "name": "declined",
+              "color": "grayLight2"
+            },
+            {
+              "id": "selnAmTp8HCOXvpVi",
+              "name": "unknown",
+              "color": "grayLight2"
+            }
+          ]
+        },
+        "id": "fld7ZxMBb9uT1Lxsd",
+        "name": "SMS consent"
       }
     ],
     "views": [

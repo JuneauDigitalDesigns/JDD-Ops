@@ -20,18 +20,21 @@ function toE164(raw: string): string | null {
 //   - callback mode also needs: RETELL_API_KEY, TWILIO_NUMBER, RETELL_AGENT_ID
 // Read ONLY these names — never invent new env vars, never expose master secrets.
 //
-// ── Why the lead is ALWAYS recorded first ───────────────────────────────────────────────────
+// ── When the submission is recorded, and when it deliberately is not ─────────────────────────
 // This route used to either email the owner (Starter, via Resend) or place a Retell callback
-// (Growth) — and in the callback case it persisted nothing. Two ways that lost a paying
-// customer's lead with no trace:
+// (Growth) — and in the callback case it persisted nothing, so a callback Retell refused lost
+// the lead with no trace. Then it recorded every submission, which fixed that and caused the
+// opposite: an answered callback reached the portal twice (the form, then the call), and an
+// unanswered one sat there as a "new lead" nobody had spoken to.
 //
-//   1. `create-phone-call` fails (bad number, Retell error, rate limit) → 502, nothing stored.
-//   2. It succeeds but the lead never answers → no `call_analyzed` event → the Make post-call
-//      scenario never fires → no Airtable row. The lead simply evaporates.
+// The rule now (operator decision, 2026-11-03):
 //
-// So the lead is recorded before anything else, on every tier, and the callback becomes an
-// additional action rather than the only one. The portal is then the system of record and the
-// owner can act on a lead the receptionist never reached.
+//   - Callback PLACED (LEAD_CALLBACK=on and Retell accepted it) → not recorded here. If the lead
+//     answers, the post-call scenario logs the call and briefs the owner; that is the portal
+//     entry. If they don't answer, it's a lost lead, and nothing lands anywhere — the scenario
+//     stops at its trigger for no-answer, busy, failed and voicemail.
+//   - No callback (Starter, web-only, Retell refused it, no dialable number) → recorded, and the
+//     owner is texted at once. A refused callback is a system failure, not a lost lead.
 //
 // Resend is gone entirely. It was the whole delivery mechanism for Starter and it failed open:
 // `RESEND_API_KEY` seeded empty on a fresh client and `syncVercelEnv` skips empty values, so the
@@ -67,8 +70,34 @@ async function recordLead(data: Record<string, unknown>, callbackPlaced: boolean
   }
 }
 
+/**
+ * The name the lead typed, as the agent may say it back to them: letters, spaces, apostrophes
+ * and hyphens only, short enough to say in one breath. Anything else means "no name".
+ */
+function spokenLeadName(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[^\p{L}\p{M}' -]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60).trim();
+}
+
+/**
+ * The first thing the agent says on a callback: the recording disclosure, then an identity
+ * check, word for word as the operator approved them on 2026-11-02.
+ *
+ * A standalone copy of `outboundOpeningLine()` in jdd-ops/lib/voice-consent.js — this file is
+ * written verbatim into client repos, which have no dependency on it. test/voice-consent.test.mjs
+ * pins the two equal. Change the wording there, with sign-off, never here.
+ *
+ * It has to be sent per call: the LLM's own `begin_message` is the INBOUND line, and one
+ * begin_message cannot branch on direction. Without this the agent opens a call it placed with
+ * "how can I help you today?".
+ */
+function outboundOpeningLine(businessName: string, name: string): string {
+  const question = name ? `Am I speaking with ${name}?` : 'Is now a good time?';
+  return `This call is on a recorded line. Hi, this is ${businessName}, calling about the request you sent on our website. ${question}`;
+}
+
 /** Place the Retell callback. Returns true when Retell accepted the call. */
-async function placeCallback(toNumber: string): Promise<boolean> {
+async function placeCallback(toNumber: string, leadName: unknown): Promise<boolean> {
   const apiKey = process.env.RETELL_API_KEY;
   const fromNumber = process.env.TWILIO_NUMBER;
   const agentId = process.env.RETELL_AGENT_ID;
@@ -76,6 +105,11 @@ async function placeCallback(toNumber: string): Promise<boolean> {
     console.error('[contact] callback env not set — skipping callback');
     return false;
   }
+  // Synced to Vercel by onboard.js step 9. Without it the callback still goes out, opening with
+  // the LLM's inbound line — wrong words, but a lead who is called beats one who is not.
+  const businessName = process.env.NEXT_PUBLIC_BRAND_NAME?.trim();
+  if (!businessName) console.error('[contact] NEXT_PUBLIC_BRAND_NAME not set — callback opens with the inbound line');
+  const name = spokenLeadName(leadName);
   try {
     const res = await fetch('https://api.retellai.com/v2/create-phone-call', {
       method: 'POST',
@@ -84,6 +118,11 @@ async function placeCallback(toNumber: string): Promise<boolean> {
         from_number: fromNumber,
         to_number: toNumber,
         override_agent_id: agentId,
+        ...(businessName
+          ? { agent_override: { retell_llm: { begin_message: outboundOpeningLine(businessName, name) } } }
+          : {}),
+        // So the prompt can use the name after the opening line. Values must be strings.
+        retell_llm_dynamic_variables: { lead_name: name },
       }),
     });
     if (!res.ok) {
@@ -112,21 +151,29 @@ export async function POST(req: Request) {
     );
   }
 
-  // Order matters: dial first so the lead is recorded knowing whether the callback happened.
+  // Dial first: whether the callback went out decides whether the submission is recorded at all.
   // The caller is waiting on this response, and `create-phone-call` only queues the call, so
   // the added latency is one API round trip rather than the length of a conversation.
   let callbackPlaced = false;
   if (process.env.LEAD_CALLBACK === 'on' && toNumber) {
-    callbackPlaced = await placeCallback(toNumber);
+    callbackPlaced = await placeCallback(toNumber, (data as { name?: unknown }).name);
   }
 
-  const stored = await recordLead(data as Record<string, unknown>, callbackPlaced);
+  // A placed callback is NOT recorded here. Operator rule, 2026-11-03: an unanswered callback is
+  // a lost lead and must not land in the portal. The lead reaches the portal only through the
+  // completed call — the post-call scenario logs a CONNECTED callback and briefs the owner, and
+  // stops at the trigger for no-answer, busy, failed or voicemail. Recording the form here as
+  // well put every callback in the portal twice when it was answered, and once, as a stale
+  // "new lead", when it was not.
+  if (callbackPlaced) return NextResponse.json({ ok: true });
 
-  // 502 when the lead could not be stored AND no callback went out — nothing happened, so the
-  // form must say so and show the phone number as a fallback. If the callback was placed, the
-  // client is already being contacted, so this is a success for the visitor even though we owe
-  // ourselves a log line about the ingest failure.
-  if (!stored && !callbackPlaced) {
+  // No callback went out — Starter / web-only by design, or a Growth callback Retell refused, or
+  // no dialable number. Nobody else is going to reach this person, so the submission is recorded
+  // and the owner is told now. A refused callback is a system failure, not a lost lead.
+  const stored = await recordLead(data as Record<string, unknown>, false);
+
+  // Nothing happened at all: the form must say so and show the phone number as a fallback.
+  if (!stored) {
     return NextResponse.json({ ok: false, error: 'Delivery failed' }, { status: 502 });
   }
 

@@ -245,3 +245,28 @@ test('an operator-corrected forward number survives a re-run', () => {
   const webOnly = build({ plan: 'starter', webOnly: true, prev });
   assert.equal(webOnly.env.CLIENT_FORWARD_PHONE, undefined, 'web-only must have no forward key');
 });
+
+test('a re-run writes each key exactly once', () => {
+  // LEAD_INGEST_TOKEN was written by the template AND re-appended by CARRIED_KEYS, so every
+  // re-run produced it on two lines — found in the live `_e2e_test_growth/.env.local` at lines
+  // 4 and 18. Same value both times, so nothing failed; but readEnvLocal takes the last
+  // occurrence, so a hand edit to the first copy was silently ignored.
+  const prev = {
+    LEAD_INGEST_TOKEN: 'lit_existing0000000000000000000000000000',
+    PORTAL_ACCOUNT_EMAIL: 'owner@example.com',
+    MAKE_POST_CALL_SCENARIO_ID: '1234567',
+  };
+  const { lines } = build({ plan: 'growth', webOnly: false, prev });
+  const keys = lines.map((l) => String(l).slice(0, String(l).indexOf('='))).filter(Boolean);
+  const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+  assert.deepEqual(dupes, [], `keys written more than once: ${[...new Set(dupes)].join(', ')}`);
+});
+
+test('the existing ingest token survives a re-run, once', () => {
+  // The de-duplication must not cost the thing the duplication was protecting: losing the
+  // registered token silently 401s every lead.
+  const token = 'lit_existing0000000000000000000000000000';
+  const { lines, env } = build({ plan: 'starter', webOnly: false, prev: { LEAD_INGEST_TOKEN: token } });
+  assert.equal(env.LEAD_INGEST_TOKEN, token, 'the registered token must be kept, not re-minted');
+  assert.equal(lines.filter((l) => String(l).startsWith('LEAD_INGEST_TOKEN=')).length, 1);
+});

@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clientDir } from './paths';
 import { getClientContext, listClientContexts, siteDirFor } from './clients';
-import { loadVercelCredentials, loadRetellApiKey, loadGithubToken, loadMakeApiKey, loadTeardownCredentials } from './opsSecrets';
+import { loadVercelCredentials, loadRetellApiKey, loadGithubToken, loadMakeApiKey, loadTeardownCredentials, loadKvCredentials } from './opsSecrets';
 import { loadVercelSync } from './vercelSync';
 import { loadTeardownOps } from './teardownOps';
 import { accountStoreConfigured, getAccount, getAccountEmailByUserId } from './accountStore';
@@ -43,6 +43,15 @@ export interface TeardownPlanSite {
     resolvedBy: 'env' | 'name' | 'webhook' | null;
     webhookUrl: string | null;
   };
+  /**
+   * This site's leads, CRM records and ingest token, counted by a dry-run purge so the operator
+   * sees how much customer data goes before confirming. `records` is null when it could not be
+   * counted — never zero, which would read as "nothing to lose".
+   *
+   * Deliberately NOT in the preview hash: identifiers are stable, but a count moves every time a
+   * lead arrives, and a teardown must not abort because a customer filled in a form meanwhile.
+   */
+  portalData: { records: number | null; detail: string };
 }
 
 export interface TeardownPlan {
@@ -132,6 +141,8 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
   if (!twilioAccountSid || !twilioAuthToken) warnings.push('Twilio credentials not set — numbers could not be verified.');
   if (!airtableApiKey) warnings.push('AIRTABLE_API_KEY not set — the Airtable base could not be verified.');
   if (!clerkSecretKey) warnings.push('CLERK_SECRET_KEY not set — the portal login could not be resolved.');
+  const hasKv = loadKvCredentials();
+  if (!hasKv) warnings.push('KV credentials not set — leads and CRM records could not be counted, and will NOT be purged.');
 
   const [ops, vercel] = await Promise.all([loadTeardownOps(), hasVercel ? loadVercelSync() : null]);
 
@@ -173,6 +184,21 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
     );
     if (verifiedCustom) hasVerifiedCustomDomain = true;
 
+    const portalProbe = hasKv
+      ? await ops.purgePortalSiteData({
+          kvUrl: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+          kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+          siteSlug: site.slug,
+          accountEmail: env.PORTAL_ACCOUNT_EMAIL,
+          ingestToken: env.LEAD_INGEST_TOKEN,
+          dryRun: true,
+        })
+      : null;
+    const portalData = {
+      records: portalProbe && portalProbe.outcome !== 'failed' && portalProbe.keys ? portalProbe.keys.length : null,
+      detail: portalProbe?.message ?? 'KV not configured — portal data could not be counted.',
+    };
+
     sites.push({
       siteSlug: site.slug,
       brandName: site.brandName,
@@ -196,6 +222,7 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
         resolvedBy: makeScenario?.resolvedBy ?? null,
         webhookUrl: webhookUrl ?? null,
       },
+      portalData,
     });
   }
 

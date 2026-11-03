@@ -179,8 +179,8 @@ function Field({ field, copied, onCopy }: { field: MakeField; copied: boolean; o
   );
 }
 
-/** Make's Save button is per-app: Airtable's is the Make purple, Twilio's is Twilio red. */
-const SAVE_COLOR: Record<MakeModule['app'], string> = { airtable: '#6b4ee6', twilio: '#f22f46' };
+/** Make's Save button is per-app: Airtable's is the Make purple, HTTP's is Make's HTTP blue. */
+const SAVE_COLOR: Record<MakeModule['app'], string> = { airtable: '#6b4ee6', http: '#1f6feb' };
 
 function Panel({
   module: mod, copiedKeys, onCopy,
@@ -197,7 +197,7 @@ function Panel({
       <div style={{ flexShrink: 0, width: 74, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         <div style={{ width: 74, height: 74, borderRadius: 999, background: '#eef0f3', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
           <div style={{ width: 54, height: 54, borderRadius: 999, background: mod.accent, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21 }}>
-            {mod.app === 'airtable' ? '▦' : '✆'}
+            {mod.app === 'airtable' ? '▦' : '⇄'}
           </div>
           <span style={{
             position: 'absolute', right: -1, top: 7, background: '#fff', border: '1px solid #d6dae0', color: '#4a5159',

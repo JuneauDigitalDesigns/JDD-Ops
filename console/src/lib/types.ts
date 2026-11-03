@@ -152,6 +152,10 @@ export interface OpsConfig {
   githubOrg?: string; // jdd-ops/.env GITHUB_ORG
   vercelTeamId?: string; // jdd-ops/.env VERCEL_TEAM_ID
   makePostCallMasterScenarioId?: string; // jdd-ops/.env MAKE_POST_CALL_MASTER_SCENARIO_ID
+  twilioNotificationNumber?: string; // jdd-ops/.env TWILIO_NOTIFICATION_NUMBER (Account-lane sender)
+  // Deliberately NO twilioPrimaryProfileSid. `node scripts/a2p-readiness.js` reads that SID AND
+  // checks the profile's business type live; a key-presence field here would be a second, weaker
+  // judge of the same fact that can read satisfied while the real check reads blocked.
   portalSignInUrl?: string; // agency NEXT_PUBLIC_CLERK_SIGN_IN_URL → absolute
   siteUrl?: string; // agency NEXT_PUBLIC_SITE_URL, no trailing slash
   serviceAccountEmail?: string; // GOOGLE_SERVICE_ACCOUNT_KEY → client_email

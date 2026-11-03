@@ -227,6 +227,15 @@ export default function DangerSection() {
               name={s.make.scenarioId ?? 'not resolved'}
               exists={s.make.scenarioId ? true : null}
             />
+            {/* Customer data, not infrastructure: leads, CRM contacts and threads, and the ingest
+                token. Shown as a count so the scale of what is lost is visible before confirming;
+                null renders as unknown rather than zero, which would read as nothing to lose. */}
+            <ResourceRow
+              label="Portal data"
+              name={s.portalData.records == null ? 'not counted' : `${s.portalData.records} record(s)`}
+              exists={s.portalData.records == null ? null : s.portalData.records > 0}
+              detail={s.portalData.detail}
+            />
           </div>
         ))}
         {plan.airtable.baseId && (

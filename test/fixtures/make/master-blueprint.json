@@ -23,6 +23,43 @@
                   "a": "{{1.event}}",
                   "b": "call_analyzed",
                   "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.direction}}",
+                  "b": "outbound",
+                  "o": "text:notequal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.direction}}",
+                  "b": "outbound",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
                 }
               ]
             ]
@@ -47,10 +84,11 @@
               "fld2smPri8IPvoNwh": "{{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}",
               "fld3xCSY4BXXEkdMM": "{{1.call.call_analysis.custom_analysis_data.caller_address}}",
               "fld7GZx09e7dnHNIU": "{{1.call.call_analysis.custom_analysis_data.caller_email}}",
+              "fld7ZxMBb9uT1Lxsd": "{{if(1.call.call_analysis.custom_analysis_data.sms_consent = \"granted\"; \"granted\"; if(1.call.call_analysis.custom_analysis_data.sms_consent = \"declined\"; \"declined\"; \"unknown\"))}}",
               "fld8sG3TSj5Va42yI": "{{parseDate(1.call.start_timestamp; \"x\")}}",
               "fld9ONpSErMn97LP6": "{{1.call.call_analysis.call_summary}}",
               "fldMGK569tnD647g2": "{{1.call.call_analysis.custom_analysis_data.caller_name}}",
-              "fldVbJMLbBiDzEvZF": "{{1.call.call_analysis.custom_analysis_data.caller_priority}}",
+              "fldVbJMLbBiDzEvZF": "{{if(1.call.call_analysis.custom_analysis_data.caller_priority = \"emergency\"; \"emergency\"; \"callback\")}}",
               "fldtqHttzKEPSQazh": "{{round(ifempty(1.call.duration_ms; 0) / 1000)}}",
               "fldxb2nunz4Pt1SJT": "{{1.call.recording_url}}"
             },
@@ -64,18 +102,47 @@
           }
         },
         {
-          "id": 9,
+          "id": 10,
           "mapper": {
-            "to": "+15005550006",
-            "body": "Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}\n{{newline}}\nStatus:{{1.call.call_analysis.custom_analysis_data.caller_priority}}\n{{newline}}\nPhone: {{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}\n{{newline}}\nAbout: {{1.call.call_analysis.call_summary}}",
-            "from": "+15005550009",
-            "fromType": "phone",
-            "messageBody": "body"
+            "url": "https://www.juneaudigitaldesigns.com/api/ingest/call",
+            "method": "post",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer REPLACE_PER_CLIENT"
+              }
+            ],
+            "timeout": "40",
+            "contentType": "urlEncoded",
+            "shareCookies": false,
+            "parseResponse": false,
+            "allowRedirects": true,
+            "stopOnHttpError": false,
+            "urlEncodedBodyContent": [
+              {
+                "name": "call_id",
+                "value": "{{1.call.call_id}}"
+              },
+              {
+                "name": "caller_name",
+                "value": "{{1.call.call_analysis.custom_analysis_data.caller_name}}"
+              },
+              {
+                "name": "caller_priority",
+                "value": "{{1.call.call_analysis.custom_analysis_data.caller_priority}}"
+              },
+              {
+                "name": "caller_number",
+                "value": "{{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}"
+              }
+            ],
+            "requestCompressedContent": true
           },
-          "module": "twilio:SendSMS",
-          "version": 2,
+          "module": "http:MakeRequest",
+          "version": 4,
           "parameters": {
-            "__IMTCONN__": 9736550
+            "tlsType": "",
+            "authenticationType": "noAuth"
           }
         }
       ],
@@ -106,12 +173,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-08-28T20:18:20.308Z",
+    "last_edit": "2026-11-03T19:58:02.866Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
-    "idSequence": 10,
-    "version": 38
+    "idSequence": 11,
+    "version": 44
   }
 }

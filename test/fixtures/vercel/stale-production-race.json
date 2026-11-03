@@ -1,0 +1,52 @@
+{
+  "_note": "Recorded 2026-11-03 from the live Vercel API for project e2e_test_starter (read-only), trimmed to the fields the race check reads. deployments[1] is the push-triggered production build that started ~36ms before onboard.js wrote LEAD_DELIVERY_MODE and ~760ms before LEAD_INGEST_URL, so it served with neither and every form post 502d. deployments[0] is the manual redeploy that fixed it.",
+  "deployments": {
+    "deployments": [
+      {
+        "uid": "dpl_DrdzNWRrbGPQzN5dbYHvFARyL3UW",
+        "created": 1793727711050,
+        "target": "production",
+        "state": "READY",
+        "meta": {
+          "githubCommitSha": "430e5e3d80202419afb864dffdbb569034e4e6d6"
+        }
+      },
+      {
+        "uid": "dpl_7D8JJMWEGxcPwhb563WGq7ky5W9h",
+        "created": 1793665852990,
+        "target": "production",
+        "state": "READY",
+        "meta": {
+          "githubCommitSha": "430e5e3d80202419afb864dffdbb569034e4e6d6"
+        }
+      },
+      {
+        "uid": "dpl_zMP8D75M8DpFTx85vBN7FJB2tJka",
+        "created": 1793039359310,
+        "target": "production",
+        "state": "READY",
+        "meta": {
+          "githubCommitSha": "c22f49a3aa181ab8f2a1ba5bb609af307aec7cfc"
+        }
+      }
+    ]
+  },
+  "envWrites": [
+    {
+      "key": "LEAD_DELIVERY_MODE",
+      "updatedAt": 1793665853026
+    },
+    {
+      "key": "LEAD_CALLBACK",
+      "updatedAt": 1793665853328
+    },
+    {
+      "key": "LEAD_INGEST_TOKEN",
+      "updatedAt": 1793665853545
+    },
+    {
+      "key": "LEAD_INGEST_URL",
+      "updatedAt": 1793665853751
+    }
+  ]
+}

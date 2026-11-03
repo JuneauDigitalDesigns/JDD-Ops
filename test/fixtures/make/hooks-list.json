@@ -231,7 +231,7 @@
       },
       "scenarioId": 6738067,
       "scenarioName": "Post-call: E2E Starter Test Co.",
-      "scenarioIsActive": true,
+      "scenarioIsActive": false,
       "relay": null,
       "url": "https://hook.us2.make.com/REDACTED_HOOK_TOKEN_2970134"
     },

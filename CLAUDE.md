@@ -45,8 +45,8 @@ identically to Starter, offered only when a client refuses AI on their line. onb
 the voice stack on `isWebOnly` (from `@jdd/schema`), never on `plan === 'starter'`.
 
 **Starter and Growth run the identical stack front to back** — number rings the owner, agent
-picks up on no-answer, Make webhook fires, Airtable row is written, owner is texted that a
-lead is waiting. Three things differ, and only three:
+picks up on no-answer, Make webhook fires, Airtable row is written, the agency texts the owner
+that a lead is waiting (if they have opted in). Three things differ, and only three:
 
 1. **Web-form behaviour.** Starter drops the submission straight into the portal inbox.
    Growth has the agent call the submitter back, collect details, and put *that* in the
@@ -110,12 +110,65 @@ default `407,321,689` → `TWILIO_DEFAULT_REGION`, default `FL`) and hard-fails 
 no local number is available rather than buying toll-free. Expanding to new
 regions is an env edit.
 
-**A2P SMS:** the sending number must live in the `TWILIO_MESSAGING_SERVICE_SID`
-sender pool (which holds the approved campaign) or every post-call text 30034s.
-onboard.js adds each local number to the pool and reads it back to confirm; for
-a client with SMS consent, the pre-flight hard-fails when the SID is unset or the
-campaign isn't approved, so we never provision a silently-textless client. The
-reconcile engine also flags any live number that isn't in the pool.
+**A2P SMS — two lanes. Who receives a message decides which campaign carries it.**
+
+- **Account lane** — to the business owner: post-call briefs, new-lead alerts. Rides JDD's own
+  approved `ACCOUNT_NOTIFICATION` campaign, sent from one dedicated number,
+  `TWILIO_NOTIFICATION_NUMBER`, which sits in the `TWILIO_MESSAGING_SERVICE_SID` pool with its
+  voiceUrl deliberately unset. **The agency sends every account-lane text**: new-lead alerts and,
+  since 2026-11-03, the post-call brief. So the notification number lives in the agency's env,
+  and its `sendSms` refuses to send without it. onboard.js no longer checks it, because nothing
+  in a clone sends SMS any more. For a client with SMS consent, pre-flight still hard-fails when
+  the service SID is unset or the campaign isn't approved (`usAppToPersonRegistered`).
+- **Customer lane** — to the owner's customers: portal replies, review requests. Each
+  Growth/Enterprise client's own `CUSTOMER_CARE` campaign and number, registered per client
+  through the console's A2P chain. 13–20 business days of carrier review per client; not live.
+
+**A client's number must never send account-lane traffic.** A campaign binds to a Messaging
+Service and a number sits in exactly one, so a client number used for owner alerts is stranded
+in JDD's service and can never join the client's own campaign. Make can't break this any more:
+clones carry no Twilio module, and the agency's `sendSms` pins the account lane's `From` to
+`TWILIO_NOTIFICATION_NUMBER`. `checkOwnerBriefViaAgency` replaced `checkAccountLaneSender`, which
+checked the `from` that onboard.js used to stamp onto each clone's Twilio module.
+
+**Pool membership is what associates a number with a campaign — not naming the service in the
+API call.** The account's history shows one number going `30034` → `delivered` when the campaign
+was approved, with `messaging_service_sid` null on every message before and after. So `30034`
+means "this number is not associated with an approved campaign", not "the call omitted the
+service SID". This file used to imply the latter.
+
+**Transitional, and the reconcile probe still reflects the old design.** onboard.js still adds
+each client number to the master pool and reads it back, and the reconcile engine still flags a
+live client number that is *not* in the master pool. Under the two-lane design that is backwards
+— a client number *in* the master pool is the drift — but flipping it needs each client's own
+Messaging Service SID to compare against, which the A2P chain hasn't produced yet
+(`HANDOFF-ORCHESTRATOR-lead-capture-a2p.md` §6 items 5 and 7). Until then the flag is correct for
+how onboard.js actually provisions. Don't "fix" it ahead of those.
+
+**The owner's end-of-call brief is sent by the agency, not by Make.** Each clone's last module
+is an `http:MakeRequest` that POSTs the call (form-encoded `call_id`, `caller_name`,
+`caller_priority`, `caller_number`) to `https://www.juneaudigitaldesigns.com/api/ingest/call`
+with `Authorization: Bearer <this site's LEAD_INGEST_TOKEN>`. The agency resolves the account
+from the token, reads the owner's SMS consent **at send time** (the portal's `sms:consent:*`),
+texts once per Retell `call_id`, and sends on the account lane from its own
+`TWILIO_NOTIFICATION_NUMBER`.
+
+It used to be a Twilio module in each clone, with `to`, `from` and whether to text at all
+stamped in by `patchPostCallBlueprint` at onboarding and never re-read. Owner opt-in moved to the
+portal and never reached Make: on 2026-11-03 the growth fixture's clone had no Twilio module,
+and a completed callback briefed nobody. So `patchPostCallBlueprint` now replaces the master's
+`Bearer REPLACE_PER_CLIENT` placeholder with the site's token, drops any Twilio module (a
+leftover one double-texts under stale consent), and drops the HTTP module if the site has no
+token. `checkOwnerBriefViaAgency` enforces the shape: no Twilio, one POST to `www`
+`/api/ingest/call` (the apex 307s and loses the header), form-encoded, carrying `call_id`, with
+"evaluate all states as errors" OFF (repeated errors deactivate the scenario and stop the call
+log too), and this site's token. The token is a credential: it is written into the clone and
+never printed by onboard.js, the checks, or the verifier.
+
+The master's HTTP module was built in the Make UI and recorded, never written from memory: an
+`http:MakeRequest` saved with nothing filled in has no `mapper` at all, and one first saved
+with `method: "get"`, which the agency's route would have refused. If you rebuild it, re-record
+it with `npm run fixtures:refresh`.
 
 **The site must advertise the Twilio number, not the owner's.** Two numbers with two jobs:
 
@@ -204,8 +257,26 @@ answers FAQs from intake, defers prices to owner, never invents facts.
 engine, `general_prompt` passed to `create-agent`/`update-agent` is ignored — so
 onboard.js creates a per-client LLM (cloning `RETELL_LLM_ID`'s model+tools) with
 the prompt and binds the agent to it; the per-client LLM id is saved as
-`RETELL_LLM_ID` in the client `.env.local`. `npm run update-prompt` edits that LLM
-(`update-retell-llm`), not the agent. Note: Retell blocks changing an agent's
+`RETELL_LLM_ID` in the client `.env.local`. `npm run update-prompt -- --slug {slug}` edits that
+LLM (`update-retell-llm`: prompt + the fixed `begin_message` recording disclosure) **and** the
+agent's `post_call_analysis_data` in one command, so a prompt that asks for SMS consent never
+runs on an agent with no field to record it. It refuses a prompt missing the approved consent
+ask; `--prompt-only` keeps the old prompt-alone behaviour.
+
+**Every agent hangs up on voicemail** (`voicemail_option: { action: { type: "hangup" } }`, an
+*agent* field, `VOICEMAIL_OPTION` in `lib/voice-consent.js`). onboard.js sets it at creation and
+`update-prompt` pushes it to existing client agents **first and on its own**: with
+`--prompt-only`, with `--voicemail-only` (the safety setting alone), and even when the prompt
+lacks the consent ask and the run refuses. A safety setting must not wait on prompt regeneration.
+An API-created agent has voicemail detection OFF
+unless the field is set; the dashboard's hang-up default doesn't apply. On 2026-11-03 the growth
+fixture's agent spent 48 s talking to an unanswered lead's voicemail.
+
+**Live calls use the agent's latest draft.** The fixture agent is `is_published: false` at
+version 9, and its calls ran on version 9. So `update-agent` / `update-retell-llm` take effect
+with no publish step.
+
+Note: Retell blocks changing an agent's
 `response_engine` once it has multiple versions — re-point at provision time, not
 after.
 
@@ -214,8 +285,18 @@ after.
 Base name: `{brand.name} — Calls`
 Table: `Call Log`
 Fields: Date, Caller name, Caller number, Summary, Duration (seconds),
-Call type, Email, Address, Recording URL, Priority, Outcome
-(+ `Site` for enterprise).
+Call type, Email, Address, Recording URL, Priority, SMS consent, Outcome
+(+ `Site` for enterprise). The list lives once, in `lib/call-log-fields.js`; `onboard.js` and
+`lib/repair-ops.js` both import it. Never copy it — the repair copy once drifted to 7 columns.
+
+**`SMS consent` is the caller's spoken answer to the closing SMS question** —
+`custom_analysis_data.sms_consent`, `granted`/`declined`/`unknown`, lowercase. `unknown` blocks
+and `declined` is sticky. The wording, the opening recording disclosure and the analysis schema
+all live in `lib/voice-consent.js`, word-for-word as the operator approved them on 2026-11-02;
+don't reword them without sign-off. Every `custom_analysis_data.*` the master reads must be
+extracted by the agent (`checkAnalysisCoversBlueprint`): Email, Address and Priority were blank
+on every call until that was true. The master's mapping for this column was a deliberate,
+approved edit (2026-11-02), not provisioning drift.
 
 **This column list is a contract with the Make master scenario, not a preference.** Step 8c
 remaps the cloned blueprint's Airtable module by **column name** (master field id → name →
@@ -232,6 +313,13 @@ Two gotchas worth keeping:
   with `typecast: false` — so prettier labels like `Inbound` / `Outbound callback` are
   rejected as an invalid option and fail the **whole row**, not just that cell. `Priority` is
   `emergency`/`callback` for the same reason.
+- **Never map an analysis field into a singleSelect bare.** Retell returns `""` for a field it
+  could not fill, and Airtable rejects `""` as a new option ("Insufficient permissions to
+  create new select option") — the whole row is lost and Make deactivates the scenario, so
+  later calls queue behind it. On 2026-11-03 this ate a completed Growth callback. `Priority`
+  and `SMS consent` are mapped through total `if()` expressions (`SELECT_MAPPINGS` in
+  `lib/voice-consent.js`) that fall back to `callback` / `unknown`;
+  `checkSelectMappingsTotal` enforces it in the dry run, the suite and `verify-post-call`.
 - **Nothing writes `Outcome`.** The master has no mapping for it; it exists for the owner to
   set by hand while triaging, which is why it keeps human-cased labels.
 
@@ -300,18 +388,64 @@ Things worth knowing:
 - The voice-agent editor reads `agent-prompt.txt` from disk. There is no read-back from
   Retell, so it can lag a change made in the Retell dashboard; the UI says so.
 
-## Lead callback (Growth/Enterprise)
+## Lead capture (every tier)
 
-The final-CTA form POSTs `{name, phone}` to `/api/contact`. With
-`LEAD_DELIVERY_MODE=callback`, the route normalizes the phone to E.164 and calls
-`POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`,
-body `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID }`)
-so the Retell agent dials the lead back. Starter uses `LEAD_DELIVERY_MODE=email`
-(Resend): the route sends the owner a formatted HTML lead email (subject/heading
-personalized via `LEAD_BRAND_NAME`, a labeled field table built from all posted form
-fields, `reply_to` set to the lead's email when present) and returns HTTP 502 if the
-Resend send fails rather than silently reporting success. **The `/api/contact`,
-`/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
+The final-CTA form POSTs to `/api/contact`. `LEAD_DELIVERY_MODE` is `portal` on every tier; the
+only tier difference here is `LEAD_CALLBACK`:
+
+1. **If `LEAD_CALLBACK=on`** (Growth/Enterprise), the route normalizes the phone to E.164 and calls
+   `POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`, body
+   `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID,
+   agent_override: { retell_llm: { begin_message: <outbound opening line> } },
+   retell_llm_dynamic_variables: { lead_name } }`) so the agent dials the lead back, opening with
+   the approved recording disclosure and identity check.
+2. **If that callback was placed, the submission is NOT recorded.** The lead reaches the portal
+   only through the completed call.
+3. **Otherwise** (Starter, web-only, a callback Retell refused, no dialable number), the whole
+   posted body goes to `LEAD_INGEST_URL` with the per-client bearer `LEAD_INGEST_TOKEN`, so fields
+   like the form's `consent` object arrive with no further change here, and the owner is texted
+   at once. The route returns 502 only when that write fails: nothing happened, so the form shows
+   the phone number as a fallback.
+
+**An unanswered callback is a lost lead (operator decision, 2026-11-03).** It must produce no
+after-call run and nothing in the client's portal. Both halves enforce it:
+
+- **The route** doesn't record a placed callback, so the form submission never becomes a portal
+  lead by itself.
+- **The post-call scenario's trigger filter** lets an outbound call through only when it actually
+  connected to a person. Retell still sends `call_analyzed` for a call that never connected, so
+  the filter, not Retell, has to stop it. Inbound and other calls pass as before. The rejected
+  cases, as Retell reports them:
+  - `call_status: "not_connected"` with `dial_no_answer` / `dial_busy` / `dial_failed`;
+  - `disconnection_reason: "voicemail_reached"` / `"ivr_reached"`;
+  - **voicemail as it really shows up on these agents:** `call_status: "ended"` with an ordinary
+    `agent_hangup` / `user_hangup` and `call_analysis.in_voicemail: true`. Voicemail detection is
+    off, so `voicemail_reached` has never appeared on this account. A filter on
+    `disconnection_reason` alone lets voicemail through.
+
+  **Voicemail counts as unanswered.** The filter (master module 2, carried onto each clone's
+  Airtable module) was built in the Make UI and recorded. It has two OR groups: anything not
+  `outbound` passes as before, and an `outbound` call passes only if `ended`, `in_voicemail` ≠
+  `true`, and the reason isn't `voicemail_reached` / `ivr_reached`. `checkConnectedCallsOnly`
+  *evaluates* it the way Make does against `lib/call-outcomes.js`. Those cases are this account's
+  real outcomes (`test/fixtures/retell/call-outcomes.json`, captured by `fixtures:refresh`) plus
+  Retell's documented never-connected ones, and a newly recorded outcome with no case fails the
+  suite.
+
+**Why this replaced "always record".** Recording every submission was itself a fix. The route
+before it placed the callback and persisted nothing, so a callback Retell refused lost the lead
+without a trace. That case is still recorded. But "always record" put an answered callback in the
+portal twice (form, then call) and left an unanswered one in the inbox as a "new lead" nobody had
+spoken to.
+
+What the rule gives up: a lead who doesn't pick up is gone. So is the web form's `consent`
+object, which only travels with a recorded submission, and so is a call Retell accepts and then
+fails to place (an `error`-status call, such as a telephony-provider failure).
+
+Resend is agency-side transactional mail only; anything describing a Starter lead email is
+pre-portal and wrong.
+
+**The `/api/contact`, `/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
 (`lib/site-routes/*.ts`) and written into the repo on every run — it is not sourced
 from `template/` or the client repo.
 
@@ -338,9 +472,12 @@ yet, the run will clone the master and re-point the agent at that clone, so refu
 block the very run that fixes it. The agent is read live because the env file can be silent
 while the agent is wired — which is precisely how the e2e fixture hid.
 
-**The master scenario is never modified.** `cloneAndWirePostCall` GETs the blueprint, clones,
-and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refresh` reporting
-`make/master-blueprint.json` and `make/scenario.json` unchanged is the proof.
+**The master scenario is never modified by a run.** `cloneAndWirePostCall` GETs the blueprint,
+clones, and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refresh` reporting
+`make/master-blueprint.json` and `make/scenario.json` unchanged after a run is the proof.
+Deliberate, operator-approved edits do happen. Each one is re-recorded and committed with its
+reason, so its diff never looks like drift. So far: the SMS consent mapping, the total select
+mappings, and replacing the Twilio module with the agency HTTP module (2026-11-02 / 03).
 
 **A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
 attach the clone to the master's hook, which already belongs to the master, and refuses with
