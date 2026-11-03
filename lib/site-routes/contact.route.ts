@@ -20,24 +20,21 @@ function toE164(raw: string): string | null {
 //   - callback mode also needs: RETELL_API_KEY, TWILIO_NUMBER, RETELL_AGENT_ID
 // Read ONLY these names — never invent new env vars, never expose master secrets.
 //
-// ── Why the lead is ALWAYS recorded ──────────────────────────────────────────────────────────
+// ── When the submission is recorded, and when it deliberately is not ─────────────────────────
 // This route used to either email the owner (Starter, via Resend) or place a Retell callback
-// (Growth) — and in the callback case it persisted nothing. Two ways that lost a paying
-// customer's lead with no trace:
+// (Growth) — and in the callback case it persisted nothing, so a callback Retell refused lost
+// the lead with no trace. Then it recorded every submission, which fixed that and caused the
+// opposite: an answered callback reached the portal twice (the form, then the call), and an
+// unanswered one sat there as a "new lead" nobody had spoken to.
 //
-//   1. `create-phone-call` fails (bad number, Retell error, rate limit) → 502, nothing stored.
-//   2. It succeeds but the lead never answers → no `call_analyzed` event → the Make post-call
-//      scenario never fires → no Airtable row. The lead simply evaporates.
+// The rule now (operator decision, 2026-11-03):
 //
-// So the lead is recorded on every tier, whatever happens to the callback, and the callback
-// becomes an additional action rather than the only one. The portal is then the system of
-// record and the owner can act on a lead the receptionist never reached.
-//
-// Note the ORDER is the other way round from what "record first" would suggest: the callback
-// is attempted first (see POST below) so the stored lead can say whether it went out. What
-// matters is that a failed callback never prevents the lead being stored — not which runs
-// first. This comment used to say "recorded before anything else", which was not true of the
-// code beneath it, and the claim had already been copied into CLAUDE.md.
+//   - Callback PLACED (LEAD_CALLBACK=on and Retell accepted it) → not recorded here. If the lead
+//     answers, the post-call scenario logs the call and briefs the owner; that is the portal
+//     entry. If they don't answer, it's a lost lead, and nothing lands anywhere — the scenario
+//     stops at its trigger for no-answer, busy, failed and voicemail.
+//   - No callback (Starter, web-only, Retell refused it, no dialable number) → recorded, and the
+//     owner is texted at once. A refused callback is a system failure, not a lost lead.
 //
 // Resend is gone entirely. It was the whole delivery mechanism for Starter and it failed open:
 // `RESEND_API_KEY` seeded empty on a fresh client and `syncVercelEnv` skips empty values, so the
@@ -154,7 +151,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Order matters: dial first so the lead is recorded knowing whether the callback happened.
+  // Dial first: whether the callback went out decides whether the submission is recorded at all.
   // The caller is waiting on this response, and `create-phone-call` only queues the call, so
   // the added latency is one API round trip rather than the length of a conversation.
   let callbackPlaced = false;
@@ -162,13 +159,21 @@ export async function POST(req: Request) {
     callbackPlaced = await placeCallback(toNumber, (data as { name?: unknown }).name);
   }
 
-  const stored = await recordLead(data as Record<string, unknown>, callbackPlaced);
+  // A placed callback is NOT recorded here. Operator rule, 2026-11-03: an unanswered callback is
+  // a lost lead and must not land in the portal. The lead reaches the portal only through the
+  // completed call — the post-call scenario logs a CONNECTED callback and briefs the owner, and
+  // stops at the trigger for no-answer, busy, failed or voicemail. Recording the form here as
+  // well put every callback in the portal twice when it was answered, and once, as a stale
+  // "new lead", when it was not.
+  if (callbackPlaced) return NextResponse.json({ ok: true });
 
-  // 502 when the lead could not be stored AND no callback went out — nothing happened, so the
-  // form must say so and show the phone number as a fallback. If the callback was placed, the
-  // client is already being contacted, so this is a success for the visitor even though we owe
-  // ourselves a log line about the ingest failure.
-  if (!stored && !callbackPlaced) {
+  // No callback went out — Starter / web-only by design, or a Growth callback Retell refused, or
+  // no dialable number. Nobody else is going to reach this person, so the submission is recorded
+  // and the owner is told now. A refused callback is a system failure, not a lost lead.
+  const stored = await recordLead(data as Record<string, unknown>, false);
+
+  // Nothing happened at all: the form must say so and show the phone number as a fallback.
+  if (!stored) {
     return NextResponse.json({ ok: false, error: 'Delivery failed' }, { status: 502 });
   }
 

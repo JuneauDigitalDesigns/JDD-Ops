@@ -377,23 +377,48 @@ only tier difference here is `LEAD_CALLBACK`:
 
 1. **If `LEAD_CALLBACK=on`** (Growth/Enterprise), the route normalizes the phone to E.164 and calls
    `POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`, body
-   `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID }`) so the agent
-   dials the lead back.
-2. **Then, on every tier,** the lead is recorded to the client's portal: the whole posted body
-   goes to `LEAD_INGEST_URL` with the per-client bearer `LEAD_INGEST_TOKEN`, so fields like the
-   form's `consent` object arrive with no further change here.
+   `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID,
+   agent_override: { retell_llm: { begin_message: <outbound opening line> } },
+   retell_llm_dynamic_variables: { lead_name } }`) so the agent dials the lead back, opening with
+   the approved recording disclosure and identity check.
+2. **If that callback was placed, the submission is NOT recorded.** The lead reaches the portal
+   only through the completed call.
+3. **Otherwise** (Starter, web-only, a callback Retell refused, no dialable number), the whole
+   posted body goes to `LEAD_INGEST_URL` with the per-client bearer `LEAD_INGEST_TOKEN`, so fields
+   like the form's `consent` object arrive with no further change here, and the owner is texted
+   at once. The route returns 502 only when that write fails: nothing happened, so the form shows
+   the phone number as a fallback.
 
-The callback is attempted first only so the stored lead can say whether it went out. **A failed
-callback never prevents the lead being stored.** The route returns 502 only when the lead could
-not be stored *and* no callback went out — the one case where nothing happened, so the form shows
-the phone number as a fallback.
+**An unanswered callback is a lost lead (operator decision, 2026-11-03).** It must produce no
+after-call run and nothing in the client's portal. Both halves enforce it:
 
-**The old version lost leads, which is why this ordering is load-bearing.** Starter used to email
-the owner through Resend, and Growth placed the callback and persisted nothing — so an unanswered
-callback produced no `call_analyzed` event, no Make run, no Airtable row and no record anywhere.
-Resend also failed open: `RESEND_API_KEY` was seeded empty, `syncVercelEnv` skips empty values,
-and the route 502'd on every Starter lead until someone noticed by hand. Resend is now agency-side
-transactional mail only; anything describing a Starter lead email is pre-portal and wrong.
+- **The route** doesn't record a placed callback, so the form submission never becomes a portal
+  lead by itself.
+- **The post-call scenario's trigger filter** lets an outbound call through only when it actually
+  connected to a person. Retell still sends `call_analyzed` for a call that never connected, so
+  the filter, not Retell, has to stop it. Inbound and other calls pass as before. The rejected
+  cases, as Retell reports them:
+  - `call_status: "not_connected"` with `dial_no_answer` / `dial_busy` / `dial_failed`;
+  - `disconnection_reason: "voicemail_reached"` / `"ivr_reached"`;
+  - **voicemail as it really shows up on these agents:** `call_status: "ended"` with an ordinary
+    `agent_hangup` / `user_hangup` and `call_analysis.in_voicemail: true`. Voicemail detection is
+    off, so `voicemail_reached` has never appeared on this account. A filter on
+    `disconnection_reason` alone lets voicemail through.
+
+  **Voicemail counts as unanswered.**
+
+**Why this replaced "always record".** Recording every submission was itself a fix. The route
+before it placed the callback and persisted nothing, so a callback Retell refused lost the lead
+without a trace. That case is still recorded. But "always record" put an answered callback in the
+portal twice (form, then call) and left an unanswered one in the inbox as a "new lead" nobody had
+spoken to.
+
+What the rule gives up: a lead who doesn't pick up is gone. So is the web form's `consent`
+object, which only travels with a recorded submission, and so is a call Retell accepts and then
+fails to place (an `error`-status call, such as a telephony-provider failure).
+
+Resend is agency-side transactional mail only; anything describing a Starter lead email is
+pre-portal and wrong.
 
 **The `/api/contact`, `/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
 (`lib/site-routes/*.ts`) and written into the repo on every run — it is not sourced
