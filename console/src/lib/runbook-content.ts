@@ -541,7 +541,7 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
               },
               {
                 text: 'SMS body MUST identify the sender, carry opt-out language, and match the sample message submitted with JDD’s A2P campaign and juneaudigitaldesigns.com/sms-terms.',
-                detail: 'Not met today: the live body is “Name / Status / Phone / About” with no sender name and no “Reply STOP” line, and Status renders blank on every call. Open with the operator — the body is not pinned here until the wording is agreed, so nobody submits the current one to a carrier as the sample.',
+                detail: 'Not met today. The campaign’s registered samples (read from Twilio 2026-11-02) open with “Juneau Digital Designs call alert”, then Name / Status / Phone / About, then close with “Reply STOP to opt out, HELP for help”. The live body has the middle four lines only — no sender line, no opt-out line — and its Status renders blank on every call. Closing that gap is a master edit awaiting the operator’s sign-off; until then this body is not pinned here.',
               },
               { text: 'Save, then Deactivate the master (only per-client clones run).' },
             ],
@@ -574,8 +574,8 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             items: [
               { text: 'Twilio Console → Messaging → Regulatory Compliance → A2P 10DLC. Register the JDD Brand (business/EIN) once.' },
               { text: 'Create/attach a Messaging Service FIRST, and enable Advanced Opt-Out on it (STOP / HELP / START). That is what handles opt-out keywords; the site has no inbound SMS webhook wired. Its SID is TWILIO_MESSAGING_SERVICE_SID.' },
-              { text: 'Create a Campaign against that Messaging Service, use case ACCOUNT_NOTIFICATION. It carries owner alerts only — never a text to a client’s customer.' },
-              { text: 'Sample message: must match what the Make master actually sends and juneaudigitaldesigns.com/sms-terms.', detail: 'They do not match today — see the SMS body item in the post-call master step above. Do not resubmit a sample until that wording is settled.' },
+              { text: 'Create a Campaign against that Messaging Service, use case ACCOUNT_NOTIFICATION, no embedded links. It carries owner alerts only — never a text to a client’s customer.', detail: 'Live state read 2026-11-02: ACCOUNT_NOTIFICATION, VERIFIED, has_embedded_links false.' },
+              { text: 'Sample messages: the live master body must match them and juneaudigitaldesigns.com/sms-terms.', detail: 'Today it does not — the registered samples carry a sender line and a STOP/HELP line the live body lacks. See the SMS body item in the post-call master step above. Bringing the body up to the samples needs no carrier action; changing the samples to match the body would mean editing a verified campaign.' },
               { text: 'Opt-in description: consent is a separate unchecked checkbox beside a mobile-number field on the PUBLIC agreement page, juneaudigitaldesigns.com/agreement?plan=growth (no login). Tell the reviewer to open that URL and scroll to “Your details”. Consent is not a condition of purchase, and alerts only activate after Stripe payment completes.' },
               { text: 'Point the reviewer at juneaudigitaldesigns.com/sms-terms (linked in the site footer) for program name, message types, frequency, rates, and STOP/HELP.' },
               {

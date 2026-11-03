@@ -263,7 +263,7 @@ function twilioFields(_site: SiteInfo): MakeField[] {
           [txt('About:'), callVar('call_analysis.call_summary')],
         ],
       },
-      help: 'This is the master’s live body, reproduced as it is — not as it should be. Status: renders blank on every call (the agent never emits caller_priority), and the body carries no “Reply STOP” opt-out line. Both are open items with the operator; do not submit this as an A2P sample. The newline tokens are Make functions — copy the block whole rather than retyping it.',
+      help: 'This is the master’s live body, reproduced as it is — not as it should be. JDD’s registered campaign samples wrap these four lines in a “Juneau Digital Designs call alert” first line and a “Reply STOP to opt out, HELP for help” last line; this body has neither. Status: also renders blank on every call (the agent never emits caller_priority). Both are open items with the operator; do not submit this as an A2P sample. The newline tokens are Make functions — copy the block whole rather than retyping it.',
       warn: true,
     },
   ];
