@@ -40,6 +40,18 @@ jobs:
         working-directory: console
         run: npm test
 
+      # The console's production build never finished, on every revision, and nobody saw it
+      # because nothing here ran it: @vercel/nft globbed `console/**/*/site.ts` through
+      # node_modules for 20+ minutes. next.config.js turns tracing off; this keeps the build
+      # able to finish. It also type-checks the console, which `npm test` does not. Needs no
+      # secrets: the 2m38s measurement was taken in a checkout with no .env at all.
+      - name: Console build
+        working-directory: console
+        timeout-minutes: 15
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
+
       # `npm run fixtures:dry-run:check` deliberately does NOT run here.
       #
       # It used to, on the belief that "a dry run creates nothing and the phase SEQUENCE does
