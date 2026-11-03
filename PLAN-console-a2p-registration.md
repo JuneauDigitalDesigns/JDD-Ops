@@ -391,4 +391,18 @@ with fake identity data. The first evaluation failed on `job_position: "Owner"`,
    LAN client can set. Consider `-H 127.0.0.1` in `console/package.json` (§6's last invariant).
 6. **Restart the console after editing any `lib/a2p-*.js`** — see the comment in `console/src/lib/a2pChain.ts`.
 7. The `_e2e_test_growth` drafts are kept for inspection (operator's choice); remove them in the teardown work.
+8. **`profile.reset`** (requested 2026-11-03 by the sales-call close design, `DESIGN-sales-call-close.md`
+   §8c, relayed as approved by the operator): let the registration path change before submission. Rules
+   as requested — allowed only while `statuses.profile` is not filed (no submit has run), needs
+   `confirm: true`, deletes the draft's TrustHub objects and clears their SIDs from the record, keeps
+   `jdd:a2p-intake:{slug}`; the UI then runs `profile.create` on the other path (sole-prop still refused
+   on Enterprise); rep details are re-entered. Two notes before building:
+   - **Only `DELETE /v1/EndUsers/{sid}` is verified live.** Deleting a draft CustomerProfile, a
+     SupportingDocument, an Address and EntityAssignments is believed supported but unexercised —
+     verify each once (on the `_e2e_test_growth` drafts, with the operator's yes) before the step
+     relies on it, and make the step tolerate 404 as already-gone.
+   - **The address and its document can survive a reset.** Both policies accept a
+     `customer_profile_address` document (recorded), so only the profile, the business/rep EndUsers
+     and the assignments must go. Delete order: assignments → profile → EndUsers; keep `addressSid` /
+     `addressDocSid` unless the operator also corrects the address.
 

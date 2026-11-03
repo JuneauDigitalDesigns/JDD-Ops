@@ -46,7 +46,7 @@ readiness server-side. **Filing** steps (start a review clock or a fee) also nee
 
 | Step | Runbook | Input (`input`) | Needs first | Filing |
 |---|---|---|---|---|
-| `profile.create` | 2.1 | `registrationPath: 'standard' \| 'sole-proprietor'` (sole-prop refused for Enterprise; fixed forever) | Growth/Enterprise plan | |
+| `profile.create` | 2.1 | `registrationPath: 'standard' \| 'sole-proprietor'` (sole-prop refused for Enterprise; fixed until `profile.reset` exists — PLAN §12 follow-up 8) | Growth/Enterprise plan | |
 | `business.create` | 2.2 | `legalBusinessName, businessType, businessIndustry, websiteUrl, ein` — **the only EIN consumer** | profile | |
 | `business.update` | 2.2 | any of the above minus `ein` (Twilio merges) | business EndUser, not filed | |
 | `rep.create` | 2.3 | `firstName, lastName, email, phone` (+ `jobPosition` enum, `businessTitle` on standard) | profile | |
