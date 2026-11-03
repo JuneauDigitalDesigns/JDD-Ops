@@ -10,6 +10,7 @@ import { loadTeardownOps } from './teardownOps';
 import { accountStoreConfigured, getAccount, getAccountEmailByUserId } from './accountStore';
 import type { ArchiveOrphan, ArchiveSiteIdentifiers } from './archive';
 import type { ClientContext, Plan } from './types';
+import { planA2pForTeardown, type A2pTeardownPlan } from './a2pTeardown';
 
 /**
  * The teardown preview — what actually exists, verified rather than assumed, and what
@@ -81,6 +82,13 @@ export interface TeardownPlan {
 
   /** Missing credentials or other reasons a bucket couldn't be fully verified. */
   warnings: string[];
+
+  /**
+   * The client's A2P registration: what goes (a registration that never completed) and what is
+   * kept (a live one — never auto-deleted). `null` when it could not be read; the reason is in
+   * `warnings`. Not in the preview hash — see planA2pForTeardown.
+   */
+  a2p: A2pTeardownPlan | null;
 }
 
 function dirSize(dir: string): number | null {
@@ -281,6 +289,19 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
     });
   }
 
+  // A2P, read live. A kept (live or unreadable) registration is the one thing a teardown can
+  // leave billing, so it goes in leftBehind with what to do about it.
+  const a2pRead = await planA2pForTeardown(slug);
+  const a2p = a2pRead.plan;
+  if (a2pRead.error) warnings.push(`A2P registration not checked — ${a2pRead.error} It will NOT be torn down.`);
+  if (a2p && (a2p.state === 'live' || a2p.state === 'unknown')) {
+    leftBehind.push({
+      kind: 'a2p.registration',
+      detail: `${a2p.detail} Kept: ${a2p.kept.map((k) => `${k.kind} ${k.sid}`).join(', ')}.`,
+      action: 'Remove the campaign in the Twilio console if the client is not coming back — it bills monthly until then',
+    });
+  }
+
   const identifiersForHash: ArchiveSiteIdentifiers[] = sites.map((s) => ({
     siteSlug: s.siteSlug,
     vercelProjectId: null,
@@ -319,6 +340,7 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
     hasVerifiedCustomDomain,
     leftBehind,
     warnings,
+    a2p,
   };
 }
 

@@ -1,0 +1,8 @@
+{
+  "httpStatus": 404,
+  "body": {
+    "code": 20404,
+    "message": "The requested resource /v1/EndUsers/IT00000000000000000000000000000000 was not found",
+    "status": 404
+  }
+}

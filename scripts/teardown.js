@@ -37,6 +37,9 @@ import {
   deleteVercelProject,
   deleteAirtableBase,
 } from '../lib/teardown-ops.js';
+// A separate import, not a line in the block above: the A2P half lives in its own module so its
+// rules (delete Trust Hub objects only for a registration that never completed) stay in one place.
+import { detachA2pNumber, planA2pTeardown, teardownA2pRegistration } from '../lib/a2p-teardown.js';
 
 function fail(msg, err) {
   console.error(`teardown: ${msg}`);
@@ -117,6 +120,19 @@ async function main() {
   const sharedBase = sites.map((s) => s.env.AIRTABLE_BASE_ID).filter(Boolean)[0];
   if (sharedBase) console.log(`  - Airtable base:  ${sharedBase}`);
   console.log(`  - Local folder:   ${clientDir}`);
+  const a2pEnv = {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    kvUrl: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+    kvToken: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+  };
+  const a2p = await planA2pTeardown({ slug, ...a2pEnv });
+  if (!a2p.ok) console.log(`  - A2P:            could not be checked (${a2p.error})`);
+  else if (a2p.plan.state !== 'none') {
+    console.log(`  - A2P:            ${a2p.plan.detail}`);
+    for (const o of a2p.plan.toDelete) console.log(`      delete ${o.kind} ${o.sid}${o.exists === false ? ' (already gone)' : ''}`);
+    for (const k of a2p.plan.kept) console.log(`      keep   ${k.kind} ${k.sid} — ${k.reason}`);
+  }
 
   if (!yes) {
     const ok = await confirm('\nProceed?');
@@ -137,6 +153,9 @@ async function main() {
       }),
       'Vercel project',
     );
+    // Out of the client's own Messaging Service BEFORE the release, whatever the registration's
+    // state — a released number must not linger as a sender on the client's campaign.
+    report(await detachA2pNumber({ slug, phoneNumber: s.env.TWILIO_NUMBER, ...a2pEnv }), 'Number in client Messaging Service');
     report(
       await releaseTwilioNumber({
         accountSid: process.env.TWILIO_ACCOUNT_SID,
@@ -150,6 +169,11 @@ async function main() {
     );
     report(await deleteRetellAgent({ apiKey: process.env.RETELL_API_KEY, agentId: s.env.RETELL_AGENT_ID }), 'Retell agent');
   }
+
+  // After every number is out of the client's service and released: the A2P objects themselves.
+  // Deletes only a registration that never completed; a live one is reported and kept.
+  console.log(`\n--- A2P registration ---`);
+  for (const r of (await teardownA2pRegistration({ slug, ...a2pEnv })).steps) report(r, r.resource.replace(/^a2p\./, 'A2P '));
 
   if (sharedBase) {
     console.log(`\n--- Deleting shared Airtable base ---`);

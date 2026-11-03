@@ -155,6 +155,37 @@ if (a2pProduct) {
   failed++;
 }
 
+// ── Teardown (lib/a2p-teardown.js) ─────────────────────────────────────────────────────────
+// Each response is cut to an ALLOWLIST of the fields the teardown reads. Sources: the
+// `_e2e_test_growth` drafts (a never-completed registration, the deletable case), JDD's own
+// approved brand and verified campaign (the live case, which teardown must never delete), a real
+// 404, and the KV record + a KV miss as Upstash's REST API returns them.
+const pick = (/** @type {any} */ o, /** @type {string[]} */ keys) => (o ? Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]])) : null);
+const kvUrl = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
+const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+if (kvUrl && kvToken) {
+  for (const [name, key] of [['kv-registration-e2e.json', 'jdd:a2p-registration:_e2e_test_growth'], ['kv-miss.json', 'jdd:a2p-registration:__fixture-miss__']]) {
+    const res = await fetch(`${kvUrl}/get/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${kvToken}` } });
+    save(`teardown/${name}`, res.ok ? await res.json() : null);
+  }
+} else {
+  console.error('  ✗ KV credentials missing — teardown KV fixtures not recorded');
+  failed++;
+}
+const e2e = { profile: 'BU3782f82c2f2f0c8fce2850d86ed2e932', doc: 'RD45150bfae738a5fc79746a2415e9502e' };
+save('teardown/e2e-profile.json', pick(await getJson(`${TRUSTHUB}/CustomerProfiles/${e2e.profile}`, 'e2e profile'), ['sid', 'status', 'policy_sid']));
+save('teardown/e2e-supporting-document.json', pick(await getJson(`${TRUSTHUB}/SupportingDocuments/${e2e.doc}`, 'e2e document'), ['sid', 'status', 'type']));
+save('teardown/e2e-enduser-business.json', pick(await getJson(`${TRUSTHUB}/EndUsers/ITd979f6114c919fe4c1bdbf797ed3e7e2`, 'e2e business EndUser'), ['sid', 'type']));
+save('teardown/e2e-enduser-rep.json', pick(await getJson(`${TRUSTHUB}/EndUsers/ITc341e12902d045d8a090218d07652d3a`, 'e2e rep EndUser'), ['sid', 'type']));
+save('teardown/e2e-address.json', pick(await getJson(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Addresses/ADaa688365e86e41c5d6d4a1326733b3ed.json`, 'e2e address'), ['sid', 'iso_country', 'validated']));
+save('teardown/brand-approved.json', pick(await getJson('https://messaging.twilio.com/v1/a2p/BrandRegistrations/BN6051caf4a60936c690c106d5a72f2de9', 'JDD brand'), ['sid', 'status', 'identity_status', 'mock', 'brand_type']));
+const campaigns = await getJson('https://messaging.twilio.com/v1/Services/MGd65c80f165d080f5d6d5b451ac4f431c/Compliance/Usa2p', 'JDD campaign');
+save('teardown/campaign-list-verified.json', campaigns && { compliance: (campaigns.compliance ?? []).map((/** @type {any} */ c) => pick(c, ['sid', 'campaign_status', 'brand_registration_sid', 'mock', 'us_app_to_person_usecase'])) });
+{
+  const res = await fetch(`${TRUSTHUB}/EndUsers/IT00000000000000000000000000000000`, { headers });
+  save('teardown/twilio-404.json', { httpStatus: res.status, body: pick(await res.json(), ['code', 'message', 'status']) });
+}
+
 // A real NONCOMPLIANT evaluation, by explicit SID: `-- --noncompliant BU…/EL…`. JDD's own
 // bundles only ever evaluate compliant, so the failing shape can only come from a client
 // profile — first captured from the 2026-11-02 `_e2e_test_growth` draft (job_position "Owner").
