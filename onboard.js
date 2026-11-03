@@ -43,6 +43,7 @@ import {
   syncEnvToVercel,
   syncVercelFirewall,
   triggerPreviewDeploy,
+  redeployProductionIfStale,
   sanitizeProjectName,
   vercelAppHost,
   getVercelProjectId,
@@ -2227,6 +2228,16 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
         // from there like every other key. The tier difference lives in LEAD_CALLBACK.
       },
     });
+
+    // On a re-run, step 8's push already started a production build — before the env above was
+    // written, so it serves the old env. Rebuild it; see productionPredatesEnv for the incident.
+    const envWrittenAt = Date.now();
+    const prod = await redeployProductionIfStale({ slug: siteSlug, envWrittenAt });
+    if (prod.redeployed) {
+      console.log(`  ✓ Production rebuilt with the new env (${prod.reason})`);
+    } else if (/failed|could not/.test(prod.reason)) {
+      console.warn(`  ⚠ Production not rebuilt: ${prod.reason}. Redeploy from the console's Deployments section.`);
+    }
 
     // Apply the standard anti-scraping WAF rate limits. Best-effort: a firewall failure
     // (plan, permission, transient) must never fail onboarding — the per-repo robots.ts +
