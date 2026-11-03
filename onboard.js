@@ -86,12 +86,15 @@ import {
   checkBlueprintFieldsResolve,
   checkBlueprintEventFilter,
   checkBlueprintNoDatastore,
+  checkAccountLaneSender,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
   checkNotMasterHook,
   formatCheckLines,
   summarizeChecks,
 } from './lib/onboard-checks.js';
+// Make rate-limits per organization per minute; a 429 is "wait", not "unreachable".
+import { fetchWithRetry } from './lib/make-fetch.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -1580,7 +1583,21 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
 
   const apiKey   = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
-  const fromNum  = readEnvLocal(clientDir).TWILIO_NUMBER;      // this client's provisioned number
+  // The owner brief sends from the ACCOUNT-lane number: a JDD-owned sender on JDD's own
+  // approved ACCOUNT_NOTIFICATION campaign, never from this client's number.
+  //
+  // This was `readEnvLocal(clientDir).TWILIO_NUMBER`, which delivers today — onboard.js puts
+  // every client number in the master pool, and pool membership is what registers a number
+  // with a campaign (the account's own history shows one number going 30034 -> delivered when
+  // the campaign was approved, with messaging_service_sid null throughout). It is wrong
+  // anyway: a campaign binds to a Messaging Service and a number sits in exactly one, so a
+  // client number used for owner alerts can never join that client's own CUSTOMER_CARE
+  // service later. It also breaks outright the moment client numbers stop joining the master
+  // pool, which is the point of the two-lane migration.
+  //
+  // Patching the master blueprint cannot fix this: patchPostCallBlueprint stamps `from` onto
+  // every clone, so the value has to be right here.
+  const fromNum  = (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim();
 
   // The SMS destination now comes from the owner's recorded consent, not from
   // content.brand.phone. brand.phone is the number printed on the client's website — a
@@ -1957,20 +1974,47 @@ function patchPostCallBlueprint(
  * as "could not check" rather than as a pass.
  */
 let MASTER_RESOURCES;
+/**
+ * Why MASTER_RESOURCES is null, in words an operator can act on. The old warning said "no Make
+ * credentials, or unreachable" for every failure — including a 429, where the credentials were
+ * fine and Make was up. A diagnosis that names the wrong cause is worse than none.
+ */
+let MASTER_RESOURCES_REASON = null;
 async function resolveMasterResources() {
   if (MASTER_RESOURCES !== undefined) return MASTER_RESOURCES;
   MASTER_RESOURCES = null;
 
   const apiKey = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
-  if (!apiKey || !masterId) return MASTER_RESOURCES;
+  if (!apiKey || !masterId) {
+    MASTER_RESOURCES_REASON = 'MAKE_API_KEY or MAKE_POST_CALL_MASTER_SCENARIO_ID is not set in .env';
+    return MASTER_RESOURCES;
+  }
 
   const headers = { Authorization: `Token ${apiKey}` };
+  // Every GET here goes through the retry: one 429 on any of the three used to null the whole
+  // resolution, and every caller of this function — including the live clone — read that as
+  // "Make is unreachable". Retries are announced on stderr so a pause is explained without
+  // changing stdout, which the dry-run recordings are compared against byte for byte.
+  const get = (url) =>
+    fetchWithRetry(url, { headers }, {
+      onRetry: ({ attempt, waitMs }) =>
+        console.warn(`  … Make rate limit reached; waiting ${Math.round(waitMs / 1000)}s before retry ${attempt}`),
+    });
   try {
-    const bres = await fetch(`${MAKE_ZONE}/scenarios/${masterId}/blueprint`, { headers });
-    if (!bres.ok) return MASTER_RESOURCES;
+    const bres = await get(`${MAKE_ZONE}/scenarios/${masterId}/blueprint`);
+    if (!bres.ok) {
+      MASTER_RESOURCES_REASON =
+        bres.status === 429
+          ? 'Make rate limit — the organization request limit was still exceeded after waiting out a full minute'
+          : `Make returned ${bres.status} for the master blueprint`;
+      return MASTER_RESOURCES;
+    }
     const blueprint = (await bres.json())?.response?.blueprint;
-    if (!blueprint?.flow) return MASTER_RESOURCES;
+    if (!blueprint?.flow) {
+      MASTER_RESOURCES_REASON = 'the master blueprint came back with no modules';
+      return MASTER_RESOURCES;
+    }
 
     const masterBaseId =
       blueprint.flow.find((m) => (m.module ?? '').startsWith('airtable'))?.mapper?.base ?? null;
@@ -1980,13 +2024,13 @@ async function resolveMasterResources() {
     let masterHookUrl = null;
     let teamId = null;
     let organizationId = null;
-    const sres = await fetch(`${MAKE_ZONE}/scenarios/${masterId}`, { headers });
+    const sres = await get(`${MAKE_ZONE}/scenarios/${masterId}`);
     const scenario = sres.ok ? (await sres.json())?.scenario : null;
     const hookId = scenario?.hookId ?? null;
     // The scenario record carries teamId directly; the hook record carries both.
     if (typeof scenario?.teamId === 'number') teamId = scenario.teamId;
     if (hookId) {
-      const hres = await fetch(`${MAKE_ZONE}/hooks/${hookId}`, { headers });
+      const hres = await get(`${MAKE_ZONE}/hooks/${hookId}`);
       if (hres.ok) {
         const hook = (await hres.json())?.hook ?? {};
         masterHookUrl = hook.url ?? null;
@@ -1996,8 +2040,9 @@ async function resolveMasterResources() {
     }
 
     MASTER_RESOURCES = { blueprint, masterBaseId, masterHookUrl, hookId, teamId, organizationId };
-  } catch {
+  } catch (err) {
     MASTER_RESOURCES = null; // offline: unknown, not broken
+    MASTER_RESOURCES_REASON = `Make unreachable (${err?.cause?.code ?? err?.code ?? err?.message ?? 'network error'})`;
   }
   return MASTER_RESOURCES;
 }
@@ -2029,7 +2074,10 @@ async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir 
   patchPostCallBlueprint(copy, {
     baseId,
     siteTag,
-    fromNum: readEnvLocal(clientDir).TWILIO_NUMBER,
+    // The same Account-lane sender the live clone uses — see the note at its definition. A
+    // preview showing the client number while the run writes the notification number would
+    // make the dry run bless something different from what provisions.
+    fromNum: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
     toNum: smsEnabled ? (toE164(smsAlerts?.phone) ?? '') : '',
     smsEnabled,
     masterMap,
@@ -2071,6 +2119,12 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
       checkBlueprintFieldsResolve({ blueprint: preview?.blueprint ?? null, clientMap: preview?.clientMap ?? null, siteTag }),
       checkBlueprintEventFilter({ blueprint: preview?.blueprint ?? null }),
       checkBlueprintNoDatastore({ blueprint: preview?.blueprint ?? null }),
+      checkAccountLaneSender({
+        blueprint: preview?.blueprint ?? null,
+        notificationNumber: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
+        clientNumber: twilioNumber,
+        smsEnabled: smsAlerts?.consented === true && Boolean(smsAlerts?.phone),
+      }),
       checkAirtableSchemaCovers({
         masterMap: preview?.masterMap ?? null,
         clientMap: preview?.clientMap ?? null,
@@ -2788,6 +2842,19 @@ function preflight(intake) {
       } else {
         fmt('TWILIO_MESSAGING_SERVICE_SID', 'MG');
       }
+
+      // And a sender for the owner brief. Without one the cloned Twilio module carries an
+      // empty `from`, which errors on every run until Make auto-disables the scenario, taking
+      // the Airtable call log down with it. So a missing number is fatal, not a warning.
+      if (!process.env.TWILIO_NOTIFICATION_NUMBER) {
+        errors.push(
+          'SMS alerts are consented but TWILIO_NOTIFICATION_NUMBER is not set — the owner brief ' +
+          'has no Account-lane sender. Buy one LOCAL number, add it to the TWILIO_MESSAGING_SERVICE_SID ' +
+          'sender pool, leave its voiceUrl unset, and record it in .env. It is agency-wide, bought once.',
+        );
+      } else {
+        fmt('TWILIO_NOTIFICATION_NUMBER', '+1');
+      }
     }
   }
 
@@ -2831,7 +2898,7 @@ async function verifyNoMasterResources(intake, baseSlug) {
 
   const master = await resolveMasterResources();
   if (!master) {
-    console.warn('  ⚠ Could not resolve the master scenario (no Make credentials, or unreachable) — not checked. This is not a pass.');
+    console.warn(`  ⚠ Could not resolve the master scenario (${MASTER_RESOURCES_REASON ?? 'reason unknown'}) — not checked. This is not a pass.`);
     return;
   }
   const { masterBaseId, masterHookUrl } = master;

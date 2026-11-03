@@ -56,7 +56,7 @@
   [dry-run]   POST /scenarios/5315889/clone?organizationId=7633018 body { teamId: 2283785, states: false, hook: { 2421720: <new> } }
   [dry-run] would repoint Airtable module at base=<dry-run-base-id>, remapping its table + field ids by column name
   [dry-run] would REMOVE the vestigial datastore module, carrying its event filter forward
-  [dry-run] would patch Twilio from=undefined, to=<E164>
+  [dry-run] would patch Twilio from=<E164>, to=<E164>
   [dry-run] would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent <dry-run-agent-id> webhook_url
 
 [step 12] Publish number on the site (was <PHONE>)
@@ -73,8 +73,9 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
+  ? post-call brief sends from the JDD notification number — no credentials to resolve the blueprint, or nothing provisioned yet
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  3 passed, 1 failed, 6 not checked
+  3 passed, 1 failed, 7 not checked
 
 [step 14] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Plumbing Co." && git push origin main
