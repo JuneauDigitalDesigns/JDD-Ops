@@ -801,17 +801,34 @@ function SetupStep({ order, onOrder, onContinue }: { order: OperatorOrder; onOrd
 // ── SMS registration ────────────────────────────────────────────────────────
 
 /**
- * The A2P chain's own panel, embedded. It is the only EIN form there is (A2P handoff §5), so the
- * wizard does not build one. Requested from the a2p-chain session (PLAN §6): a compact
- * `close-wizard` variant matching the mockup, and a one-confirm batch submit. Until then it is
- * the full stepper.
+ * The A2P chain's own panel in its `close-wizard` variant (A2P handoff §1C). It is the only EIN
+ * form there is, so the wizard builds none: it hands over what the order already knows and the
+ * panel does the form, the one typed-slug confirm, the batch filing and its checklist.
+ *
+ * "Business profile submitted, messaging registration pending" is a normal on-call outcome:
+ * Twilio may not accept the trust bundle until the profile reaches in-review, and pressing Submit
+ * again later (from Resume) carries on. So Continue is always available here.
  */
 function SmsStep({ order, enums, onContinue }: { order: OperatorOrder; enums: A2pEnums | null; onContinue: () => void }) {
+  const [first, ...rest] = order.client.contactName.trim().split(/\s+/);
   return (
     <Card>
       <h2 className="text-xl font-semibold text-fg">SMS registration</h2>
       {enums ? (
-        <A2pRegistrationPanel slug={order.siteSlug} enums={enums} embedded />
+        <A2pRegistrationPanel
+          slug={order.siteSlug}
+          enums={enums}
+          variant="close-wizard"
+          vertical={order.vertical}
+          prefill={{
+            legalBusinessName: order.client.legalName,
+            repFirstName: first,
+            repLastName: rest.join(' '),
+            repEmail: order.client.email,
+            repPhone: order.client.phone,
+            address: order.client.address,
+          }}
+        />
       ) : (
         <div className="text-fg2">The registration tools aren’t available right now.</div>
       )}

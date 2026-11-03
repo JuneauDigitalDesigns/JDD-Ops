@@ -377,4 +377,4 @@ last item is "EIN still needed".
 | jdd-ops branch `feat/sales-call-close` | Built on **`claude/sales-close-design-0f5f8d`**, rebased onto a2p-chain's tip | A guard stops this session from writing to another worktree. |
 | Pin bump to v1.31.0 | **Not done yet** | It needs the `v1.31.0` tag pushed to GitHub (Xander's go-ahead). Typechecks/builds ran against the local schema build copied into `node_modules`. |
 | Phase 8 Stripe test-mode run | **Not done** | It needs `OPS_ORDERS_SECRET`, Stripe test keys, the Stripe CLI and a Clerk dev instance on localhost. Xander runs it or approves it. |
-| SMS step | Embeds `A2pRegistrationPanel` as it is | R1/R2 were sent to a2p-chain. Until then it's the full stepper. |
+| SMS step | `A2pRegistrationPanel variant="close-wizard"` (a2p-chain `e084b08`), prefilled from the order | R1/R2 delivered. "Profile submitted, messaging registration pending" is a normal on-call outcome; Continue stays available. |
