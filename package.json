@@ -19,6 +19,7 @@
     "test": "node --test \"test/**/*.test.mjs\"",
     "fixtures:refresh": "node scripts/refresh-fixtures.js",
     "fixtures:check": "node scripts/refresh-fixtures.js --check",
+    "fixtures:a2p": "node scripts/record-a2p-fixtures.js",
     "fixtures:dry-run": "node scripts/record-dry-runs.js",
     "fixtures:dry-run:check": "node scripts/record-dry-runs.js --check",
     "setup-hooks": "git config core.hooksPath .githooks",

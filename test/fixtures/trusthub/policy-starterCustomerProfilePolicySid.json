@@ -1,0 +1,53 @@
+{
+  "friendly_name": "Starter Customer Profile of type Business",
+  "requirements": {
+    "end_user": [
+      {
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "phone_number"
+        ],
+        "name": "Information",
+        "requirement_name": "starter_customer_profile_information",
+        "type": "starter_customer_profile_information"
+      }
+    ],
+    "supporting_customer_profiles": [
+      {
+        "name": "Primary Customer Profile Bundle",
+        "requirement_name": "primary_customer_profile",
+        "type": "primary_customer_profile_type_business"
+      }
+    ],
+    "supporting_document": [
+      [
+        {
+          "accepted_documents": [
+            {
+              "fields": [
+                "address_sids"
+              ],
+              "name": "Legal Company Address",
+              "type": "customer_profile_address"
+            },
+            {
+              "fields": [
+                "address_sids"
+              ],
+              "name": "Legal Company Address",
+              "type": "starter_customer_profile_address"
+            }
+          ],
+          "description": "Customer Profile Address",
+          "name": "Customer Profile Address",
+          "requirement_name": "customer_profile_address",
+          "type": "document"
+        }
+      ]
+    ],
+    "supporting_trust_products": []
+  },
+  "sid": "RN806dd6cd175f314e1f96a9727ee271f4"
+}

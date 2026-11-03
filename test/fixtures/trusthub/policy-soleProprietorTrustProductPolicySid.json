@@ -1,0 +1,34 @@
+{
+  "friendly_name": "Sole Proprietor TrustProduct",
+  "requirements": {
+    "end_user": [
+      {
+        "fields": [
+          "brand_name",
+          "mobile_phone_number",
+          "vertical"
+        ],
+        "name": "Sole Proprietor Information",
+        "requirement_name": "sole_proprietor_information",
+        "type": "sole_proprietor_information"
+      }
+    ],
+    "supporting_customer_profiles": [
+      {
+        "name": "Starter Customer Profile(isv customers) Proof",
+        "requirement_name": "customer_profile",
+        "type": "starter_customer_profile_type_business"
+      },
+      {
+        "name": "Starter Customer Profile(direct customers) Proof",
+        "requirement_name": "customer_profile",
+        "type": "starter_customer_profile_type_direct_long_tail"
+      }
+    ],
+    "supporting_document": [
+      []
+    ],
+    "supporting_trust_products": []
+  },
+  "sid": "RN670d5d2e282a6130ae063b234b6019c8"
+}

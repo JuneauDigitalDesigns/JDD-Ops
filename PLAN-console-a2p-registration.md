@@ -35,15 +35,22 @@ exist anywhere yet. **This plan is therefore half migration, half first build of
 | 5 | **The A2P SIDs stay in the Redis record** `jdd:a2p-registration:{slug}`. The console reads and writes that record; a follow-up corrects `/manage` and the sibling handoff, which planned `.env.local` keys instead (Phase 6). |
 | 6 | **The portal shows progress with no timeframe.** The console advances `PortalSite.a2pStatus` at each gate. |
 | 7 | **The agency commit is stripped, not reverted.** The `.mjs` modules and the test move into `jdd-ops`; the wizard keeps a plain intake form with no EIN field. |
+| 8 | *(2026-11-02)* **Build the sole-proprietor path too, the way Twilio actually defines it.** It is not "the EIN path minus the EIN": it is a *Starter* customer profile (policy `RN806dd6…`, a `starter_customer_profile_information` EndUser), a *Sole Proprietor* trust product (policy `RN670d5d…`, a `sole_proprietor_information` EndUser carrying the owner's mobile), `BrandType=SOLE_PROPRIETOR`, an SMS OTP the owner must answer YES to, and `UsAppToPersonUsecase=SOLE_PROPRIETOR`. Both policies were read live and are recorded under `test/fixtures/trusthub/`. Enterprise is refused this path (one number per sole-prop campaign). |
+| 9 | *(2026-11-02)* **Business industry is console-only (closes §9.1).** The wizard stops collecting it; the operator picks it in the console, defaulted from the vertical via `DEFAULT_INDUSTRY_BY_VERTICAL`. One copy of the TCR enum, in `lib/a2p-identity.js`, so there is nothing to pin. |
+| 10 | *(2026-11-02)* **The end-to-end mock run uses the `_e2e_test_growth` client** ("Your HVAC Co"), with `Mock=true` on the brand, so the whole stack is exercised rather than a brand against JDD's own bundles. Every write in that run is still click-gated. |
 
 ---
 
 ## 3. Facts this plan rests on (verified, not assumed)
 
-1. **Phase 0 is not done.** `TWILIO_PRIMARY_PROFILE_SID` is absent from `jdd-ops/.env`. The runbook:
-   omit the primary-profile link and the secondary profile "evaluates as a direct business and the
-   whole ISV posture collapses." **No correct per-client registration is possible until this is
-   fixed by hand in the Twilio console.** Phase 1 below makes that visible rather than silent.
+1. **Phase 0 is done (corrected 2026-11-02 — this fact originally read "not done").** The primary
+   profile `BU09473483d4fd6808a200190e84309592` is `twilio-approved` with
+   `business_identity: isv_reseller_or_partner`, it is recorded in `jdd-ops/.env` as
+   `TWILIO_PRIMARY_PROFILE_SID`, and `node scripts/a2p-readiness.js` reports READY on all six checks.
+   The two chain policies are **absent from `GET /v1/Policies`** on this account (49 results, all
+   Alphanumeric Sender ID), so `lib/a2p-readiness.js` resolves them by SID and verifies them by name.
+   Phase 1's "discover from the listing" design is superseded by that; do not reintroduce it. The
+   readiness gate itself still blocks every per-client write.
 2. **The whole chain is API-driven.** Runbook phases 1–5 are all tagged `Automatable`; 2.7, 3.2 and
    4.2 are `AutomatableWait` (file, then wait on review) and only 5.2 — one real test message — is
    `Manual`. There is no step that forces the operator into the Twilio dashboard. The dashboard
@@ -298,6 +305,21 @@ defensively and that is stated in its comment rather than assumed away.
 ---
 
 ## 9. Open items to settle before building
+
+> **Resolved 2026-11-02.** 1 → decision 9 (console-only industry). 2 → **merges**: a live
+> `POST /v1/EndUsers/{sid}` carrying only `business_name` updated that one key and left the other
+> five intact (throwaway EndUser, fake data, no EIN, deleted after — `DELETE` returned 204 and a
+> re-read 404). A correction therefore never needs the EIN retyped. 3 → moot: the sole-prop path
+> does not use a business EndUser at all (decision 8); that same live call did confirm TrustHub
+> *accepts* a business EndUser with no registration number at create time, though it was never
+> evaluated. 4 → deferred to the orchestrator's §6 item 5; the registration record carries
+> `messagingServiceSid` for it to read. 5 → done (§3 fact 1).
+>
+> **One more vendor fact the docs got wrong.** Twilio's ISV guide documents an evaluation's
+> per-requirement results as `valid[]` / `invalid[]`. Every recorded evaluation on this account
+> (`test/fixtures/trusthub/evaluation-*.json`) carries `results[].fields[]` with a `passed` boolean
+> per field instead. The parser reads the recorded shape and treats the documented one as a
+> fallback.
 
 1. **The shared industry enum.** Two repos now need the TCR list. Pin them with a test, or keep one
    copy and have the agency wizard fetch the enum from... nowhere — it is a separate deployment.

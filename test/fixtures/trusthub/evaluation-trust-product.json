@@ -1,0 +1,66 @@
+{
+  "date_created": "2026-08-03T14:38:44Z",
+  "policy_sid": "RNb0d4771c2c98518d916a3d4cd70a8f8b",
+  "results": [
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Supporting Bundle Status",
+          "object_field": "bundle_status",
+          "passed": true
+        }
+      ],
+      "friendly_name": "Primary Customer Profile Bundle Proof",
+      "object_type": "primary_customer_profile_type_business",
+      "passed": true,
+      "requirement_friendly_name": "Customer Profile",
+      "requirement_name": "customer_profile"
+    },
+    {
+      "error_code": null,
+      "failure_reason": null,
+      "fields": [
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Company Type",
+          "object_field": "company_type",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Stock Exchange",
+          "object_field": "stock_exchange",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Stock Ticker",
+          "object_field": "stock_ticker",
+          "passed": true
+        },
+        {
+          "error_code": null,
+          "failure_reason": null,
+          "friendly_name": "Brand Contact Email",
+          "object_field": "brand_contact_email",
+          "passed": true
+        }
+      ],
+      "friendly_name": "US A2P Messaging Profile General Business Information",
+      "object_type": "us_a2p_messaging_profile_information",
+      "passed": true,
+      "requirement_friendly_name": "US A2P Messaging Profile Information",
+      "requirement_name": "us_a2p_messaging_profile_information"
+    }
+  ],
+  "sid": "EL5fff50fa65ddeb5dbcf674302c04a3ec",
+  "status": "compliant",
+  "trust_product_sid": "BUf4a51766c2225295336ac6ae1258242f"
+}
