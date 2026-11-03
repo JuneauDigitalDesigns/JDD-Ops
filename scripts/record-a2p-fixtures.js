@@ -155,6 +155,21 @@ if (a2pProduct) {
   failed++;
 }
 
+// A real NONCOMPLIANT evaluation, by explicit SID: `-- --noncompliant BU…/EL…`. JDD's own
+// bundles only ever evaluate compliant, so the failing shape can only come from a client
+// profile — first captured from the 2026-11-02 `_e2e_test_growth` draft (job_position "Owner").
+const flag = process.argv.indexOf('--noncompliant');
+if (flag > -1) {
+  const [bundle, evaluation] = String(process.argv[flag + 1] ?? '').split('/');
+  if (!/^BU[0-9a-f]{32}$/.test(bundle ?? '') || !/^EL[0-9a-f]{32}$/.test(evaluation ?? '')) {
+    console.error('  ✗ --noncompliant expects BU…/EL…');
+    failed++;
+  } else {
+    const body = await getJson(`${TRUSTHUB}/CustomerProfiles/${bundle}/Evaluations/${evaluation}`, 'noncompliant evaluation');
+    save('evaluation-customer-profile-noncompliant.json', body && scrub(body));
+  }
+}
+
 if (failed) process.exit(1);
 if (CHECK_ONLY && changed) process.exit(1);
 console.log(changed ? `✓ ${changed} fixture(s) updated — review the diff.` : '✓ All A2P fixtures current.');

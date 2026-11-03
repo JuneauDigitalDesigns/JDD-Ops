@@ -93,6 +93,7 @@ export interface A2pEnums {
   businessTypes: ReadonlyArray<{ value: string; label: string }>;
   soleProprietorVerticals: ReadonlyArray<string>;
   companyTypes: ReadonlyArray<string>;
+  jobPositions: ReadonlyArray<string>;
   standardUsecases: ReadonlyArray<string>;
   defaultIndustryByVertical: Readonly<Record<string, string>>;
 }
@@ -137,6 +138,7 @@ interface IdentityModule {
   A2P_BUSINESS_TYPES: ReadonlyArray<{ value: string; label: string }>;
   A2P_SOLE_PROP_VERTICALS: ReadonlyArray<string>;
   A2P_COMPANY_TYPES: ReadonlyArray<string>;
+  A2P_JOB_POSITIONS: ReadonlyArray<string>;
   DEFAULT_INDUSTRY_BY_VERTICAL: Readonly<Record<string, string>>;
   findTaxIdPaths(value: unknown): string[];
 }
@@ -181,6 +183,7 @@ export async function loadA2pEnums(): Promise<A2pEnums> {
     businessTypes: identity.A2P_BUSINESS_TYPES,
     soleProprietorVerticals: identity.A2P_SOLE_PROP_VERTICALS,
     companyTypes: identity.A2P_COMPANY_TYPES,
+    jobPositions: identity.A2P_JOB_POSITIONS,
     standardUsecases: register.STANDARD_USECASES,
     defaultIndustryByVertical: identity.DEFAULT_INDUSTRY_BY_VERTICAL,
   };

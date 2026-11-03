@@ -47,6 +47,7 @@ import {
   findTaxIdPaths,
   repEndUserType,
   summarizeEvaluation,
+  validateRepInput,
 } from '../lib/a2p-identity.js';
 import { writeRegistration, a2pRegistrationKey } from '../lib/a2p-registration-store.js';
 
@@ -58,6 +59,7 @@ const PRIMARY_ASSIGNMENTS = read('primary-profile-assignments.json');
 const PRIMARY_BUSINESS = read('primary-business-enduser.json');
 const EVAL_PROFILE = read('evaluation-customer-profile.json');
 const EVAL_TRUST = read('evaluation-trust-product.json');
+const EVAL_FAILING = read('evaluation-customer-profile-noncompliant.json');
 const POLICIES = new Map([
   ...KNOWN_POLICIES.map((k) => [k.sid, read(`policy-${k.key}.json`)]),
   ...SOLE_PROP_POLICIES.map((k) => [k.sid, read(`policy-${k.key}.json`)]),
@@ -101,6 +103,7 @@ function twilio({ failOn = null, evaluation = EVAL_PROFILE, trustEvaluation = EV
     if (p === `/v1/CustomerProfiles/${PRIMARY.sid}/EntityAssignments`) return json(PRIMARY_ASSIGNMENTS);
     if (p === `/v1/EndUsers/${PRIMARY_BUSINESS.sid}`) return json(PRIMARY_BUSINESS);
     if (/\/v1\/EndUsers\/IT/.test(p) && method === 'GET') return json({}, 404);
+    if (/\/v1\/EndUsers\/IT/.test(p) && method === 'POST') return json({ sid: p.split('/').pop() });
     if (p === '/v1/CustomerProfiles' && method === 'GET') return json({ results: [] });
     // ── the chain ──
     if (method === 'POST' && p === '/v1/CustomerProfiles') return json({ sid: sid('BU'), status: 'draft' }, 201);
@@ -171,7 +174,7 @@ const INPUTS = {
   },
   'rep.create': {
     firstName: 'Arthur', lastName: 'Reyes', email: 'arthur@arthursplumbing.com', phone: '+14075550123',
-    jobPosition: 'Owner', businessTitle: 'Owner',
+    jobPosition: 'CEO', businessTitle: 'Owner',
   },
   'address.create': {
     customerName: "Arthur's Plumbing LLC", street: '1200 Main St', city: 'Orlando', region: 'FL', postalCode: '32801', country: 'US',
@@ -233,6 +236,37 @@ test('summarizeEvaluation reports a failing field from the recorded shape', () =
 
   assert.deepEqual(summarizeEvaluation(EVAL_PROFILE), { status: 'compliant', sid: EVAL_PROFILE.sid, failures: [] });
   assert.equal(summarizeEvaluation({ status: 'weird' }).status, 'unknown', 'an unrecognised status is never a pass');
+});
+
+test('the first live evaluation failed on job_position "Owner", and the parser names it', () => {
+  // Recorded 2026-11-02 from the `_e2e_test_growth` draft profile. The runbook's example sent
+  // `job_position: "Owner"`; Twilio's evaluation answered "Job Level is invalid." — the field is
+  // an enum that neither the policy nor GET /EndUserTypes admits to.
+  const summary = summarizeEvaluation(EVAL_FAILING);
+  assert.equal(summary.status, 'noncompliant');
+  assert.deepEqual(
+    summary.failures.map((f) => [f.objectType, f.field]),
+    [['authorized_representative_1', 'job_position']],
+  );
+  assert.match(summary.failures[0].reason, /Job Level is invalid/);
+});
+
+test('the rep validator refuses "Owner" as a job position, before Twilio can', () => {
+  const rep = { ...INPUTS['rep.create'], jobPosition: 'Owner' };
+  const check = validateRepInput(rep, 'standard');
+  assert.equal(check.ok, false);
+  assert.deepEqual(check.fields, ['jobPosition']);
+  assert.equal(validateRepInput({ ...rep, jobPosition: 'Other' }, 'standard').ok, true);
+});
+
+test('correcting the rep title resends no personal details', async () => {
+  const h = harness();
+  for (const step of ['profile.create', 'rep.create']) await h.run(step);
+  await h.run('rep.update', { jobPosition: 'Other', businessTitle: 'Owner' });
+  const update = h.fetchImpl.calls.filter((c) => c.method === 'POST' && c.path === `/v1/EndUsers/${h.record.repEndUserSid}`);
+  assert.equal(update.length, 1);
+  const attributes = JSON.parse(new URLSearchParams(update[0].body).get('Attributes'));
+  assert.deepEqual(attributes, { job_position: 'Other', business_title: 'Owner' });
 });
 
 test('every EndUser we build uses a type and attribute keys the recorded policy lists', () => {

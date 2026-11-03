@@ -68,6 +68,7 @@ const EFFECT: Record<string, (d: SectionData, f: Record<string, any>) => string>
   'business.create': () => 'Creates the business-information EndUser. The EIN is sent to Twilio in this one request and is not kept anywhere by JDD.',
   'business.update': () => 'Updates only the business fields you changed on the existing EndUser. The EIN is not resent.',
   'rep.create': () => 'Creates the representative EndUser. Their name, email and phone are sent to Twilio in this one request and not kept by JDD.',
+  'rep.update': () => 'Updates only the representative’s job position / title on the existing EndUser. Their name, email and phone are not resent.',
   'address.create': () => 'Creates a Twilio Address and the supporting document that wraps it.',
   'profile.attach': () => "Attaches every identity object to the profile — including JDD's primary profile, which declares the ISV relationship.",
   'profile.evaluate': () => 'Runs a free compliance evaluation. Files nothing.',
@@ -132,6 +133,7 @@ export default function MessagingSection({ enums }: { enums: A2pEnums }) {
       'business.create': { legalBusinessName: i.legalBusinessName ?? '', businessType: i.businessType ?? '', businessIndustry: '', websiteUrl: i.websiteUrl ?? '', ein: '' },
       'business.update': { legalBusinessName: '', businessType: '', businessIndustry: '', websiteUrl: '' },
       'rep.create': { firstName: '', lastName: '', email: '', phone: '', jobPosition: '', businessTitle: '' },
+      'rep.update': { jobPosition: '', businessTitle: '' },
       'address.create': {
         customerName: i.legalBusinessName ?? '',
         street: i.address?.street ?? '',
@@ -538,10 +540,17 @@ function StepForm({
           <Field label="Mobile (+1…)" value={v.phone} onChange={(x) => set('phone', x)} secret />
           {path === 'standard' && (
             <>
-              <Field label="Job position" value={v.jobPosition} onChange={(x) => set('jobPosition', x)} />
-              <Field label="Business title" value={v.businessTitle} onChange={(x) => set('businessTitle', x)} />
+              <JobPosition enums={enums} value={v.jobPosition} onChange={(x) => set('jobPosition', x)} />
+              <Field label="Business title (free text — “Owner” goes here)" value={v.businessTitle} onChange={(x) => set('businessTitle', x)} />
             </>
           )}
+        </div>
+      );
+    case 'rep.update':
+      return (
+        <div className={grid}>
+          <JobPosition enums={enums} value={v.jobPosition} onChange={(x) => set('jobPosition', x)} />
+          <Field label="Business title" value={v.businessTitle} onChange={(x) => set('businessTitle', x)} />
         </div>
       );
     case 'address.create':
@@ -617,6 +626,18 @@ function StepForm({
     default:
       return null;
   }
+}
+
+function JobPosition({ enums, value, onChange }: { enums: A2pEnums; value: string; onChange: (v: string) => void }) {
+  return (
+    <Select
+      label="Job position (Twilio enum)"
+      value={value}
+      options={enums.jobPositions.map((x) => ({ value: x, label: x }))}
+      onChange={onChange}
+      hint="Twilio rejects “Owner” here. An owner is CEO, or Other."
+    />
+  );
 }
 
 function NumberRows({ data, disabled, onAttach }: { data: SectionData; disabled: boolean; onAttach: (siteSlug: string, moveFromMaster: boolean) => void }) {
