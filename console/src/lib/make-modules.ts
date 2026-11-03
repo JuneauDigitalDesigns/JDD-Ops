@@ -276,6 +276,11 @@ function httpFields(): MakeField[] {
         ]],
       },
     },
+    {
+      label: 'airtable_record_id',
+      expr: { raw: '{{8.id}}', lines: [[v('8. ID')]] },
+      help: 'The Airtable row just written (module 8’s ID) — the portal’s id for this call, so the owner’s text can open it. Pick it from the mapping panel; don’t type it.',
+    },
     { label: 'Parse response', select: { value: 'No' } },
     {
       label: 'Evaluate all states as errors',
