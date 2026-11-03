@@ -449,17 +449,17 @@ function IntakeCard({
   return (
     <section className="mt-8 rounded-lg border p-4" style={{ borderColor: 'var(--rule)' }}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Business registration intake</p>
+        <p className="text-sm font-semibold">Business registration details</p>
         <button type="button" className="btn btn-sm" onClick={onSave} disabled={busy}>
           {busy ? <SpinnerGap size={13} className="animate-spin" /> : null}Save corrections
         </button>
       </div>
       <p className="mt-1 text-xs" style={{ color: 'var(--fg-3)' }}>
-        From the client’s onboarding, fully editable. Corrections are saved back to the intake record. No EIN and no representative details live here.
+        Typed here by you — the client’s onboarding form doesn’t collect these. Saved to the intake record and reused as defaults below. No EIN and no representative details live here.
       </p>
       {missing.length > 0 && (
         <p className="mt-3 text-xs" style={{ color: 'var(--warn)' }}>
-          The client still owes us: {missing.join('; ')}.
+          Still to enter: {missing.join('; ')}.
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-3">

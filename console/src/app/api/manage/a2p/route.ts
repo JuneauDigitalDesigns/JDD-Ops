@@ -9,7 +9,7 @@ import { appendAudit } from '@/lib/audit';
  * The Messaging & A2P section's read, and the intake correction write.
  *
  *   GET ?slug=   the registration record, the step table with what is legal now, the client's
- *                intake record, and what the client still owes us.
+ *                intake record, and which of its fields are still empty.
  *   PUT ?slug=   save the operator's corrections to `jdd:a2p-intake:{slug}`.
  *
  * Nothing sensitive can come back from the GET: the registration record holds SIDs, statuses
@@ -18,9 +18,9 @@ import { appendAudit } from '@/lib/audit';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Fields the operator needs before identity steps can run — named so the client can be chased. */
+/** Fields still empty. The operator enters them (PLAN decision 11 — the agency form collects none). */
 function intakeMissing(intake: A2pIntakeRecord | null): string[] {
-  if (!intake) return ['the whole business-registration step'];
+  if (!intake) return ['legal business name, business type, website and address'];
   const missing: string[] = [];
   if (!intake.legalBusinessName?.trim()) missing.push('legal business name (as registered with the IRS)');
   if (!intake.businessType?.trim()) missing.push('business type');
