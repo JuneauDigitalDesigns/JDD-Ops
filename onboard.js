@@ -89,6 +89,7 @@ import {
   checkBlueprintNoDatastore,
   checkAnalysisCoversBlueprint,
   checkPromptHasConsentAsk,
+  checkSelectMappingsTotal,
   checkAccountLaneSender,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
@@ -2084,6 +2085,14 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
         blueprint: preview?.blueprint ?? (await resolveMasterResources())?.blueprint ?? null,
         analysisData: buildPostCallAnalysisData(''),
       }),
+      // The patched clone against the client base when both exist; otherwise the master against
+      // its own base, which is where every clone's expressions come from.
+      preview?.blueprint && preview?.clientMap
+        ? checkSelectMappingsTotal({ blueprint: preview.blueprint, fieldMap: preview.clientMap })
+        : checkSelectMappingsTotal({
+            blueprint: (await resolveMasterResources())?.blueprint ?? null,
+            fieldMap: preview?.masterMap ?? null,
+          }),
       checkAccountLaneSender({
         blueprint: preview?.blueprint ?? null,
         notificationNumber: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),

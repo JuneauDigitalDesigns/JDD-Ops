@@ -270,6 +270,13 @@ Two gotchas worth keeping:
   with `typecast: false` — so prettier labels like `Inbound` / `Outbound callback` are
   rejected as an invalid option and fail the **whole row**, not just that cell. `Priority` is
   `emergency`/`callback` for the same reason.
+- **Never map an analysis field into a singleSelect bare.** Retell returns `""` for a field it
+  could not fill, and Airtable rejects `""` as a new option ("Insufficient permissions to
+  create new select option") — the whole row is lost and Make deactivates the scenario, so
+  later calls queue behind it. On 2026-11-03 this ate a completed Growth callback. `Priority`
+  and `SMS consent` are mapped through total `if()` expressions (`SELECT_MAPPINGS` in
+  `lib/voice-consent.js`) that fall back to `callback` / `unknown`;
+  `checkSelectMappingsTotal` enforces it in the dry run, the suite and `verify-post-call`.
 - **Nothing writes `Outcome`.** The master has no mapping for it; it exists for the owner to
   set by hand while triaging, which is why it keeps human-cased labels.
 

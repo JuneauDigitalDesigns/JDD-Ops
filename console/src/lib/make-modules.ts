@@ -173,19 +173,31 @@ function airtableFields(ctx: ClientContext, site: SiteInfo): MakeField[] {
     },
     {
       label: 'Priority',
+      // Never the bare field: Retell sends "" when it could not fill it, Airtable rejects "" as a
+      // new select option, and the whole row is lost (2026-11-03). Pinned equal to
+      // SELECT_MAPPINGS in jdd-ops/lib/voice-consent.js by test/voice-consent.test.mjs.
       expr: {
-        raw: '{{1.call.call_analysis.custom_analysis_data.caller_priority}}',
-        lines: [[callVar('call_analysis.custom_analysis_data.caller_priority')]],
+        raw: '{{if(1.call.call_analysis.custom_analysis_data.caller_priority = "emergency"; "emergency"; "callback")}}',
+        lines: [[
+          fn('if('), callVar('call_analysis.custom_analysis_data.caller_priority'), op('='), lit('emergency'), fn(';'),
+          lit('emergency'), fn(';'), lit('callback'), fn(')'),
+        ]],
       },
-      help: 'emergency / callback — lowercase, same reason as Call type.',
+      help: 'emergency / callback — lowercase, same reason as Call type. Wrapped in if() so a blank extraction becomes “callback” instead of failing the whole row.',
+      warn: true,
     },
     {
       label: 'SMS consent',
       expr: {
-        raw: '{{1.call.call_analysis.custom_analysis_data.sms_consent}}',
-        lines: [[callVar('call_analysis.custom_analysis_data.sms_consent')]],
+        raw: '{{if(1.call.call_analysis.custom_analysis_data.sms_consent = "granted"; "granted"; if(1.call.call_analysis.custom_analysis_data.sms_consent = "declined"; "declined"; "unknown"))}}',
+        lines: [
+          [fn('if('), callVar('call_analysis.custom_analysis_data.sms_consent'), op('='), lit('granted'), fn(';'), lit('granted'), fn(';')],
+          [fn('if('), callVar('call_analysis.custom_analysis_data.sms_consent'), op('='), lit('declined'), fn(';'), lit('declined'), fn(';')],
+          [lit('unknown'), fn('))')],
+        ],
       },
-      help: 'granted / declined / unknown — the caller’s answer to the closing SMS question. Lowercase, same reason as Call type. The portal reads this to decide whether the business may text them.',
+      help: 'granted / declined / unknown — the caller’s answer to the closing SMS question. Anything else, including a blank, becomes “unknown”, which blocks texting. Lowercase, same reason as Call type.',
+      warn: true,
     },
     {
       label: 'Outcome',

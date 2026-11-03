@@ -22,6 +22,7 @@ import {
   analysisFieldsReadBy,
   checkAnalysisCoversBlueprint,
   checkPromptHasConsentAsk,
+  checkSelectMappingsTotal,
 } from '../lib/onboard-checks.js';
 import {
   buildPostCallAnalysisData,
@@ -30,8 +31,9 @@ import {
   smsConsentAsk,
   voiceConsentInstructions,
   SMS_CONSENT_CHOICES,
+  SELECT_MAPPINGS,
 } from '../lib/voice-consent.js';
-import { masterBlueprint } from './helpers/fixtures.mjs';
+import { masterBlueprint, masterFieldMap } from './helpers/fixtures.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BIZ = 'Acme Plumbing';
@@ -148,4 +150,65 @@ test('a paraphrased ask is caught; the verbatim one passes', () => {
   assert.equal(c.ok, false);
   assert.doesNotMatch(c.detail, /FAIL:/);
   assert.equal(checkPromptHasConsentAsk({ prompt: '', ask }).ok, null);
+});
+
+/* ── singleSelect mappings must be total (2026-11-03 outage) ──────────────── */
+
+// The recorded master's field ids for the two select columns, resolved by NAME so the test
+// follows a re-recorded fixture rather than hard-coding ids.
+function masterWithSelectMappings(mappings) {
+  const bp = masterBlueprint();
+  const map = masterFieldMap();
+  const at = bp.flow.find((m) => (m.module ?? '').startsWith('airtable'));
+  for (const [column, expr] of Object.entries(mappings)) at.mapper.record[map.byName[column]] = expr;
+  return { bp, map };
+}
+
+test('the recorded master maps no singleSelect in a way that can fail the row', () => {
+  // On 2026-11-03 a completed callback returned caller_priority "", the bare mapping wrote ""
+  // into Priority, Airtable rejected it as a new option, and the whole row was lost.
+  const c = checkSelectMappingsTotal({ blueprint: masterBlueprint(), fieldMap: masterFieldMap() });
+  assert.equal(c.ok, true, c.detail);
+});
+
+test('a bare analysis mapping into a select is caught — the shape that failed on 2026-11-03', () => {
+  const { bp, map } = masterWithSelectMappings({
+    Priority: '{{1.call.call_analysis.custom_analysis_data.caller_priority}}',
+  });
+  const c = checkSelectMappingsTotal({ blueprint: bp, fieldMap: map });
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /Priority/);
+  assert.doesNotMatch(c.detail, /FAIL:/);
+});
+
+test('a mapping that can emit a mis-cased option is caught', () => {
+  const { bp, map } = masterWithSelectMappings({
+    Priority: '{{if(1.call.call_analysis.custom_analysis_data.caller_priority = "emergency"; "emergency"; "Callback")}}',
+  });
+  const c = checkSelectMappingsTotal({ blueprint: bp, fieldMap: map });
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /"Callback"/);
+});
+
+test('the shared SELECT_MAPPINGS are total against the recorded master base', () => {
+  const { bp, map } = masterWithSelectMappings(SELECT_MAPPINGS);
+  const c = checkSelectMappingsTotal({ blueprint: bp, fieldMap: map });
+  assert.equal(c.ok, true, c.detail);
+});
+
+test('the recorded master carries exactly the shared SELECT_MAPPINGS', () => {
+  const map = masterFieldMap();
+  const at = masterBlueprint().flow.find((m) => (m.module ?? '').startsWith('airtable'));
+  for (const [column, expr] of Object.entries(SELECT_MAPPINGS)) {
+    assert.equal(at.mapper.record[map.byName[column]], expr, `master mapping for "${column}"`);
+  }
+});
+
+test('the console replica shows the same select expressions the master runs', () => {
+  // make-modules.ts is bundled by Next and cannot import from the ops root, so it restates
+  // them. An operator copying a stale bare mapping off that screen would reintroduce the bug.
+  const src = readFileSync(resolve(ROOT, 'console/src/lib/make-modules.ts'), 'utf8');
+  for (const expr of Object.values(SELECT_MAPPINGS)) {
+    assert.ok(src.includes(`raw: '${expr}'`), `console replica is missing ${expr}`);
+  }
 });

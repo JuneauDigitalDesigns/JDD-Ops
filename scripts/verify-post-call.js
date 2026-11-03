@@ -35,7 +35,7 @@ import dotenv from 'dotenv';
 dotenv.config({ override: true });
 
 import { patchPostCallBlueprint, airtableFieldMap, CALL_LOG_FIELDS } from '../onboard.js';
-import { checkAnalysisCoversBlueprint } from '../lib/onboard-checks.js';
+import { checkAnalysisCoversBlueprint, checkSelectMappingsTotal } from '../lib/onboard-checks.js';
 import { buildPostCallAnalysisData } from '../lib/voice-consent.js';
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
@@ -126,6 +126,13 @@ async function main() {
   } else {
     note(`✓ Every master column exists in the client base`);
   }
+
+  // Every singleSelect mapping must be unable to emit an invalid option — a bare analysis field
+  // that comes back "" fails the whole row (2026-11-03). Checked on the master, before the patch
+  // mutates it, against the master's own base: every clone inherits these expressions.
+  const selects = checkSelectMappingsTotal({ blueprint, fieldMap: masterMap });
+  if (selects.ok) note(`✓ ${selects.detail}`);
+  else bad(selects.detail);
 
   // 4) Run the real patch.
   const before = JSON.stringify(blueprint);
