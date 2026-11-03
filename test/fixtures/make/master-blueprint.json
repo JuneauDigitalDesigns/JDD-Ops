@@ -23,6 +23,43 @@
                   "a": "{{1.event}}",
                   "b": "call_analyzed",
                   "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.direction}}",
+                  "b": "outbound",
+                  "o": "text:notequal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.direction}}",
+                  "b": "outbound",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
                 }
               ]
             ]
@@ -136,12 +173,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-11-03T19:30:58.375Z",
+    "last_edit": "2026-11-03T19:58:02.866Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
     "idSequence": 11,
-    "version": 43
+    "version": 44
   }
 }
