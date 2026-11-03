@@ -115,18 +115,21 @@ regions is an env edit.
 - **Account lane** — to the business owner: post-call briefs, new-lead alerts. Rides JDD's own
   approved `ACCOUNT_NOTIFICATION` campaign, sent from one dedicated number,
   `TWILIO_NOTIFICATION_NUMBER`, which sits in the `TWILIO_MESSAGING_SERVICE_SID` pool with its
-  voiceUrl deliberately unset. For a client with SMS consent, pre-flight hard-fails when the
-  service SID or the notification number is unset, or the campaign isn't approved
-  (`usAppToPersonRegistered`), so we never provision a silently-textless client.
+  voiceUrl deliberately unset. **The agency sends every account-lane text**: new-lead alerts and,
+  since 2026-11-03, the post-call brief. So the notification number lives in the agency's env,
+  and its `sendSms` refuses to send without it. onboard.js no longer checks it, because nothing
+  in a clone sends SMS any more. For a client with SMS consent, pre-flight still hard-fails when
+  the service SID is unset or the campaign isn't approved (`usAppToPersonRegistered`).
 - **Customer lane** — to the owner's customers: portal replies, review requests. Each
   Growth/Enterprise client's own `CUSTOMER_CARE` campaign and number, registered per client
   through the console's A2P chain. 13–20 business days of carrier review per client; not live.
 
 **A client's number must never send account-lane traffic.** A campaign binds to a Messaging
 Service and a number sits in exactly one, so a client number used for owner alerts is stranded
-in JDD's service and can never join the client's own campaign. `patchPostCallBlueprint` stamps
-`from` onto every clone, so the owner brief's sender is set at onboard.js's call sites — patching
-the master blueprint cannot change it. `checkAccountLaneSender` asserts it.
+in JDD's service and can never join the client's own campaign. Make can't break this any more:
+clones carry no Twilio module, and the agency's `sendSms` pins the account lane's `From` to
+`TWILIO_NOTIFICATION_NUMBER`. `checkOwnerBriefViaAgency` replaced `checkAccountLaneSender`, which
+checked the `from` that onboard.js used to stamp onto each clone's Twilio module.
 
 **Pool membership is what associates a number with a campaign — not naming the service in the
 API call.** The account's history shows one number going `30034` → `delivered` when the campaign
@@ -405,7 +408,14 @@ after-call run and nothing in the client's portal. Both halves enforce it:
     off, so `voicemail_reached` has never appeared on this account. A filter on
     `disconnection_reason` alone lets voicemail through.
 
-  **Voicemail counts as unanswered.**
+  **Voicemail counts as unanswered.** The filter (master module 2, carried onto each clone's
+  Airtable module) was built in the Make UI and recorded. It has two OR groups: anything not
+  `outbound` passes as before, and an `outbound` call passes only if `ended`, `in_voicemail` ≠
+  `true`, and the reason isn't `voicemail_reached` / `ivr_reached`. `checkConnectedCallsOnly`
+  *evaluates* it the way Make does against `lib/call-outcomes.js`. Those cases are this account's
+  real outcomes (`test/fixtures/retell/call-outcomes.json`, captured by `fixtures:refresh`) plus
+  Retell's documented never-connected ones, and a newly recorded outcome with no case fails the
+  suite.
 
 **Why this replaced "always record".** Recording every submission was itself a fix. The route
 before it placed the callback and persisted nothing, so a callback Retell refused lost the lead

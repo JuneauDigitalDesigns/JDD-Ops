@@ -35,10 +35,16 @@ import dotenv from 'dotenv';
 dotenv.config({ override: true });
 
 import { patchPostCallBlueprint, airtableFieldMap, CALL_LOG_FIELDS } from '../onboard.js';
-import { checkAnalysisCoversBlueprint, checkSelectMappingsTotal, checkOwnerBriefViaAgency } from '../lib/onboard-checks.js';
+import {
+  checkAnalysisCoversBlueprint,
+  checkSelectMappingsTotal,
+  checkOwnerBriefViaAgency,
+  checkConnectedCallsOnly,
+} from '../lib/onboard-checks.js';
+import { buildPostCallAnalysisData } from '../lib/voice-consent.js';
+import { CALL_OUTCOME_CASES, shouldLog } from '../lib/call-outcomes.js';
 
 const SIM_TOKEN = 'f'.repeat(64);
-import { buildPostCallAnalysisData } from '../lib/voice-consent.js';
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
 
@@ -201,6 +207,11 @@ async function main() {
 
   // The owner brief goes through the agency now: no Twilio module, one HTTP module posting to
   // /api/ingest/call with the site's token. Same predicate the dry run uses.
+  // Only a callback that reached a person continues past the trigger (operator rule, 2026-11-03).
+  const gated = checkConnectedCallsOnly({ blueprint, cases: CALL_OUTCOME_CASES, shouldLog });
+  if (gated.ok) note(`  ✓ ${gated.detail}`);
+  else bad(gated.detail);
+
   console.log('\nOwner brief (HTTP module):');
   const brief = checkOwnerBriefViaAgency({ blueprint, ingestToken: SIM_TOKEN });
   if (brief.ok) note(`  ✓ ${brief.detail}`);

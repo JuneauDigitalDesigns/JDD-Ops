@@ -91,6 +91,7 @@ import {
   checkPromptHasConsentAsk,
   checkSelectMappingsTotal,
   checkOwnerBriefViaAgency,
+  checkConnectedCallsOnly,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
   checkNotMasterHook,
@@ -110,6 +111,8 @@ import {
   voiceConsentInstructions,
 } from './lib/voice-consent.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
+// Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
+import { CALL_OUTCOME_CASES, shouldLog } from './lib/call-outcomes.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -2089,6 +2092,12 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
             blueprint: (await resolveMasterResources())?.blueprint ?? null,
             fieldMap: preview?.masterMap ?? null,
           }),
+      // The patched clone when there is one, else the master: the gate is carried, not rewritten.
+      checkConnectedCallsOnly({
+        blueprint: preview?.blueprint ?? (await resolveMasterResources())?.blueprint ?? null,
+        cases: CALL_OUTCOME_CASES,
+        shouldLog,
+      }),
       checkOwnerBriefViaAgency({
         blueprint: preview?.blueprint ?? null,
         ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
