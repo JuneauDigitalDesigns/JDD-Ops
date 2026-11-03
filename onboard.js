@@ -87,6 +87,8 @@ import {
   checkBlueprintFieldsResolve,
   checkBlueprintEventFilter,
   checkBlueprintNoDatastore,
+  checkAnalysisCoversBlueprint,
+  checkPromptHasConsentAsk,
   checkAccountLaneSender,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
@@ -99,6 +101,14 @@ import { fetchWithRetry } from './lib/make-fetch.js';
 // stdout is narrated into the console UI and pasted into chats; nothing printed may carry a
 // credential. See lib/secrets.js for the run that printed two.
 import { redactUrlCredentials, gitAuthEnv } from './lib/secrets.js';
+// The spoken consent wording + post-call analysis schema, and the Call Log columns that record it.
+import {
+  buildPostCallAnalysisData,
+  inboundOpeningLine,
+  smsConsentAsk,
+  voiceConsentInstructions,
+} from './lib/voice-consent.js';
+import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -997,19 +1007,21 @@ CORE SPEAKING RULES (write as direct instructions to the agent) — this is a vo
 - Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
 - Spoken-number formatting: read phone numbers back in natural grouped chunks ("four oh seven… five five five… one two one two"), say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
 
-GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name.
+GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it.
 
-QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time. Have the agent gauge and internally note the urgency as exactly one of: "Immediate service", "Callback requested", or "General inquiry" (this label is used downstream, so use those exact words).
+${voiceConsentInstructions(content.brand.name)}
+
+QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time.
 
 LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
 
 NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
 
-CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), and optionally email (never pressure).
+CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), the service address or town when the job is at a location, and optionally email (never pressure; if given, spell it back to confirm).
 
 ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
 
-CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up.
+CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye.
 
 EDGE CASES to cover: silence/no response; leaving a short friendly voicemail on outbound; an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
 
@@ -1032,6 +1044,12 @@ Keep everything warm, specific to this business, and grounded only in the provid
   const promptPath = resolve(clientDir, 'agent-prompt.txt');
   writeFileSync(promptPath, prompt, 'utf8');
   console.log(`  Wrote ${promptPath} (${prompt.length} chars)`);
+  // The consent ask is evidence, so a paraphrase is not good enough — refuse before an agent is
+  // built on it. The file is already written so the miss can be inspected; delete it to retry.
+  const askCheck = checkPromptHasConsentAsk({ prompt, ask: smsConsentAsk(content.brand.name) });
+  if (askCheck.ok === false) {
+    fail(6, `${askCheck.detail}. Delete ${promptPath} and re-run to regenerate.`);
+  }
   console.log(`  Review this before Checkpoint 2 — you will tune it on a test call`);
   return prompt;
 }
@@ -1081,7 +1099,8 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
   // Passing general_prompt to create-agent is silently ignored, which would make
   // every client share one LLM/prompt. So create a per-client LLM (cloning the
   // master template's model + tools) carrying this client's prompt, then bind the
-  // agent to it. The greeting is baked into agentPrompt, so no begin_message.
+  // agent to it. The LLM's begin_message is the fixed recording disclosure; the persona's own
+  // greeting follows it and is baked into agentPrompt.
   // Adopt a per-client LLM a previous interrupted run already created.
   //
   // RETELL_LLM_ID is recorded immediately after creation, but the only reuse check used to be
@@ -1120,6 +1139,10 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
         ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
         ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
         general_prompt: agentPrompt,
+        // The recording disclosure, spoken verbatim before the caller can say anything. Fixed
+        // text rather than generated, because it is evidence — see lib/voice-consent.js.
+        start_speaker: 'agent',
+        begin_message: inboundOpeningLine(content.brand.name),
       }),
     });
     if (!llmRes.ok) fail(7, `Retell create-retell-llm returned ${llmRes.status}: ${await llmRes.text()}`);
@@ -1130,30 +1153,10 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     patchEnvLocal(clientDir, 'RETELL_LLM_ID', clientLlmId);
   }
 
-  // Structured fields Retell extracts after each call and includes in the
-  // call_ended webhook (under call_analysis.custom_analysis_data). The shared
-  // Make post-call scenario uses these to text the owner a brief. The generated
-  // prompt is what makes the agent actually collect name/callback/urgency.
-  const postCallAnalysisData = [
-    {
-      type: 'string',
-      name: 'caller_name',
-      description: "The caller's full name as they gave it. Empty string if never provided.",
-    },
-    {
-      type: 'string',
-      name: 'callback_number',
-      description:
-        'The best callback number the caller asked to be reached at, as spoken during the call (digits only). If none was spoken, use the number they called from.',
-    },
-    {
-      type: 'enum',
-      name: 'urgency',
-      choices: ['Immediate service', 'Callback requested', 'General inquiry'],
-      description:
-        'How urgent the call is. "Immediate service" for emergencies or safety/comfort-critical issues; "Callback requested" when they want the team to call back about real work; "General inquiry" for questions or non-urgent interest.',
-    },
-  ];
+  // Structured fields Retell extracts after each call (call_analysis.custom_analysis_data).
+  // Defined in lib/voice-consent.js, shared with scripts/update-agent-prompt.js, so a new agent
+  // and a backfilled one carry the identical schema the Make clone reads from.
+  const postCallAnalysisData = buildPostCallAnalysisData(content.brand.name);
 
   const res = await fetch('https://api.retellai.com/create-agent', {
     method: 'POST',
@@ -1435,57 +1438,7 @@ async function airtableFieldMap(baseId) {
   }
 }
 
-/**
- * The `Call Log` columns every client base gets.
- *
- * Module-level and exported so a test can compare this spec against a LIVE read of the Make
- * master's Airtable module. That comparison is the real contract: step 8c remaps the cloned
- * blueprint's record keys BY COLUMN NAME, so a name present on one side and not the other
- * silently drops that value from every logged call. Freezing a captured client base as a
- * fixture would only prove what one historical base looked like; checking this array proves
- * what the next client base will look like.
- *
- * The singleSelect choices are the master's literal values, not prettier labels. The master
- * maps `{{1.call.direction}}` straight into `Call type`, which Retell emits as
- * "inbound"/"outbound", and the module runs with `typecast: false`. Choices of
- * "Inbound"/"Outbound callback" therefore rejected the write as an invalid option and failed
- * the whole row — the casing has to match what Retell actually sends.
- */
-const CALL_LOG_FIELDS = [
-  { name: 'Date', type: 'dateTime', options: { dateFormat: { name: 'us' }, timeFormat: { name: '12hour' }, timeZone: 'client' } },
-  { name: 'Caller name', type: 'singleLineText' },
-  { name: 'Caller number', type: 'phoneNumber' },
-  { name: 'Summary', type: 'multilineText' },
-  { name: 'Duration (seconds)', type: 'number', options: { precision: 0 } },
-  {
-    name: 'Call type',
-    type: 'singleSelect',
-    options: { choices: [{ name: 'inbound' }, { name: 'outbound' }] },
-  },
-  { name: 'Email', type: 'email' },
-  { name: 'Address', type: 'singleLineText' },
-  { name: 'Recording URL', type: 'url' },
-  {
-    name: 'Priority',
-    type: 'singleSelect',
-    options: { choices: [{ name: 'emergency' }, { name: 'callback' }] },
-  },
-  // Nothing writes Outcome — the master scenario has no mapping for it. It exists for the
-  // owner to set by hand while triaging the log, which is why it keeps human-cased labels.
-  {
-    name: 'Outcome',
-    type: 'singleSelect',
-    options: {
-      choices: [
-        { name: 'Qualified' },
-        { name: 'Not qualified' },
-        { name: 'Follow-up needed' },
-        { name: 'No answer' },
-        { name: 'Voicemail' },
-      ],
-    },
-  },
-];
+// The Call Log columns live in lib/call-log-fields.js — one copy, shared with lib/repair-ops.js.
 
 async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
   const siteTags = intake.sites.map((_, i) => siteTagFor(baseSlug, intake, i));
@@ -2124,6 +2077,13 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
       checkBlueprintFieldsResolve({ blueprint: preview?.blueprint ?? null, clientMap: preview?.clientMap ?? null, siteTag }),
       checkBlueprintEventFilter({ blueprint: preview?.blueprint ?? null }),
       checkBlueprintNoDatastore({ blueprint: preview?.blueprint ?? null }),
+      // Falls back to the master: the patch rewrites record keys, never the {{1.call.…}}
+      // expressions, so the master answers this even before a client base exists to preview.
+      // (Memoized — no extra request.) Field NAMES only, which do not depend on the business name.
+      checkAnalysisCoversBlueprint({
+        blueprint: preview?.blueprint ?? (await resolveMasterResources())?.blueprint ?? null,
+        analysisData: buildPostCallAnalysisData(''),
+      }),
       checkAccountLaneSender({
         blueprint: preview?.blueprint ?? null,
         notificationNumber: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),

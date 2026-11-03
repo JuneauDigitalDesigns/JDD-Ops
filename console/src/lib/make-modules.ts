@@ -180,6 +180,14 @@ function airtableFields(ctx: ClientContext, site: SiteInfo): MakeField[] {
       help: 'emergency / callback — lowercase, same reason as Call type.',
     },
     {
+      label: 'SMS consent',
+      expr: {
+        raw: '{{1.call.call_analysis.custom_analysis_data.sms_consent}}',
+        lines: [[callVar('call_analysis.custom_analysis_data.sms_consent')]],
+      },
+      help: 'granted / declined / unknown — the caller’s answer to the closing SMS question. Lowercase, same reason as Call type. The portal reads this to decide whether the business may text them.',
+    },
+    {
       label: 'Outcome',
       unmapped: '— leave unmapped —',
       help: 'Nothing writes Outcome. It exists for the owner to set by hand while triaging.',

@@ -34,7 +34,9 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
 
-import { patchPostCallBlueprint, airtableFieldMap } from '../onboard.js';
+import { patchPostCallBlueprint, airtableFieldMap, CALL_LOG_FIELDS } from '../onboard.js';
+import { checkAnalysisCoversBlueprint } from '../lib/onboard-checks.js';
+import { buildPostCallAnalysisData } from '../lib/voice-consent.js';
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
 
@@ -49,12 +51,9 @@ const problems = [];
 const note = (m) => console.log(m);
 const bad = (m) => { problems.push(m); console.error(`  ✗ ${m}`); };
 
-// The columns createAirtableBase creates today. Kept here so the verifier can run with no
-// client base at all and still catch a master/onboard.js schema divergence.
-const EXPECTED_COLUMNS = [
-  'Date', 'Caller name', 'Caller number', 'Summary', 'Duration (seconds)',
-  'Call type', 'Email', 'Address', 'Recording URL', 'Priority', 'Outcome',
-];
+// The columns createAirtableBase creates today — read from the shared spec, not restated, so the
+// verifier cannot pass against a column list onboard.js no longer creates.
+const EXPECTED_COLUMNS = CALL_LOG_FIELDS.map((f) => f.name);
 
 async function main() {
   const apiKey = process.env.MAKE_API_KEY;
@@ -185,6 +184,12 @@ async function main() {
   } else {
     bad(`Airtable module has no call_analyzed filter (${guard}) — every Retell event would log a row.`);
   }
+
+  // Every custom_analysis_data field the scenario reads must be one the agent extracts, or that
+  // cell is blank on every call. Same predicate the dry run and the suite use.
+  const analysis = checkAnalysisCoversBlueprint({ blueprint, analysisData: buildPostCallAnalysisData('') });
+  if (analysis.ok) note(`  ✓ ${analysis.detail}`);
+  else bad(analysis.detail);
 
   console.log('\nPatched Twilio module:');
   if (patchedTwilio?.mapper?.from !== '+15005550006' || patchedTwilio?.mapper?.to !== '+15005550009') {

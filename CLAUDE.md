@@ -229,8 +229,11 @@ answers FAQs from intake, defers prices to owner, never invents facts.
 engine, `general_prompt` passed to `create-agent`/`update-agent` is ignored — so
 onboard.js creates a per-client LLM (cloning `RETELL_LLM_ID`'s model+tools) with
 the prompt and binds the agent to it; the per-client LLM id is saved as
-`RETELL_LLM_ID` in the client `.env.local`. `npm run update-prompt` edits that LLM
-(`update-retell-llm`), not the agent. Note: Retell blocks changing an agent's
+`RETELL_LLM_ID` in the client `.env.local`. `npm run update-prompt -- --slug {slug}` edits that
+LLM (`update-retell-llm`: prompt + the fixed `begin_message` recording disclosure) **and** the
+agent's `post_call_analysis_data` in one command, so a prompt that asks for SMS consent never
+runs on an agent with no field to record it. It refuses a prompt missing the approved consent
+ask; `--prompt-only` keeps the old prompt-alone behaviour. Note: Retell blocks changing an agent's
 `response_engine` once it has multiple versions — re-point at provision time, not
 after.
 
@@ -239,8 +242,18 @@ after.
 Base name: `{brand.name} — Calls`
 Table: `Call Log`
 Fields: Date, Caller name, Caller number, Summary, Duration (seconds),
-Call type, Email, Address, Recording URL, Priority, Outcome
-(+ `Site` for enterprise).
+Call type, Email, Address, Recording URL, Priority, SMS consent, Outcome
+(+ `Site` for enterprise). The list lives once, in `lib/call-log-fields.js`; `onboard.js` and
+`lib/repair-ops.js` both import it. Never copy it — the repair copy once drifted to 7 columns.
+
+**`SMS consent` is the caller's spoken answer to the closing SMS question** —
+`custom_analysis_data.sms_consent`, `granted`/`declined`/`unknown`, lowercase. `unknown` blocks
+and `declined` is sticky. The wording, the opening recording disclosure and the analysis schema
+all live in `lib/voice-consent.js`, word-for-word as the operator approved them on 2026-11-02;
+don't reword them without sign-off. Every `custom_analysis_data.*` the master reads must be
+extracted by the agent (`checkAnalysisCoversBlueprint`): Email, Address and Priority were blank
+on every call until that was true. The master's mapping for this column was a deliberate,
+approved edit (2026-11-02), not provisioning drift.
 
 **This column list is a contract with the Make master scenario, not a preference.** Step 8c
 remaps the cloned blueprint's Airtable module by **column name** (master field id → name →
