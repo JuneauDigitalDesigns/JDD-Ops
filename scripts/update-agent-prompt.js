@@ -36,7 +36,7 @@ import 'dotenv/config';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk } from '../lib/voice-consent.js';
+import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
 import { setRetellAgentConfig } from '../lib/repair-ops.js';
 import { checkPromptHasConsentAsk } from '../lib/onboard-checks.js';
 
@@ -123,7 +123,8 @@ async function main() {
     const schema = await setRetellAgentConfig({
       apiKey,
       agentId,
-      patch: { post_call_analysis_data: buildPostCallAnalysisData(business) },
+      // The voicemail hang-up rides along: an agent provisioned before it talks to voicemail.
+      patch: { post_call_analysis_data: buildPostCallAnalysisData(business), voicemail_option: VOICEMAIL_OPTION },
     });
     if (!schema.ok) fail(`Agent ${agentId} post_call_analysis_data not updated: ${schema.reason}`);
     const before = (schema.before?.post_call_analysis_data ?? []).map((f) => f?.name).join(', ') || '(none)';

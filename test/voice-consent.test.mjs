@@ -226,3 +226,34 @@ test('the callback route sends the approved outbound opening line, word for word
   assert.ok(src.includes("'Is now a good time?'"));
   assert.match(src, /agent_override:\s*\{\s*retell_llm:\s*\{\s*begin_message:\s*outboundOpeningLine\(/);
 });
+
+/* ── voicemail: hang up, leave nothing (2026-11-03) ──────────────────────── */
+
+test('every agent is told to hang up on voicemail', async () => {
+  // The growth fixture's agent had no voicemail_option, so Retell never detected voicemail and
+  // the agent talked to the lead's voicemail for 48 seconds on an unanswered callback.
+  const { VOICEMAIL_OPTION } = await import('../lib/voice-consent.js');
+  assert.deepEqual(VOICEMAIL_OPTION, { action: { type: 'hangup' } });
+  const onboard = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  const createAgent = onboard.slice(onboard.indexOf("'https://api.retellai.com/create-agent'"));
+  assert.match(createAgent.slice(0, 1500), /voicemail_option: VOICEMAIL_OPTION/, 'create-agent must set voicemail_option');
+});
+
+test('the backfill pushes the voicemail hang-up with the analysis schema', () => {
+  const script = readFileSync(resolve(ROOT, 'scripts/update-agent-prompt.js'), 'utf8');
+  assert.match(script, /patch: \{ post_call_analysis_data: buildPostCallAnalysisData\(business\), voicemail_option: VOICEMAIL_OPTION \}/);
+});
+
+test('the repair allow-list accepts voicemail_option (and still refuses anything else)', async () => {
+  const { setRetellAgentConfig } = await import('../lib/repair-ops.js');
+  const res = await setRetellAgentConfig({ apiKey: 'k', agentId: 'a', patch: { voicemail_option: { action: { type: 'hangup' } }, general_prompt: 'x' } });
+  assert.equal(res.ok, false);
+  assert.match(res.reason, /Not settable from here: general_prompt$/, 'voicemail_option must not be the refused key');
+});
+
+test('no prompt instruction tells the agent to leave a voicemail on a callback', () => {
+  const onboard = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  assert.doesNotMatch(onboard, /leaving a short friendly voicemail/);
+  assert.doesNotMatch(voiceConsentInstructions('Acme'), /leave the short voicemail/);
+  assert.match(voiceConsentInstructions('Acme'), /leave NO message — hang up/);
+});
