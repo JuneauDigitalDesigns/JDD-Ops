@@ -74,9 +74,10 @@
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
   ✓ analysis.coversBlueprint — all 5 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority
+  ✓ blueprint.selectsTotal — all 3 singleSelect mapping(s) can only emit a valid choice
   ? post-call brief sends from the JDD notification number — no credentials to resolve the blueprint, or nothing provisioned yet
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  4 passed, 1 failed, 7 not checked
+  5 passed, 1 failed, 7 not checked
 
 [step 14] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Plumbing Co." && git push origin main
