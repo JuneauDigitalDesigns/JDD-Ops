@@ -47,6 +47,7 @@
               "fld2smPri8IPvoNwh": "{{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}",
               "fld3xCSY4BXXEkdMM": "{{1.call.call_analysis.custom_analysis_data.caller_address}}",
               "fld7GZx09e7dnHNIU": "{{1.call.call_analysis.custom_analysis_data.caller_email}}",
+              "fld7ZxMBb9uT1Lxsd": "{{1.call.call_analysis.custom_analysis_data.sms_consent}}",
               "fld8sG3TSj5Va42yI": "{{parseDate(1.call.start_timestamp; \"x\")}}",
               "fld9ONpSErMn97LP6": "{{1.call.call_analysis.call_summary}}",
               "fldMGK569tnD647g2": "{{1.call.call_analysis.custom_analysis_data.caller_name}}",
@@ -106,12 +107,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-08-28T20:18:20.308Z",
+    "last_edit": "2026-11-03T00:35:32.877Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
     "idSequence": 10,
-    "version": 38
+    "version": 39
   }
 }

@@ -21,7 +21,7 @@
       "airtable",
       "twilio"
     ],
-    "lastEdit": "2026-08-28T20:18:20.308Z",
+    "lastEdit": "2026-11-03T00:35:32.877Z",
     "scheduling": {
       "type": "immediately",
       "maximum_runs_per_minute": 100

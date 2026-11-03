@@ -78,9 +78,10 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
+  ✓ analysis.coversBlueprint — all 5 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority
   ? post-call brief sends from the JDD notification number — no credentials to resolve the blueprint, or nothing provisioned yet
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  3 passed, 1 failed, 7 not checked
+  4 passed, 1 failed, 7 not checked
 
 [step 14 site 1/2] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Mechanical Orlando" && git push origin main
@@ -158,9 +159,10 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
+  ✓ analysis.coversBlueprint — all 5 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority
   ? post-call brief sends from the JDD notification number — no credentials to resolve the blueprint, or nothing provisioned yet
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  3 passed, 1 failed, 7 not checked
+  4 passed, 1 failed, 7 not checked
 
 [step 29 site 2/2] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Mechanical Tampa" && git push origin main
