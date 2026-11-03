@@ -6,9 +6,9 @@
 // runbook-content.ts — put the field list in two places and guaranteed they would drift.
 //
 // WHY THIS EXISTS AT ALL: onboard.js clones the master post-call scenario per client, but the
-// clone carries the master's module settings. Until someone points the Airtable module at this
-// client's base and the Twilio module at this client's number, the scenario is wired to
-// someone else's resources. Nothing errors — the calls just land in the wrong log.
+// clone carries the master's module settings. Until the Airtable module points at this client's
+// base and the HTTP module carries this client's ingest token, the scenario is wired to someone
+// else's resources. Nothing errors — the calls just land in the wrong log, or brief nobody.
 //
 // The column list below is a CONTRACT with the master scenario, not a preference. A column the
 // master writes that `createAirtableBase` doesn't create is silently dropped from every logged
@@ -56,7 +56,7 @@ export interface MakeField {
 }
 
 export interface MakeModule {
-  app: 'airtable' | 'twilio';
+  app: 'airtable' | 'http';
   title: string;
   subtitle: string;
   /** The module's number on the Make canvas — 8 and 10 in the master's layout. */
@@ -66,18 +66,19 @@ export interface MakeModule {
 }
 
 const v = (t: string): MakeToken => ({ k: 'var', t });
-const vl = (t: string): MakeToken => ({ k: 'varlt', t });
 const fn = (t: string): MakeToken => ({ k: 'fn', t });
 const op = (t: string): MakeToken => ({ k: 'op', t });
 const lit = (t: string): MakeToken => ({ k: 'lit', t });
-const txt = (t: string): MakeToken => ({ k: 'txt', t });
-const nl = (): MakeToken => ({ k: 'nl', t: 'newline' });
 
 /** `1. call: a: b` — how Make prints a resolved path chip. */
 const callVar = (path: string) => v(`1. call: ${path.split('.').join(': ')}`);
 
 export const AIRTABLE_BLUE = '#2d7ff9';
-export const TWILIO_RED = '#f22f46';
+/** Make's HTTP app colour. */
+export const HTTP_BLUE = '#1f6feb';
+
+/** Where every clone's HTTP module posts the owner brief — the recorded master's URL. */
+export const AGENCY_CALL_URL = 'https://www.juneaudigitaldesigns.com/api/ingest/call';
 
 /**
  * The ten mapped Call Log columns, plus the one that must stay empty.
@@ -173,11 +174,31 @@ function airtableFields(ctx: ClientContext, site: SiteInfo): MakeField[] {
     },
     {
       label: 'Priority',
+      // Never the bare field: Retell sends "" when it could not fill it, Airtable rejects "" as a
+      // new select option, and the whole row is lost (2026-11-03). Pinned equal to
+      // SELECT_MAPPINGS in jdd-ops/lib/voice-consent.js by test/voice-consent.test.mjs.
       expr: {
-        raw: '{{1.call.call_analysis.custom_analysis_data.caller_priority}}',
-        lines: [[callVar('call_analysis.custom_analysis_data.caller_priority')]],
+        raw: '{{if(1.call.call_analysis.custom_analysis_data.caller_priority = "emergency"; "emergency"; "callback")}}',
+        lines: [[
+          fn('if('), callVar('call_analysis.custom_analysis_data.caller_priority'), op('='), lit('emergency'), fn(';'),
+          lit('emergency'), fn(';'), lit('callback'), fn(')'),
+        ]],
       },
-      help: 'emergency / callback — lowercase, same reason as Call type.',
+      help: 'emergency / callback — lowercase, same reason as Call type. Wrapped in if() so a blank extraction becomes “callback” instead of failing the whole row.',
+      warn: true,
+    },
+    {
+      label: 'SMS consent',
+      expr: {
+        raw: '{{if(1.call.call_analysis.custom_analysis_data.sms_consent = "granted"; "granted"; if(1.call.call_analysis.custom_analysis_data.sms_consent = "declined"; "declined"; "unknown"))}}',
+        lines: [
+          [fn('if('), callVar('call_analysis.custom_analysis_data.sms_consent'), op('='), lit('granted'), fn(';'), lit('granted'), fn(';')],
+          [fn('if('), callVar('call_analysis.custom_analysis_data.sms_consent'), op('='), lit('declined'), fn(';'), lit('declined'), fn(';')],
+          [lit('unknown'), fn('))')],
+        ],
+      },
+      help: 'granted / declined / unknown — the caller’s answer to the closing SMS question. Anything else, including a blank, becomes “unknown”, which blocks texting. Lowercase, same reason as Call type.',
+      warn: true,
     },
     {
       label: 'Outcome',
@@ -196,74 +217,70 @@ function airtableFields(ctx: ClientContext, site: SiteInfo): MakeField[] {
 }
 
 /**
- * The Twilio module as `patchPostCallBlueprint` writes it into the clone.
+ * The HTTP module as `patchPostCallBlueprint` writes it into the clone: the owner's end-of-call
+ * brief, handed to the agency.
  *
- * `from` is the ACCOUNT-lane sender, TWILIO_NOTIFICATION_NUMBER — one JDD number, identical in
- * every clone — never this client's TWILIO_NUMBER (onboard.js commit 30acaf3). The brief goes to
- * the business owner, so it rides JDD's own campaign; a client number used for it would be stuck
- * in JDD's Messaging Service and could never join the client's own campaign later. Shown as the
- * key name, not the value: the number is agency-wide and Part A's context card carries it.
+ * It replaced a Twilio module (2026-11-03). That module's `to`, `from` and very existence were
+ * stamped in at onboarding and never re-read, so an owner who opted in through the portal later
+ * was never texted. Now the clone posts the call to the agency's `/api/ingest/call`, which reads
+ * the owner's consent at send time and texts from JDD's notification number. There is nothing
+ * SMS-shaped left in the clone to get wrong.
  *
- * There is deliberately no MessagingServiceSid field. The master sends `fromType: phone`, and the
- * account's own history shows 10DLC delivering with `messaging_service_sid` null — pool
- * membership is what ties a sender to a campaign, not naming the service in the call.
- *
- * `to` is the number the owner ticked SMS consent beside at intake (`smsAlerts.phone`), NOT
- * CLIENT_FORWARD_PHONE: the line we forward calls to is not a number we have permission to text.
- * SiteInfo doesn't carry it, so it is described rather than shown.
+ * Every value here mirrors the RECORDED master module (jdd-ops test/fixtures/make/
+ * master-blueprint.json, module 10), which test/sms-lane-copy.test.mjs pins. The token is shown
+ * by key name only: it is this client's credential, and a copy button holding it would put it on
+ * the clipboard of anyone reading the runbook.
  */
-function twilioFields(_site: SiteInfo): MakeField[] {
-  const bodyRaw = [
-    'Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}',
-    '{{newline}}',
-    'Status:{{1.call.call_analysis.custom_analysis_data.caller_priority}}',
-    '{{newline}}',
-    'Phone: {{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}',
-    '{{newline}}',
-    'About: {{1.call.call_analysis.call_summary}}',
-  ].join('\n');
+function httpFields(): MakeField[] {
   return [
+    { label: 'Authentication type', required: true, select: { value: 'No authentication' }, help: 'The token goes in a header below, not here.' },
     {
-      label: 'Connection',
+      label: 'URL',
       required: true,
-      select: { value: 'JDD', add: true },
-      help: 'For more information on how to create a connection to Twilio, see the online Help.',
-    },
-    { label: 'Send a message from', required: true, select: { value: 'phone number', map: true } },
-    {
-      label: 'Phone number',
-      required: true,
-      select: { value: 'TWILIO_NOTIFICATION_NUMBER', emphasis: true, map: true },
-      help: 'From = JDD’s notification number (jdd-ops/.env), the same in every clone — NOT this client’s TWILIO_NUMBER. It is already in JDD’s approved campaign pool, so this client needs no SMS registration for the owner brief. If this clone shows the client’s own number, it was made before 2026-11-02: change it here.',
+      expr: { raw: AGENCY_CALL_URL, lines: [[lit(AGENCY_CALL_URL)]] },
+      help: 'www, not the bare domain — the apex 307-redirects and drops the Authorization header, so every brief would 401.',
       warn: true,
     },
+    { label: 'Method', required: true, select: { value: 'POST', emphasis: true }, help: 'The agency only accepts POST. The master’s module was first saved as GET.', warn: true },
+    { label: 'Headers', group: true },
     {
-      label: 'To',
-      required: true,
-      select: { value: 'Owner’s SMS-consent number', emphasis: true },
-      help: 'To = the number the owner ticked SMS consent beside at intake, in E.164. Not necessarily the forwarding line. No consent on file → onboard.js removes this whole module and the owner gets no brief.',
+      label: 'Authorization',
+      select: { value: 'Bearer <this site’s LEAD_INGEST_TOKEN>', emphasis: true },
+      help: 'onboard.js writes this site’s token in place of the master’s REPLACE_PER_CLIENT placeholder. Another site’s token would brief the wrong owner; the placeholder would 401 every call.',
       warn: true,
     },
-    { label: 'Message Body', required: true, select: { value: 'Create a Body', map: true } },
+    { label: 'Body content type', required: true, select: { value: 'application/x-www-form-urlencoded' }, help: 'Make encodes form values itself. A JSON body would be built by string interpolation and break on a quote in a caller’s name.' },
+    { label: 'Fields', group: true },
+    { label: 'call_id', expr: { raw: '{{1.call.call_id}}', lines: [[callVar('call_id')]] }, help: 'The agency texts once per call_id, so a Make retry never double-texts.' },
     {
-      label: 'Body',
-      required: true,
+      label: 'caller_name',
       expr: {
-        raw: bodyRaw,
-        lines: [
-          [txt('Name:'), callVar('call_analysis.custom_analysis_data.caller_name')],
-          [nl()],
-          [txt('Status:'), vl('1.call.call_analysis.custom_analysis_data.caller_priority')],
-          [nl()],
-          [
-            txt('Phone:'), fn('if('), callVar('direction'), op('='), lit('inbound'), fn(';'),
-            callVar('from_number'), fn(';'), callVar('to_number'), fn(')'),
-          ],
-          [nl()],
-          [txt('About:'), callVar('call_analysis.call_summary')],
-        ],
+        raw: '{{1.call.call_analysis.custom_analysis_data.caller_name}}',
+        lines: [[callVar('call_analysis.custom_analysis_data.caller_name')]],
       },
-      help: 'This is the master’s live body, reproduced as it is — not as it should be. JDD’s registered campaign samples wrap these four lines in a “Juneau Digital Designs call alert” first line and a “Reply STOP to opt out, HELP for help” last line; this body has neither. Status: also renders blank on every call (the agent never emits caller_priority). Both are open items with the operator; do not submit this as an A2P sample. The newline tokens are Make functions — copy the block whole rather than retyping it.',
+    },
+    {
+      label: 'caller_priority',
+      expr: {
+        raw: '{{1.call.call_analysis.custom_analysis_data.caller_priority}}',
+        lines: [[callVar('call_analysis.custom_analysis_data.caller_priority')]],
+      },
+    },
+    {
+      label: 'caller_number',
+      expr: {
+        raw: '{{if(1.call.direction = "inbound"; 1.call.from_number; 1.call.to_number)}}',
+        lines: [[
+          fn('if('), callVar('direction'), op('='), lit('inbound'), fn(';'),
+          callVar('from_number'), fn(';'), callVar('to_number'), fn(')'),
+        ]],
+      },
+    },
+    { label: 'Parse response', select: { value: 'No' } },
+    {
+      label: 'Evaluate all states as errors',
+      select: { value: 'No', emphasis: true },
+      help: 'Must stay No. A 429 or 503 that errors the run counts toward Make deactivating the scenario — and that stops the Airtable call log too.',
       warn: true,
     },
   ];
@@ -281,12 +298,12 @@ export function makeModulesForSite(ctx: ClientContext, site: SiteInfo): MakeModu
       fields: airtableFields(ctx, site),
     },
     {
-      app: 'twilio',
-      title: 'Twilio',
-      subtitle: 'Create a Message',
+      app: 'http',
+      title: 'HTTP',
+      subtitle: 'Make a request',
       number: 10,
-      accent: TWILIO_RED,
-      fields: twilioFields(site),
+      accent: HTTP_BLUE,
+      fields: httpFields(),
     },
   ];
 }

@@ -50,13 +50,12 @@
   [dry-run] would patch AIRTABLE_BASE_ID into <ROOT>/clients/fixture-growth/.env.local
 
 [step 11] Clone post-call Make scenario + wire Retell webhook
-  SMS alerts: ON → <E164> (consented 2026-10-20T15:00:00.000Z)
   [dry-run] would clone FROM master scenario 5315889 → new scenario "Post-call: Fixture Plumbing Co."
   [dry-run] would first create a gateway-webhook for this client (master's hook 2421720 stays with the master)
   [dry-run]   POST /scenarios/5315889/clone?organizationId=7633018 body { teamId: 2283785, states: false, hook: { 2421720: <new> } }
   [dry-run] would repoint Airtable module at base=<dry-run-base-id>, remapping its table + field ids by column name
   [dry-run] would REMOVE the vestigial datastore module, carrying its event filter forward
-  [dry-run] would patch Twilio from=<E164>, to=<E164>
+  [dry-run] would set the HTTP module's Authorization to this site's LEAD_INGEST_TOKEN (not printed), and drop any Twilio module
   [dry-run] would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent <dry-run-agent-id> webhook_url
 
 [step 12] Publish number on the site (was <PHONE>)
@@ -73,9 +72,12 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
-  ? post-call brief sends from the JDD notification number — no credentials to resolve the blueprint, or nothing provisioned yet
+  ✓ analysis.coversBlueprint — all 5 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority
+  ✓ blueprint.selectsTotal — all 3 singleSelect mapping(s) can only emit a valid choice
+  ✓ post-call scenario logs only connected calls — 16 call outcomes: connected calls logged, unanswered / voicemail callbacks dropped
+  ? post-call brief goes through the agency — no credentials to resolve the blueprint, or nothing provisioned yet
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  3 passed, 1 failed, 7 not checked
+  6 passed, 1 failed, 7 not checked
 
 [step 14] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Plumbing Co." && git push origin main

@@ -214,7 +214,7 @@ function callLoggingSetupStepsForSite(ctx: ClientContext, s: SiteInfo): Step[] {
             { text: `Open Make.com → this client’s cloned scenario “Post-call: ${s.brandName}”.` },
             { text: 'Airtable module: Base is this client’s own base and Table is “Call Log”.', detail: 'onboard.js sets both. If the run printed “Could not resolve Airtable schemas”, they still point at the master — set them by hand.' },
             { text: 'Each Call Log field matches the expression shown below — click any box to copy it.', detail: 'The column names are a contract with the master scenario. A column the master writes that this base does not have is dropped silently from every logged call; the run warns “Dropped unmapped Airtable column(s)” when that happens.' },
-            { text: 'Twilio module: From is JDD’s notification number (not this client’s) and To is the owner’s SMS-consent number.', detail: 'No SMS consent on file → onboard.js removed the Twilio module entirely, and that is correct. A clone made before 2026-11-02 still sends from the client’s own number; change From here.' },
+            { text: 'HTTP module: POST to the agency’s /api/ingest/call with Authorization = this site’s LEAD_INGEST_TOKEN — and no Twilio module anywhere in the clone.', detail: 'The agency texts the owner the brief, if they have opted in through the portal; Make no longer texts anyone. A clone made before 2026-11-03 may still have a Twilio module and no HTTP module: re-patch it rather than editing the Twilio module.' },
             { text: 'Confirm the scenario is Active.' },
           ],
         },
@@ -408,7 +408,7 @@ function callLoggingReviewStepsForSite(ctx: ClientContext, s: SiteInfo, config: 
               ? { text: `Trigger an AI-handled call: call ${twilio.value} and let it ring past ${ring}s so the AI answers.`, detail: 'Not the web form — Starter runs with LEAD_CALLBACK=off, so a submission lands in the portal inbox and no call is placed.' }
               : { text: `Trigger an AI-handled call: submit the form with your number (the agent calls you back), or call ${twilio.value} and let it ring past ${ring}s so the AI answers.`, detail: 'A form lead may also send the owner a “New lead from …” text at submit. Agency PR #30 drops that for callback leads, leaving the end-of-call brief as their only text; until it merges, two texts is expected.' },
             { text: 'Finish the call and hang up.' },
-            { text: 'Within ~30s confirm a new Airtable Call Log row AND a brief SMS to the owner’s SMS-consent number.', detail: 'That is the number the owner ticked consent beside at intake — not necessarily the line calls forward to. No consent on file means no SMS, by design: the clone has no Twilio module.' },
+            { text: 'Within ~30s confirm a new Airtable Call Log row AND a brief SMS to the owner.', detail: 'The agency sends it to the number the owner opted in with in the portal — not necessarily the line calls forward to. No opt-in on file means no SMS, by design; the call is still logged. A callback the lead did not answer (no answer, busy, voicemail) logs nothing and texts nobody — that is the rule, not a fault.' },
           ],
         },
         { t: 'copy', label: 'The owner’s brief arrives from', value: sender.value, pending: sender.pending },

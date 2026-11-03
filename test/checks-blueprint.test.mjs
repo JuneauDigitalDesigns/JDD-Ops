@@ -23,7 +23,9 @@ import { masterBlueprint, masterFieldMap } from './helpers/fixtures.mjs';
 const CLIENT_BASE = 'appCLIENTbase0001';
 
 /** Patch a copy of the recorded master the way step 8c does for one client. */
-function patched({ siteTag = null, smsEnabled = true, withSiteColumn = false } = {}) {
+const TOKEN = 'a'.repeat(64);
+
+function patched({ siteTag = null, ingestToken = TOKEN, withSiteColumn = false } = {}) {
   const bp = masterBlueprint();
   const masterMap = masterFieldMap();
   const spec = withSiteColumn
@@ -33,9 +35,7 @@ function patched({ siteTag = null, smsEnabled = true, withSiteColumn = false } =
   patchPostCallBlueprint(bp, {
     baseId: CLIENT_BASE,
     siteTag,
-    fromNum: '+15005550006',
-    toNum: smsEnabled ? '+15005550009' : '',
-    smsEnabled,
+    ingestToken,
     masterMap,
     clientMap,
     quiet: true,
@@ -118,20 +118,20 @@ test('the call_analyzed filter survives datastore removal', () => {
   );
 });
 
-test('Twilio from/to are applied when SMS consent is on file', () => {
-  const { bp } = patched({ smsEnabled: true });
-  const tw = bp.flow.find((m) => (m.module ?? '').startsWith('twilio'));
-  assert.ok(tw, 'the twilio module should survive when consent exists');
-  assert.equal(tw.mapper.from, '+15005550006');
-  assert.equal(tw.mapper.to, '+15005550009');
+test('the clone posts the owner brief to the agency with this site’s own token', () => {
+  const { bp } = patched();
+  const http = bp.flow.filter((m) => (m.module ?? '').startsWith('http'));
+  assert.equal(http.length, 1, 'one HTTP module, posting to /api/ingest/call');
+  const auth = http[0].mapper.headers.filter((h) => h.name.toLowerCase() === 'authorization');
+  assert.deepEqual(auth, [{ name: 'Authorization', value: `Bearer ${TOKEN}` }], 'the master placeholder must be replaced, not kept beside it');
+  assert.equal(bp.flow.filter((m) => (m.module ?? '').startsWith('twilio')).length, 0);
 });
 
-test('the Twilio module is removed entirely without consent', () => {
-  // Not left configured-but-empty: an unconfigured module errors on every run, and enough
-  // errors get the scenario auto-disabled — which takes the Airtable call log down with it.
-  const { bp } = patched({ smsEnabled: false });
-  assert.equal(bp.flow.filter((m) => (m.module ?? '').startsWith('twilio')).length, 0);
-  assert.ok(airtableOf(bp), 'removing Twilio must not disturb Airtable logging');
+test('a site with no ingest token gets no HTTP module, and Airtable logging is untouched', () => {
+  // A module that would 401 on every call is noise that looks wired; it comes out instead.
+  const { bp } = patched({ ingestToken: '' });
+  assert.equal(bp.flow.filter((m) => (m.module ?? '').startsWith('http')).length, 0);
+  assert.ok(airtableOf(bp), 'removing the HTTP module must not disturb Airtable logging');
 });
 
 test('the predicates agree with the patched result', () => {

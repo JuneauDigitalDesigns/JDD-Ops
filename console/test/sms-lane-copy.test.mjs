@@ -7,7 +7,9 @@
  *   1. After onboard.js moved the owner's post-call brief onto the JDD notification number
  *      (30acaf3), the Make replica still said "From = this client's TWILIO_NUMBER", and the
  *      per-client step told the operator to set it. Following it re-strands the client's number
- *      in JDD's Messaging Service — the exact thing that commit exists to stop.
+ *      in JDD's Messaging Service — the exact thing that commit exists to stop. Then the brief
+ *      left Make altogether (2026-11-03: an HTTP module posts the call to the agency), and the
+ *      replica described a Twilio module no clone has. It is now pinned to the RECORDED master.
  *   2. After Resend lead delivery was removed, the web-only checkpoint still told the operator
  *      to wait for a lead email, and Part A still asked for RESEND_API_KEY "for Starter lead
  *      emails". An operator waiting for an email that can never arrive concludes the form is
@@ -67,27 +69,41 @@ const growth = {
   sites: [site()],
 };
 
-const twilioModule = () => makeModulesForSite(growth, growth.sites[0]).find((m) => m.app === 'twilio');
+const TOKEN = 'b'.repeat(64);
+const modules = () => makeModulesForSite(growth, { ...growth.sites[0], env: { ...growth.sites[0].env, LEAD_INGEST_TOKEN: TOKEN } });
+const httpModule = () => modules().find((m) => m.app === 'http');
+const field = (label) => httpModule().fields.find((f) => f.label === label);
 
-/** The env key onboard.js reads for the sender it stamps onto every clone's Twilio module. */
-function onboardSenderKey() {
-  const keys = [...onboardSrc.matchAll(/fromNum\s*(?::|=)\s*\(process\.env\.([A-Z_]+)/g)].map((m) => m[1]);
-  assert.ok(keys.length >= 2, 'expected both patchPostCallBlueprint call sites to resolve fromNum from process.env');
-  const unique = new Set(keys);
-  assert.equal(unique.size, 1, `onboard.js call sites disagree on the sender: ${[...unique].join(', ')}`);
-  return keys[0];
-}
+/** The master's HTTP module as Make returned it — never a hand-written shape. */
+const recorded = JSON.parse(read(OPS_ROOT, 'test/fixtures/make/master-blueprint.json'))
+  .response.blueprint.flow.find((m) => (m.module ?? '').startsWith('http')).mapper;
 
-test('the Make replica’s From names the same env key onboard.js stamps on the clone', () => {
-  const from = twilioModule().fields.find((f) => f.label === 'Phone number');
-  assert.equal(from.select.value, onboardSenderKey());
-  assert.notEqual(from.select.value, growth.sites[0].env.TWILIO_NUMBER);
+test('the Make replica shows no Twilio module — the brief is sent by the agency now', () => {
+  assert.deepEqual(modules().map((m) => m.app), ['airtable', 'http']);
 });
 
-test('the Make replica does not offer the forwarding line as the SMS destination', () => {
-  // `to` is the owner's SMS-consent number. The forwarding line is not a number we have
-  // permission to text, and a copy button holding it invites pasting it into the clone.
-  assert.doesNotMatch(JSON.stringify(twilioModule().fields), /\+14075550000/);
+test('the HTTP replica matches the recorded master module', () => {
+  assert.equal(field('URL').expr.raw, recorded.url);
+  assert.equal(field('Method').select.value.toLowerCase(), recorded.method);
+  assert.equal(recorded.contentType, 'urlEncoded');
+  assert.match(field('Body content type').select.value, /x-www-form-urlencoded/);
+  for (const f of recorded.urlEncodedBodyContent) {
+    assert.equal(field(f.name)?.expr.raw, f.value, `replica field ${f.name}`);
+  }
+  assert.equal(recorded.stopOnHttpError, false);
+  assert.equal(field('Evaluate all states as errors').select.value, 'No');
+  assert.deepEqual(recorded.headers.map((h) => h.name), ['Authorization']);
+});
+
+test('the replica never shows a client’s ingest token — key name only', () => {
+  // It is a credential; a copy button holding it would put it on anyone's clipboard.
+  assert.doesNotMatch(JSON.stringify(modules()), new RegExp(TOKEN));
+  assert.match(field('Authorization').select.value, /LEAD_INGEST_TOKEN/);
+});
+
+test('onboard.js stamps the same token the replica names', () => {
+  assert.ok(onboardSrc.includes('const ingestToken = readEnvLocal(clientDir).LEAD_INGEST_TOKEN'));
+  assert.ok(onboardSrc.includes("{ name: 'Authorization', value: `Bearer ${ingestToken}` }"));
 });
 
 test('no runbook step tells the operator to set the clone’s From to the client’s number', () => {

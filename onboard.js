@@ -87,7 +87,11 @@ import {
   checkBlueprintFieldsResolve,
   checkBlueprintEventFilter,
   checkBlueprintNoDatastore,
-  checkAccountLaneSender,
+  checkAnalysisCoversBlueprint,
+  checkPromptHasConsentAsk,
+  checkSelectMappingsTotal,
+  checkOwnerBriefViaAgency,
+  checkConnectedCallsOnly,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
   checkNotMasterHook,
@@ -99,6 +103,16 @@ import { fetchWithRetry } from './lib/make-fetch.js';
 // stdout is narrated into the console UI and pasted into chats; nothing printed may carry a
 // credential. See lib/secrets.js for the run that printed two.
 import { redactUrlCredentials, gitAuthEnv } from './lib/secrets.js';
+// The spoken consent wording + post-call analysis schema, and the Call Log columns that record it.
+import {
+  buildPostCallAnalysisData,
+  inboundOpeningLine,
+  smsConsentAsk,
+  voiceConsentInstructions,
+} from './lib/voice-consent.js';
+import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
+// Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
+import { CALL_OUTCOME_CASES, shouldLog } from './lib/call-outcomes.js';
 
 // Hard ceiling on a single AI call, in milliseconds.
 //
@@ -997,19 +1011,21 @@ CORE SPEAKING RULES (write as direct instructions to the agent) — this is a vo
 - Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
 - Spoken-number formatting: read phone numbers back in natural grouped chunks ("four oh seven… five five five… one two one two"), say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
 
-GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name.
+GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it.
 
-QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time. Have the agent gauge and internally note the urgency as exactly one of: "Immediate service", "Callback requested", or "General inquiry" (this label is used downstream, so use those exact words).
+${voiceConsentInstructions(content.brand.name)}
+
+QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time.
 
 LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
 
 NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
 
-CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), and optionally email (never pressure).
+CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), the service address or town when the job is at a location, and optionally email (never pressure; if given, spell it back to confirm).
 
 ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
 
-CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up.
+CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye.
 
 EDGE CASES to cover: silence/no response; leaving a short friendly voicemail on outbound; an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
 
@@ -1032,6 +1048,12 @@ Keep everything warm, specific to this business, and grounded only in the provid
   const promptPath = resolve(clientDir, 'agent-prompt.txt');
   writeFileSync(promptPath, prompt, 'utf8');
   console.log(`  Wrote ${promptPath} (${prompt.length} chars)`);
+  // The consent ask is evidence, so a paraphrase is not good enough — refuse before an agent is
+  // built on it. The file is already written so the miss can be inspected; delete it to retry.
+  const askCheck = checkPromptHasConsentAsk({ prompt, ask: smsConsentAsk(content.brand.name) });
+  if (askCheck.ok === false) {
+    fail(6, `${askCheck.detail}. Delete ${promptPath} and re-run to regenerate.`);
+  }
   console.log(`  Review this before Checkpoint 2 — you will tune it on a test call`);
   return prompt;
 }
@@ -1081,7 +1103,8 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
   // Passing general_prompt to create-agent is silently ignored, which would make
   // every client share one LLM/prompt. So create a per-client LLM (cloning the
   // master template's model + tools) carrying this client's prompt, then bind the
-  // agent to it. The greeting is baked into agentPrompt, so no begin_message.
+  // agent to it. The LLM's begin_message is the fixed recording disclosure; the persona's own
+  // greeting follows it and is baked into agentPrompt.
   // Adopt a per-client LLM a previous interrupted run already created.
   //
   // RETELL_LLM_ID is recorded immediately after creation, but the only reuse check used to be
@@ -1120,6 +1143,10 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
         ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
         ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
         general_prompt: agentPrompt,
+        // The recording disclosure, spoken verbatim before the caller can say anything. Fixed
+        // text rather than generated, because it is evidence — see lib/voice-consent.js.
+        start_speaker: 'agent',
+        begin_message: inboundOpeningLine(content.brand.name),
       }),
     });
     if (!llmRes.ok) fail(7, `Retell create-retell-llm returned ${llmRes.status}: ${await llmRes.text()}`);
@@ -1130,30 +1157,10 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     patchEnvLocal(clientDir, 'RETELL_LLM_ID', clientLlmId);
   }
 
-  // Structured fields Retell extracts after each call and includes in the
-  // call_ended webhook (under call_analysis.custom_analysis_data). The shared
-  // Make post-call scenario uses these to text the owner a brief. The generated
-  // prompt is what makes the agent actually collect name/callback/urgency.
-  const postCallAnalysisData = [
-    {
-      type: 'string',
-      name: 'caller_name',
-      description: "The caller's full name as they gave it. Empty string if never provided.",
-    },
-    {
-      type: 'string',
-      name: 'callback_number',
-      description:
-        'The best callback number the caller asked to be reached at, as spoken during the call (digits only). If none was spoken, use the number they called from.',
-    },
-    {
-      type: 'enum',
-      name: 'urgency',
-      choices: ['Immediate service', 'Callback requested', 'General inquiry'],
-      description:
-        'How urgent the call is. "Immediate service" for emergencies or safety/comfort-critical issues; "Callback requested" when they want the team to call back about real work; "General inquiry" for questions or non-urgent interest.',
-    },
-  ];
+  // Structured fields Retell extracts after each call (call_analysis.custom_analysis_data).
+  // Defined in lib/voice-consent.js, shared with scripts/update-agent-prompt.js, so a new agent
+  // and a backfilled one carry the identical schema the Make clone reads from.
+  const postCallAnalysisData = buildPostCallAnalysisData(content.brand.name);
 
   const res = await fetch('https://api.retellai.com/create-agent', {
     method: 'POST',
@@ -1435,57 +1442,7 @@ async function airtableFieldMap(baseId) {
   }
 }
 
-/**
- * The `Call Log` columns every client base gets.
- *
- * Module-level and exported so a test can compare this spec against a LIVE read of the Make
- * master's Airtable module. That comparison is the real contract: step 8c remaps the cloned
- * blueprint's record keys BY COLUMN NAME, so a name present on one side and not the other
- * silently drops that value from every logged call. Freezing a captured client base as a
- * fixture would only prove what one historical base looked like; checking this array proves
- * what the next client base will look like.
- *
- * The singleSelect choices are the master's literal values, not prettier labels. The master
- * maps `{{1.call.direction}}` straight into `Call type`, which Retell emits as
- * "inbound"/"outbound", and the module runs with `typecast: false`. Choices of
- * "Inbound"/"Outbound callback" therefore rejected the write as an invalid option and failed
- * the whole row — the casing has to match what Retell actually sends.
- */
-const CALL_LOG_FIELDS = [
-  { name: 'Date', type: 'dateTime', options: { dateFormat: { name: 'us' }, timeFormat: { name: '12hour' }, timeZone: 'client' } },
-  { name: 'Caller name', type: 'singleLineText' },
-  { name: 'Caller number', type: 'phoneNumber' },
-  { name: 'Summary', type: 'multilineText' },
-  { name: 'Duration (seconds)', type: 'number', options: { precision: 0 } },
-  {
-    name: 'Call type',
-    type: 'singleSelect',
-    options: { choices: [{ name: 'inbound' }, { name: 'outbound' }] },
-  },
-  { name: 'Email', type: 'email' },
-  { name: 'Address', type: 'singleLineText' },
-  { name: 'Recording URL', type: 'url' },
-  {
-    name: 'Priority',
-    type: 'singleSelect',
-    options: { choices: [{ name: 'emergency' }, { name: 'callback' }] },
-  },
-  // Nothing writes Outcome — the master scenario has no mapping for it. It exists for the
-  // owner to set by hand while triaging the log, which is why it keeps human-cased labels.
-  {
-    name: 'Outcome',
-    type: 'singleSelect',
-    options: {
-      choices: [
-        { name: 'Qualified' },
-        { name: 'Not qualified' },
-        { name: 'Follow-up needed' },
-        { name: 'No answer' },
-        { name: 'Voicemail' },
-      ],
-    },
-  },
-];
+// The Call Log columns live in lib/call-log-fields.js — one copy, shared with lib/repair-ops.js.
 
 async function createAirtableBase(intake, primaryContent, clientDir, baseSlug) {
   const siteTags = intake.sites.map((_, i) => siteTagFor(baseSlug, intake, i));
@@ -1577,7 +1534,7 @@ export function isScenarioAlreadyRunning(status, body) {
   return status === 422 && /"code"\s*:\s*"IM306"/.test(String(body ?? ''));
 }
 
-async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag, smsAlerts) {
+async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag) {
   log(8, `Clone post-call Make scenario + wire Retell webhook`);
 
   const existing = readEnvLocal(clientDir).RETELL_POST_CALL_WEBHOOK_URL;
@@ -1588,39 +1545,28 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
 
   const apiKey   = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
-  // The owner brief sends from the ACCOUNT-lane number: a JDD-owned sender on JDD's own
-  // approved ACCOUNT_NOTIFICATION campaign, never from this client's number.
+  // The owner's end-of-call text is NOT sent by Make. The clone's HTTP module posts the call to
+  // the agency's /api/ingest/call, which reads the owner's SMS consent at send time and texts
+  // from the JDD notification number. It used to be a Twilio module whose `to`, `from` and very
+  // existence were decided here, at onboarding, and never re-read — so an owner who opted in
+  // through the portal afterwards was never texted (the growth fixture's clone had no Twilio
+  // module at all on 2026-11-03), and one who revoked kept being texted.
   //
-  // This was `readEnvLocal(clientDir).TWILIO_NUMBER`, which delivers today — onboard.js puts
-  // every client number in the master pool, and pool membership is what registers a number
-  // with a campaign (the account's own history shows one number going 30034 -> delivered when
-  // the campaign was approved, with messaging_service_sid null throughout). It is wrong
-  // anyway: a campaign binds to a Messaging Service and a number sits in exactly one, so a
-  // client number used for owner alerts can never join that client's own CUSTOMER_CARE
-  // service later. It also breaks outright the moment client numbers stop joining the master
-  // pool, which is the point of the two-lane migration.
-  //
-  // Patching the master blueprint cannot fix this: patchPostCallBlueprint stamps `from` onto
-  // every clone, so the value has to be right here.
-  const fromNum  = (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim();
-
-  // The SMS destination now comes from the owner's recorded consent, not from
-  // content.brand.phone. brand.phone is the number printed on the client's website — a
-  // front desk, a shared line, sometimes a landline — and nobody ever agreed to receive
-  // texts there. smsAlerts.phone is the number the owner typed beside a checkbox they
-  // ticked, which is the only number we have permission to text.
-  const smsEnabled = smsAlerts?.consented === true && Boolean(smsAlerts?.phone);
-  const toNum      = smsEnabled ? (toE164(smsAlerts.phone) ?? '') : '';
-
-  if (smsEnabled) {
-    console.log(`  SMS alerts: ON → ${toNum} (consented ${smsAlerts.consentedAt ?? 'unknown'})`);
-  } else {
-    console.log(`  SMS alerts: OFF (no consent on file) — Twilio module will be removed from the clone`);
+  // The module authenticates with this site's own LEAD_INGEST_TOKEN, the one /api/contact
+  // already uses, so the agency resolves the account from the token and a clone can only ever
+  // brief its own owner. It is a credential: it goes into the clone and is never printed.
+  const ingestToken = readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '';
+  if (ingestToken) {
+    console.log(`  Owner brief: posted to the agency, authenticated with this site's LEAD_INGEST_TOKEN`);
+  } else if (!DRY_RUN) {
+    // A dry run writes no .env.local, so a fresh client has no token on disk yet — step 5 of a
+    // real run mints it before this. Warning there would describe a run that cannot happen.
+    console.warn(`  ⚠ No LEAD_INGEST_TOKEN in ${basename(clientDir)}/.env.local — the HTTP module is removed and the owner gets no end-of-call text.`);
   }
 
   if (!apiKey || !masterId) {
     console.warn(`  ⚠ MAKE_API_KEY or MAKE_POST_CALL_MASTER_SCENARIO_ID not set — skipping post-call clone.`);
-    console.warn(`    Clone by hand: base=${baseId}, from=${fromNum}, to=${toNum || '(no SMS — remove the Twilio module)'}, agent=${agentId}`);
+    console.warn(`    Clone by hand: base=${baseId}, agent=${agentId}, HTTP module header = this site's LEAD_INGEST_TOKEN`);
     return null;
   }
   if (DRY_RUN) {
@@ -1652,9 +1598,7 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
     dryLog(`would repoint Airtable module at base=${baseId}, remapping its table + field ids by column name`);
     if (siteTag) dryLog(`  + Site="${siteTag}" written into mapper.record (not as a top-level mapper key)`);
     dryLog(`would REMOVE the vestigial datastore module, carrying its event filter forward`);
-    dryLog(smsEnabled
-      ? `would patch Twilio from=${fromNum}, to=${toNum}`
-      : `would REMOVE the Twilio module (no SMS consent on file)`);
+    dryLog(`would set the HTTP module's Authorization to this site's LEAD_INGEST_TOKEN (not printed), and drop any Twilio module`);
     dryLog(`would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent ${agentId} webhook_url`);
     return null;
   }
@@ -1778,7 +1722,7 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   ]);
 
   patchPostCallBlueprint(blueprint, {
-    baseId, siteTag, fromNum, toNum, smsEnabled, masterMap, clientMap,
+    baseId, siteTag, ingestToken, masterMap, clientMap,
   }); // mutates in place
 
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}`, {
@@ -1836,19 +1780,22 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   return webhookUrl;
 }
 
-// Rewrites the cloned blueprint's Airtable + Twilio modules for this client.
+// Rewrites the cloned blueprint's Airtable + HTTP modules for this client.
 // Modules are matched by app name so it survives module-id changes on clone.
 //
 // Mapper key shapes below were confirmed against a live GET of the master blueprint:
 //   airtable:ActionCreateRecord → { base, table, record: { <fldId>: <expr> }, typecast, useColumnId }
-//   twilio:SendSMS              → { to, from, fromType, body, messageBody }
+//   http:MakeRequest (v4)       → { url, method, headers: [{ name, value }], contentType: "urlEncoded",
+//                                   urlEncodedBodyContent: [{ name, value }], stopOnHttpError, … }
+// The HTTP module was built in the Make UI and recorded (2026-11-03), never written from memory:
+// with nothing filled in it saves with NO mapper at all, which is how a guessed shape would fail.
 // Note that Airtable column values live inside `record`, keyed by field id — NOT as
 // top-level mapper keys. An earlier version set `mapper.Site`, a key the module does not
 // read, so the enterprise per-site tag was never written and the portal (which filters on
 // `row.Site === site.slug`) showed no calls at all for a multi-site client.
 function patchPostCallBlueprint(
   blueprint,
-  { baseId, siteTag, fromNum, toNum, smsEnabled, masterMap, clientMap, quiet = false },
+  { baseId, siteTag, ingestToken, masterMap, clientMap, quiet = false },
 ) {
   // `quiet` is for the dry-run preview, which patches a throwaway copy purely to inspect it.
   // Announcing "Removed 1 datastore module(s) from the clone" when no clone exists would be
@@ -1894,10 +1841,14 @@ function patchPostCallBlueprint(
         warn(`    Fix the Airtable module by hand in the clone, or post-call rows will not be written.`);
       }
     }
-    if (app.startsWith('twilio') && smsEnabled) {
+    // The owner brief: the master carries a placeholder Authorization header, and each clone
+    // gets its own site's token. Any existing Authorization is replaced rather than appended, so
+    // the master's placeholder never rides along beside the real one.
+    if (app.startsWith('http') && ingestToken) {
       mod.mapper = mod.mapper ?? {};
-      mod.mapper.from = fromNum;
-      mod.mapper.to = toNum;
+      const others = (Array.isArray(mod.mapper.headers) ? mod.mapper.headers : [])
+        .filter((h) => String(h?.name ?? '').toLowerCase() !== 'authorization');
+      mod.mapper.headers = [...others, { name: 'Authorization', value: `Bearer ${ingestToken}` }];
     }
   }
 
@@ -1940,15 +1891,21 @@ function patchPostCallBlueprint(
     }
   }
 
-  // No consent means the module comes out of the flow entirely, rather than being left
-  // with an empty `to`. An unconfigured module errors on every run, and enough errors get
-  // a Make scenario auto-disabled — which would take the Airtable call log down with it.
-  // Removing it leaves a scenario that logs calls correctly and simply never texts.
-  if (!smsEnabled && Array.isArray(blueprint?.flow)) {
+  // Make never texts the owner itself any more — the agency does, at send time, from the
+  // owner's CURRENT consent. A Twilio module left in a clone (a master edited back, or a clone
+  // re-patched from an old blueprint) would text them a second time, under consent decided at
+  // onboarding. And an HTTP module with no token would 401 on every call, so it comes out too,
+  // loudly, rather than looking wired.
+  if (Array.isArray(blueprint?.flow)) {
     const before = blueprint.flow.length;
     blueprint.flow = blueprint.flow.filter((m) => !(m.module ?? '').startsWith('twilio'));
-    const removed = before - blueprint.flow.length;
-    if (removed > 0) say(`  Removed ${removed} Twilio module(s) from the clone (no SMS consent)`);
+    const twilioRemoved = before - blueprint.flow.length;
+    if (twilioRemoved > 0) say(`  Removed ${twilioRemoved} Twilio module(s) — the owner brief is sent by the agency, not Make`);
+    if (!ingestToken) {
+      const n = blueprint.flow.length;
+      blueprint.flow = blueprint.flow.filter((m) => !(m.module ?? '').startsWith('http'));
+      if (blueprint.flow.length < n) warn(`  ⚠ Removed the HTTP module — no LEAD_INGEST_TOKEN, so the owner gets no end-of-call text.`);
+    }
   }
 }
 
@@ -2060,7 +2017,7 @@ async function resolveMasterResources() {
  * checks surface as `?` rather than as a pass — CI has no secrets and must not read as
  * "verified".
  */
-async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir }) {
+async function previewPostCallBlueprint({ baseId, siteTag, clientDir }) {
   if (!baseId) return null;
   const master = await resolveMasterResources();
   if (!master) return null;
@@ -2072,19 +2029,15 @@ async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir 
   ]);
   if (!masterMap || !clientMap) return { blueprint: null, masterBaseId, masterHookUrl, masterMap, clientMap };
 
-  const smsEnabled = smsAlerts?.consented === true && Boolean(smsAlerts?.phone);
   // Deep copy: the memoized blueprint is shared across sites, so patching it in place would
   // leak one site's base and Site tag into the next site's preview.
   const copy = JSON.parse(JSON.stringify(master.blueprint));
   patchPostCallBlueprint(copy, {
     baseId,
     siteTag,
-    // The same Account-lane sender the live clone uses — see the note at its definition. A
-    // preview showing the client number while the run writes the notification number would
-    // make the dry run bless something different from what provisions.
-    fromNum: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
-    toNum: smsEnabled ? (toE164(smsAlerts?.phone) ?? '') : '',
-    smsEnabled,
+    // The same token the live clone gets, so the check below judges what a real run would write.
+    // It never leaves this process: the check reports whether it matches, not what it is.
+    ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
     masterMap,
     clientMap,
     quiet: true,
@@ -2099,7 +2052,7 @@ async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir 
  * we already know is misconfigured) but only reported on a dry run, whose job is to list
  * everything wrong rather than stop at the first thing.
  */
-async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, phoneSwap, baseId, siteTag, smsAlerts, clientDir }) {
+async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, phoneSwap, baseId, siteTag, clientDir }) {
   log(8, `Correctness checks`);
 
   const checks = [
@@ -2111,7 +2064,7 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
 
   // Vendor-facing checks. Skipped wholesale for a web-only client, which has no call log.
   if (!webOnly) {
-    const preview = await previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir });
+    const preview = await previewPostCallBlueprint({ baseId, siteTag, clientDir });
     checks.push(
       checkNotMasterBase({ clientBaseId: baseId, masterBaseId: preview?.masterBaseId ?? null }),
       // Re-verified here against what the run actually wired, not just what pre-flight saw —
@@ -2124,11 +2077,30 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
       checkBlueprintFieldsResolve({ blueprint: preview?.blueprint ?? null, clientMap: preview?.clientMap ?? null, siteTag }),
       checkBlueprintEventFilter({ blueprint: preview?.blueprint ?? null }),
       checkBlueprintNoDatastore({ blueprint: preview?.blueprint ?? null }),
-      checkAccountLaneSender({
+      // Falls back to the master: the patch rewrites record keys, never the {{1.call.…}}
+      // expressions, so the master answers this even before a client base exists to preview.
+      // (Memoized — no extra request.) Field NAMES only, which do not depend on the business name.
+      checkAnalysisCoversBlueprint({
+        blueprint: preview?.blueprint ?? (await resolveMasterResources())?.blueprint ?? null,
+        analysisData: buildPostCallAnalysisData(''),
+      }),
+      // The patched clone against the client base when both exist; otherwise the master against
+      // its own base, which is where every clone's expressions come from.
+      preview?.blueprint && preview?.clientMap
+        ? checkSelectMappingsTotal({ blueprint: preview.blueprint, fieldMap: preview.clientMap })
+        : checkSelectMappingsTotal({
+            blueprint: (await resolveMasterResources())?.blueprint ?? null,
+            fieldMap: preview?.masterMap ?? null,
+          }),
+      // The patched clone when there is one, else the master: the gate is carried, not rewritten.
+      checkConnectedCallsOnly({
+        blueprint: preview?.blueprint ?? (await resolveMasterResources())?.blueprint ?? null,
+        cases: CALL_OUTCOME_CASES,
+        shouldLog,
+      }),
+      checkOwnerBriefViaAgency({
         blueprint: preview?.blueprint ?? null,
-        notificationNumber: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
-        clientNumber: twilioNumber,
-        smsEnabled: smsAlerts?.consented === true && Boolean(smsAlerts?.phone),
+        ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
       }),
       checkAirtableSchemaCovers({
         masterMap: preview?.masterMap ?? null,
@@ -2871,18 +2843,10 @@ function preflight(intake) {
         fmt('TWILIO_MESSAGING_SERVICE_SID', 'MG');
       }
 
-      // And a sender for the owner brief. Without one the cloned Twilio module carries an
-      // empty `from`, which errors on every run until Make auto-disables the scenario, taking
-      // the Airtable call log down with it. So a missing number is fatal, not a warning.
-      if (!process.env.TWILIO_NOTIFICATION_NUMBER) {
-        errors.push(
-          'SMS alerts are consented but TWILIO_NOTIFICATION_NUMBER is not set — the owner brief ' +
-          'has no Account-lane sender. Buy one LOCAL number, add it to the TWILIO_MESSAGING_SERVICE_SID ' +
-          'sender pool, leave its voiceUrl unset, and record it in .env. It is agency-wide, bought once.',
-        );
-      } else {
-        fmt('TWILIO_NOTIFICATION_NUMBER', '+1');
-      }
+      // No TWILIO_NOTIFICATION_NUMBER check any more. It existed because the cloned Twilio
+      // module needed a `from`; the clone has no Twilio module now. The owner brief is sent by
+      // the agency (/api/ingest/call), which holds that number in its own env and refuses to
+      // send without it — see `sendSms` there.
     }
   }
 
@@ -3210,8 +3174,6 @@ async function main() {
         agentId, site, clientDir,
         sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID,
         siteTag,
-        // Envelope-level: one owner, one consented cell, however many sites they run.
-        intake.smsAlerts,
       );
 
       // Last thing before the commit: swap the number the site advertises. Deliberately
@@ -3239,7 +3201,6 @@ async function main() {
       phoneSwap,
       baseId: sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID || null,
       siteTag,
-      smsAlerts: intake.smsAlerts,
       clientDir,
     });
 
