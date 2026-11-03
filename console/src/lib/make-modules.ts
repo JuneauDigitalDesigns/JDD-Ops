@@ -195,9 +195,24 @@ function airtableFields(ctx: ClientContext, site: SiteInfo): MakeField[] {
   ];
 }
 
-function twilioFields(site: SiteInfo): MakeField[] {
-  const from = site.env.TWILIO_NUMBER ?? '+1… (provision first)';
-  const to = site.env.CLIENT_FORWARD_PHONE ?? 'the owner’s number';
+/**
+ * The Twilio module as `patchPostCallBlueprint` writes it into the clone.
+ *
+ * `from` is the ACCOUNT-lane sender, TWILIO_NOTIFICATION_NUMBER — one JDD number, identical in
+ * every clone — never this client's TWILIO_NUMBER (onboard.js commit 30acaf3). The brief goes to
+ * the business owner, so it rides JDD's own campaign; a client number used for it would be stuck
+ * in JDD's Messaging Service and could never join the client's own campaign later. Shown as the
+ * key name, not the value: the number is agency-wide and Part A's context card carries it.
+ *
+ * There is deliberately no MessagingServiceSid field. The master sends `fromType: phone`, and the
+ * account's own history shows 10DLC delivering with `messaging_service_sid` null — pool
+ * membership is what ties a sender to a campaign, not naming the service in the call.
+ *
+ * `to` is the number the owner ticked SMS consent beside at intake (`smsAlerts.phone`), NOT
+ * CLIENT_FORWARD_PHONE: the line we forward calls to is not a number we have permission to text.
+ * SiteInfo doesn't carry it, so it is described rather than shown.
+ */
+function twilioFields(_site: SiteInfo): MakeField[] {
   const bodyRaw = [
     'Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}',
     '{{newline}}',
@@ -218,15 +233,15 @@ function twilioFields(site: SiteInfo): MakeField[] {
     {
       label: 'Phone number',
       required: true,
-      select: { value: from, emphasis: true, map: true },
-      help: 'From = this client’s TWILIO_NUMBER. It must be in the A2P sender pool or every post-call text fails with 30034.',
+      select: { value: 'TWILIO_NOTIFICATION_NUMBER', emphasis: true, map: true },
+      help: 'From = JDD’s notification number (jdd-ops/.env), the same in every clone — NOT this client’s TWILIO_NUMBER. It is already in JDD’s approved campaign pool, so this client needs no SMS registration for the owner brief. If this clone shows the client’s own number, it was made before 2026-11-02: change it here.',
       warn: true,
     },
     {
       label: 'To',
       required: true,
-      expr: { raw: to, lines: [[lit(to)]] },
-      help: 'To = the owner’s consented alert number, in E.164 format.',
+      select: { value: 'Owner’s SMS-consent number', emphasis: true },
+      help: 'To = the number the owner ticked SMS consent beside at intake, in E.164. Not necessarily the forwarding line. No consent on file → onboard.js removes this whole module and the owner gets no brief.',
       warn: true,
     },
     { label: 'Message Body', required: true, select: { value: 'Create a Body', map: true } },
@@ -248,7 +263,8 @@ function twilioFields(site: SiteInfo): MakeField[] {
           [txt('About:'), callVar('call_analysis.call_summary')],
         ],
       },
-      help: 'The newline tokens are Make functions — copy the block whole rather than retyping it.',
+      help: 'This is the master’s live body, reproduced as it is — not as it should be. JDD’s registered campaign samples wrap these four lines in a “Juneau Digital Designs call alert” first line and a “Reply STOP to opt out, HELP for help” last line; this body has neither. Status: also renders blank on every call (the agent never emits caller_priority). Both are open items with the operator; do not submit this as an A2P sample. The newline tokens are Make functions — copy the block whole rather than retyping it.',
+      warn: true,
     },
   ];
 }
