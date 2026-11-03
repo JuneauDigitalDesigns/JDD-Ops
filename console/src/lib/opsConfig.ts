@@ -120,6 +120,7 @@ export function readOpsConfig(): OpsConfig {
     githubOrg: ops.GITHUB_ORG || undefined,
     vercelTeamId: ops.VERCEL_TEAM_ID || undefined,
     makePostCallMasterScenarioId: ops.MAKE_POST_CALL_MASTER_SCENARIO_ID || undefined,
+    twilioNotificationNumber: ops.TWILIO_NOTIFICATION_NUMBER || undefined,
     portalSignInUrl,
     serviceAccountEmail: serviceAccountEmail(ops.GOOGLE_SERVICE_ACCOUNT_KEY || agency.GOOGLE_SERVICE_ACCOUNT_KEY),
   };

@@ -161,7 +161,7 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
         id: 'run-onboard',
         launch: true,
         title: 'Launch onboard.js',
-        why: 'One command stands up the whole stack: GitHub repo, schema, build, Vercel deploy — plus (Growth/Enterprise) the Retell agent, phone number, Airtable base, Make post-call clone, and the Clerk portal user.',
+        why: 'One command stands up the whole stack: GitHub repo, schema, build, Vercel deploy and the Clerk portal user — plus, for every client with a receptionist (all tiers except web-only), the Retell agent, phone number, Airtable base and Make post-call clone.',
         blocks: [
           { t: 'diagram', kind: 'pipeline' },
           {
@@ -195,27 +195,27 @@ function provisionPhase(ctx: ClientContext, config: OpsConfig): Phase {
   };
 }
 
-// ── Onboarding: map the cloned post-call scenario (per site, non-web-only) ──────
-// The clone inherits the MASTER's module settings, so its Airtable + Twilio modules must be
-// pointed at THIS client by hand before the first real call. The exact field expressions and
-// message body are operator-supplied and reproduced verbatim.
+// ── Onboarding: check the cloned post-call scenario (per site, non-web-only) ────
+// onboard.js clones the master and patches the copy (patchPostCallBlueprint): Airtable base,
+// table and field ids remapped by column name, Twilio From/To stamped. This step confirms the
+// patch landed, and is where you repair it by hand if the run warned it could not.
 function callLoggingSetupStepsForSite(ctx: ClientContext, s: SiteInfo): Step[] {
   const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
   return [
     {
       id: `make-fieldmap-${s.slug}`,
       site: s.slug,
-      title: `Map the cloned call-log scenario${label}`,
-      why: 'onboard.js clones the master post-call scenario for this client, but the clone carries the master’s module settings — it is not pointed at this client yet. Until you do this, a finished call writes nothing, or writes into someone else’s log.',
+      title: `Check the cloned call-log scenario${label}`,
+      why: 'onboard.js clones the master post-call scenario for this client and points the copy at this client’s base and owner. If any of that did not land, a finished call writes nothing, or writes into someone else’s log — with no error anywhere.',
       blocks: [
         {
           t: 'substeps',
           items: [
             { text: `Open Make.com → this client’s cloned scenario “Post-call: ${s.brandName}”.` },
-            { text: 'In the Airtable module, set Base to this client’s own base and Table to “Call Log”.', detail: 'The clone still points at the master’s base until you change it.' },
-            { text: 'Map each Call Log field to the expression shown below — click any box to copy it.', detail: 'The column names are a contract with the master scenario. A column the master writes that this base does not have is dropped silently from every logged call.' },
-            { text: 'In the Twilio module, set From to this client’s number and To to the owner’s consented alert number, then paste the message body.' },
-            { text: 'Save both modules, then confirm the scenario is Active.' },
+            { text: 'Airtable module: Base is this client’s own base and Table is “Call Log”.', detail: 'onboard.js sets both. If the run printed “Could not resolve Airtable schemas”, they still point at the master — set them by hand.' },
+            { text: 'Each Call Log field matches the expression shown below — click any box to copy it.', detail: 'The column names are a contract with the master scenario. A column the master writes that this base does not have is dropped silently from every logged call; the run warns “Dropped unmapped Airtable column(s)” when that happens.' },
+            { text: 'Twilio module: From is JDD’s notification number (not this client’s) and To is the owner’s SMS-consent number.', detail: 'No SMS consent on file → onboard.js removed the Twilio module entirely, and that is correct. A clone made before 2026-11-02 still sends from the client’s own number; change From here.' },
+            { text: 'Confirm the scenario is Active.' },
           ],
         },
         { t: 'make-module', siteSlug: s.slug },
@@ -234,10 +234,10 @@ function callLoggingSetupPhase(ctx: ClientContext): Phase {
   return {
     id: 'call-logging-setup',
     group: 'onboarding',
-    title: 'Map the call log (Make)',
+    title: 'Check the call log (Make)',
     subtitle: ctx.isEnterprise
-      ? 'Point each site’s cloned post-call scenario at its own base + number.'
-      : 'Point the cloned post-call scenario at this client’s base + number.',
+      ? 'Confirm each site’s cloned post-call scenario points at its own base + owner.'
+      : 'Confirm the cloned post-call scenario points at this client’s base + owner.',
     steps: ctx.sites.flatMap((s) => callLoggingSetupStepsForSite(ctx, s)),
   };
 }
@@ -321,7 +321,7 @@ function siteReviewPhase(ctx: ClientContext): Phase {
                 {
                   t: 'callout',
                   tone: 'info',
-                  body: `This is a web-only client (receptionist declined) — no voice agent or Make scenario. Submit the contact form with a test message and confirm the lead email lands at ${primary?.env.LEAD_DELIVERY_MODE ? 'the brand inbox' : (primary?.brandName ?? 'the brand') + '’s inbox'} (Resend).`,
+                  body: `This is a web-only client (receptionist declined) — no voice agent or Make scenario. Submit the contact form with a test message and confirm the lead appears in ${primary?.brandName ?? 'the client'}’s portal inbox. There is no lead email on any tier: LEAD_DELIVERY_MODE is always “portal”.`,
                 } as Block,
               ])
             : []),
@@ -388,9 +388,9 @@ function voiceReviewPhase(ctx: ClientContext): Phase {
 }
 
 // ── Review: prove post-call logging + owner SMS (per site) ──────────────────────
-function callLoggingReviewStepsForSite(ctx: ClientContext, s: SiteInfo): Step[] {
+function callLoggingReviewStepsForSite(ctx: ClientContext, s: SiteInfo, config: OpsConfig): Step[] {
   const twilio = envVal(s.env.TWILIO_NUMBER, '+1… (provision first)');
-  const owner = envVal(s.env.CLIENT_FORWARD_PHONE, 'the owner number (brand.phone)');
+  const sender = envVal(config.twilioNotificationNumber, 'JDD’s notification number (TWILIO_NOTIFICATION_NUMBER unset)');
   const ring = s.env.CLIENT_FORWARD_RING_SECONDS ?? RING_SECONDS_DEFAULT;
   const label = ctx.isEnterprise ? ` (${s.brandName})` : '';
   return [
@@ -406,29 +406,33 @@ function callLoggingReviewStepsForSite(ctx: ClientContext, s: SiteInfo): Step[] 
           items: [
             { text: `Trigger an AI-handled call: submit the form with your number, or call ${twilio.value} and let it ring past ${ring}s so the AI answers.` },
             { text: 'Finish the call and hang up.' },
-            { text: `Within ~30s confirm a new Airtable Call Log row AND a brief SMS to ${owner.value}.` },
+            { text: 'Within ~30s confirm a new Airtable Call Log row AND a brief SMS to the owner’s SMS-consent number.', detail: 'That is the number the owner ticked consent beside at intake — not necessarily the line calls forward to. No consent on file means no SMS, by design: the clone has no Twilio module.' },
           ],
         },
+        { t: 'copy', label: 'The owner’s brief arrives from', value: sender.value, pending: sender.pending },
         {
           t: 'verify',
           title: 'Within ~30 seconds',
           items: [
             { text: 'A new row in the client’s Airtable Call Log.' },
-            { text: `A brief SMS to ${owner.value}.` },
+            {
+              text: 'A brief SMS to the owner, sent from JDD’s notification number above — not from this client’s number.',
+              detail: 'Tell the owner to save it as a contact. It is one JDD number shared by every client’s brief, so an unrecognised sender is expected, not a bug.',
+            },
           ],
         },
         {
           t: 'callout',
           tone: 'warn',
           title: 'If nothing arrives',
-          body: `Walk it backwards: Retell call log (did the call complete?) → Make “Post-call: ${s.brandName}” History (webhook fired? filter passed? module errors?) → Twilio Messaging logs (is the number registered yet?).`,
+          body: `Walk it backwards: Retell call log (did the call complete?) → Make “Post-call: ${s.brandName}” History (webhook fired? filter passed? module errors?) → Twilio Messaging logs for the notification number. Error 30034 there means the sender is not associated with an approved campaign — check it is still in the Messaging Service’s sender pool. A null messaging_service_sid on the message record is normal and not the cause.`,
         },
       ],
     },
   ];
 }
 
-function callLoggingReviewPhase(ctx: ClientContext): Phase {
+function callLoggingReviewPhase(ctx: ClientContext, config: OpsConfig): Phase {
   return {
     id: 'review-call-logging',
     group: 'review',
@@ -436,7 +440,7 @@ function callLoggingReviewPhase(ctx: ClientContext): Phase {
     subtitle: ctx.isEnterprise
       ? 'Prove each site logs calls + texts the owner.'
       : 'Prove the chain: AI call → Airtable row + owner SMS.',
-    steps: ctx.sites.flatMap((s) => callLoggingReviewStepsForSite(ctx, s)),
+    steps: ctx.sites.flatMap((s) => callLoggingReviewStepsForSite(ctx, s, config)),
   };
 }
 
@@ -451,7 +455,7 @@ export function buildRunbook(ctx: ClientContext, config: OpsConfig = {}): Phase[
   phases.push(siteReviewPhase(ctx));
   if (!ctx.isWebOnly) {
     phases.push(voiceReviewPhase(ctx));
-    phases.push(callLoggingReviewPhase(ctx));
+    phases.push(callLoggingReviewPhase(ctx, config));
   }
   return phases;
 }
@@ -475,14 +479,16 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             items: [
               { text: 'ANTHROPIC_API_KEY — console.anthropic.com (generates the Retell agent prompt).' },
               { text: 'RETELL_API_KEY + RETELL_LLM_ID + RETELL_DEFAULT_VOICE_ID — dashboard.retellai.com (agent + voice). The account also needs custom-telephony / outbound SIP available — the no-answer leg dials sip:{call_id}@sip.retellai.com (on by default for standard accounts).' },
-              { text: 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN — console.twilio.com (Growth/Enterprise: step 8 buys each client’s number and sets human-first call routing).' },
+              { text: 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN — console.twilio.com (every client with a receptionist: onboard.js buys their number and sets human-first call routing).' },
+              { text: 'TWILIO_MESSAGING_SERVICE_SID + TWILIO_NOTIFICATION_NUMBER — the owner-alert SMS lane, below. Pre-flight hard-fails a client with SMS consent if either is unset.' },
               { text: 'AIRTABLE_API_KEY (data.records:write + schema.bases:write) + AIRTABLE_WORKSPACE_ID (wsp…).' },
               { text: 'GITHUB_TOKEN (repo + delete_repo) + GITHUB_ORG; VERCEL_TOKEN + VERCEL_TEAM_ID.' },
               { text: 'MAKE_API_KEY + MAKE_POST_CALL_MASTER_SCENARIO_ID — from the Make setup below.' },
-              { text: 'CLERK_SECRET_KEY — step 10 auto-creates the portal user. RESEND_API_KEY for Starter lead emails.' },
+              { text: 'CLERK_SECRET_KEY — step 10 auto-creates the portal user.' },
+              { text: 'RESEND_API_KEY + RESEND_FROM_EMAIL — agency-side mail only (agreements, welcome, reminders).', detail: 'No client lead goes through Resend. Every tier’s web-form leads land in that client’s portal inbox (LEAD_DELIVERY_MODE=portal); Starter vs Growth differs only in LEAD_CALLBACK.' },
             ],
           },
-          { t: 'callout', tone: 'info', body: 'Twilio creds (TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN) are required for Growth/Enterprise — onboard.js buys the number and wires human-first routing → Retell fallback. Leave TEMPLATE_REPO blank — onboarding is local-first.' },
+          { t: 'callout', tone: 'info', body: 'Twilio creds (TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN) are required for every client with a receptionist — all tiers except web-only — because onboard.js buys the number and wires human-first routing → Retell fallback. Leave TEMPLATE_REPO blank — onboarding is local-first.' },
         ],
       },
     ],
@@ -518,17 +524,25 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
       {
         id: 'a-make-post-build',
         title: 'Prepare the post-call master (Webhook → filter → Airtable → Twilio SMS)',
-        why: 'onboard.js clones this master per client and overwrites the Airtable base and the Twilio From/To. The master itself never runs.',
+        why: 'onboard.js clones this master per client and patches the copy: the Airtable base, table and field ids, and the Twilio From/To. The master itself never runs and is never modified.',
         blocks: [
           {
             t: 'substeps',
             items: [
               { text: 'Open your post-call scenario. Module 1: Custom webhook (Retell posts call_ended/call_analyzed here).' },
               { text: 'Add a Filter immediately after the webhook that only passes AI-handled leads (e.g. event = call_analyzed AND custom_analysis_data.caller_name exists) — so client-answered calls never log or text.' },
-              { text: 'Module: Airtable → Create a Record, table Call Log; map Date / Caller name / Caller number / Summary / Duration / Call type / Outcome. Leave the Base as a PLACEHOLDER — onboard.js overwrites it per clone.' },
-              { text: 'Module: Twilio → Send a Message (JDD SID/auth connection). Leave From and To as PLACEHOLDERS — onboard.js sets From = client TWILIO_NUMBER and To = the owner’s CONSENTED alert number per clone. If the owner never opted in, onboard.js removes this module from the clone entirely.' },
-              { text: 'Send via the A2P Messaging Service, not a bare From number — the Messaging Service carries the approved campaign and the Advanced Opt-Out (STOP/HELP) behaviour.' },
-              { text: 'SMS body MUST identify the sender and carry opt-out language. Use exactly: “Juneau Digital Designs call alert: {{urgency}}. New lead {{caller_name}}, callback {{callback_number}}. Reply STOP to opt out.” This string must match the sample message submitted with the A2P campaign and the sample shown on juneaudigitaldesigns.com/sms-terms.' },
+              {
+                text: 'Module: Airtable → Create a Record, table Call Log. Leave the Base as a PLACEHOLDER — onboard.js overwrites it per clone and remaps every field by column name.',
+                detail: 'The column list is CALL_LOG_FIELDS in onboard.js, and each client’s onboarding page shows the full mapping replica. Run npm run verify-post-call after touching either side — it diffs them against this master.',
+              },
+              {
+                text: 'Module: Twilio → Send a Message (JDD SID/auth connection), sending from a phone number. Leave From and To as PLACEHOLDERS — onboard.js stamps both on every clone.',
+                detail: 'From = TWILIO_NOTIFICATION_NUMBER, the same JDD number in every clone. To = the owner’s SMS-consent number. If the owner never opted in, onboard.js removes this module from the clone entirely. Because From is overwritten per clone, editing it here changes nothing.',
+              },
+              {
+                text: 'SMS body MUST identify the sender, carry opt-out language, and match the sample message submitted with JDD’s A2P campaign and juneaudigitaldesigns.com/sms-terms.',
+                detail: 'Not met today: the live body is “Name / Status / Phone / About” with no sender name and no “Reply STOP” line, and Status renders blank on every call. Open with the operator — the body is not pinned here until the wording is agreed, so nobody submits the current one to a carrier as the sample.',
+              },
               { text: 'Save, then Deactivate the master (only per-client clones run).' },
             ],
           },
@@ -541,30 +555,92 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
             example: '1234567',
             pending: !config.makePostCallMasterScenarioId,
           },
-          { t: 'callout', tone: 'info', body: 'onboard.js reads the clone’s webhook URL and sets it on the Retell agent automatically. Exact Airtable field expressions are in retell-post-call-airtable-plan.md (repo root).' },
+          { t: 'callout', tone: 'info', body: 'onboard.js creates a webhook for each clone, reads its URL back and sets it on the Retell agent automatically.' },
         ],
       },
       {
         id: 'a-twilio-a2p',
         title: 'Register JDD for outbound SMS (A2P 10DLC)',
-        why: 'US carriers block SMS from unregistered numbers. Register once so client numbers can text owners; per-number attach/verify happens during each onboarding.',
+        why: 'US carriers block SMS from numbers not associated with an approved campaign. This is JDD’s own registration, done once: it carries the texts JDD sends to business owners, for every client.',
         blocks: [
+          {
+            t: 'callout',
+            tone: 'info',
+            title: 'Two SMS lanes',
+            body: 'Who RECEIVES a text decides which campaign carries it. Account lane: texts to the business owner ride JDD’s own campaign (this step) from one JDD notification number (next step). Customer lane: texts to the owner’s customers ride that client’s own campaign from the client’s own number — registered per client, and not live yet.',
+          },
           {
             t: 'substeps',
             items: [
               { text: 'Twilio Console → Messaging → Regulatory Compliance → A2P 10DLC. Register the JDD Brand (business/EIN) once.' },
-              { text: 'Create/attach a Messaging Service FIRST, and enable Advanced Opt-Out on it (STOP / HELP / START). That is what handles opt-out keywords; the site has no inbound SMS webhook wired.' },
-              { text: 'Create a Campaign against that Messaging Service. Use-case: Customer Care / account notifications.' },
-              { text: 'Sample message: “Juneau Digital Designs call alert: Callback requested. New lead Maria Alvarez, callback (930) 555-0117. Reply STOP to opt out.” Must match the Make master body and /sms-terms.' },
+              { text: 'Create/attach a Messaging Service FIRST, and enable Advanced Opt-Out on it (STOP / HELP / START). That is what handles opt-out keywords; the site has no inbound SMS webhook wired. Its SID is TWILIO_MESSAGING_SERVICE_SID.' },
+              { text: 'Create a Campaign against that Messaging Service, use case ACCOUNT_NOTIFICATION. It carries owner alerts only — never a text to a client’s customer.' },
+              { text: 'Sample message: must match what the Make master actually sends and juneaudigitaldesigns.com/sms-terms.', detail: 'They do not match today — see the SMS body item in the post-call master step above. Do not resubmit a sample until that wording is settled.' },
               { text: 'Opt-in description: consent is a separate unchecked checkbox beside a mobile-number field on the PUBLIC agreement page, juneaudigitaldesigns.com/agreement?plan=growth (no login). Tell the reviewer to open that URL and scroll to “Your details”. Consent is not a condition of purchase, and alerts only activate after Stripe payment completes.' },
               { text: 'Point the reviewer at juneaudigitaldesigns.com/sms-terms (linked in the site footer) for program name, message types, frequency, rates, and STOP/HELP.' },
-              { text: 'Sender Pool holds the client LOCAL numbers; onboard.js adds each one automatically AND reads the pool back to confirm it landed when TWILIO_MESSAGING_SERVICE_SID is set. If a client has SMS consent, onboarding now HARD-FAILS (no resources created) when the SID is unset or the campaign is not yet approved — it no longer provisions a silently-textless client.' },
+              {
+                text: 'Pre-flight HARD-FAILS (no resources created) for a client with SMS consent when TWILIO_MESSAGING_SERVICE_SID or TWILIO_NOTIFICATION_NUMBER is unset, or the campaign is not approved.',
+                detail: 'It no longer provisions a silently-textless client.',
+              },
+              {
+                text: 'onboard.js still adds each CLIENT number to this service’s sender pool and reads it back.',
+                detail: 'That join no longer carries the owner brief (it sends from the notification number), and it is what will have to stop before a client can join its own Customer-lane campaign — a number sits in exactly one Messaging Service. No plan currently owns removing it, so do not assume a client number lives only in its own service.',
+              },
               { text: 'We never buy toll-free numbers — provisioning is local-only (Central FL by default via TWILIO_DEFAULT_AREA_CODES / TWILIO_DEFAULT_REGION, searched business-address ZIP → brand area code → defaults → region), so every provisioned number is A2P-eligible.' },
             ],
           },
-          { t: 'callout', tone: 'warn', body: 'Carrier approval takes days — do this early. Until a number’s registration is approved, owner SMS silently fails with error 30034 (call logging still works).' },
+          {
+            t: 'callout',
+            tone: 'warn',
+            title: 'What 30034 means',
+            body: 'Error 30034 means the sending number is not associated with an approved campaign — i.e. not in an approved Messaging Service’s sender pool. It does NOT mean the API call omitted the service: messaging_service_sid is null on JDD’s delivered messages too. Owner alerts send from the notification number, which is already in JDD’s approved pool, so a client’s own pending registration never affects them.',
+          },
+          {
+            t: 'callout',
+            tone: 'info',
+            title: 'Per-client (Customer-lane) registration',
+            body: 'Each client’s own campaign takes 13–20 business days of carrier review end to end, so “campaign not yet verified” is an expected state for about three weeks, not a failure. The console steps for it are being built separately; until they land, check the account-level prerequisite with node scripts/a2p-readiness.js — it reads the primary ISV profile live and is the authority on whether per-client registration can start.',
+          },
           { t: 'callout', tone: 'info', body: 'Consent proof: every opt-in and opt-out is stored with timestamp, IP, user agent, and a hash of the exact wording shown. Look it up with GET /api/ops/sms-consent?phone=+1… (x-ops-secret header) on the agency site.' },
           { t: 'link', label: 'Twilio A2P 10DLC', href: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/a2p-10dlc' },
+        ],
+      },
+      {
+        id: 'a-twilio-notification-number',
+        title: 'The JDD notification number (owner-alert sender)',
+        why: 'Owner alerts send from this one JDD number for every client — today that is the post-call brief; new-lead alerts are meant to join it. It already sits in JDD’s approved campaign pool, so a new client needs no SMS registration for the owner to get texts. Agency-wide, bought once.',
+        blocks: [
+          {
+            t: 'context',
+            label: 'Notification number',
+            from: 'Twilio → Phone Numbers → Active numbers (the one named as the JDD notification sender)',
+            to: 'jdd-ops/.env → TWILIO_NOTIFICATION_NUMBER (onboard.js stamps it as From on every post-call clone)',
+            value: config.twilioNotificationNumber,
+            example: '+14075550123',
+            pending: !config.twilioNotificationNumber,
+          },
+          {
+            t: 'substeps',
+            items: [
+              { text: 'Already bought and recorded — these are the properties it must keep, and what to repeat only if it is ever replaced.' },
+              { text: 'A LOCAL Central FL number (407 → 321 → 689), never toll-free — toll-free cannot join the A2P Messaging Service.' },
+              { text: 'Named unmistakably in Twilio (friendly name) as the JDD notification sender, so nobody hands it to a client site.' },
+              { text: 'In TWILIO_MESSAGING_SERVICE_SID’s sender pool — that membership is what ties it to JDD’s approved campaign.' },
+              { text: 'voiceUrl left UNSET. It is send-only; nothing should ever dial it, and it must never be a client’s advertised or forwarding number.' },
+            ],
+          },
+          {
+            t: 'verify',
+            title: 'It is still working if',
+            items: [
+              { text: 'Twilio → Messaging → Services → your service → Sender Pool lists this number.' },
+              {
+                text: 'A test message from it shows status “delivered” in Twilio’s Messaging logs.',
+                detail: 'Judge by status, not by messaging_service_sid: that field can be null on a perfectly delivered 10DLC message.',
+              },
+              { text: 'Its Voice configuration has no webhook URL.' },
+            ],
+          },
         ],
       },
     ],
