@@ -90,7 +90,7 @@ import {
   checkAnalysisCoversBlueprint,
   checkPromptHasConsentAsk,
   checkSelectMappingsTotal,
-  checkAccountLaneSender,
+  checkOwnerBriefViaAgency,
   checkAirtableSchemaCovers,
   checkNotMasterBase,
   checkNotMasterHook,
@@ -1531,7 +1531,7 @@ export function isScenarioAlreadyRunning(status, body) {
   return status === 422 && /"code"\s*:\s*"IM306"/.test(String(body ?? ''));
 }
 
-async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag, smsAlerts) {
+async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag) {
   log(8, `Clone post-call Make scenario + wire Retell webhook`);
 
   const existing = readEnvLocal(clientDir).RETELL_POST_CALL_WEBHOOK_URL;
@@ -1542,39 +1542,28 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
 
   const apiKey   = process.env.MAKE_API_KEY;
   const masterId = process.env.MAKE_POST_CALL_MASTER_SCENARIO_ID;
-  // The owner brief sends from the ACCOUNT-lane number: a JDD-owned sender on JDD's own
-  // approved ACCOUNT_NOTIFICATION campaign, never from this client's number.
+  // The owner's end-of-call text is NOT sent by Make. The clone's HTTP module posts the call to
+  // the agency's /api/ingest/call, which reads the owner's SMS consent at send time and texts
+  // from the JDD notification number. It used to be a Twilio module whose `to`, `from` and very
+  // existence were decided here, at onboarding, and never re-read — so an owner who opted in
+  // through the portal afterwards was never texted (the growth fixture's clone had no Twilio
+  // module at all on 2026-11-03), and one who revoked kept being texted.
   //
-  // This was `readEnvLocal(clientDir).TWILIO_NUMBER`, which delivers today — onboard.js puts
-  // every client number in the master pool, and pool membership is what registers a number
-  // with a campaign (the account's own history shows one number going 30034 -> delivered when
-  // the campaign was approved, with messaging_service_sid null throughout). It is wrong
-  // anyway: a campaign binds to a Messaging Service and a number sits in exactly one, so a
-  // client number used for owner alerts can never join that client's own CUSTOMER_CARE
-  // service later. It also breaks outright the moment client numbers stop joining the master
-  // pool, which is the point of the two-lane migration.
-  //
-  // Patching the master blueprint cannot fix this: patchPostCallBlueprint stamps `from` onto
-  // every clone, so the value has to be right here.
-  const fromNum  = (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim();
-
-  // The SMS destination now comes from the owner's recorded consent, not from
-  // content.brand.phone. brand.phone is the number printed on the client's website — a
-  // front desk, a shared line, sometimes a landline — and nobody ever agreed to receive
-  // texts there. smsAlerts.phone is the number the owner typed beside a checkbox they
-  // ticked, which is the only number we have permission to text.
-  const smsEnabled = smsAlerts?.consented === true && Boolean(smsAlerts?.phone);
-  const toNum      = smsEnabled ? (toE164(smsAlerts.phone) ?? '') : '';
-
-  if (smsEnabled) {
-    console.log(`  SMS alerts: ON → ${toNum} (consented ${smsAlerts.consentedAt ?? 'unknown'})`);
-  } else {
-    console.log(`  SMS alerts: OFF (no consent on file) — Twilio module will be removed from the clone`);
+  // The module authenticates with this site's own LEAD_INGEST_TOKEN, the one /api/contact
+  // already uses, so the agency resolves the account from the token and a clone can only ever
+  // brief its own owner. It is a credential: it goes into the clone and is never printed.
+  const ingestToken = readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '';
+  if (ingestToken) {
+    console.log(`  Owner brief: posted to the agency, authenticated with this site's LEAD_INGEST_TOKEN`);
+  } else if (!DRY_RUN) {
+    // A dry run writes no .env.local, so a fresh client has no token on disk yet — step 5 of a
+    // real run mints it before this. Warning there would describe a run that cannot happen.
+    console.warn(`  ⚠ No LEAD_INGEST_TOKEN in ${basename(clientDir)}/.env.local — the HTTP module is removed and the owner gets no end-of-call text.`);
   }
 
   if (!apiKey || !masterId) {
     console.warn(`  ⚠ MAKE_API_KEY or MAKE_POST_CALL_MASTER_SCENARIO_ID not set — skipping post-call clone.`);
-    console.warn(`    Clone by hand: base=${baseId}, from=${fromNum}, to=${toNum || '(no SMS — remove the Twilio module)'}, agent=${agentId}`);
+    console.warn(`    Clone by hand: base=${baseId}, agent=${agentId}, HTTP module header = this site's LEAD_INGEST_TOKEN`);
     return null;
   }
   if (DRY_RUN) {
@@ -1606,9 +1595,7 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
     dryLog(`would repoint Airtable module at base=${baseId}, remapping its table + field ids by column name`);
     if (siteTag) dryLog(`  + Site="${siteTag}" written into mapper.record (not as a top-level mapper key)`);
     dryLog(`would REMOVE the vestigial datastore module, carrying its event filter forward`);
-    dryLog(smsEnabled
-      ? `would patch Twilio from=${fromNum}, to=${toNum}`
-      : `would REMOVE the Twilio module (no SMS consent on file)`);
+    dryLog(`would set the HTTP module's Authorization to this site's LEAD_INGEST_TOKEN (not printed), and drop any Twilio module`);
     dryLog(`would activate clone, resolve webhook via scenario.hookId → /hooks/{id}, set Retell agent ${agentId} webhook_url`);
     return null;
   }
@@ -1732,7 +1719,7 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   ]);
 
   patchPostCallBlueprint(blueprint, {
-    baseId, siteTag, fromNum, toNum, smsEnabled, masterMap, clientMap,
+    baseId, siteTag, ingestToken, masterMap, clientMap,
   }); // mutates in place
 
   res = await fetch(`${MAKE_ZONE}/scenarios/${cloneId}`, {
@@ -1790,19 +1777,22 @@ async function cloneAndWirePostCall(agentId, content, clientDir, baseId, siteTag
   return webhookUrl;
 }
 
-// Rewrites the cloned blueprint's Airtable + Twilio modules for this client.
+// Rewrites the cloned blueprint's Airtable + HTTP modules for this client.
 // Modules are matched by app name so it survives module-id changes on clone.
 //
 // Mapper key shapes below were confirmed against a live GET of the master blueprint:
 //   airtable:ActionCreateRecord → { base, table, record: { <fldId>: <expr> }, typecast, useColumnId }
-//   twilio:SendSMS              → { to, from, fromType, body, messageBody }
+//   http:MakeRequest (v4)       → { url, method, headers: [{ name, value }], contentType: "urlEncoded",
+//                                   urlEncodedBodyContent: [{ name, value }], stopOnHttpError, … }
+// The HTTP module was built in the Make UI and recorded (2026-11-03), never written from memory:
+// with nothing filled in it saves with NO mapper at all, which is how a guessed shape would fail.
 // Note that Airtable column values live inside `record`, keyed by field id — NOT as
 // top-level mapper keys. An earlier version set `mapper.Site`, a key the module does not
 // read, so the enterprise per-site tag was never written and the portal (which filters on
 // `row.Site === site.slug`) showed no calls at all for a multi-site client.
 function patchPostCallBlueprint(
   blueprint,
-  { baseId, siteTag, fromNum, toNum, smsEnabled, masterMap, clientMap, quiet = false },
+  { baseId, siteTag, ingestToken, masterMap, clientMap, quiet = false },
 ) {
   // `quiet` is for the dry-run preview, which patches a throwaway copy purely to inspect it.
   // Announcing "Removed 1 datastore module(s) from the clone" when no clone exists would be
@@ -1848,10 +1838,14 @@ function patchPostCallBlueprint(
         warn(`    Fix the Airtable module by hand in the clone, or post-call rows will not be written.`);
       }
     }
-    if (app.startsWith('twilio') && smsEnabled) {
+    // The owner brief: the master carries a placeholder Authorization header, and each clone
+    // gets its own site's token. Any existing Authorization is replaced rather than appended, so
+    // the master's placeholder never rides along beside the real one.
+    if (app.startsWith('http') && ingestToken) {
       mod.mapper = mod.mapper ?? {};
-      mod.mapper.from = fromNum;
-      mod.mapper.to = toNum;
+      const others = (Array.isArray(mod.mapper.headers) ? mod.mapper.headers : [])
+        .filter((h) => String(h?.name ?? '').toLowerCase() !== 'authorization');
+      mod.mapper.headers = [...others, { name: 'Authorization', value: `Bearer ${ingestToken}` }];
     }
   }
 
@@ -1894,15 +1888,21 @@ function patchPostCallBlueprint(
     }
   }
 
-  // No consent means the module comes out of the flow entirely, rather than being left
-  // with an empty `to`. An unconfigured module errors on every run, and enough errors get
-  // a Make scenario auto-disabled — which would take the Airtable call log down with it.
-  // Removing it leaves a scenario that logs calls correctly and simply never texts.
-  if (!smsEnabled && Array.isArray(blueprint?.flow)) {
+  // Make never texts the owner itself any more — the agency does, at send time, from the
+  // owner's CURRENT consent. A Twilio module left in a clone (a master edited back, or a clone
+  // re-patched from an old blueprint) would text them a second time, under consent decided at
+  // onboarding. And an HTTP module with no token would 401 on every call, so it comes out too,
+  // loudly, rather than looking wired.
+  if (Array.isArray(blueprint?.flow)) {
     const before = blueprint.flow.length;
     blueprint.flow = blueprint.flow.filter((m) => !(m.module ?? '').startsWith('twilio'));
-    const removed = before - blueprint.flow.length;
-    if (removed > 0) say(`  Removed ${removed} Twilio module(s) from the clone (no SMS consent)`);
+    const twilioRemoved = before - blueprint.flow.length;
+    if (twilioRemoved > 0) say(`  Removed ${twilioRemoved} Twilio module(s) — the owner brief is sent by the agency, not Make`);
+    if (!ingestToken) {
+      const n = blueprint.flow.length;
+      blueprint.flow = blueprint.flow.filter((m) => !(m.module ?? '').startsWith('http'));
+      if (blueprint.flow.length < n) warn(`  ⚠ Removed the HTTP module — no LEAD_INGEST_TOKEN, so the owner gets no end-of-call text.`);
+    }
   }
 }
 
@@ -2014,7 +2014,7 @@ async function resolveMasterResources() {
  * checks surface as `?` rather than as a pass — CI has no secrets and must not read as
  * "verified".
  */
-async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir }) {
+async function previewPostCallBlueprint({ baseId, siteTag, clientDir }) {
   if (!baseId) return null;
   const master = await resolveMasterResources();
   if (!master) return null;
@@ -2026,19 +2026,15 @@ async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir 
   ]);
   if (!masterMap || !clientMap) return { blueprint: null, masterBaseId, masterHookUrl, masterMap, clientMap };
 
-  const smsEnabled = smsAlerts?.consented === true && Boolean(smsAlerts?.phone);
   // Deep copy: the memoized blueprint is shared across sites, so patching it in place would
   // leak one site's base and Site tag into the next site's preview.
   const copy = JSON.parse(JSON.stringify(master.blueprint));
   patchPostCallBlueprint(copy, {
     baseId,
     siteTag,
-    // The same Account-lane sender the live clone uses — see the note at its definition. A
-    // preview showing the client number while the run writes the notification number would
-    // make the dry run bless something different from what provisions.
-    fromNum: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
-    toNum: smsEnabled ? (toE164(smsAlerts?.phone) ?? '') : '',
-    smsEnabled,
+    // The same token the live clone gets, so the check below judges what a real run would write.
+    // It never leaves this process: the check reports whether it matches, not what it is.
+    ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
     masterMap,
     clientMap,
     quiet: true,
@@ -2053,7 +2049,7 @@ async function previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir 
  * we already know is misconfigured) but only reported on a dry run, whose job is to list
  * everything wrong rather than stop at the first thing.
  */
-async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, phoneSwap, baseId, siteTag, smsAlerts, clientDir }) {
+async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, phoneSwap, baseId, siteTag, clientDir }) {
   log(8, `Correctness checks`);
 
   const checks = [
@@ -2065,7 +2061,7 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
 
   // Vendor-facing checks. Skipped wholesale for a web-only client, which has no call log.
   if (!webOnly) {
-    const preview = await previewPostCallBlueprint({ baseId, siteTag, smsAlerts, clientDir });
+    const preview = await previewPostCallBlueprint({ baseId, siteTag, clientDir });
     checks.push(
       checkNotMasterBase({ clientBaseId: baseId, masterBaseId: preview?.masterBaseId ?? null }),
       // Re-verified here against what the run actually wired, not just what pre-flight saw —
@@ -2093,11 +2089,9 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
             blueprint: (await resolveMasterResources())?.blueprint ?? null,
             fieldMap: preview?.masterMap ?? null,
           }),
-      checkAccountLaneSender({
+      checkOwnerBriefViaAgency({
         blueprint: preview?.blueprint ?? null,
-        notificationNumber: (process.env.TWILIO_NOTIFICATION_NUMBER ?? '').trim(),
-        clientNumber: twilioNumber,
-        smsEnabled: smsAlerts?.consented === true && Boolean(smsAlerts?.phone),
+        ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
       }),
       checkAirtableSchemaCovers({
         masterMap: preview?.masterMap ?? null,
@@ -2840,18 +2834,10 @@ function preflight(intake) {
         fmt('TWILIO_MESSAGING_SERVICE_SID', 'MG');
       }
 
-      // And a sender for the owner brief. Without one the cloned Twilio module carries an
-      // empty `from`, which errors on every run until Make auto-disables the scenario, taking
-      // the Airtable call log down with it. So a missing number is fatal, not a warning.
-      if (!process.env.TWILIO_NOTIFICATION_NUMBER) {
-        errors.push(
-          'SMS alerts are consented but TWILIO_NOTIFICATION_NUMBER is not set — the owner brief ' +
-          'has no Account-lane sender. Buy one LOCAL number, add it to the TWILIO_MESSAGING_SERVICE_SID ' +
-          'sender pool, leave its voiceUrl unset, and record it in .env. It is agency-wide, bought once.',
-        );
-      } else {
-        fmt('TWILIO_NOTIFICATION_NUMBER', '+1');
-      }
+      // No TWILIO_NOTIFICATION_NUMBER check any more. It existed because the cloned Twilio
+      // module needed a `from`; the clone has no Twilio module now. The owner brief is sent by
+      // the agency (/api/ingest/call), which holds that number in its own env and refuses to
+      // send without it — see `sendSms` there.
     }
   }
 
@@ -3179,8 +3165,6 @@ async function main() {
         agentId, site, clientDir,
         sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID,
         siteTag,
-        // Envelope-level: one owner, one consented cell, however many sites they run.
-        intake.smsAlerts,
       );
 
       // Last thing before the commit: swap the number the site advertises. Deliberately
@@ -3208,7 +3192,6 @@ async function main() {
       phoneSwap,
       baseId: sharedBaseId || readEnvLocal(clientDir).AIRTABLE_BASE_ID || null,
       siteTag,
-      smsAlerts: intake.smsAlerts,
       clientDir,
     });
 

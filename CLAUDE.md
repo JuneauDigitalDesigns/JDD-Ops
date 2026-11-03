@@ -45,8 +45,8 @@ identically to Starter, offered only when a client refuses AI on their line. onb
 the voice stack on `isWebOnly` (from `@jdd/schema`), never on `plan === 'starter'`.
 
 **Starter and Growth run the identical stack front to back** — number rings the owner, agent
-picks up on no-answer, Make webhook fires, Airtable row is written, owner is texted that a
-lead is waiting. Three things differ, and only three:
+picks up on no-answer, Make webhook fires, Airtable row is written, the agency texts the owner
+that a lead is waiting (if they have opted in). Three things differ, and only three:
 
 1. **Web-form behaviour.** Starter drops the submission straight into the portal inbox.
    Growth has the agent call the submitter back, collect details, and put *that* in the
@@ -141,6 +141,31 @@ live client number that is *not* in the master pool. Under the two-lane design t
 Messaging Service SID to compare against, which the A2P chain hasn't produced yet
 (`HANDOFF-ORCHESTRATOR-lead-capture-a2p.md` §6 items 5 and 7). Until then the flag is correct for
 how onboard.js actually provisions. Don't "fix" it ahead of those.
+
+**The owner's end-of-call brief is sent by the agency, not by Make.** Each clone's last module
+is an `http:MakeRequest` that POSTs the call (form-encoded `call_id`, `caller_name`,
+`caller_priority`, `caller_number`) to `https://www.juneaudigitaldesigns.com/api/ingest/call`
+with `Authorization: Bearer <this site's LEAD_INGEST_TOKEN>`. The agency resolves the account
+from the token, reads the owner's SMS consent **at send time** (the portal's `sms:consent:*`),
+texts once per Retell `call_id`, and sends on the account lane from its own
+`TWILIO_NOTIFICATION_NUMBER`.
+
+It used to be a Twilio module in each clone, with `to`, `from` and whether to text at all
+stamped in by `patchPostCallBlueprint` at onboarding and never re-read. Owner opt-in moved to the
+portal and never reached Make: on 2026-11-03 the growth fixture's clone had no Twilio module,
+and a completed callback briefed nobody. So `patchPostCallBlueprint` now replaces the master's
+`Bearer REPLACE_PER_CLIENT` placeholder with the site's token, drops any Twilio module (a
+leftover one double-texts under stale consent), and drops the HTTP module if the site has no
+token. `checkOwnerBriefViaAgency` enforces the shape: no Twilio, one POST to `www`
+`/api/ingest/call` (the apex 307s and loses the header), form-encoded, carrying `call_id`, with
+"evaluate all states as errors" OFF (repeated errors deactivate the scenario and stop the call
+log too), and this site's token. The token is a credential: it is written into the clone and
+never printed by onboard.js, the checks, or the verifier.
+
+The master's HTTP module was built in the Make UI and recorded, never written from memory: an
+`http:MakeRequest` saved with nothing filled in has no `mapper` at all, and one first saved
+with `method: "get"`, which the agency's route would have refused. If you rebuild it, re-record
+it with `npm run fixtures:refresh`.
 
 **The site must advertise the Twilio number, not the owner's.** Two numbers with two jobs:
 
@@ -397,9 +422,12 @@ yet, the run will clone the master and re-point the agent at that clone, so refu
 block the very run that fixes it. The agent is read live because the env file can be silent
 while the agent is wired — which is precisely how the e2e fixture hid.
 
-**The master scenario is never modified.** `cloneAndWirePostCall` GETs the blueprint, clones,
-and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refresh` reporting
-`make/master-blueprint.json` and `make/scenario.json` unchanged is the proof.
+**The master scenario is never modified by a run.** `cloneAndWirePostCall` GETs the blueprint,
+clones, and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refresh` reporting
+`make/master-blueprint.json` and `make/scenario.json` unchanged after a run is the proof.
+Deliberate, operator-approved edits do happen. Each one is re-recorded and committed with its
+reason, so its diff never looks like drift. So far: the SMS consent mapping, the total select
+mappings, and replacing the Twilio module with the agency HTTP module (2026-11-02 / 03).
 
 **A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
 attach the clone to the master's hook, which already belongs to the master, and refuses with

@@ -65,18 +65,47 @@
           }
         },
         {
-          "id": 9,
+          "id": 10,
           "mapper": {
-            "to": "+15005550006",
-            "body": "Name:{{1.call.call_analysis.custom_analysis_data.caller_name}}\n{{newline}}\nStatus:{{1.call.call_analysis.custom_analysis_data.caller_priority}}\n{{newline}}\nPhone: {{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}\n{{newline}}\nAbout: {{1.call.call_analysis.call_summary}}",
-            "from": "+15005550009",
-            "fromType": "phone",
-            "messageBody": "body"
+            "url": "https://www.juneaudigitaldesigns.com/api/ingest/call",
+            "method": "post",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer REPLACE_PER_CLIENT"
+              }
+            ],
+            "timeout": "40",
+            "contentType": "urlEncoded",
+            "shareCookies": false,
+            "parseResponse": false,
+            "allowRedirects": true,
+            "stopOnHttpError": false,
+            "urlEncodedBodyContent": [
+              {
+                "name": "call_id",
+                "value": "{{1.call.call_id}}"
+              },
+              {
+                "name": "caller_name",
+                "value": "{{1.call.call_analysis.custom_analysis_data.caller_name}}"
+              },
+              {
+                "name": "caller_priority",
+                "value": "{{1.call.call_analysis.custom_analysis_data.caller_priority}}"
+              },
+              {
+                "name": "caller_number",
+                "value": "{{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}"
+              }
+            ],
+            "requestCompressedContent": true
           },
-          "module": "twilio:SendSMS",
-          "version": 2,
+          "module": "http:MakeRequest",
+          "version": 4,
           "parameters": {
-            "__IMTCONN__": 9736550
+            "tlsType": "",
+            "authenticationType": "noAuth"
           }
         }
       ],
@@ -107,12 +136,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-11-03T18:23:30.391Z",
+    "last_edit": "2026-11-03T19:30:58.375Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
-    "idSequence": 10,
-    "version": 40
+    "idSequence": 11,
+    "version": 43
   }
 }

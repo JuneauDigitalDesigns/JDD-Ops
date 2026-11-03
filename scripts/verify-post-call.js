@@ -4,7 +4,7 @@
  * working post-call scenario BEFORE a client run creates one.
  *
  * Background: `cloneAndWirePostCall` clones the Make master scenario and rewrites its
- * Airtable + Twilio modules for one client. Everything that can go wrong there goes wrong
+ * Airtable + HTTP modules for one client. Everything that can go wrong there goes wrong
  * silently — a clone with a stale table id, a dropped column, or a missing event filter
  * still looks like a healthy scenario in the Make UI, and the only symptom is a call log
  * that never fills. Every failure of this kind costs a real client real leads before anyone
@@ -35,7 +35,9 @@ import dotenv from 'dotenv';
 dotenv.config({ override: true });
 
 import { patchPostCallBlueprint, airtableFieldMap, CALL_LOG_FIELDS } from '../onboard.js';
-import { checkAnalysisCoversBlueprint, checkSelectMappingsTotal } from '../lib/onboard-checks.js';
+import { checkAnalysisCoversBlueprint, checkSelectMappingsTotal, checkOwnerBriefViaAgency } from '../lib/onboard-checks.js';
+
+const SIM_TOKEN = 'f'.repeat(64);
 import { buildPostCallAnalysisData } from '../lib/voice-consent.js';
 
 const MAKE_ZONE = 'https://us2.make.com/api/v2';
@@ -139,16 +141,15 @@ async function main() {
   patchPostCallBlueprint(blueprint, {
     baseId: clientMap === null ? null : (clientBaseArg ?? 'appSIMULATED'),
     siteTag,
-    fromNum: '+15005550006',
-    toNum: '+15005550009',
-    smsEnabled: true,
+    // A throwaway token of the right shape. The real one is a client credential and this script
+    // never needs it: the check asks whether the header carries the token it was handed.
+    ingestToken: SIM_TOKEN,
     masterMap,
     clientMap,
   });
   if (JSON.stringify(blueprint) === before) bad('patchPostCallBlueprint made no changes at all.');
 
   const patchedAirtable = blueprint.flow.find((m) => (m.module ?? '').startsWith('airtable'));
-  const patchedTwilio = blueprint.flow.find((m) => (m.module ?? '').startsWith('twilio'));
 
   console.log('\nPatched Airtable module:');
   if (patchedAirtable?.mapper?.table !== clientMap.tableId) {
@@ -198,12 +199,12 @@ async function main() {
   if (analysis.ok) note(`  ✓ ${analysis.detail}`);
   else bad(analysis.detail);
 
-  console.log('\nPatched Twilio module:');
-  if (patchedTwilio?.mapper?.from !== '+15005550006' || patchedTwilio?.mapper?.to !== '+15005550009') {
-    bad(`from/to not applied (from=${patchedTwilio?.mapper?.from}, to=${patchedTwilio?.mapper?.to}).`);
-  } else {
-    note('  ✓ from/to applied');
-  }
+  // The owner brief goes through the agency now: no Twilio module, one HTTP module posting to
+  // /api/ingest/call with the site's token. Same predicate the dry run uses.
+  console.log('\nOwner brief (HTTP module):');
+  const brief = checkOwnerBriefViaAgency({ blueprint, ingestToken: SIM_TOKEN });
+  if (brief.ok) note(`  ✓ ${brief.detail}`);
+  else bad(brief.detail);
 
   if (problems.length) {
     console.error(`\n✗ ${problems.length} problem(s) — step 8c would produce a scenario that does not log calls correctly.`);
