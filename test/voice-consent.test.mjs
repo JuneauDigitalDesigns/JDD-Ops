@@ -212,3 +212,17 @@ test('the console replica shows the same select expressions the master runs', ()
     assert.ok(src.includes(`raw: '${expr}'`), `console replica is missing ${expr}`);
   }
 });
+
+/* ── the outbound opening line, as /api/contact sends it ─────────────────── */
+
+test('the callback route sends the approved outbound opening line, word for word', () => {
+  // The route is written verbatim into client repos, which cannot import lib/voice-consent.js, so
+  // it carries a copy. Without it the agent opened a call it placed with the INBOUND line, "how
+  // can I help you today?", to a lead who had asked us to call.
+  const src = readFileSync(resolve(ROOT, 'lib/site-routes/contact.route.ts'), 'utf8');
+  const template = outboundOpeningLine('${businessName}', 'X').replace('Am I speaking with X?', '${question}');
+  assert.ok(src.includes(`\`${template}\``), `contact.route.ts lost the approved line:\n${template}`);
+  assert.ok(src.includes('`Am I speaking with ${name}?`'));
+  assert.ok(src.includes("'Is now a good time?'"));
+  assert.match(src, /agent_override:\s*\{\s*retell_llm:\s*\{\s*begin_message:\s*outboundOpeningLine\(/);
+});
