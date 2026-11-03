@@ -110,12 +110,37 @@ default `407,321,689` → `TWILIO_DEFAULT_REGION`, default `FL`) and hard-fails 
 no local number is available rather than buying toll-free. Expanding to new
 regions is an env edit.
 
-**A2P SMS:** the sending number must live in the `TWILIO_MESSAGING_SERVICE_SID`
-sender pool (which holds the approved campaign) or every post-call text 30034s.
-onboard.js adds each local number to the pool and reads it back to confirm; for
-a client with SMS consent, the pre-flight hard-fails when the SID is unset or the
-campaign isn't approved, so we never provision a silently-textless client. The
-reconcile engine also flags any live number that isn't in the pool.
+**A2P SMS — two lanes. Who receives a message decides which campaign carries it.**
+
+- **Account lane** — to the business owner: post-call briefs, new-lead alerts. Rides JDD's own
+  approved `ACCOUNT_NOTIFICATION` campaign, sent from one dedicated number,
+  `TWILIO_NOTIFICATION_NUMBER`, which sits in the `TWILIO_MESSAGING_SERVICE_SID` pool with its
+  voiceUrl deliberately unset. For a client with SMS consent, pre-flight hard-fails when the
+  service SID or the notification number is unset, or the campaign isn't approved
+  (`usAppToPersonRegistered`), so we never provision a silently-textless client.
+- **Customer lane** — to the owner's customers: portal replies, review requests. Each
+  Growth/Enterprise client's own `CUSTOMER_CARE` campaign and number, registered per client
+  through the console's A2P chain. 13–20 business days of carrier review per client; not live.
+
+**A client's number must never send account-lane traffic.** A campaign binds to a Messaging
+Service and a number sits in exactly one, so a client number used for owner alerts is stranded
+in JDD's service and can never join the client's own campaign. `patchPostCallBlueprint` stamps
+`from` onto every clone, so the owner brief's sender is set at onboard.js's call sites — patching
+the master blueprint cannot change it. `checkAccountLaneSender` asserts it.
+
+**Pool membership is what associates a number with a campaign — not naming the service in the
+API call.** The account's history shows one number going `30034` → `delivered` when the campaign
+was approved, with `messaging_service_sid` null on every message before and after. So `30034`
+means "this number is not associated with an approved campaign", not "the call omitted the
+service SID". This file used to imply the latter.
+
+**Transitional, and the reconcile probe still reflects the old design.** onboard.js still adds
+each client number to the master pool and reads it back, and the reconcile engine still flags a
+live client number that is *not* in the master pool. Under the two-lane design that is backwards
+— a client number *in* the master pool is the drift — but flipping it needs each client's own
+Messaging Service SID to compare against, which the A2P chain hasn't produced yet
+(`HANDOFF-ORCHESTRATOR-lead-capture-a2p.md` §6 items 5 and 7). Until then the flag is correct for
+how onboard.js actually provisions. Don't "fix" it ahead of those.
 
 **The site must advertise the Twilio number, not the owner's.** Two numbers with two jobs:
 
@@ -300,18 +325,32 @@ Things worth knowing:
 - The voice-agent editor reads `agent-prompt.txt` from disk. There is no read-back from
   Retell, so it can lag a change made in the Retell dashboard; the UI says so.
 
-## Lead callback (Growth/Enterprise)
+## Lead capture (every tier)
 
-The final-CTA form POSTs `{name, phone}` to `/api/contact`. With
-`LEAD_DELIVERY_MODE=callback`, the route normalizes the phone to E.164 and calls
-`POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`,
-body `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID }`)
-so the Retell agent dials the lead back. Starter uses `LEAD_DELIVERY_MODE=email`
-(Resend): the route sends the owner a formatted HTML lead email (subject/heading
-personalized via `LEAD_BRAND_NAME`, a labeled field table built from all posted form
-fields, `reply_to` set to the lead's email when present) and returns HTTP 502 if the
-Resend send fails rather than silently reporting success. **The `/api/contact`,
-`/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
+The final-CTA form POSTs to `/api/contact`. `LEAD_DELIVERY_MODE` is `portal` on every tier; the
+only tier difference here is `LEAD_CALLBACK`:
+
+1. **If `LEAD_CALLBACK=on`** (Growth/Enterprise), the route normalizes the phone to E.164 and calls
+   `POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`, body
+   `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID }`) so the agent
+   dials the lead back.
+2. **Then, on every tier,** the lead is recorded to the client's portal: the whole posted body
+   goes to `LEAD_INGEST_URL` with the per-client bearer `LEAD_INGEST_TOKEN`, so fields like the
+   form's `consent` object arrive with no further change here.
+
+The callback is attempted first only so the stored lead can say whether it went out. **A failed
+callback never prevents the lead being stored.** The route returns 502 only when the lead could
+not be stored *and* no callback went out — the one case where nothing happened, so the form shows
+the phone number as a fallback.
+
+**The old version lost leads, which is why this ordering is load-bearing.** Starter used to email
+the owner through Resend, and Growth placed the callback and persisted nothing — so an unanswered
+callback produced no `call_analyzed` event, no Make run, no Airtable row and no record anywhere.
+Resend also failed open: `RESEND_API_KEY` was seeded empty, `syncVercelEnv` skips empty values,
+and the route 502'd on every Starter lead until someone noticed by hand. Resend is now agency-side
+transactional mail only; anything describing a Starter lead email is pre-portal and wrong.
+
+**The `/api/contact`, `/api/voice`, and `/api/voice/no-answer` route code is owned by onboard.js**
 (`lib/site-routes/*.ts`) and written into the repo on every run — it is not sourced
 from `template/` or the client repo.
 

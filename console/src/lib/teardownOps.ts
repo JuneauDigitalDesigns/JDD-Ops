@@ -56,6 +56,18 @@ interface TeardownOpsModule {
     kvUrl: string | undefined;
     kvToken: string | undefined;
   }): Promise<StepResult>;
+  /**
+   * Purge one site's leads, CRM records and ingest token from KV. `dryRun` counts without
+   * deleting — the preview uses it so the operator sees how many records go before confirming.
+   */
+  purgePortalSiteData(args: {
+    kvUrl: string | undefined;
+    kvToken: string | undefined;
+    siteSlug: string;
+    accountEmail: string | null | undefined;
+    ingestToken: string | undefined;
+    dryRun?: boolean;
+  }): Promise<StepResult & { keys?: string[] }>;
   deleteRetellAgent(args: { apiKey: string | undefined; agentId: string | undefined }): Promise<StepResult>;
   deleteRetellLlm(args: { apiKey: string | undefined; llmId: string | null | undefined }): Promise<StepResult>;
   deleteVercelProject(args: { token: string | undefined; teamId: string | undefined; slug: string }): Promise<StepResult>;

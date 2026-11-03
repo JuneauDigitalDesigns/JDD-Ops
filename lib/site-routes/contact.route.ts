@@ -20,7 +20,7 @@ function toE164(raw: string): string | null {
 //   - callback mode also needs: RETELL_API_KEY, TWILIO_NUMBER, RETELL_AGENT_ID
 // Read ONLY these names — never invent new env vars, never expose master secrets.
 //
-// ── Why the lead is ALWAYS recorded first ───────────────────────────────────────────────────
+// ── Why the lead is ALWAYS recorded ──────────────────────────────────────────────────────────
 // This route used to either email the owner (Starter, via Resend) or place a Retell callback
 // (Growth) — and in the callback case it persisted nothing. Two ways that lost a paying
 // customer's lead with no trace:
@@ -29,9 +29,15 @@ function toE164(raw: string): string | null {
 //   2. It succeeds but the lead never answers → no `call_analyzed` event → the Make post-call
 //      scenario never fires → no Airtable row. The lead simply evaporates.
 //
-// So the lead is recorded before anything else, on every tier, and the callback becomes an
-// additional action rather than the only one. The portal is then the system of record and the
-// owner can act on a lead the receptionist never reached.
+// So the lead is recorded on every tier, whatever happens to the callback, and the callback
+// becomes an additional action rather than the only one. The portal is then the system of
+// record and the owner can act on a lead the receptionist never reached.
+//
+// Note the ORDER is the other way round from what "record first" would suggest: the callback
+// is attempted first (see POST below) so the stored lead can say whether it went out. What
+// matters is that a failed callback never prevents the lead being stored — not which runs
+// first. This comment used to say "recorded before anything else", which was not true of the
+// code beneath it, and the claim had already been copied into CLAUDE.md.
 //
 // Resend is gone entirely. It was the whole delivery mechanism for Starter and it failed open:
 // `RESEND_API_KEY` seeded empty on a fresh client and `syncVercelEnv` skips empty values, so the
