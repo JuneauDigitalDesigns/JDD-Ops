@@ -298,11 +298,9 @@ records. It keeps no state of its own.
   Overview while any light needs action (for example Lakeside Roofing → "Needs EIN").
 - **Reads:** `GET /api/ops/orders?leadId=` (agency), `readRegistration({ slug })` and the A2P intake
   (local), and the account store. The slug locked at order time is what joins all three.
-- **The client can supply the EIN themselves.** The portal onboarding already has an A2P identity step
-  (`app/api/onboarding/a2p-identity`, submit-and-consume, zero retention). It writes the same
-  `jdd:a2p-registration:{slug}` record. So if they'd rather not read the EIN out, they enter it at
-  onboarding, and Resume shows "Business details and EIN: added in the portal" with only **Submit
-  registration** left. This only works because the portal site's slug equals the console slug (§3).
+- **Only the operator collects the EIN** (Xander, 2026-11-03), either on the closing call or on a follow-up
+  via Resume. The agency onboarding form must not collect it. Its existing A2P identity step is being
+  removed (a2p-chain follow-up 1).
 - **Registration type stays editable until the profile is submitted** (Xander, 2026-11-03). A client
   saved as "Business with an EIN" may turn out to have no EIN, or the reverse. Today the A2P chain fixes
   `registrationPath` forever at `profile.create`, so this needs one new chain step,
