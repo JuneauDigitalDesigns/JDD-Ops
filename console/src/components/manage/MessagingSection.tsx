@@ -89,8 +89,23 @@ const EFFECT: Record<string, (d: SectionData, f: Record<string, any>) => string>
       : `Adds ${f.siteSlug}'s number to this client's Messaging Service, then reads it back.`,
 };
 
+/** The /manage section: the panel, with the client taken from the manage context. */
 export default function MessagingSection({ enums }: { enums: A2pEnums }) {
   const { ctx } = useManage();
+  return <A2pRegistrationPanel slug={ctx.slug} enums={enums} />;
+}
+
+/**
+ * The whole registration stepper for one client, with no dependency on /manage.
+ *
+ * Exported so another console flow (the sales-call wizard) can EMBED it rather than build a
+ * second EIN form — two places that take an EIN are two places to get zero-retention wrong.
+ * `embedded` drops the page header and width; everything else, the confirm dialog included,
+ * is identical. The host must pass `enums` from a server component (`loadA2pEnums()`).
+ */
+export function A2pRegistrationPanel({ slug, enums, embedded = false }: { slug: string; enums: A2pEnums; embedded?: boolean }) {
+  const ctx = { slug };
+  const Shell = embedded ? EmbeddedShell : PageShell;
   const [data, setData] = useState<SectionData | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [loading, setLoading] = useState(true);
@@ -349,9 +364,18 @@ export default function MessagingSection({ enums }: { enums: A2pEnums }) {
   );
 }
 
+function EmbeddedShell({ children, actions }: { children: React.ReactNode; actions?: React.ReactNode }) {
+  return (
+    <div className="w-full">
+      {actions && <div className="mb-3 flex justify-end">{actions}</div>}
+      {children}
+    </div>
+  );
+}
+
 // ── Pieces ───────────────────────────────────────────────────────────────────────────────────
 
-function Shell({ children, actions }: { children: React.ReactNode; actions?: React.ReactNode }) {
+function PageShell({ children, actions }: { children: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
       <SectionHeader
