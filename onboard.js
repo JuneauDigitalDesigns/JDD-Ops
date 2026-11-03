@@ -108,6 +108,7 @@ import {
   buildPostCallAnalysisData,
   inboundOpeningLine,
   smsConsentAsk,
+  VOICEMAIL_OPTION,
   voiceConsentInstructions,
 } from './lib/voice-consent.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
@@ -1027,7 +1028,7 @@ ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have
 
 CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye.
 
-EDGE CASES to cover: silence/no response; leaving a short friendly voicemail on outbound; an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
+EDGE CASES to cover: silence/no response; reaching voicemail on an outbound callback (hang up at once and leave NO message — the system normally hangs up on its own); an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
 
 NEVER (consolidated list): sounding robotic or scripted; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
 
@@ -1171,6 +1172,9 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
       voice_id: voiceId,
       max_call_duration_ms: MAX_CALL_DURATION_MS,
       post_call_analysis_data: postCallAnalysisData,
+      // Hang up on voicemail. An API-created agent has detection OFF unless this is set, and then
+      // talks to the voicemail — see lib/voice-consent.js.
+      voicemail_option: VOICEMAIL_OPTION,
     }),
   });
 

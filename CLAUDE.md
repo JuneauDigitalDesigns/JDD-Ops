@@ -261,7 +261,19 @@ the prompt and binds the agent to it; the per-client LLM id is saved as
 LLM (`update-retell-llm`: prompt + the fixed `begin_message` recording disclosure) **and** the
 agent's `post_call_analysis_data` in one command, so a prompt that asks for SMS consent never
 runs on an agent with no field to record it. It refuses a prompt missing the approved consent
-ask; `--prompt-only` keeps the old prompt-alone behaviour. Note: Retell blocks changing an agent's
+ask; `--prompt-only` keeps the old prompt-alone behaviour.
+
+**Every agent hangs up on voicemail** (`voicemail_option: { action: { type: "hangup" } }`, an
+*agent* field, `VOICEMAIL_OPTION` in `lib/voice-consent.js`). onboard.js sets it at creation and
+`update-prompt` pushes it to existing agents. An API-created agent has voicemail detection OFF
+unless the field is set; the dashboard's hang-up default doesn't apply. On 2026-11-03 the growth
+fixture's agent spent 48 s talking to an unanswered lead's voicemail.
+
+**Live calls use the agent's latest draft.** The fixture agent is `is_published: false` at
+version 9, and its calls ran on version 9. So `update-agent` / `update-retell-llm` take effect
+with no publish step.
+
+Note: Retell blocks changing an agent's
 `response_engine` once it has multiple versions — re-point at provision time, not
 after.
 
