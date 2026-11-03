@@ -239,9 +239,25 @@ test('every agent is told to hang up on voicemail', async () => {
   assert.match(createAgent.slice(0, 1500), /voicemail_option: VOICEMAIL_OPTION/, 'create-agent must set voicemail_option');
 });
 
-test('the backfill pushes the voicemail hang-up with the analysis schema', () => {
-  const script = readFileSync(resolve(ROOT, 'scripts/update-agent-prompt.js'), 'utf8');
-  assert.match(script, /patch: \{ post_call_analysis_data: buildPostCallAnalysisData\(business\), voicemail_option: VOICEMAIL_OPTION \}/);
+test('the voicemail hang-up is pushed whatever happens to the prompt', async () => {
+  // It used to ride inside the consent push, so --prompt-only skipped it and a prompt without the
+  // consent ask refused the run before it — i.e. every pre-consent agent, the ones that lacked it.
+  const { planAgentUpdate } = await import('../scripts/update-agent-prompt.js');
+  assert.deepEqual(planAgentUpdate({ slug: 'acme' }), { voicemail: true, prompt: true, consent: true });
+  assert.deepEqual(planAgentUpdate({ slug: 'acme', promptOnly: true }), { voicemail: true, prompt: true, consent: false });
+  assert.deepEqual(planAgentUpdate({ slug: 'acme', voicemailOnly: true }), { voicemail: true, prompt: false, consent: false });
+  // JDD's own demo line is not a client callback agent.
+  assert.equal(planAgentUpdate({ file: 'demo/agent-prompt.txt' }).voicemail, false);
+});
+
+test('the voicemail push runs before the prompt is read or checked', () => {
+  // So a missing prompt file or a refused prompt cannot stop it landing.
+  const src = readFileSync(resolve(ROOT, 'scripts/update-agent-prompt.js'), 'utf8');
+  const main = src.slice(src.indexOf('async function main()'));
+  const vm = main.indexOf('patch: { voicemail_option: VOICEMAIL_OPTION }');
+  assert.ok(vm > 0, 'voicemail is pushed on its own');
+  assert.ok(vm < main.indexOf('readFileSync(promptPath'), 'before the prompt is read');
+  assert.ok(vm < main.indexOf('checkPromptHasConsentAsk('), 'before the consent check can refuse');
 });
 
 test('the repair allow-list accepts voicemail_option (and still refuses anything else)', async () => {

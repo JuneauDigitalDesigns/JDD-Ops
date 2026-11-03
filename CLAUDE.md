@@ -265,7 +265,10 @@ ask; `--prompt-only` keeps the old prompt-alone behaviour.
 
 **Every agent hangs up on voicemail** (`voicemail_option: { action: { type: "hangup" } }`, an
 *agent* field, `VOICEMAIL_OPTION` in `lib/voice-consent.js`). onboard.js sets it at creation and
-`update-prompt` pushes it to existing agents. An API-created agent has voicemail detection OFF
+`update-prompt` pushes it to existing client agents **first and on its own**: with
+`--prompt-only`, with `--voicemail-only` (the safety setting alone), and even when the prompt
+lacks the consent ask and the run refuses. A safety setting must not wait on prompt regeneration.
+An API-created agent has voicemail detection OFF
 unless the field is set; the dashboard's hang-up default doesn't apply. On 2026-11-03 the growth
 fixture's agent spent 48 s talking to an unanswered lead's voicemail.
 

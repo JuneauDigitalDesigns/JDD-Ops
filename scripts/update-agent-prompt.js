@@ -11,7 +11,17 @@
  *   npm run update-prompt -- <agentId> --slug <slug>          # explicit agent id
  *   npm run update-prompt -- <agentId> --file <path>          # any path, relative to repo root
  *   ... --business "<Business Name>"                          # override the spoken business name
- *   ... --prompt-only                                         # the old behaviour: prompt alone
+ *   ... --prompt-only                                         # prompt alone (+ the voicemail hang-up)
+ *   ... --voicemail-only                                      # ONLY the voicemail hang-up; no prompt read
+ *
+ * ── The voicemail hang-up does not wait on the prompt ───────────────────────
+ *
+ * For a client agent, `voicemail_option` (hang up on voicemail) is pushed FIRST and on its own,
+ * before the prompt file is even read — with `--prompt-only`, with `--voicemail-only`, and when
+ * the prompt then turns out to lack the consent ask and the run refuses. It is a safety setting:
+ * an agent without it talks to an unanswered lead's voicemail (growth fixture, 2026-11-03, 48 s).
+ * It used to ride inside the consent push, so every pre-consent client — exactly the agents that
+ * lacked it — could not get it without first regenerating their prompt.
  *
  * ── Two objects, one command ────────────────────────────────────────────────
  *
@@ -35,6 +45,7 @@
 import 'dotenv/config';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
 import { setRetellAgentConfig } from '../lib/repair-ops.js';
@@ -47,7 +58,7 @@ function fail(msg, err) {
 }
 
 function parseArgs(argv) {
-  const args = { agentId: null, slug: null, file: null, business: null, promptOnly: false };
+  const args = { agentId: null, slug: null, file: null, business: null, promptOnly: false, voicemailOnly: false };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--slug' && argv[i + 1]) {
       args.slug = argv[i + 1];
@@ -60,6 +71,8 @@ function parseArgs(argv) {
       i++;
     } else if (argv[i] === '--prompt-only') {
       args.promptOnly = true;
+    } else if (argv[i] === '--voicemail-only') {
+      args.voicemailOnly = true;
     } else if (!args.agentId && !argv[i].startsWith('--')) {
       args.agentId = argv[i];
     }
@@ -75,6 +88,22 @@ function agentIdFromEnvLocal(slug) {
   return m ? m[1].trim().replace(/^["']|["']$/g, '') || null : null;
 }
 
+/**
+ * What a run will push, decided from the flags alone — exported so the test exercises the real
+ * decision rather than a copy of it.
+ *
+ *   voicemail — client agents (`--slug`), always, and first. Not `--file`: that is JDD's own
+ *               demo line, not a client callback agent.
+ *   prompt    — unless `--voicemail-only`.
+ *   consent   — the prompt push plus the opening disclosure and analysis schema; a client
+ *               agent, not `--prompt-only`.
+ */
+export function planAgentUpdate({ slug, file, promptOnly = false, voicemailOnly = false }) {
+  const client = Boolean(slug) && !file;
+  const prompt = !voicemailOnly;
+  return { voicemail: client, prompt, consent: client && prompt && !promptOnly };
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const { slug, file } = args;
@@ -84,13 +113,24 @@ async function main() {
   const apiKey = process.env.RETELL_API_KEY;
   if (!apiKey) fail('RETELL_API_KEY not set in .env');
 
+  const plan = planAgentUpdate(args);
+
+  // The safety setting first, on its own, so nothing below — a missing prompt, a refused prompt,
+  // a failed LLM update — can stop it landing.
+  if (plan.voicemail) {
+    const vm = await setRetellAgentConfig({ apiKey, agentId, patch: { voicemail_option: VOICEMAIL_OPTION } });
+    if (!vm.ok) fail(`Agent ${agentId} voicemail_option not updated: ${vm.reason}`);
+    console.log(`✓ Agent ${agentId} voicemail: ${JSON.stringify(vm.before?.voicemail_option ?? null)} → ${JSON.stringify(vm.after?.voicemail_option ?? null)}`);
+  }
+  if (!plan.prompt) return;
+
   // --file wins, so a caller who passes an explicit path never silently gets a client's prompt.
   const promptPath = file ? resolve(file) : resolve('clients', slug, 'agent-prompt.txt');
   if (!existsSync(promptPath)) fail(`Prompt file not found: ${promptPath}`);
   const prompt = readFileSync(promptPath, 'utf8').trim();
   if (!prompt) fail(`Prompt file is empty: ${promptPath}`);
 
-  const withConsent = !file && !args.promptOnly;
+  const withConsent = plan.consent;
   const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
   // The prompt lives on the agent's LLM, not the agent itself (retell-llm engine).
@@ -114,7 +154,8 @@ async function main() {
         `${promptPath} does not contain the approved SMS consent ask for "${business}" word for word:\n` +
           `  "${smsConsentAsk(business)}"\n` +
           'Regenerate the prompt (delete it and re-run onboard.js for this client) or add the ask, then push again.\n' +
-          'Pass --prompt-only to push the prompt alone, without the disclosure or the consent schema.',
+          'Pass --prompt-only to push the prompt alone, without the disclosure or the consent schema.\n' +
+          (plan.voicemail ? 'The voicemail hang-up WAS applied — it does not depend on the prompt.' : ''),
       );
     }
     console.log(`Business name spoken on the line: "${business}"${args.business ? '' : ' (from agent_name; override with --business)'}`);
@@ -123,8 +164,7 @@ async function main() {
     const schema = await setRetellAgentConfig({
       apiKey,
       agentId,
-      // The voicemail hang-up rides along: an agent provisioned before it talks to voicemail.
-      patch: { post_call_analysis_data: buildPostCallAnalysisData(business), voicemail_option: VOICEMAIL_OPTION },
+      patch: { post_call_analysis_data: buildPostCallAnalysisData(business) },
     });
     if (!schema.ok) fail(`Agent ${agentId} post_call_analysis_data not updated: ${schema.reason}`);
     const before = (schema.before?.post_call_analysis_data ?? []).map((f) => f?.name).join(', ') || '(none)';
@@ -157,4 +197,7 @@ async function main() {
   if (withConsent) console.log('  Verify with one real test call: the disclosure first, the SMS ask last, and the Airtable row.');
 }
 
-main().catch((err) => fail('unhandled error', err));
+// Only when run as the CLI, so the test can import planAgentUpdate without starting a run.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => fail('unhandled error', err));
+}

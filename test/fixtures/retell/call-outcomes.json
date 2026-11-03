@@ -49,6 +49,13 @@
     "example_call_id": "call_6adc708f444566a0138df1c1fb5"
   },
   {
+    "direction": "outbound",
+    "call_status": "ended",
+    "disconnection_reason": "voicemail_reached",
+    "in_voicemail": true,
+    "example_call_id": "call_646008ddd550bf43ae889add8dd"
+  },
+  {
     "direction": null,
     "call_status": "ended",
     "disconnection_reason": "user_hangup",
