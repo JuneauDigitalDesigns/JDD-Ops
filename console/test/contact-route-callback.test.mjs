@@ -102,5 +102,11 @@ test('the placed callback opens with the approved outbound line, naming the lead
     calls.retell[0].agent_override.retell_llm.begin_message,
     'This call is on a recorded line. Hi, this is Acme Plumbing, calling about the request you sent on our website. Am I speaking with Santa Juno?',
   );
-  assert.deepEqual(calls.retell[0].retell_llm_dynamic_variables, { lead_name: 'Santa Juno' });
+  // The number goes to the agent already in words. Read as raw digits on live calls, 207 came
+  // out "four oh seven" and then "seven oh seven" (2026-11-04) — so never digits here.
+  assert.deepEqual(calls.retell[0].retell_llm_dynamic_variables, {
+    lead_name: 'Santa Juno',
+    callback_number_spoken: 'two zero seven, three one eight, one eight three eight',
+  });
+  assert.doesNotMatch(calls.retell[0].retell_llm_dynamic_variables.callback_number_spoken, /\d/);
 });
