@@ -35,15 +35,37 @@ const OTHER_OWNER = 'someone-else@example.com';
 const OTHER = accountScope(OTHER_OWNER);
 const TOKEN = 'lit_test000000000000000000000000000000000';
 
-/** The site being torn down: every key family the agency writes for one site. */
+/**
+ * The site being torn down: every site-scoped key family the agency writes.
+ *
+ * Transcribed from the key builders in `portal-crm.ts` and `portal-leads.ts` on the agency
+ * side, not from memory — that is the only place the shapes are decided, and this list is a
+ * claim about them.
+ *
+ * It is a REGRESSION GUARD, and it passes today. `purgePortalSiteData` does not enumerate
+ * families: it SCANs `portal:*:{acct}:{slug}` and `…:{slug}:*` and lets `isSiteScopedKey`
+ * decide, so a family added to the portal is covered the moment it exists. That is a good
+ * design and this list is what stops anyone quietly replacing it with an enumeration — the
+ * archive set below arrived after the purge was written and needed no change to be deleted.
+ *
+ * Four of these (`activity`, `unread`, `task`, `promoted`) had never been listed, and the
+ * two `archived` ones are new. The comment above them used to claim the list was complete
+ * while it was missing six, which is exactly how a guard stops guarding.
+ */
 const OWN = [
   `portal:lead:v1:${ACCT}:acme:lead1`,
   `portal:lead:index:v1:${ACCT}:acme`,
   `portal:crm:v2:customer:${ACCT}:acme:c1`,
   `portal:crm:v2:index:${ACCT}:acme`,
   `portal:crm:v2:phone:${ACCT}:acme:+14075550100`,
+  `portal:crm:v2:activity:${ACCT}:acme:c1`,
   `portal:crm:v2:thread:${ACCT}:acme:c1`,
+  `portal:crm:v2:unread:${ACCT}:acme`,
+  `portal:crm:v2:task:${ACCT}:acme:t1`,
   `portal:crm:v2:tasks:${ACCT}:acme`,
+  `portal:crm:v2:promoted:${ACCT}:acme`,
+  `portal:crm:v2:archived:${ACCT}:acme`,
+  `portal:crm:v2:archived-at:${ACCT}:acme:recAAAAAAAAAAAAAA`,
 ];
 /** Everything that must survive. */
 const SURVIVORS = [
@@ -51,6 +73,9 @@ const SURVIVORS = [
   `portal:lead:v1:${ACCT}:acme-2:lead9`,
   `portal:lead:index:v1:${ACCT}:acme-2`,
   `portal:crm:v2:customer:${ACCT}:acme-2:c9`,
+  // The new families are in the trap as well: `acme-2`'s archive must outlive `acme`.
+  `portal:crm:v2:archived:${ACCT}:acme-2`,
+  `portal:crm:v2:archived-at:${ACCT}:acme-2:recBBBBBBBBBBBBBB`,
   // Account-scoped: shared by every site on the account.
   `portal:review:sent:v1:${ACCT}:+14075550100`,
   `portal:crm:v2:owner-email:${ACCT}`,
@@ -201,7 +226,9 @@ test('a dry run counts the records and deletes none', async () => {
   const res = await purgePortalSiteData({ ...BASE, ingestToken: TOKEN, dryRun: true, fetchImpl: kv.impl });
   assert.equal(kv.deleted.length, 0, 'a dry run must not delete');
   assert.equal(res.keys.length, OWN.length + 1, 'every own key plus the token');
-  assert.match(res.message, /Would purge 8/);
+  // Derived, not a literal: the message is what the operator reads before confirming, and a
+  // hardcoded total silently stops describing the fixture the moment a key family is added.
+  assert.match(res.message, new RegExp(`Would purge ${OWN.length + 1} portal record`));
 });
 
 test('every KV command is sent as POST', async () => {
