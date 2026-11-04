@@ -18,6 +18,10 @@ const SYNC_KEYS = [
   'STRIPE_PRICE_STARTER_ONBOARDING',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_ENTERPRISE_MONTHLY',
+  // Annual prices: without them the drift check flags every annual client as drifting.
+  'STRIPE_PRICE_STARTER_ANNUAL',
+  'STRIPE_PRICE_GROWTH_ANNUAL',
+  'STRIPE_PRICE_ENTERPRISE_ANNUAL',
   'OPS_SHARED_SECRET',
 ] as const;
 
