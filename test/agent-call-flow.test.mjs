@@ -78,9 +78,9 @@ test('a Starter agent gets no outbound branch; a Growth agent gets both', () => 
 
 test('an outbound callback does not re-ask the name it just confirmed; inbound asks', () => {
   const growth = callerDetailsInstructions({ callbacks: true });
-  assert.match(growth, /ON AN OUTBOUND CALLBACK, do NOT ask for it/);
+  assert.match(growth, /NEVER ask for their name or "full name" on an outbound call/);
   assert.match(growth, /\{\{lead_name\}\}/);
-  assert.match(growth, /ON AN INBOUND CALL, ask for their full name/);
+  assert.match(growth, /INBOUND CALL \(\{\{direction\}\} is inbound\):\n1\. Name — ask for their full name/);
   assert.match(callerDetailsInstructions({ callbacks: false }), /ask for their full name/);
 });
 
@@ -99,7 +99,7 @@ test('"my name at gmail" is built from the name it already has', () => {
   const x = callerDetailsInstructions({ callbacks: true });
   assert.match(x, /build it from the name you already have/);
   assert.match(x, /together, or with a dot in between/);
-  assert.match(x, /spell the address back letter by letter/);
+  assert.match(x, /spell the actual address back letter by letter/);
 });
 
 test('the generator uses these rules, chosen by whether the agent places callbacks', () => {
@@ -111,4 +111,40 @@ test('the generator uses these rules, chosen by whether the agent places callbac
   assert.match(src, /generateRetellPrompt\(site, clientDir, siteSlug, \{ callbacks: placesCallbacks\(intake\.plan\) \}\)/);
   const regen = readFileSync(resolve(ROOT, 'scripts/regenerate-prompt.js'), 'utf8');
   assert.match(regen, /\{ regenerate: true, callbacks \}/);
+});
+
+/* ── the re-test, 2026-11-04 16:34: what the first fix still got wrong ──── */
+
+test('the direction comes from Retell\'s {{direction}}, not from guessing at the opening line', () => {
+  const growth = voiceConsentInstructions(BIZ, { callbacks: true });
+  assert.match(growth, /This call's direction: \{\{direction\}\}\./);
+  assert.match(growth, /from that word alone/);
+  // The first fix inferred it from the opening line, and got it wrong on a live callback.
+  assert.doesNotMatch(growth, /Tell it to read its own opening line in the conversation to know which kind of call this is/);
+  assert.doesNotMatch(voiceConsentInstructions(BIZ, { callbacks: false }), /\{\{direction\}\}/);
+});
+
+test('the outbound checklist has no name step at all', () => {
+  const growth = callerDetailsInstructions({ callbacks: true });
+  const [inbound, outbound] = growth.split(/OUTBOUND CALLBACK \(\{\{direction\}\} is outbound\)/);
+  assert.ok(outbound, 'an outbound checklist of its own');
+  assert.match(inbound, /1\. Name — ask for their full name/);
+  assert.doesNotMatch(outbound, /^\d\. Name/m);
+  assert.match(outbound, /^1\. Callback number/m);
+  assert.match(outbound, /NEVER ask for their name/);
+});
+
+test('the number is read from {{user_number}} only — the 207 read back as "four oh seven"', () => {
+  assert.match(callerDetailsInstructions({ callbacks: true }), /EXACTLY the digits \{\{user_number\}\} contains/);
+  const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  // The generator's own example number was 407; the agent swapped it in for the real area code.
+  assert.doesNotMatch(src, /four oh seven/);
+  assert.match(src, /never write an example phone number into the prompt/);
+});
+
+test('no bracketed placeholder is ever spoken — it said "[spelling out the email address]"', () => {
+  const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  assert.match(src, /a quoted line must never contain a bracketed placeholder or stage direction/);
+  assert.match(src, /NEVER \(consolidated list\): sounding robotic or scripted; saying a bracketed placeholder or stage direction aloud;/);
+  assert.match(src, /never "thanks for calling"/);
 });

@@ -1014,7 +1014,7 @@ CORE SPEAKING RULES (write as direct instructions to the agent) — this is a vo
 - If interrupted, stop talking immediately and listen.
 - Don't repeat yourself or re-greet, and don't ask for a detail already given.
 - Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
-- Spoken-number formatting: read phone numbers back in natural grouped chunks ("four oh seven… five five five… one two one two"), say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
+- Spoken-number formatting: read phone numbers back digit by digit in natural grouped chunks (area code… three digits… four digits), exactly the digits given — never write an example phone number into the prompt, say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
 
 ${callbacks
   ? "GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it."
@@ -1032,11 +1032,13 @@ ${callerDetailsInstructions({ callbacks })}
 
 ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
 
-CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye.
+QUOTED EXAMPLE LINES: the voice model speaks quoted lines word for word, so a quoted line must never contain a bracketed placeholder or stage direction ("[grouped number]", "[spelling out the email address]"). Where a line needs a value, put the instruction outside the quote in plain words — e.g. read the number back, then ask: "Is that a good number to reach you?"
+
+CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye${callbacks ? ' (on an outbound callback the agent placed the call, so it thanks them for their time — never "thanks for calling")' : ''}.
 
 EDGE CASES to cover: silence/no response; ${callbacks ? 'reaching voicemail on an outbound callback (hang up at once and leave NO message — the system normally hangs up on its own); ' : ''}an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
 
-NEVER (consolidated list): sounding robotic or scripted; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
+NEVER (consolidated list): sounding robotic or scripted; saying a bracketed placeholder or stage direction aloud; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
 
 Keep everything warm, specific to this business, and grounded only in the provided data.`;
 
