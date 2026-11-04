@@ -593,22 +593,26 @@ function PaymentStep({
   onPaid: (o: OperatorOrder) => void;
   onCancelled: () => void;
 }) {
-  const [tab, setTab] = useState<'link' | 'card'>('link');
+  const onCard = order.payment?.method === 'dashboard-moto';
+  const [tab, setTab] = useState<'link' | 'card'>(onCard ? 'card' : 'link');
   const [shortUrl, setShortUrl] = useState<string | null>(null);
-  const [waiting, setWaiting] = useState(order.status === 'awaiting-payment');
+  const [waiting, setWaiting] = useState(order.status === 'awaiting-payment' && !onCard);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const expired = order.status === 'expired';
 
-  // Open (or fetch) the link as the step appears. Idempotent at the agency.
+  // Open (or fetch) the link while the Link tab is showing. Idempotent at the agency, and from
+  // the card path it switches back to a link (the agency refuses while a charge is running).
   useEffect(() => {
+    if (tab !== 'link') return;
     if (order.status !== 'terms-accepted' && order.status !== 'awaiting-payment') return;
     let cancelled = false;
     (async () => {
       const { ok, data } = await post<{ order: OperatorOrder; shortUrl: string }>(`/api/sales/orders/${order.id}/payment`, { method: 'link' });
       if (cancelled) return;
       if (!ok) return setError(data.error ?? 'Could not open a payment link.');
+      setError(null);
       setShortUrl(data.shortUrl);
       if (data.order) onOrder(data.order);
     })();
@@ -616,9 +620,9 @@ function PaymentStep({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order.id]);
+  }, [order.id, tab]);
 
-  // Poll while waiting. The agency's GET also checks Stripe when the webhook is late.
+  // Poll while waiting on the link. The agency's GET also checks Stripe when the webhook is late.
   useEffect(() => {
     if (!waiting) return;
     const t = setInterval(async () => {
@@ -663,6 +667,14 @@ function PaymentStep({
     onCancelled();
   }
 
+  function switchTo(next: 'link' | 'card') {
+    setError(null);
+    setWaiting(false);
+    setCopied(false);
+    if (next === 'card') setShortUrl(null);
+    setTab(next);
+  }
+
   const today = totals ? money(totals.today) : '';
   const then = totals ? `${money(totals.recurring)}/${totals.period === 'annual' ? 'yr' : 'mo'}` : '';
 
@@ -678,8 +690,8 @@ function PaymentStep({
       {!waiting && (
         <>
           <div role="tablist" className="flex flex-wrap gap-1.5">
-            <button type="button" role="tab" aria-selected={tab === 'link'} onClick={() => setTab('link')} className={`btn ${tab === 'link' ? 'border-2 border-fg' : ''}`}>Link</button>
-            <button type="button" role="tab" aria-selected={tab === 'card'} onClick={() => setTab('card')} className={`btn ${tab === 'card' ? 'border-2 border-fg' : ''}`}>Enter card</button>
+            <button type="button" role="tab" aria-selected={tab === 'link'} disabled={busy} onClick={() => switchTo('link')} className={`btn ${tab === 'link' ? 'border-2 border-fg' : ''}`}>Link</button>
+            <button type="button" role="tab" aria-selected={tab === 'card'} disabled={busy} onClick={() => switchTo('card')} className={`btn ${tab === 'card' ? 'border-2 border-fg' : ''}`}>Enter card</button>
           </div>
 
           {tab === 'link' && (
@@ -699,7 +711,16 @@ function PaymentStep({
             </div>
           )}
           {tab === 'card' && (
-            <div className="rounded-xl border border-[var(--rule)] bg-[var(--panel)] p-4 text-fg2">Not enabled yet</div>
+            <CardPanel
+              order={order}
+              totals={totals}
+              busy={busy}
+              setBusy={setBusy}
+              onOrder={onOrder}
+              onPaid={onPaid}
+              onUseLink={() => switchTo('link')}
+              onCancel={cancel}
+            />
           )}
         </>
       )}
@@ -717,12 +738,176 @@ function PaymentStep({
           </ol>
           <div className="flex flex-wrap gap-2.5">
             {shortUrl && <span className="codechip self-center">{shortUrl}</span>}
+            <button type="button" className="btn" disabled={busy} onClick={() => switchTo('card')}>Switch to card</button>
             <button type="button" className="btn" disabled={busy} onClick={cancel}>Cancel</button>
           </div>
         </div>
       )}
       <ErrorLine text={error} />
     </Card>
+  );
+}
+
+interface ChargePreview {
+  card: { id: string; brand: string; last4: string; expMonth: number | null; expYear: number | null } | null;
+  amountCents: number;
+  recurringCents: number;
+  period: Period;
+  stripeAmountCents: number | null;
+}
+
+/**
+ * The card path. The operator types the card into the client's Customer page in the Stripe
+ * Dashboard (a new tab, never this screen), then charges it here. This component sees only what
+ * Stripe reports back about the card: brand, last 4, expiry.
+ *
+ * The amount charged is the agency's: it comes back from the preview, is shown for reading
+ * aloud, and is sent back with Charge so the agency can refuse anything else.
+ */
+function CardPanel({
+  order,
+  totals,
+  busy,
+  setBusy,
+  onOrder,
+  onPaid,
+  onUseLink,
+  onCancel,
+}: {
+  order: OperatorOrder;
+  totals: TermsView['totals'] | null;
+  busy: boolean;
+  setBusy: (b: boolean) => void;
+  onOrder: (o: OperatorOrder) => void;
+  onPaid: (o: OperatorOrder) => void;
+  onUseLink: () => void;
+  onCancel: () => void;
+}) {
+  const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ChargePreview | null>(null);
+  const [needsLink, setNeedsLink] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const charging = useRef(false);
+
+  // Set up card entry as the tab opens: the Customer exists before the Dashboard does.
+  // Idempotent at the agency, which also closes a live payment link first.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      const { ok, data } = await post<{ order: OperatorOrder; dashboardUrl: string }>(`/api/sales/orders/${order.id}/payment`, {
+        method: 'dashboard-moto',
+      });
+      setBusy(false);
+      if (cancelled) return;
+      if (!ok) return setError(data.error ?? 'Could not set up card entry.');
+      setDashboardUrl(data.dashboardUrl);
+      if (data.order) onOrder(data.order);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
+
+  async function checkCard() {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/sales/orders/${order.id}/charge`, { cache: 'no-store' });
+    const data = (await res.json().catch(() => ({}))) as ChargePreview & { error?: string };
+    setBusy(false);
+    if (!res.ok) return setError(data.error ?? 'Could not read the card from Stripe.');
+    setPreview(data);
+    if (!data.card) setError('No card yet. Add it on the customer page in Stripe, then check again.');
+  }
+
+  async function charge() {
+    if (!preview?.card || charging.current) return;
+    charging.current = true; // a double click never sends two requests; the agency refuses one anyway
+    setBusy(true);
+    setError(null);
+    const { ok, data } = await post<{ order?: OperatorOrder; outcome?: string }>(`/api/sales/orders/${order.id}/charge`, {
+      amountCents: preview.amountCents,
+    });
+    setBusy(false);
+    charging.current = false;
+    if (ok && data.outcome === 'paid' && data.order) {
+      onOrder(data.order);
+      onPaid(data.order);
+      return;
+    }
+    if (data.outcome === 'requires_action') setNeedsLink(true);
+    setError(data.error ?? 'The charge did not go through.');
+  }
+
+  const amount = preview ? money(preview.amountCents / 100) : totals ? money(totals.today) : '';
+  const stripeDisagrees = preview != null && preview.stripeAmountCents !== preview.amountCents;
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <ol className="flex flex-col gap-3 rounded-xl border border-[var(--rule)] bg-[var(--panel)] p-4">
+        <li className="flex flex-col gap-1.5">
+          <div className="font-semibold">1. Add the card in Stripe</div>
+          <div className="text-[13px] text-fg2">
+            Opens {order.client.legalName} in the Stripe Dashboard in a new tab. Don&apos;t share that tab while you type the card.
+          </div>
+          <div>
+            <a
+              className={`btn ${dashboardUrl ? '' : 'pointer-events-none opacity-50'}`}
+              href={dashboardUrl ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open customer in Stripe
+            </a>
+          </div>
+        </li>
+        <li className="flex flex-col gap-1.5">
+          <div className="font-semibold">2. Check the card</div>
+          <div>
+            <button type="button" className="btn" disabled={busy || !dashboardUrl} onClick={checkCard}>
+              {preview?.card ? 'Check again' : 'I’ve added the card'}
+            </button>
+          </div>
+          {preview?.card && (
+            <div className="text-[15px]">
+              <span className="font-semibold capitalize">{preview.card.brand}</span> •••• {preview.card.last4}
+              {preview.card.expMonth && preview.card.expYear
+                ? ` · expires ${preview.card.expMonth}/${String(preview.card.expYear).slice(-2)}`
+                : ''}
+            </div>
+          )}
+        </li>
+        <li className="flex flex-col gap-1.5">
+          <div className="font-semibold">3. Charge</div>
+          {preview?.card && totals && (
+            <div className="text-[15px]">
+              {amount} due today, then {money(totals.recurring)}/{totals.period === 'annual' ? 'yr' : 'mo'}
+              <div className="text-xs text-fg2">Renews automatically · cancel any time</div>
+            </div>
+          )}
+          {stripeDisagrees && (
+            <div className="text-[13px]" style={{ color: 'var(--danger)' }}>
+              Stripe&apos;s price doesn&apos;t match this order, so charging is blocked. Check the plan prices in Stripe.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2.5">
+            <button type="button" className="btn btn-primary" disabled={busy || !preview?.card || stripeDisagrees} onClick={charge}>
+              Charge {amount}
+            </button>
+            {needsLink && (
+              <button type="button" className="btn" disabled={busy} onClick={onUseLink}>
+                Use a payment link
+              </button>
+            )}
+            <button type="button" className="btn" disabled={busy} onClick={onCancel}>
+              Cancel
+            </button>
+          </div>
+        </li>
+      </ol>
+      <ErrorLine text={error} />
+    </div>
   );
 }
 

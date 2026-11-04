@@ -378,3 +378,51 @@ last item is "EIN still needed".
 | Pin bump to v1.31.0 | **Not done yet** | It needs the `v1.31.0` tag pushed to GitHub (Xander's go-ahead). Typechecks/builds ran against the local schema build copied into `node_modules`. |
 | Phase 8 Stripe test-mode run | **Not done** | It needs `OPS_ORDERS_SECRET`, Stripe test keys, the Stripe CLI and a Clerk dev instance on localhost. Xander runs it or approves it. |
 | SMS step | `A2pRegistrationPanel variant="close-wizard"` (a2p-chain `e084b08`), prefilled from the order | R1/R2 delivered. "Profile submitted, messaging registration pending" is a normal on-call outcome; Continue stays available. |
+
+## 13. Phase 7 as built (2026-11-04): the card path (MOTO)
+
+Stripe approved MOTO for the account on 2026-11-04. Manual card entry in the Dashboard unlocks within
+about 24 hours of approval. The flow is the one Stripe described: create the Customer first, add the card
+on that Customer's Dashboard page, then create the subscription against that Customer.
+
+| Piece | Built |
+|---|---|
+| Order step | Unchanged. It already collects what the Customer needs: legal name, contact, email, phone, address. |
+| `POST /api/ops/orders/{id}/payment {method:"dashboard-moto"}` | Creates the account and Customer if missing, then fills the Customer's empty name, phone and address from the order and sets `metadata.order_id`. Stamps `startedAt` and returns `dashboardUrl`. A test key gives the test Dashboard. Switching from a live link expires that link first, and is refused if the link was already paid. Idempotent: choosing it again keeps the original `startedAt`. |
+| `GET /api/ops/orders/{id}/charge` | The card added after `startedAt` (brand, last 4 and expiry only), the order's amount, and Stripe's own preview of the first invoice. |
+| `POST /api/ops/orders/{id}/charge {amountCents}` | Only `awaiting-payment` on the card path. `amountCents` must equal the Schedule A amount and Stripe's preview, otherwise 409 with nothing sent. Creates the subscription at the period price, with onboarding as `add_invoice_items`, using the added card and `payment_behavior: "error_if_incomplete"`. A decline or a bank-verification request therefore creates nothing and charges nothing (402). It then runs the same fulfilment as a paid link. |
+| Never twice | An NX lock per order. An existing live subscription for the order is found and fulfilled instead of creating another. Every create carries an idempotency key per attempt, and the attempt only advances after a definitive decline. |
+| `invoice.paid` | When `billing_reason=subscription_create` and the subscription metadata has `order_id` + `payment_method: "dashboard-moto"`, it dispatches into the shared `fulfilOperatorPayment`. This is the backstop for a charge whose response never arrived. Link payments don't carry the marker and stay with `checkout.session.completed`. |
+| `sessionId` stand-in | `moto:{subscriptionId}`. It keys `createPendingSite` and the welcome-email claim the way a Checkout Session id does, and is not shaped like anything Stripe could be asked to retrieve. The site also gets `stripeSubscriptionId`, so the session fallbacks (`resolveSubscriptionId` etc.) never try to read the stand-in. |
+| Card-path state | `jdd:order-charge:{id}` (`startedAt`, `attempt`, `subscriptionId`), beside the order rather than on it. `zOperatorOrder` drops unknown fields on read, and a schema release for agency-only state wasn't worth a cross-repo pin. |
+| Cancel / switch to link | Both are refused while a charge is running or after one has made a subscription. |
+| Console | The Enter card tab now has three steps. **Open customer in Stripe** opens a new tab, with a note not to share that tab. **I've added the card** shows brand and last 4. **Charge {amount}** is shown under "{amount} due today, then {recurring}" and "Renews automatically · cancel any time". On a bank-verification decline it shows "This card needs bank verification. Use a payment link instead. Nothing was charged." and a **Use a payment link** button. The waiting-on-link screen gains **Switch to card**. |
+| Tests | Agency `test/moto-charge.test.mjs`: the real `chargeMotoOrder` and Stripe SDK, with in-memory Upstash and a Stripe HTTP double. It covers double click, amount mismatch, Stripe price drift, a card already on file, the request shape, bank verification with a fresh idempotency key, and an already-paid order. Breaking each guard turns its test red. Console `test/close-card-path.test.mjs`. |
+
+### 13.1 Test-mode steps (Stripe test run with Xander)
+
+**Setup, once:**
+1. Agency `.env.local` uses Stripe **test** keys, plus every `STRIPE_PRICE_*` for the plans you test,
+   including `_ONBOARDING` and `_ANNUAL`. The test-mode prices must equal Schedule A, otherwise Charge is
+   blocked with "Stripe's price doesn't match this order". `OPS_ORDERS_SECRET` must match `jdd-ops/.env`.
+2. `stripe listen --forward-to localhost:3000/api/webhooks/stripe`. The CLI forwards every event,
+   `invoice.paid` included. For a deployed preview instead, add **`invoice.paid`** to the webhook
+   endpoint's events, in test and in live.
+3. Run the agency on :3000 and the console. Use a lead whose email isn't an existing portal account, so a
+   fresh Customer is created.
+
+**Runs.** Each run is a new order through Order → Terms → Payment → Enter card:
+
+| # | Card typed in the Dashboard | Expect |
+|---|---|---|
+| 1 | `4242 4242 4242 4242`, any future expiry, any CVC | **Charge** → Setup step. In Stripe: one active subscription with `metadata.payment_method = dashboard-moto`, and one paid invoice of exactly the "due today" amount (price + onboarding). In the portal record: the site has `sessionId = moto:sub_…` and `stripeSubscriptionId`. One welcome email with the invite. |
+| 2 | Same, but double-click **Charge** fast | Still exactly one subscription and one invoice. |
+| 3 | `4000 0000 0000 0002` (declined) | "The card was declined. Nothing was charged." No subscription. Then add `4242…`, **Check again**, **Charge** → paid. |
+| 4 | `4000 0027 6000 3184` (always asks for 3-D Secure) | "This card needs bank verification. Use a payment link instead. Nothing was charged." **Use a payment link** shows a new link. No subscription. |
+| 5 | Annual order, `4242…` | The invoice is the annual price + onboarding. The subscription is on the `_ANNUAL` price. |
+| 6 | Open a link first, then **Switch to card** | In Stripe the Checkout Session is now `expired`, and the short link 404s. |
+| 7 | An existing client (master already signed) whose Customer already holds a card | **I've added the card** says "No card yet" until a new card is added. The old card is never charged. |
+| 8 | Webhook backstop: stop `stripe listen`, charge `4242…`, restart it, run `stripe events resend <evt_id>` for the `invoice.paid` | The order stays fulfilled. No second site, and no second welcome email. |
+
+**Live, after the 24 hours.** One real card for the smallest amount you're happy to refund (a Starter
+order). Check that the Dashboard's customer page offers card entry. Then refund and cancel it in Stripe.
