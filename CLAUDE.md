@@ -437,6 +437,11 @@ Things worth knowing:
   named key, disk only — localhost-only assumption; delete that route first if the console
   is ever deployed). `VERCEL_PROJECT_NAME` / `CLERK_USER_ID` / `RETELL_LLM_ID` are
   read-only, since onboard.js owns them.
+- **The console binds 127.0.0.1 only** (`-H 127.0.0.1` on `npm run dev` / `npm start`, pinned
+  by `console/test/loopback-bind.test.mjs`). Next binds every interface by default, and until
+  2026-11-04 it did: the console, reveal route included, answered on the LAN IP. The
+  middleware's Host check is not a substitute — Host is caller-written. Never start it with
+  `-H 0.0.0.0` or bare `next dev`.
 - Changing `AIRTABLE_BASE_ID` also updates the portal account record, which stores its own
   copy.
 - **Every write is appended to `console/.state/audit.ndjson`** (key names, never values)
