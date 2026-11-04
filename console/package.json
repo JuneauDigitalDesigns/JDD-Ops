@@ -8,7 +8,6 @@
     "build": "next build",
     "start": "next start -p 3040",
     "check-schema": "node scripts/check-pins.mjs",
-    "postinstall": "node scripts/patch-next-font.mjs",
     "lint": "next lint",
     "test": "node --import tsx --test \"test/**/*.test.mjs\""
   },

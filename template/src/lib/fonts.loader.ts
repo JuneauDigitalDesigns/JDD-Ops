@@ -7,14 +7,14 @@
 // client build depend on Google answering correctly:
 //   - ~5% of Google Fonts CSS responses list a file as `fonts.gstatic.com/l/font?kit=…` with no
 //     extension, and Next 14.2's google loader crashes on those ("Cannot read properties of null
-//     (reading '1')"). Seven families per build made that a frequent random failure. The console
-//     patches its own Next for it (console/scripts/patch-next-font.mjs, JDD-Ops #16).
+//     (reading '1')"). Seven families per build made that a frequent random failure. JDD-Ops #16
+//     patched the console's Next for it; the console now self-hosts too, and the patch is gone.
 //   - A download that fails or times out fails the build outright. That broke an agency
-//     production build on 2026-11-04, and no patch can fix it.
+//     production build, and a console build, on 2026-11-04. No patch can fix it.
 // Local files remove the network from the build entirely. The woff2 files are exactly what
 // next/font/google was downloading (latin subset, Chrome user agent), fetched once by
-// jdd-ops/scripts/vendor-template-fonts.js. To add a family or weight, edit that script's
-// FAMILIES, run it, and add the entry below. Never import next/font/google in a client repo:
+// jdd-ops/scripts/vendor-fonts.js. To add a family or weight, edit that script's
+// TARGETS, run it, and add the entry below. Never import next/font/google in a client repo:
 // jdd-ops/test/template-fonts.test.mjs fails if anything under template/src does.
 //
 // Google serves each of these families as ONE variable file and lists it once per requested
@@ -43,7 +43,8 @@
 // Net: a system-stack client ships ZERO font bytes, and a client on a pairing ships ONE
 // family at two weights rather than all five.
 //
-// The CONSOLE's twin of this file deliberately still loads all five — it is the pairing picker
+// The CONSOLE's twin of this file (console/src/lib/fonts.loader.ts) loads these same files, but
+// deliberately still loads all of them — it is the pairing picker
 // and preview surface and needs every family resolvable at once. Do not "sync" the two.
 //
 // If a client on a real web font ever shows a swap cost worth fixing, add a targeted

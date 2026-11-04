@@ -1,5 +1,5 @@
 Every font in this folder is licensed under the SIL Open Font License 1.1, reproduced below
-per family with its copyright notice. Fetched by jdd-ops/scripts/vendor-template-fonts.js.
+per family with its copyright notice. Fetched by jdd-ops/scripts/vendor-fonts.js.
 
 ==============================================================================
 Instrument Sans (instrument-sans*.woff2)

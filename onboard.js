@@ -871,7 +871,7 @@ function writeSelfHostedFonts(repoDir) {
   // catalog components, the two places a client repo's code comes from.
   for (const rel of googleFontImports(repoDir)) {
     console.warn(`  ⚠ ${rel} imports next/font/google, so this site's builds still download from Google and can fail at random.`);
-    console.warn(`    Vendor the family into template/src/lib/fonts/ (scripts/vendor-template-fonts.js) and load it with next/font/local.`);
+    console.warn(`    Vendor the family into template/src/lib/fonts/ (scripts/vendor-fonts.js) and load it with next/font/local.`);
   }
 }
 

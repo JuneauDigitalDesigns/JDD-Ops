@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * vendor-template-fonts.js — download the template's Google fonts ONCE, into the repo.
+ * vendor-fonts.js — download the Google fonts the template and console use ONCE, into the repo.
  *
- * Usage: node scripts/vendor-template-fonts.js [--check]
+ * Usage: node scripts/vendor-fonts.js [--check]
  *
  * Why this exists: the template used to load its seven families through `next/font/google`,
  * which downloads every declared family from Google during `next build` — on Vercel, for every
@@ -17,9 +17,13 @@
  * So the files now live in template/src/lib/fonts/ and fonts.loader.ts loads them with
  * `next/font/local`. A build reads them from disk and never touches the network.
  *
- * This script is how the files got there, and how to add a family or a weight: edit FAMILIES,
- * run it, then add the matching `localFont` entry to template/src/lib/fonts.loader.ts (next/font
- * needs literal arguments, so the loader cannot read this list). The root suite
+ * The console has the same exposure (its own build failed on a Google download on 2026-11-04,
+ * despite the #16 patch), so it loads the pairing families from the template's files and its
+ * own chrome fonts from console/src/app/fonts/, both written here.
+ *
+ * This script is how the files got there, and how to add a family or a weight: edit TARGETS,
+ * run it, then add the matching `localFont` entry to the loader (next/font needs literal
+ * arguments, so the loaders cannot read this list). The root suite
  * (test/template-fonts.test.mjs) fails if the loader names a file that is missing or not woff2.
  *
  * It requests the CSS the way next/font/google does (a Chrome user agent, so Google answers with
@@ -35,10 +39,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const FONT_DIR = resolve(ROOT, 'template/src/lib/fonts');
-
-/** family: Google's name. file: our basename. license: the google/fonts repo path of its OFL. */
-export const FAMILIES = [
+/**
+ * One entry per folder. family: Google's name. file: our basename. license: the google/fonts repo
+ * path of its OFL.
+ */
+const PAIRING_FAMILIES = [
   { family: 'Instrument Sans', file: 'instrument-sans', weights: ['400', '700'], license: 'ofl/instrumentsans' },
   { family: 'Schibsted Grotesk', file: 'schibsted-grotesk', weights: ['400', '800'], license: 'ofl/schibstedgrotesk' },
   { family: 'Bricolage Grotesque', file: 'bricolage-grotesque', weights: ['400', '800'], license: 'ofl/bricolagegrotesque' },
@@ -46,6 +51,20 @@ export const FAMILIES = [
   { family: 'Archivo', file: 'archivo', weights: ['500', '800'], license: 'ofl/archivo' },
   { family: 'Oswald', file: 'oswald', weights: ['600', '700'], license: 'ofl/oswald' },
   { family: 'Inter', file: 'inter', weights: ['400', '600', '700'], license: 'ofl/inter' },
+];
+
+// The console's own chrome (mirrors the agency site). Next 14's font data only knows the
+// "Big Shoulders Display" sub-family, so that is the one the console has always requested.
+const CONSOLE_FAMILIES = [
+  { family: 'Big Shoulders Display', file: 'big-shoulders-display', weights: ['500', '600', '700', '800', '900'], license: 'ofl/bigshoulders' },
+  { family: 'Hanken Grotesk', file: 'hanken-grotesk', weights: ['400', '500', '600'], license: 'ofl/hankengrotesk' },
+  { family: 'DM Mono', file: 'dm-mono', weights: ['400', '500'], license: 'ofl/dmmono' },
+];
+
+export const TARGETS = [
+  // Used by the template (every client site) AND the console's pairing previews.
+  { dir: resolve(ROOT, 'template/src/lib/fonts'), families: PAIRING_FAMILIES },
+  { dir: resolve(ROOT, 'console/src/app/fonts'), families: CONSOLE_FAMILIES },
 ];
 
 // The user agent next/font/google sends, so Google serves the same woff2 a build would have got.
@@ -72,10 +91,12 @@ export function latinUrls(css) {
 
 async function main() {
   const check = process.argv.includes('--check');
-  mkdirSync(FONT_DIR, { recursive: true });
   let drift = 0;
+  for (const { dir: FONT_DIR, families } of TARGETS) {
+  mkdirSync(FONT_DIR, { recursive: true });
+  console.log(FONT_DIR.slice(ROOT.length + 1));
   const licenses = [];
-  for (const f of FAMILIES) {
+  for (const f of families) {
     const q = `${f.family.replace(/ /g, '+')}:wght@${f.weights.join(';')}`;
     const css = await get(`https://fonts.googleapis.com/css2?family=${q}&display=swap`, 'text');
     const urls = latinUrls(css);
@@ -113,10 +134,11 @@ async function main() {
     writeFileSync(
       resolve(FONT_DIR, 'LICENSES.txt'),
       'Every font in this folder is licensed under the SIL Open Font License 1.1, reproduced below\n' +
-        'per family with its copyright notice. Fetched by jdd-ops/scripts/vendor-template-fonts.js.\n\n' +
+        'per family with its copyright notice. Fetched by jdd-ops/scripts/vendor-fonts.js.\n\n' +
         licenses.join('\n'),
     );
     console.log('  wrote LICENSES.txt');
+  }
   }
   if (check && drift) {
     console.log(`\n${drift} file(s) differ from what Google serves now. Re-run without --check to re-vendor.`);
@@ -126,7 +148,7 @@ async function main() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((e) => {
-    console.error(`vendor-template-fonts: ${e.message}`);
+    console.error(`vendor-fonts: ${e.message}`);
     process.exit(1);
   });
 }

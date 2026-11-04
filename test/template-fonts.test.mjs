@@ -16,9 +16,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   FONT_LOADER,
@@ -36,14 +36,38 @@ test('nothing in the template imports next/font/google', () => {
   assert.deepEqual(googleFontImports(TEMPLATE), []);
 });
 
-test("the console's catalog components do not import next/font/google either", () => {
-  // Exported catalog components are copied into client repos, so they are client-site code too.
-  // (The console's own app layout is not: it never ships to a client.)
-  const consoleDir = resolve(ROOT, 'console');
-  assert.deepEqual(googleFontImports(consoleDir, { under: 'src/components/catalog' }), []);
-  // The walk itself must reach that tree, or the assertion above passes on an empty directory:
-  // the console's own layout DOES import next/font/google, so the same walk over src/app finds it.
-  assert.ok(googleFontImports(consoleDir, { under: 'src/app' }).includes('src/app/layout.tsx'));
+test('nothing in the console imports next/font/google either', () => {
+  // Two reasons. Exported catalog components are copied into client repos, so they are
+  // client-site code. And the console's own build failed on a Google download on 2026-11-04,
+  // after JDD-Ops #16 had patched the extensionless-URL crash: a patch cannot fix a failed fetch.
+  // (That writeSiteFonts' walker does find an import is proven by the temp-repo test below.)
+  assert.deepEqual(googleFontImports(resolve(ROOT, 'console')), []);
+});
+
+test("every font file the console's loaders name exists, and is woff2", () => {
+  // The pairing loader points at the TEMPLATE's files (../../../template/...), so a rename there
+  // breaks the console build too. The layout's chrome fonts live in console/src/app/fonts/.
+  const files = [
+    resolve(ROOT, 'console/src/lib/fonts.loader.ts'),
+    resolve(ROOT, 'console/src/app/layout.tsx'),
+  ];
+  let count = 0;
+  for (const file of files) {
+    const src = readFileSync(file, 'utf8');
+    assert.match(src, /from 'next\/font\/local'/, `${file} does not use next/font/local`);
+    for (const [, rel] of src.matchAll(/path:\s*'([^']+\.woff2)'/g)) {
+      const abs = resolve(dirname(file), rel);
+      assert.ok(existsSync(abs), `${rel} (from ${file}) is missing`);
+      assert.equal(readFileSync(abs).subarray(0, 4).toString('latin1'), 'wOF2', `${rel} is not woff2`);
+      count++;
+    }
+  }
+  assert.ok(count >= 20, `expected the console to load its fonts from files, found ${count} faces`);
+  // One copy: the console's pairing faces are the template's files, not a drifting second set.
+  const pairing = readFileSync(files[0], 'utf8');
+  for (const [, rel] of pairing.matchAll(/path:\s*'([^']+)'/g)) {
+    assert.match(rel, /^\.\.\/\.\.\/\.\.\/template\/src\/lib\/fonts\//, `${rel} is not the template's file`);
+  }
 });
 
 test('every font file the template loader names is committed, and is woff2', () => {

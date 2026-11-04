@@ -13,10 +13,9 @@
 // it is the one of the two that is reachable with open faces.
 //
 // LICENSING (decision 5): every family here is open-licensed (SIL OFL). No Typekit, no paid
-// regime, no runtime third-party request. The console loads them through next/font/google; the
-// template ships the woff2 files committed in template/src/lib/fonts/ and loads them through
-// next/font/local, so a client build never fetches from Google. Adding a family here means
-// vendoring it there too (jdd-ops/scripts/vendor-template-fonts.js).
+// regime, no runtime third-party request. The woff2 files are committed in template/src/lib/fonts/
+// and both loaders read them through next/font/local, so no build fetches from Google. Adding a
+// family here means vendoring it there first (jdd-ops/scripts/vendor-fonts.js).
 //
 // CLIENT-SAFE: no next/font import here, so the Brand drawer can use it. The families are loaded
 // in fonts.loader.ts (console) and template/src/lib/fonts.loader.ts (template). A `varName` that
@@ -70,7 +69,7 @@ export const FONT_PAIRINGS: FontPairing[] = [
     varName: '--font-instrument',
     stack: 'var(--font-instrument), system-ui, sans-serif',
     // Instrument Sans ships 400/500/600/700 ONLY (verified in font-data.json). SPEC §3 asks for
-    // 800 headings; this family has no 800, and requesting one from next/font is a build error.
+    // 800 headings; this family has no 800, so there is no 800 face to load.
     // 700 at display-1 with -0.022em tracking reads as heavy as an 800 at a looser track.
     display: { weight: 700, tracking: '-0.022em', lineHeight: 1.02 },
     body: { weight: 400 },
