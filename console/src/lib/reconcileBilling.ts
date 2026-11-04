@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import type { Finding } from '@jdd/schema';
 import type { PortalAccount, PortalSite } from '@jdd/schema';
 import { loadStripeKey } from './opsSecrets';
+import { planForPrice, planPricesFromEnv, pricesFor } from './planPrices';
 
 /**
  * Billing findings, lifted from scripts/audit-billing.js.
@@ -34,14 +35,6 @@ function getStripe(): Stripe | null {
   return _stripe;
 }
 
-/** Price id per tier, from jdd-ops/.env. Absent ids simply disable the drift check. */
-function priceForPlan(): Record<string, string | undefined> {
-  return {
-    starter: process.env.STRIPE_PRICE_STARTER_MONTHLY,
-    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
-    enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
-  };
-}
 
 /**
  * Stripe statuses that mean money is not arriving. `incomplete_expired` and `canceled` are
@@ -204,9 +197,12 @@ export async function reconcileBilling(
   // Growth price while the record stayed Starter, so the client paid more and was still
   // shown an "Upgrade" button. A cancelled subscription keeps its price and isn't drifting.
   if (!ended && priceId) {
-    const prices = priceForPlan();
-    const expected = prices[site.plan];
-    if (!expected) {
+    // Monthly AND annual prices for each tier: an annual client is billed on the annual price,
+    // and checking only the monthly one flagged every annual client as drifting.
+    const prices = planPricesFromEnv(process.env);
+    const accepted = pricesFor(prices, site.plan);
+    const expected = accepted.join(' or ');
+    if (!prices[site.plan]?.monthly) {
       findings.push({
         id: 'billing.driftUnchecked',
         severity: 'unknown',
@@ -215,9 +211,8 @@ export async function reconcileBilling(
         title: 'Plan drift not checked',
         detail: `No STRIPE_PRICE_${site.plan.toUpperCase()}_MONTHLY in jdd-ops/.env, so what they pay can't be compared to their recorded tier.`,
       });
-    } else if (priceId !== expected) {
-      const payingPlan =
-        Object.entries(prices).find(([, id]) => id === priceId)?.[0] ?? '(unrecognised price)';
+    } else if (!accepted.includes(priceId)) {
+      const payingPlan = planForPrice(prices, priceId) ?? '(unrecognised price)';
       findings.push({
         id: 'billing.planDrift',
         severity: 'red',
