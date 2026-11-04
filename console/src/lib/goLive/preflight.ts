@@ -37,6 +37,10 @@ export async function runPreflight(): Promise<GoLiveResult> {
     'STRIPE_PRICE_STARTER_ONBOARDING',
     'STRIPE_PRICE_GROWTH_MONTHLY',
     'STRIPE_PRICE_ENTERPRISE_MONTHLY',
+    // Annual checkout and annual plan changes refuse without these.
+    'STRIPE_PRICE_STARTER_ANNUAL',
+    'STRIPE_PRICE_GROWTH_ANNUAL',
+    'STRIPE_PRICE_ENTERPRISE_ANNUAL',
   ]) {
     checks.push({ label: `${key} present`, ok: present(agency[key]) });
   }
