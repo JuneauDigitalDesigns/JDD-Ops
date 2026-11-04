@@ -82,6 +82,14 @@ web-only): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (in addition to `RETELL_API
 - After every code change in a client repo, run `npm run build` and fix all errors.
 - Never expose `RETELL_API_KEY`, `TWILIO_AUTH_TOKEN`, `AIRTABLE_API_KEY`, or any
   master credential in client-side code.
+- Never import `next/font/google` in `template/` or a catalog component. A client build
+  must not touch the network for fonts: next/font/google downloads every declared family on
+  every Vercel build, and Next 14.2 crashes on the ~5% of Google responses whose file URL has
+  no extension, or the download simply fails. The template loads committed woff2 files via
+  `next/font/local` (`template/src/lib/fonts/`, vendored by `scripts/vendor-template-fonts.js`),
+  and onboard.js writes the loader and files into every client repo on every run
+  (`lib/site-fonts.js`), which is how repos copied before the fix get it.
+  `test/template-fonts.test.mjs` enforces both.
 
 ## How components in client repos consume the schema
 

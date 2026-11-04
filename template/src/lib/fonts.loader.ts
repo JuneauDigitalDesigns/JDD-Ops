@@ -1,5 +1,25 @@
-// Loads the curated pairing families via next/font (self-hosted, offline, no layout
-// shift), and exposes ONLY the CSS-variable classes a given brand actually references.
+// Loads the curated pairing families via next/font/local from files COMMITTED in ./fonts/,
+// and exposes ONLY the CSS-variable classes a given brand actually references.
+//
+// WHY LOCAL FILES, NOT next/font/google (2026-11-04)
+// next/font/google downloads every family declared here during `next build`, on Vercel, for
+// every client deploy, even a system-stack client that ships none of them. That made every
+// client build depend on Google answering correctly:
+//   - ~5% of Google Fonts CSS responses list a file as `fonts.gstatic.com/l/font?kit=…` with no
+//     extension, and Next 14.2's google loader crashes on those ("Cannot read properties of null
+//     (reading '1')"). Seven families per build made that a frequent random failure. The console
+//     patches its own Next for it (console/scripts/patch-next-font.mjs, JDD-Ops #16).
+//   - A download that fails or times out fails the build outright. That broke an agency
+//     production build on 2026-11-04, and no patch can fix it.
+// Local files remove the network from the build entirely. The woff2 files are exactly what
+// next/font/google was downloading (latin subset, Chrome user agent), fetched once by
+// jdd-ops/scripts/vendor-template-fonts.js. To add a family or weight, edit that script's
+// FAMILIES, run it, and add the entry below. Never import next/font/google in a client repo:
+// jdd-ops/test/template-fonts.test.mjs fails if anything under template/src does.
+//
+// Google serves each of these families as ONE variable file and lists it once per requested
+// weight, so each family below names the same file once per weight. That reproduces the
+// @font-face rules next/font/google generated, face for face, so rendering is unchanged.
 //
 // WHY THIS IS SELECTIVE (measured, 2026-08-18)
 // This module used to export `industryFontVars`, a single string of all the families'
@@ -29,20 +49,21 @@
 // If a client on a real web font ever shows a swap cost worth fixing, add a targeted
 // <link rel="preload"> in layout.tsx for that one family. Do not re-enable blanket preload.
 
-import { Instrument_Sans, Schibsted_Grotesk, Bricolage_Grotesque, Figtree, Archivo, Oswald, Inter }
-  from 'next/font/google';
+import localFont from 'next/font/local';
 
-// Explicit weight arrays, not 'variable': the variable axis costs materially more bytes and each
-// pairing uses exactly two weights. Instrument Sans has no 800 (it ships 400 to 700), which is why
-// its pairing's display weight is 700; asking for a weight a family does not ship is a build error.
-const instrument = Instrument_Sans({ subsets: ['latin'], variable: '--font-instrument', weight: ['400', '700'], display: 'swap', preload: false });
-const schibsted  = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-schibsted', weight: ['400', '800'], display: 'swap', preload: false });
-const bricolage  = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage', weight: ['400', '800'], display: 'swap', preload: false });
-const figtree    = Figtree({ subsets: ['latin'], variable: '--font-figtree', weight: ['400', '800'], display: 'swap', preload: false });
-const archivo    = Archivo({ subsets: ['latin'], variable: '--font-archivo', weight: ['500', '800'], display: 'swap', preload: false });
+// The weights are the ones each pairing uses (console/src/lib/fonts.ts). Instrument Sans has no
+// 800 (it ships 400 to 700), which is why its pairing's display weight is 700. A pairing weight
+// with no face here renders as the nearest declared face, not as an error, so
+// console/test/fonts.test.mjs checks every pairing weight against the faces declared below.
+// next/font needs literal arguments, so these cannot be generated from a list.
+const instrument = localFont({ src: [{ path: './fonts/instrument-sans.woff2', weight: '400', style: 'normal' }, { path: './fonts/instrument-sans.woff2', weight: '700', style: 'normal' }], variable: '--font-instrument', display: 'swap', preload: false });
+const schibsted  = localFont({ src: [{ path: './fonts/schibsted-grotesk.woff2', weight: '400', style: 'normal' }, { path: './fonts/schibsted-grotesk.woff2', weight: '800', style: 'normal' }], variable: '--font-schibsted', display: 'swap', preload: false });
+const bricolage  = localFont({ src: [{ path: './fonts/bricolage-grotesque.woff2', weight: '400', style: 'normal' }, { path: './fonts/bricolage-grotesque.woff2', weight: '800', style: 'normal' }], variable: '--font-bricolage', display: 'swap', preload: false });
+const figtree    = localFont({ src: [{ path: './fonts/figtree.woff2', weight: '400', style: 'normal' }, { path: './fonts/figtree.woff2', weight: '800', style: 'normal' }], variable: '--font-figtree', display: 'swap', preload: false });
+const archivo    = localFont({ src: [{ path: './fonts/archivo.woff2', weight: '500', style: 'normal' }, { path: './fonts/archivo.woff2', weight: '800', style: 'normal' }], variable: '--font-archivo', display: 'swap', preload: false });
 // Two-family 'oswald' pairing: condensed DISPLAY (Oswald, ships 200–700) + humanist BODY (Inter).
-const oswald     = Oswald({ subsets: ['latin'], variable: '--font-oswald', weight: ['600', '700'], display: 'swap', preload: false });
-const inter      = Inter({ subsets: ['latin'], variable: '--font-inter', weight: ['400', '600', '700'], display: 'swap', preload: false });
+const oswald     = localFont({ src: [{ path: './fonts/oswald.woff2', weight: '600', style: 'normal' }, { path: './fonts/oswald.woff2', weight: '700', style: 'normal' }], variable: '--font-oswald', display: 'swap', preload: false });
+const inter      = localFont({ src: [{ path: './fonts/inter.woff2', weight: '400', style: 'normal' }, { path: './fonts/inter.woff2', weight: '600', style: 'normal' }, { path: './fonts/inter.woff2', weight: '700', style: 'normal' }], variable: '--font-inter', display: 'swap', preload: false });
 
 /**
  * CSS variable name -> the next/font class that defines it.

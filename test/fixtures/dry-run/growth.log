@@ -25,6 +25,7 @@
   [dry-run] would write src/app/api/contact/route.ts
   [dry-run] would write src/app/api/voice/route.ts
   [dry-run] would write src/app/api/voice/no-answer/route.ts
+  [dry-run] would write src/lib/fonts.loader.ts + src/lib/fonts/ (self-hosted fonts; the build never fetches from Google)
 
 [step 5] Write .env.local (plan=growth)
   [dry-run] would write <ROOT>/clients/fixture-growth/.env.local (preserving any already-provisioned IDs)

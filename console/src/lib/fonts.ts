@@ -12,8 +12,11 @@
 // move (Suisse Intl alone) rather than Spence's (a paid display serif over a paid grotesque), and
 // it is the one of the two that is reachable with open faces.
 //
-// LICENSING (decision 5): every family here is open-licensed and served by next/font/google, which
-// SELF-HOSTS the woff2 at build time. No Typekit, no paid regime, no runtime third-party request.
+// LICENSING (decision 5): every family here is open-licensed (SIL OFL). No Typekit, no paid
+// regime, no runtime third-party request. The console loads them through next/font/google; the
+// template ships the woff2 files committed in template/src/lib/fonts/ and loads them through
+// next/font/local, so a client build never fetches from Google. Adding a family here means
+// vendoring it there too (jdd-ops/scripts/vendor-template-fonts.js).
 //
 // CLIENT-SAFE: no next/font import here, so the Brand drawer can use it. The families are loaded
 // in fonts.loader.ts (console) and template/src/lib/fonts.loader.ts (template). A `varName` that

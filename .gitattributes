@@ -12,3 +12,8 @@ test/fixtures/dry-run/*.log text eol=lf
 # red caused by nothing but line endings. A check that cries wolf on a clean clone is worse
 # than no check: it is what teaches you to stop reading the output.
 test/fixtures/**/*.json text eol=lf
+
+# Font files are binary. Git usually detects that, but core.autocrlf=true on a Windows checkout
+# would corrupt a woff2 it misjudged, and the build would still pass: only the browser would
+# notice, by rejecting the font. See template/src/lib/fonts.loader.ts.
+*.woff2 binary

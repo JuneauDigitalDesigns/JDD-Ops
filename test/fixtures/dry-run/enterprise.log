@@ -26,6 +26,7 @@
   [dry-run] would write src/app/api/contact/route.ts
   [dry-run] would write src/app/api/voice/route.ts
   [dry-run] would write src/app/api/voice/no-answer/route.ts
+  [dry-run] would write src/lib/fonts.loader.ts + src/lib/fonts/ (self-hosted fonts; the build never fetches from Google)
 
 [step 5 site 1/2] Write .env.local (plan=enterprise)
   [dry-run] would write <ROOT>/clients/fixture-enterprise/site-1/.env.local (preserving any already-provisioned IDs)
@@ -111,6 +112,7 @@
   [dry-run] would write src/app/api/contact/route.ts
   [dry-run] would write src/app/api/voice/route.ts
   [dry-run] would write src/app/api/voice/no-answer/route.ts
+  [dry-run] would write src/lib/fonts.loader.ts + src/lib/fonts/ (self-hosted fonts; the build never fetches from Google)
 
 [step 21 site 2/2] Write .env.local (plan=enterprise)
   [dry-run] would write <ROOT>/clients/fixture-enterprise/site-2/.env.local (preserving any already-provisioned IDs)
