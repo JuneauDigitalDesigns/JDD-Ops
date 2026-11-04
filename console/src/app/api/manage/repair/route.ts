@@ -68,7 +68,8 @@ export type RepairAction =
   | 'make.activate'
   | 'profile.forwardPhone'
   | 'airtable.callLog'
-  | 'airtable.siteColumn';
+  | 'airtable.siteColumn'
+  | 'airtable.columns';
 
 interface Body {
   slug?: string;
@@ -114,6 +115,7 @@ export async function POST(req: Request) {
         return await adoptPortalForwardPhone(ctx, site);
       case 'airtable.callLog':
       case 'airtable.siteColumn':
+      case 'airtable.columns':
         return await repairAirtable(ops, ctx, site, action);
       default:
         return NextResponse.json({ error: `Unknown action "${action}"` }, { status: 400 });
@@ -350,10 +352,10 @@ async function repairAirtable(
   ops: Awaited<ReturnType<typeof loadRepairOps>>,
   ctx: ClientContext,
   site: SiteInfo,
-  action: 'airtable.callLog' | 'airtable.siteColumn',
+  action: 'airtable.callLog' | 'airtable.siteColumn' | 'airtable.columns',
 ) {
   const { airtableApiKey } = loadTeardownCredentials();
-  const want = action === 'airtable.callLog' ? 'call-log' : 'site-column';
+  const want = action === 'airtable.callLog' ? 'call-log' : action === 'airtable.columns' ? 'columns' : 'site-column';
 
   const result = await ops.repairAirtableBase({
     apiKey: airtableApiKey,
@@ -365,7 +367,9 @@ async function repairAirtable(
   const summary =
     want === 'call-log'
       ? `Created the Call Log table in ${site.env.AIRTABLE_BASE_ID}`
-      : `Added the Site column to Call Log in ${site.env.AIRTABLE_BASE_ID}`;
+      : want === 'columns'
+        ? `Added missing Call Log column(s) in ${site.env.AIRTABLE_BASE_ID}${result.ok && !result.noop ? ` (${result.after})` : ''}`
+        : `Added the Site column to Call Log in ${site.env.AIRTABLE_BASE_ID}`;
 
   if (!result.ok) {
     appendAudit({

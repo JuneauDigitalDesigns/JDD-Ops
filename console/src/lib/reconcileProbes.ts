@@ -51,6 +51,8 @@ export interface AirtableBaseProbe {
   exists: boolean | null;
   hasCallLog: boolean | null;
   hasSiteColumn: boolean | null;
+  /** Call Log columns from CALL_LOG_FIELDS this table lacks. null ⇒ no table / not checked. */
+  missingColumns: string[] | null;
   needsSiteColumn: boolean;
   checked: boolean;
 }

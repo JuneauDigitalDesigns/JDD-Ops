@@ -1,0 +1,137 @@
+{
+  "_recorded": "2026-11-04, read-only GET /v0/meta/bases/{base}/tables on the _e2e_test_starter client base (Call Log only). Provisioned before the SMS consent column existed.",
+  "tables": [
+    {
+      "id": "tblwDohbpAjG0KAbs",
+      "name": "Call Log",
+      "fields": [
+        {
+          "id": "fldIJilNGvvwvL04o",
+          "name": "Date",
+          "type": "dateTime",
+          "options": {
+            "dateFormat": {
+              "name": "us",
+              "format": "M/D/YYYY"
+            },
+            "timeFormat": {
+              "name": "12hour",
+              "format": "h:mma"
+            },
+            "timeZone": "client"
+          }
+        },
+        {
+          "id": "fldOYRgvjARx9axjk",
+          "name": "Caller name",
+          "type": "singleLineText"
+        },
+        {
+          "id": "fldndPfFOOPBqDkF9",
+          "name": "Caller number",
+          "type": "phoneNumber"
+        },
+        {
+          "id": "fldt6WSoJ0GbpICfV",
+          "name": "Summary",
+          "type": "multilineText"
+        },
+        {
+          "id": "fldAaPwIZ2dA4LNxp",
+          "name": "Duration (seconds)",
+          "type": "number",
+          "options": {
+            "precision": 0
+          }
+        },
+        {
+          "id": "fldwJtfflL7TSgJyp",
+          "name": "Call type",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "id": "selpYzcFQuuzIpKHr",
+                "name": "inbound",
+                "color": "grayLight2"
+              },
+              {
+                "id": "selsVLTfgD3qWxtUw",
+                "name": "outbound",
+                "color": "grayLight2"
+              }
+            ]
+          }
+        },
+        {
+          "id": "fldHCxfIeZqmQav9e",
+          "name": "Email",
+          "type": "email"
+        },
+        {
+          "id": "fldusONqfL6ZFXMd1",
+          "name": "Address",
+          "type": "singleLineText"
+        },
+        {
+          "id": "fldUB193CHZleJyYQ",
+          "name": "Recording URL",
+          "type": "url"
+        },
+        {
+          "id": "fld8zP7zzXSRif9R8",
+          "name": "Priority",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "id": "selayInDFK884QL01",
+                "name": "emergency",
+                "color": "grayLight2"
+              },
+              {
+                "id": "selJZaAiJurRBPqwi",
+                "name": "callback",
+                "color": "grayLight2"
+              }
+            ]
+          }
+        },
+        {
+          "id": "fldYC969blIce1wrI",
+          "name": "Outcome",
+          "type": "singleSelect",
+          "options": {
+            "choices": [
+              {
+                "id": "selsq29HWUXAdnJCq",
+                "name": "Qualified",
+                "color": "grayLight2"
+              },
+              {
+                "id": "sel3L6VZ8LFjMt2fH",
+                "name": "Not qualified",
+                "color": "grayLight2"
+              },
+              {
+                "id": "selM6IRAaeUQsoXGr",
+                "name": "Follow-up needed",
+                "color": "grayLight2"
+              },
+              {
+                "id": "selwhKMQtmQwGT9fe",
+                "name": "No answer",
+                "color": "grayLight2"
+              },
+              {
+                "id": "selBMargOZE85Nao4",
+                "name": "Voicemail",
+                "color": "grayLight2"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

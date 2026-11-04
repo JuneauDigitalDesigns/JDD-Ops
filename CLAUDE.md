@@ -346,6 +346,13 @@ client field id), because Airtable table and field ids are *base-scoped* — the
 `npm run verify-post-call` after touching either side; it diffs them against the live master
 and runs the real `patchPostCallBlueprint`.
 
+**A base created before a column existed doesn't gain it by itself** (e.g. `SMS consent` on bases
+older than 2026-11-02, which also makes `airtable.schemaCovers` refuse an onboard re-run).
+`npm run repair-call-log -- --slug <slug>` previews which `CALL_LOG_FIELDS` columns the table lacks;
+`--write` adds them exactly as onboard.js would and reads back. It is additive only: an existing
+column is never retyped, since Airtable's API can't edit a select's choices anyway. The console
+shows the same thing as the `airtable.missingColumns` finding, with an "Add …" button.
+
 Two gotchas worth keeping:
 
 - **`Call type` and `Priority` choices are lowercase on purpose.** The master maps

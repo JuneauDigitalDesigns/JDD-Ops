@@ -37,7 +37,8 @@
     "check-schema": "cd console && npm run check-schema",
     "console": "cd console && npm install && npm run dev",
     "preview": "cd console && npm install && npm run dev",
-    "runbook": "cd console && npm install && npm run dev"
+    "runbook": "cd console && npm install && npm run dev",
+    "repair-call-log": "node scripts/repair-call-log.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
