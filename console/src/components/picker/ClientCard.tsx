@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import type { ReadinessLight } from '@jdd/schema';
+import ReadinessStrip from '@/components/close/ReadinessStrip';
 import { Stack, ClipboardText, Wrench } from '@phosphor-icons/react';
 import type { ClientContext, ClientState, OpsConfig, RunbookState } from '@/lib/types';
 import { buildRunbook, PLAN_LABEL } from '@/lib/runbook-content';
@@ -30,8 +32,16 @@ import PhaseMeter from '@/components/PhaseMeter';
  * because a full meter reading "12/12" is stale trivia on a site that shipped months ago.
  */
 export default function ClientCard({
-  ctx, clientState, config, health, lastTouched, attention, onSelect, highlight,
+  ctx, clientState, config, health, lastTouched, attention, onSelect, highlight, readiness,
 }: {
+  /** Present only for a client closed on a call (from `/api/sales/readiness`). */
+  readiness?: {
+    orderId: string;
+    leadId: string;
+    lights: ReadinessLight[];
+    resumeStep: string | null;
+    canResendInvite: boolean;
+  };
   ctx: ClientContext;
   clientState: ClientState | undefined;
   config: OpsConfig;
@@ -158,6 +168,28 @@ export default function ClientCard({
               {attention.reason}
             </p>
           )}
+
+          {/* Closed on a call: the four readiness lights, plus Resume / Resend invite while the
+              close still needs something from us. */}
+          {readiness && (
+            <div className="mt-1 flex flex-col gap-2">
+              <ReadinessStrip lights={readiness.lights} compact />
+              {(readiness.resumeStep || readiness.canResendInvite) && (
+                <div className="flex flex-wrap gap-1.5">
+                  {readiness.resumeStep && (
+                    <Link
+                      href={`/leads/${readiness.leadId}/close`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="btn btn-xs"
+                    >
+                      Resume
+                    </Link>
+                  )}
+                  {readiness.canResendInvite && <ResendInvite orderId={readiness.orderId} />}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -169,6 +201,25 @@ export default function ClientCard({
         <ToolLink slug={ctx.slug} tool="manage" label="Manage" icon={<Wrench size={12} />} />
       </div>
     </div>
+  );
+}
+
+/** Revoke the open portal invite and send a fresh one (the agency does both). */
+function ResendInvite({ orderId }: { orderId: string }) {
+  const [label, setLabel] = useState('Resend invite');
+  return (
+    <button
+      type="button"
+      className="btn btn-xs"
+      onClick={async (e) => {
+        e.stopPropagation();
+        setLabel('Sending…');
+        const res = await fetch(`/api/sales/orders/${orderId}/resend-invite`, { method: 'POST' }).catch(() => null);
+        setLabel(res?.ok ? 'Invite sent' : 'Couldn’t send');
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

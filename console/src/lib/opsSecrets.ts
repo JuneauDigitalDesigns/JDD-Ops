@@ -209,12 +209,22 @@ function stripeMode(key: string | null): 'test' | 'live' | 'unknown' | null {
  * `PORTAL_BASE_URL` should normally point at production: an ops action that moves money
  * should act on the real subscription, not on whatever happens to be running on localhost.
  */
-export function loadPortalOpsConfig(): { baseUrl: string | null; secret: string | null } {
+export function loadPortalOpsConfig(): {
+  baseUrl: string | null;
+  secret: string | null;
+  /**
+   * `OPS_ORDERS_SECRET`: the operator-order routes (close on a call) take their own secret,
+   * because they open Checkout Sessions and create accounts. A leak of one does not hand over
+   * the other.
+   */
+  ordersSecret: string | null;
+} {
   const ops = parseEnvFile(resolve(opsRoot(), '.env'));
   const baseUrl =
     process.env.PORTAL_BASE_URL ?? ops.PORTAL_BASE_URL ?? 'https://juneaudigitaldesigns.com';
   const secret = process.env.OPS_SHARED_SECRET ?? ops.OPS_SHARED_SECRET ?? null;
-  return { baseUrl: baseUrl.replace(/\/+$/, '') || null, secret };
+  const ordersSecret = process.env.OPS_ORDERS_SECRET ?? ops.OPS_ORDERS_SECRET ?? null;
+  return { baseUrl: baseUrl.replace(/\/+$/, '') || null, secret, ordersSecret };
 }
 
 /**

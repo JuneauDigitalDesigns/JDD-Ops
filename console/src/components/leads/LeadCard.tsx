@@ -42,16 +42,16 @@ export function LeadFace({
   // card that throws is worse than a card with the wrong glyph.
   const SourceIcon = SOURCE_ICON[lead.source] ?? EnvelopeSimple;
   const fromCall = lead.source === 'call';
-  // Won but not yet turned into a client: the one state where the card is asking for action.
-  // Both halves of the link count as "converted", since a lead converted before clientRecordId
-  // existed carries only the slug. Once either is set the glow stops, so it only ever means
-  // "convert me".
+  // Won but not yet a client: the one state where the card is asking for action. Both halves of
+  // the link count as "a client", since a lead converted before clientRecordId existed carries
+  // only the slug. The action is closing it (order, terms, payment) — there is no longer a way
+  // to make a client without payment.
   const readyToConvert = lead.stage === 'won' && !lead.clientRecordId && !lead.convertedSlug;
 
   return (
     <div
       className={`flex flex-col gap-2 rounded-[12px] border p-3 transition-shadow${readyToConvert ? ' lead-ready' : ''}`}
-      title={readyToConvert ? 'Won. Open it to convert to a client.' : undefined}
+      title={readyToConvert ? 'Won but not a client yet. Open it and use Close on call.' : undefined}
       style={{
         // A stale card takes a warn edge rather than dimming to near-invisible: the whole
         // point is that it should catch your eye, not recede. Ready-to-convert wins over it;

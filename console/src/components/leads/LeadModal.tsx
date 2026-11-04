@@ -6,12 +6,12 @@
 // activity trail so corrections stay auditable.
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { CalendarPlus, CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
 import { LEAD_SOURCE_SHORT } from '@/lib/lead-meta';
 import type { DemoCall, PlanInterest, QueuedLead } from '@/lib/leadTypes';
 import { absoluteTime, relativeTime } from '@/lib/relativeTime';
 import { SOURCE_ICON } from './LeadCard';
-import ConvertDialog from './ConvertDialog';
 
 const PLAN_LABEL: Record<string, string> = {
   starter: 'Starter',
@@ -156,7 +156,7 @@ function PlanPills({
 }
 
 export default function LeadModal({
-  lead, call, siteUrl, onClose, onPatch, onDelete, onConverted, onOpenScript, onAddToCalendar, startEditing,
+  lead, call, siteUrl, onClose, onPatch, onDelete, onOpenScript, onAddToCalendar, startEditing,
 }: {
   lead: QueuedLead;
   call: DemoCall | null;
@@ -164,8 +164,6 @@ export default function LeadModal({
   onClose: () => void;
   onPatch: (patch: ModalPatch) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  /** Called with the new client's slug once Convert succeeds. The board owns navigation. */
-  onConverted?: (slug: string) => void;
   /** Opens the call script over this lead. The overlay is owned by LeadsView. */
   onOpenScript: () => void;
   /** Navigate to /calendar with this lead's details prefilled. Board owns navigation. */
@@ -181,16 +179,12 @@ export default function LeadModal({
   const [lostDraft, setLostDraft] = useState(lead.lostReason ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeBlocked, setCloseBlocked] = useState(false);
-  const [converting, setConverting] = useState(false);
   const [busy, setBusy] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const notesDirtyRef = useRef(false);
 
   const notesDirty = notes !== (lead.notes ?? '');
   notesDirtyRef.current = notesDirty;
-  // Read from the document-level Escape handler below, which closes over a stale render.
-  const convertingRef = useRef(false);
-  convertingRef.current = converting;
 
   // Sync when a different lead is opened
   useEffect(() => {
@@ -200,7 +194,6 @@ export default function LeadModal({
     setLostInput(false);
     setConfirmDelete(false);
     setCloseBlocked(false);
-    setConverting(false);
   }, [lead.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The call script writes `lead.notes` while this modal stays mounted underneath it. Pick that
@@ -220,8 +213,6 @@ export default function LeadModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      // With the convert dialog open, Escape belongs to it, not to the modal underneath.
-      if (convertingRef.current) { setConverting(false); return; }
       tryClose();
     };
     document.addEventListener('keydown', onKey);
@@ -265,7 +256,6 @@ export default function LeadModal({
 
   const fromCall = lead.source === 'call';
   const isLost = lead.stage === 'lost';
-  const isWon = lead.stage === 'won';
   // Same test the card uses to stop glowing. Both halves of the link count: a lead converted
   // before clientRecordId existed only has the slug.
   const converted = Boolean(lead.clientRecordId || lead.convertedSlug);
@@ -379,17 +369,6 @@ export default function LeadModal({
               {/* Actions. The two phone controls stay out of the way until there is a number
                   to dial — an empty primary button is a worse answer than no button. */}
               <div className="flex flex-wrap items-center gap-2">
-                {isWon && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary"
-                    disabled={converted}
-                    title={converted ? 'Already converted' : 'Create a client from this lead'}
-                    onClick={() => setConverting(true)}
-                  >
-                    Convert to Client
-                  </button>
-                )}
                 {hasPhone && (
                   <>
                     <a
@@ -402,6 +381,16 @@ export default function LeadModal({
                       <Copy size={13} /> {phoneCopied ? 'Copied' : 'Copy'}
                     </button>
                   </>
+                )}
+                {/* Close on a call: order, terms, payment link, setup. The wizard opens at the
+                    first unfinished step, so this is also Resume for a close left part-way.
+                    It is the ONLY way a lead becomes a client here: the old manual convert made
+                    a client with no payment and no onboarding steps sent, which Xander ruled a
+                    gap, not a feature (2026-11-03). */}
+                {!converted && !isLost && (
+                  <Link href={`/leads/${lead.id}/close`} className="btn btn-sm btn-primary">
+                    Close on call
+                  </Link>
                 )}
                 <button type="button" onClick={onOpenScript} className="btn btn-sm btn-accent">
                   <Phone size={13} /> Call script
@@ -624,17 +613,6 @@ export default function LeadModal({
             </div>
           </div>
         </div>
-
-        {converting && !converted && (
-          <ConvertDialog
-            lead={lead}
-            onClose={() => setConverting(false)}
-            onConverted={(slug) => {
-              setConverting(false);
-              onConverted?.(slug);
-            }}
-          />
-        )}
 
         {/* ── Unsaved notes guard ── */}
         {closeBlocked && (

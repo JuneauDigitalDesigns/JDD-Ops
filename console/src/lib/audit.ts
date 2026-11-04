@@ -57,7 +57,10 @@ export type AuditAction =
   | 'ticket.delete'
   // A2P registration: the step id and a SID-only summary, never a field value.
   | 'a2p.step'
-  | 'a2p.intake';
+  | 'a2p.intake'
+  // Close on a call: the order action and its outcome, never a card, an email body or an EIN.
+  | 'close.order'
+  | 'close.convert';
 
 export interface AuditEntry {
   /** ISO timestamp. */
