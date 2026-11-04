@@ -142,6 +142,7 @@ export default function CloseWizard({
           <PaymentStep
             order={order}
             totals={terms?.totals ?? null}
+            termsVersion={terms?.script.version.split('-')[0] ?? null}
             onOrder={setOrder}
             onPaid={(o) => {
               setOrder(o);
@@ -583,12 +584,15 @@ function TermsStep({
 function PaymentStep({
   order,
   totals,
+  termsVersion,
   onOrder,
   onPaid,
   onCancelled,
 }: {
   order: OperatorOrder;
   totals: TermsView['totals'] | null;
+  /** "v5.3": the Terms of Service version the checkout says was accepted. */
+  termsVersion: string | null;
   onOrder: (o: OperatorOrder) => void;
   onPaid: (o: OperatorOrder) => void;
   onCancelled: () => void;
@@ -678,6 +682,15 @@ function PaymentStep({
   const today = totals ? money(totals.today) : '';
   const then = totals ? `${money(totals.recurring)}/${totals.period === 'annual' ? 'yr' : 'mo'}` : '';
 
+  // The card path is a checkout of its own, with its own header (CardFlow).
+  if (tab === 'card' && !waiting) {
+    return (
+      <Card>
+        <CardFlow order={order} totals={totals} termsVersion={termsVersion} onOrder={onOrder} onPaid={onPaid} onUseLink={() => switchTo('link')} />
+      </Card>
+    );
+  }
+
   return (
     <Card>
       {totals && (
@@ -709,18 +722,6 @@ function PaymentStep({
                 )}
               </div>
             </div>
-          )}
-          {tab === 'card' && (
-            <CardPanel
-              order={order}
-              totals={totals}
-              busy={busy}
-              setBusy={setBusy}
-              onOrder={onOrder}
-              onPaid={onPaid}
-              onUseLink={() => switchTo('link')}
-              onCancel={cancel}
-            />
           )}
         </>
       )}
@@ -754,51 +755,75 @@ interface ChargePreview {
   recurringCents: number;
   period: Period;
   stripeAmountCents: number | null;
+  nextPaymentAt: number;
+  statementDescriptor: string | null;
+}
+
+interface ChargeReceipt {
+  amountPaidCents: number | null;
+  paidAt: number | null;
+  invoiceNumber: string | null;
+  card: { brand: string; last4: string } | null;
+  nextPaymentAt: number | null;
+  nextAmountCents: number | null;
+}
+
+/** Checkout money: always with cents, the way a checkout and a receipt show it. */
+const cents = (c: number) => `$${(c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const longDate = (ms: number) => new Date(ms).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const cardName = (brand: string) => (brand === 'amex' ? 'American Express' : brand.charAt(0).toUpperCase() + brand.slice(1));
+
+/** What the plan line under the plan name says it is. */
+function planIncludes(order: OperatorOrder): string {
+  if (order.plan === 'starter' && order.receptionistMode === 'declined') return 'Website';
+  if (order.plan === 'starter') return 'Website and AI receptionist';
+  return 'Website, AI receptionist and CRM';
 }
 
 /**
- * The card path. The operator types the card into the client's Customer page in the Stripe
- * Dashboard (a new tab, never this screen), then charges it here. This component sees only what
- * Stripe reports back about the card: brand, last 4, expiry.
+ * The card path, as the client sees it on a shared screen (approved mockup round 2,
+ * https://claude.ai/artifact/5WaadEEADbGDbfEL473V3x):
  *
- * The amount charged is the agency's: it comes back from the preview, is shown for reading
- * aloud, and is sent back with Charge so the agency can refuse anything else.
+ *   1. entry: the card is typed into Stripe (a new tab, never this screen) while this polls the
+ *      agency for "has a card been added?" (yes or no, nothing about the card). Continue to
+ *      checkout unlocks on yes.
+ *   2. checkout: laid out like a hosted subscription checkout. Subscribe charges exactly the
+ *      amount the agency previewed, which it checks again.
+ *   3. paid: the confirmation and receipt, from Stripe's own figures, then on to Setup.
  */
-function CardPanel({
+function CardFlow({
   order,
   totals,
-  busy,
-  setBusy,
+  termsVersion,
   onOrder,
   onPaid,
   onUseLink,
-  onCancel,
 }: {
   order: OperatorOrder;
   totals: TermsView['totals'] | null;
-  busy: boolean;
-  setBusy: (b: boolean) => void;
+  termsVersion: string | null;
   onOrder: (o: OperatorOrder) => void;
   onPaid: (o: OperatorOrder) => void;
   onUseLink: () => void;
-  onCancel: () => void;
 }) {
+  const [stage, setStage] = useState<'entry' | 'checkout' | 'paid'>('entry');
   const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
+  const [cardAdded, setCardAdded] = useState(false);
   const [preview, setPreview] = useState<ChargePreview | null>(null);
+  const [paid, setPaid] = useState<{ order: OperatorOrder; receipt: ChargeReceipt | null; statementDescriptor: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [needsLink, setNeedsLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const charging = useRef(false);
 
-  // Set up card entry as the tab opens: the Customer exists before the Dashboard does.
-  // Idempotent at the agency, which also closes a live payment link first.
+  // The Customer exists before the Dashboard does. Idempotent at the agency, which also closes a
+  // live payment link first.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setBusy(true);
       const { ok, data } = await post<{ order: OperatorOrder; dashboardUrl: string }>(`/api/sales/orders/${order.id}/payment`, {
         method: 'dashboard-moto',
       });
-      setBusy(false);
       if (cancelled) return;
       if (!ok) return setError(data.error ?? 'Could not set up card entry.');
       setDashboardUrl(data.dashboardUrl);
@@ -810,103 +835,366 @@ function CardPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id]);
 
-  async function checkCard() {
+  // Watch for the card while it's being typed into Stripe.
+  useEffect(() => {
+    if (stage !== 'entry' || !dashboardUrl || cardAdded) return;
+    let stop = false;
+    const check = async () => {
+      const d = await fetch(`/api/sales/orders/${order.id}/charge?detect=1`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!stop && d?.cardAdded === true) setCardAdded(true);
+    };
+    void check();
+    const t = setInterval(check, 3000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [stage, dashboardUrl, cardAdded, order.id]);
+
+  async function toCheckout() {
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/sales/orders/${order.id}/charge`, { cache: 'no-store' });
     const data = (await res.json().catch(() => ({}))) as ChargePreview & { error?: string };
     setBusy(false);
     if (!res.ok) return setError(data.error ?? 'Could not read the card from Stripe.');
+    if (!data.card) {
+      setCardAdded(false);
+      return setError('No card found yet. Add it in Stripe, then continue.');
+    }
     setPreview(data);
-    if (!data.card) setError('No card yet. Add it on the customer page in Stripe, then check again.');
+    setNeedsLink(false);
+    setStage('checkout');
   }
 
-  async function charge() {
+  function differentCard() {
+    setPreview(null);
+    setCardAdded(false);
+    setError(null);
+    setStage('entry');
+  }
+
+  async function subscribe() {
     if (!preview?.card || charging.current) return;
-    charging.current = true; // a double click never sends two requests; the agency refuses one anyway
+    charging.current = true; // one request per click; the agency refuses a second one anyway
     setBusy(true);
     setError(null);
-    const { ok, data } = await post<{ order?: OperatorOrder; outcome?: string }>(`/api/sales/orders/${order.id}/charge`, {
-      amountCents: preview.amountCents,
-    });
+    const { ok, data } = await post<{
+      order?: OperatorOrder;
+      outcome?: string;
+      receipt?: ChargeReceipt | null;
+      statementDescriptor?: string | null;
+    }>(`/api/sales/orders/${order.id}/charge`, { amountCents: preview.amountCents });
     setBusy(false);
     charging.current = false;
     if (ok && data.outcome === 'paid' && data.order) {
       onOrder(data.order);
-      onPaid(data.order);
+      setPaid({ order: data.order, receipt: data.receipt ?? null, statementDescriptor: data.statementDescriptor ?? null });
+      setStage('paid');
       return;
     }
     if (data.outcome === 'requires_action') setNeedsLink(true);
-    setError(data.error ?? 'The charge did not go through.');
+    setError(data.error ?? 'The payment did not go through.');
   }
 
-  const amount = preview ? money(preview.amountCents / 100) : totals ? money(totals.today) : '';
-  const stripeDisagrees = preview != null && preview.stripeAmountCents !== preview.amountCents;
+  // The confirmation stays up long enough to read, then the wizard moves on to Setup.
+  useEffect(() => {
+    if (stage !== 'paid' || !paid) return;
+    const t = setTimeout(() => onPaid(paid.order), 6000);
+    return () => clearTimeout(t);
+  }, [stage, paid, onPaid]);
+
+  if (stage === 'paid' && paid) return <CardPaid order={order} preview={preview} paid={paid} />;
+  if (stage === 'checkout' && preview?.card) {
+    return (
+      <CardCheckout
+        order={order}
+        preview={preview}
+        termsVersion={termsVersion}
+        busy={busy}
+        needsLink={needsLink}
+        error={error}
+        onSubscribe={subscribe}
+        onDifferentCard={differentCard}
+        onUseLink={onUseLink}
+      />
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-3.5">
-      <ol className="flex flex-col gap-3 rounded-xl border border-[var(--rule)] bg-[var(--panel)] p-4">
-        <li className="flex flex-col gap-1.5">
-          <div className="font-semibold">1. Add the card in Stripe</div>
-          <div className="text-[13px] text-fg2">
-            Opens {order.client.legalName} in the Stripe Dashboard in a new tab. Don&apos;t share that tab while you type the card.
-          </div>
+    <div className="flex max-w-[720px] flex-col gap-5">
+      {totals && (
+        <div className="flex flex-wrap items-baseline gap-2.5">
+          <span className="font-display text-[34px] font-bold leading-none">{money(totals.today)}</span>
+          <span className="text-fg2">
+            due today, then {money(totals.recurring)} {totals.period === 'annual' ? 'a year' : 'a month'}
+          </span>
+        </div>
+      )}
+      <div className="flex items-start gap-3 rounded-xl bg-[var(--panel-2)] p-4">
+        <LockIcon size={22} />
+        <p className="m-0">
+          <strong>Your card is entered directly into Stripe, our payment processor.</strong> It never passes through this
+          screen, and nothing is charged until you&apos;ve reviewed your order.
+        </p>
+      </div>
+
+      {cardAdded ? (
+        <div role="status" className="moto-status moto-status-ok">
+          <span className="moto-status-dot">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+          </span>
           <div>
-            <a
-              className={`btn ${dashboardUrl ? '' : 'pointer-events-none opacity-50'}`}
-              href={dashboardUrl ?? '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open customer in Stripe
-            </a>
+            <div className="font-semibold">Card added</div>
+            <div className="text-[13px] text-fg2">Saved securely in Stripe. Nothing has been charged.</div>
           </div>
-        </li>
-        <li className="flex flex-col gap-1.5">
-          <div className="font-semibold">2. Check the card</div>
+        </div>
+      ) : (
+        <div role="status" className="moto-status moto-status-wait">
+          <span className="moto-status-dot"><i /></span>
           <div>
-            <button type="button" className="btn" disabled={busy || !dashboardUrl} onClick={checkCard}>
-              {preview?.card ? 'Check again' : 'I’ve added the card'}
-            </button>
+            <div className="font-semibold">Waiting for the card…</div>
+            <div className="text-[13px] text-fg2">This updates by itself once the card is saved in Stripe.</div>
           </div>
-          {preview?.card && (
-            <div className="text-[15px]">
-              <span className="font-semibold capitalize">{preview.card.brand}</span> •••• {preview.card.last4}
-              {preview.card.expMonth && preview.card.expYear
-                ? ` · expires ${preview.card.expMonth}/${String(preview.card.expYear).slice(-2)}`
-                : ''}
-            </div>
-          )}
-        </li>
-        <li className="flex flex-col gap-1.5">
-          <div className="font-semibold">3. Charge</div>
-          {preview?.card && totals && (
-            <div className="text-[15px]">
-              {amount} due today, then {money(totals.recurring)}/{totals.period === 'annual' ? 'yr' : 'mo'}
-              <div className="text-xs text-fg2">Renews automatically · cancel any time</div>
-            </div>
-          )}
-          {stripeDisagrees && (
-            <div className="text-[13px]" style={{ color: 'var(--danger)' }}>
-              Stripe&apos;s price doesn&apos;t match this order, so charging is blocked. Check the plan prices in Stripe.
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2.5">
-            <button type="button" className="btn btn-primary" disabled={busy || !preview?.card || stripeDisagrees} onClick={charge}>
-              Charge {amount}
-            </button>
-            {needsLink && (
-              <button type="button" className="btn" disabled={busy} onClick={onUseLink}>
-                Use a payment link
-              </button>
-            )}
-            <button type="button" className="btn" disabled={busy} onClick={onCancel}>
-              Cancel
-            </button>
-          </div>
-        </li>
-      </ol>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <a
+          className={`btn ${dashboardUrl ? '' : 'pointer-events-none opacity-50'}`}
+          href={dashboardUrl ?? '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {cardAdded ? 'Open Stripe again' : 'Add card in Stripe'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+          </svg>
+        </a>
+        <button type="button" className="btn btn-primary" disabled={!cardAdded || busy} onClick={toCheckout}>
+          Continue to checkout
+        </button>
+        <button type="button" className="btn moto-quiet" disabled={busy} onClick={onUseLink}>
+          Send a payment link instead
+        </button>
+      </div>
       <ErrorLine text={error} />
+    </div>
+  );
+}
+
+function LockIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="mt-0.5 flex-none">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
+function CardCheckout({
+  order,
+  preview,
+  termsVersion,
+  busy,
+  needsLink,
+  error,
+  onSubscribe,
+  onDifferentCard,
+  onUseLink,
+}: {
+  order: OperatorOrder;
+  preview: ChargePreview;
+  termsVersion: string | null;
+  busy: boolean;
+  needsLink: boolean;
+  error: string | null;
+  onSubscribe: () => void;
+  onDifferentCard: () => void;
+  onUseLink: () => void;
+}) {
+  const card = preview.card!;
+  const unit = preview.period === 'annual' ? 'year' : 'month';
+  const onboardingCents = preview.amountCents - preview.recurringCents;
+  const planName = order.plan.charAt(0).toUpperCase() + order.plan.slice(1);
+  const billed = preview.period === 'annual' ? 'Billed yearly · 12 months for the price of 10' : 'Billed monthly';
+  const stripeDisagrees = preview.stripeAmountCents !== preview.amountCents;
+
+  return (
+    <div className="moto-checkout -m-6">
+      <div className="moto-summary">
+        <div className="flex items-center gap-2.5 font-semibold">
+          <span className="text-fg3" aria-hidden="true">←</span>
+          <span className="moto-mark" aria-hidden="true">J</span>
+          Juneau Digital Designs
+        </div>
+        <div>
+          <div className="font-medium text-fg3">Subscribe to {planName}</div>
+          <div className="mt-1 flex items-baseline gap-2 tabular-nums">
+            <b className="font-display text-[44px] font-bold leading-none">{cents(preview.recurringCents)}</b>
+            <span className="text-sm leading-tight text-fg3">
+              per
+              <br />
+              {unit}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col tabular-nums">
+          <div className="moto-item">
+            <span className="moto-thumb" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 5h16v11H4zM9 20h6M12 16v4" /></svg>
+            </span>
+            <div>
+              <div className="font-semibold">{planName}</div>
+              <div className="text-[13px] text-fg3">{planIncludes(order)} · {billed}</div>
+            </div>
+            <div className="text-right font-semibold">{cents(preview.recurringCents)}</div>
+          </div>
+          {onboardingCents > 0 && (
+            <div className="moto-item">
+              <span className="moto-thumb" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" /></svg>
+              </span>
+              <div>
+                <div className="font-semibold">Onboarding</div>
+                <div className="text-[13px] text-fg3">One-time fee</div>
+              </div>
+              <div className="text-right font-semibold">{cents(onboardingCents)}</div>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2.5 border-t border-[var(--rule)] pt-3.5 tabular-nums">
+          <div className="flex justify-between gap-3 text-fg2"><span>Subtotal</span><span>{cents(preview.amountCents)}</span></div>
+          <div className="flex justify-between gap-3 border-t border-[var(--rule)] pt-3 text-base font-bold">
+            <span>Total due today</span>
+            <span>{cents(preview.amountCents)}</span>
+          </div>
+          <div className="text-[13px] text-fg3">
+            Then {cents(preview.recurringCents)} per {unit}, starting {longDate(preview.nextPaymentAt)}.
+          </div>
+        </div>
+      </div>
+
+      <div className="moto-payside">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Contact information</h3>
+          <div className="moto-box"><div><span className="moto-k">Email</span><span>{order.client.email}</span></div></div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Payment method</h3>
+          <div className="moto-box">
+            <div>
+              <span className="moto-radio" aria-hidden="true" />
+              <span className="moto-brand" aria-hidden="true">{card.brand.toUpperCase().slice(0, 4)}</span>
+              <span>{cardName(card.brand)} •••• {card.last4}</span>
+              <span className="ml-auto text-xs font-semibold" style={{ color: 'var(--ok)' }}>Card added</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Billing details</h3>
+          <div className="moto-box">
+            <div><span className="moto-k">Name</span><span>{order.client.legalName}</span></div>
+            <div><span className="moto-k">Address</span><span>{order.client.address}</span></div>
+          </div>
+        </div>
+        <div className="moto-check">
+          <span className="moto-cb" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4"><path d="M5 12l5 5 9-10" /></svg>
+          </span>
+          <span>
+            You agreed to the Juneau Digital Designs Terms of Service{termsVersion ? ` (${termsVersion})` : ''} by phone today. A copy
+            was emailed to you.
+          </span>
+        </div>
+        {stripeDisagrees && (
+          <div className="text-[13px]" style={{ color: 'var(--danger)' }}>
+            Stripe&apos;s price doesn&apos;t match this order, so payment is blocked. Check the plan prices in Stripe.
+          </div>
+        )}
+        <button type="button" className="btn btn-primary w-full py-[15px] text-base" disabled={busy || stripeDisagrees} onClick={onSubscribe}>
+          {busy ? 'Processing…' : 'Subscribe'}
+        </button>
+        <p className="m-0 text-center text-xs text-fg3">
+          By subscribing, you allow Juneau Digital Designs to charge your card for this payment and for future payments under the
+          Terms of Service. You can cancel any time.
+        </p>
+        <div className="flex items-center justify-center gap-1.5 text-xs text-fg3">
+          <LockIcon size={12} />
+          Payments processed securely by Stripe
+        </div>
+        <ErrorLine text={error} />
+        <div className="flex flex-wrap justify-center gap-[18px]">
+          <button type="button" className="btn moto-quiet" disabled={busy} onClick={onDifferentCard}>
+            Use a different card
+          </button>
+          <button type="button" className={`btn ${needsLink ? '' : 'moto-quiet'}`} disabled={busy} onClick={onUseLink}>
+            Send a payment link instead
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardPaid({
+  order,
+  preview,
+  paid,
+}: {
+  order: OperatorOrder;
+  preview: ChargePreview | null;
+  paid: { receipt: ChargeReceipt | null; statementDescriptor: string | null };
+}) {
+  const r = paid.receipt;
+  const amount = r?.amountPaidCents ?? preview?.amountCents ?? null;
+  const paidAt = r?.paidAt ?? Date.now();
+  const card = r?.card ?? preview?.card ?? null;
+  const nextAt = r?.nextPaymentAt ?? preview?.nextPaymentAt ?? null;
+  const nextAmount = r?.nextAmountCents ?? preview?.recurringCents ?? null;
+  const planName = order.plan.charAt(0).toUpperCase() + order.plan.slice(1);
+  const firstName = order.client.contactName.split(/\s+/)[0];
+
+  return (
+    <div className="moto-confirm -m-6">
+      <div className="moto-receipt moto-play">
+        <div className="moto-seal" aria-hidden="true">
+          <span className="moto-halo" />
+          <svg viewBox="0 0 76 76"><circle className="moto-ring" cx="38" cy="38" r="34" /></svg>
+          <svg viewBox="0 0 76 76"><path className="moto-tick" d="M24 39l9 9 19-20" /></svg>
+        </div>
+        <div className="moto-rise">
+          <h2 className="font-display text-[40px] font-bold leading-none">Payment received</h2>
+          <p className="m-0 mt-1.5 text-fg2">Thanks, {firstName}. You&apos;re subscribed to {planName}.</p>
+        </div>
+        <div className="moto-slip moto-rise tabular-nums">
+          <div className="flex items-baseline justify-between border-b border-dashed border-[var(--rule)] pb-2.5">
+            <span className="text-[13px] text-fg3">Amount paid</span>
+            <b className="font-display text-[30px] font-bold leading-none">{amount != null ? cents(amount) : '—'}</b>
+          </div>
+          <div className="moto-row"><span>Date</span><span>{longDate(paidAt)}</span></div>
+          {card && <div className="moto-row"><span>Payment method</span><span>{cardName(card.brand)} •••• {card.last4}</span></div>}
+          {r?.invoiceNumber && <div className="moto-row"><span>Receipt</span><span>#{r.invoiceNumber}</span></div>}
+          {nextAt != null && nextAmount != null && (
+            <div className="moto-row"><span>Next payment</span><span>{cents(nextAmount)} on {longDate(nextAt)}</span></div>
+          )}
+        </div>
+        <p className="moto-rise m-0 text-[13px] text-fg3">
+          A receipt is on its way to {order.client.email}.
+          {paid.statementDescriptor && (
+            <>
+              <br />
+              The charge appears on your statement as {paid.statementDescriptor}.
+            </>
+          )}
+        </p>
+        <span className="moto-rise inline-flex items-center gap-2 text-[13px] text-fg3">
+          <span className="moto-spin" aria-hidden="true" />
+          Setting up your account…
+        </span>
+      </div>
     </div>
   );
 }
