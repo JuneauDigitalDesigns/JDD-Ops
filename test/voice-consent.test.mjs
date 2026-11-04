@@ -234,9 +234,12 @@ test('every agent is told to hang up on voicemail', async () => {
   // the agent talked to the lead's voicemail for 48 seconds on an unanswered callback.
   const { VOICEMAIL_OPTION } = await import('../lib/voice-consent.js');
   assert.deepEqual(VOICEMAIL_OPTION, { action: { type: 'hangup' } });
+  // The body onboard.js sends comes from clientAgentCreateBody; run it for real.
+  const { clientAgentCreateBody } = await import('../onboard.js');
+  assert.deepEqual(clientAgentCreateBody({ businessName: 'Acme', llmId: 'llm_x', voiceId: 'v' }).voicemail_option, VOICEMAIL_OPTION);
   const onboard = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
   const createAgent = onboard.slice(onboard.indexOf("'https://api.retellai.com/create-agent'"));
-  assert.match(createAgent.slice(0, 1500), /voicemail_option: VOICEMAIL_OPTION/, 'create-agent must set voicemail_option');
+  assert.match(createAgent.slice(0, 400), /body: JSON\.stringify\(clientAgentCreateBody\(/, 'create-agent must send the builder');
 });
 
 test('the voicemail hang-up is pushed whatever happens to the prompt', async () => {
@@ -270,6 +273,25 @@ test('the repair allow-list accepts voicemail_option (and still refuses anything
 test('no prompt instruction tells the agent to leave a voicemail on a callback', () => {
   const onboard = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
   assert.doesNotMatch(onboard, /leaving a short friendly voicemail/);
-  assert.doesNotMatch(voiceConsentInstructions('Acme'), /leave the short voicemail/);
-  assert.match(voiceConsentInstructions('Acme'), /leave NO message — hang up/);
+  // Only an agent that places callbacks has an outbound voicemail rule at all.
+  assert.doesNotMatch(voiceConsentInstructions('Acme', { callbacks: true }), /leave the short voicemail/);
+  assert.match(voiceConsentInstructions('Acme', { callbacks: true }), /leave NO message — hang up/);
+});
+
+test('the consent ask is the wording approved on 2026-11-04, word for word', () => {
+  // Spoken to the public and the evidence of consent: a paraphrase is a different disclosure.
+  assert.equal(
+    smsConsentAsk('Acme Plumbing'),
+    "One last thing — is it okay if Acme Plumbing texts you at that number about this request? It's optional. Message frequency varies, message and data rates may apply, and you can reply STOP to opt out or HELP for help. A yes or no is fine.",
+  );
+});
+
+test('update-prompt refuses an agent bound to the MASTER LLM, before it writes anything to the LLM', () => {
+  // The growth fixture's agent ran on the master LLM (2026-11-04): a push would have rewritten
+  // every client's template.
+  const src = readFileSync(resolve(ROOT, 'scripts/update-agent-prompt.js'), 'utf8');
+  const main = src.slice(src.indexOf('async function main()'));
+  const guard = main.indexOf('llmId === process.env.RETELL_LLM_ID');
+  assert.ok(guard > 0, 'the master-LLM guard is missing');
+  assert.ok(guard < main.indexOf('update-retell-llm/'), 'the guard must come before the LLM write');
 });

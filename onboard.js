@@ -72,7 +72,7 @@ import {
 // rather than here because onboard.js pulls in dotenv, Anthropic, Octokit, twilio and Clerk —
 // too heavy for a Next server route — so the console previously kept its own copy, and that
 // copy had already drifted to an unsafe ring window. See lib/client-env.js.
-import { buildClientEnvLines } from './lib/client-env.js';
+import { buildClientEnvLines, placesCallbacks } from './lib/client-env.js';
 import {
   extractContentObject,
   hasConsoleMarker,
@@ -111,6 +111,8 @@ import {
   smsConsentAsk,
   VOICEMAIL_OPTION,
   voiceConsentInstructions,
+  callerDetailsInstructions,
+  SPELLING_RULE,
 } from './lib/voice-consent.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
 // Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
@@ -953,7 +955,70 @@ function buildClientRepo(repoDir) {
 // Step 6: Generate Retell prompt via Claude
 // ───────────────────────────────────────────────────────────────────────────
 
-async function generateRetellPrompt(content, clientDir, siteSlug) {
+/**
+ * The instructions Claude gets when it writes a client's agent prompt. Pure, and exported so the
+ * suite builds EXACTLY what a new Growth or Starter client's generator is handed — every rule from
+ * the 2026-11-04 live tests (direction from {{direction}}, no name re-ask outbound, the spoken
+ * number, the email from the name, plain-letter spelling, no square brackets) is asserted against
+ * this, not against a grep of the source.
+ */
+export function promptGeneratorSystem(content, { callbacks = false } = {}) {
+  return `You write the complete system prompt for a Retell AI voice agent that works the phones for a single local service business. ${callbacks ? 'The agent handles inbound calls and returns outbound callbacks placed within ~60 seconds of a website form submission.' : 'The agent ONLY answers inbound calls; it never places outbound calls or callbacks, so the prompt must contain no outbound or callback branches.'}
+
+Output ONLY the finished agent prompt as a Markdown document with "##" section headers, in this exact order:
+ROLE, CORE SPEAKING RULES, GREETING, IF ASKED WHETHER YOU'RE A REAL PERSON / AN AI, QUALIFICATION, NO SCHEDULING, CONTACT COLLECTION, ANSWERING QUESTIONS, SERVICES, FAQ, WHY CHOOSE, PRICING, CLOSING, EDGE CASES, NEVER.
+No preamble, no explanation, no code fences — just the prompt itself, written as direct second-person instructions to the agent ("You are…", "You never…").
+
+PERSONA
+- Give the agent ONE warm first name and use that same name everywhere (greeting, callbacks, every example). If an agentName is provided in the context, use it exactly. If it is null, choose one natural, friendly first name and never switch names.
+- The agent is honest that it's a virtual assistant if asked, but leads with its first name like a human coordinator and does not announce being an AI unprompted.
+
+ABSOLUTE CONSTRAINTS — bake these in as hard rules and restate the key ones in the NEVER section:
+- The agent NEVER books, schedules, holds, confirms, or commits to any appointment, time window, arrival time, or ETA — not even a tentative or "pending confirmation" one. Its job is to COLLECT the caller's details and tell them a real person from the team will reach out to schedule. If the caller pushes to book, warmly explain that a team member handles scheduling and will follow up shortly. There is NO soft-booking and NO offering of time windows.
+- NEVER quote prices, price ranges, or estimates — prices are always deferred to the team.
+- NEVER invent facts. Answer questions ONLY from the provided business data. For anything not in the data (hours if not provided, license numbers, specific pricing, availability), say you'll have the team follow up.
+- NEVER mention or compare to competitors.
+- NEVER pressure the caller (to book, to give an email, etc.).
+
+CORE SPEAKING RULES (write as direct instructions to the agent) — this is a voice conversation, so:
+- One thought per turn: usually one or two sentences, then stop. Never read a paragraph aloud.
+- One question at a time. Never stack questions. Ask, wait, acknowledge, then ask the next.
+- Acknowledge what the caller said before advancing.
+- Mirror the caller's energy (casual → relaxed; stressed or formal → calm and steady).
+- If interrupted, stop talking immediately and listen.
+- Don't repeat yourself or re-greet, and don't ask for a detail already given.
+- Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
+- Spoken-number formatting: read phone numbers back digit by digit in natural grouped chunks (area code… three digits… four digits), exactly the digits given — never write an example phone number into the prompt, say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
+${SPELLING_RULE}
+
+${callbacks
+  ? "GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it."
+  : "GREETING: one inbound greeting using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it."}
+
+${voiceConsentInstructions(content.brand.name, { callbacks })}
+
+QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time.
+
+LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
+
+NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
+
+${callerDetailsInstructions({ callbacks })}
+
+ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
+
+NO SQUARE BRACKETS: the voice model speaks the prompt's lines word for word and imitates its examples, so the prompt must contain NO square brackets anywhere — no bracketed placeholders, stage directions or fill-ins, not even as an example of what not to say. Where a line needs a value, put the instruction outside the quote in plain words — e.g. read the number back, then ask: "Is that a good number to reach you?"
+
+CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye${callbacks ? ' (on an outbound callback the agent placed the call, so it thanks them for their time — never "thanks for calling")' : ''}.
+
+EDGE CASES to cover: silence/no response; ${callbacks ? 'reaching voicemail on an outbound callback (hang up at once and leave NO message — the system normally hangs up on its own); ' : ''}an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
+
+NEVER (consolidated list): sounding robotic or scripted; reading an instruction to yourself aloud; spelling with phonetic or military alphabet words; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
+
+Keep everything warm, specific to this business, and grounded only in the provided data.`;
+}
+
+async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate = false, callbacks = false } = {}) {
   log(6, `Claude → Retell agent prompt`);
 
   /**
@@ -972,8 +1037,11 @@ async function generateRetellPrompt(content, clientDir, siteSlug) {
    * Keyed on the AGENT, not the file: if no agent exists the file is a leftover from a run that
    * died before creating one, and regenerating is correct.
    */
+  // `regenerate` is the deliberate exception (`npm run regenerate-prompt`): an agent whose prompt
+  // predates a wording change — the consent ask, the opening-line rules — must get a new one, and
+  // the caller has already saved the old file for review.
   const promptFile = resolve(clientDir, 'agent-prompt.txt');
-  if (readEnvLocal(clientDir).RETELL_AGENT_ID && existsSync(promptFile)) {
+  if (!regenerate && readEnvLocal(clientDir).RETELL_AGENT_ID && existsSync(promptFile)) {
     const existing = readFileSync(promptFile, 'utf8');
     console.log(`  Reusing ${promptFile} (${existing.length.toLocaleString()} chars) — agent already exists, so not regenerating`);
     console.log(`  To change the live prompt: npm run update-prompt -- --slug ${basename(clientDir)}`);
@@ -1015,54 +1083,7 @@ async function generateRetellPrompt(content, clientDir, siteSlug) {
     hours: content.extensions?.hours ?? null,
   };
 
-  const system = `You write the complete system prompt for a Retell AI voice agent that works the phones for a single local service business. The agent handles inbound calls and returns outbound callbacks placed within ~60 seconds of a website form submission.
-
-Output ONLY the finished agent prompt as a Markdown document with "##" section headers, in this exact order:
-ROLE, CORE SPEAKING RULES, GREETING, IF ASKED WHETHER YOU'RE A REAL PERSON / AN AI, QUALIFICATION, NO SCHEDULING, CONTACT COLLECTION, ANSWERING QUESTIONS, SERVICES, FAQ, WHY CHOOSE, PRICING, CLOSING, EDGE CASES, NEVER.
-No preamble, no explanation, no code fences — just the prompt itself, written as direct second-person instructions to the agent ("You are…", "You never…").
-
-PERSONA
-- Give the agent ONE warm first name and use that same name everywhere (greeting, callbacks, every example). If an agentName is provided in the context, use it exactly. If it is null, choose one natural, friendly first name and never switch names.
-- The agent is honest that it's a virtual assistant if asked, but leads with its first name like a human coordinator and does not announce being an AI unprompted.
-
-ABSOLUTE CONSTRAINTS — bake these in as hard rules and restate the key ones in the NEVER section:
-- The agent NEVER books, schedules, holds, confirms, or commits to any appointment, time window, arrival time, or ETA — not even a tentative or "pending confirmation" one. Its job is to COLLECT the caller's details and tell them a real person from the team will reach out to schedule. If the caller pushes to book, warmly explain that a team member handles scheduling and will follow up shortly. There is NO soft-booking and NO offering of time windows.
-- NEVER quote prices, price ranges, or estimates — prices are always deferred to the team.
-- NEVER invent facts. Answer questions ONLY from the provided business data. For anything not in the data (hours if not provided, license numbers, specific pricing, availability), say you'll have the team follow up.
-- NEVER mention or compare to competitors.
-- NEVER pressure the caller (to book, to give an email, etc.).
-
-CORE SPEAKING RULES (write as direct instructions to the agent) — this is a voice conversation, so:
-- One thought per turn: usually one or two sentences, then stop. Never read a paragraph aloud.
-- One question at a time. Never stack questions. Ask, wait, acknowledge, then ask the next.
-- Acknowledge what the caller said before advancing.
-- Mirror the caller's energy (casual → relaxed; stressed or formal → calm and steady).
-- If interrupted, stop talking immediately and listen.
-- Don't repeat yourself or re-greet, and don't ask for a detail already given.
-- Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
-- Spoken-number formatting: read phone numbers back in natural grouped chunks ("four oh seven… five five five… one two one two"), say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
-
-GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it.
-
-${voiceConsentInstructions(content.brand.name)}
-
-QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time.
-
-LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
-
-NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
-
-CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), the service address or town when the job is at a location, and optionally email (never pressure; if given, spell it back to confirm).
-
-ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
-
-CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye.
-
-EDGE CASES to cover: silence/no response; reaching voicemail on an outbound callback (hang up at once and leave NO message — the system normally hangs up on its own); an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
-
-NEVER (consolidated list): sounding robotic or scripted; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
-
-Keep everything warm, specific to this business, and grounded only in the provided data.`;
+  const system = promptGeneratorSystem(content, { callbacks });
 
   const user = `Business context:\n${JSON.stringify(agentContext, null, 2)}\n\nWrite the complete agent system prompt now.`;
 
@@ -1085,6 +1106,11 @@ Keep everything warm, specific to this business, and grounded only in the provid
   if (askCheck.ok === false) {
     fail(6, `${askCheck.detail}. Delete ${promptPath} and re-run to regenerate.`);
   }
+  // The voice model reads bracketed fill-ins aloud (2026-11-04: "[spell the name letter by letter]").
+  // checkLiveAgentSetup flags the same thing on live agents; refuse it before an agent is built.
+  if (/[[\]]/.test(prompt)) {
+    fail(6, `the generated prompt contains square brackets, which the agent reads aloud. Delete ${promptPath} and re-run to regenerate.`);
+  }
   console.log(`  Review this before Checkpoint 2 — you will tune it on a test call`);
   return prompt;
 }
@@ -1092,6 +1118,43 @@ Keep everything warm, specific to this business, and grounded only in the provid
 // ───────────────────────────────────────────────────────────────────────────
 // Step 7: Create Retell agent
 // ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The body of create-retell-llm for a client's OWN LLM: the master template's model and tools,
+ * this client's prompt, and the recording disclosure as the fixed opening line. Pure, and used by
+ * the real run, the dry run's report and the tests alike — so "what would a new client get?" has
+ * one answer.
+ */
+export function clientLlmCreateBody({ tpl = {}, agentPrompt, businessName }) {
+  return {
+    model: tpl.model ?? 'gpt-4.1-mini',
+    ...(tpl.model_high_priority !== undefined ? { model_high_priority: tpl.model_high_priority } : {}),
+    ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
+    ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
+    general_prompt: agentPrompt,
+    // The recording disclosure, spoken verbatim before the caller can say anything. Fixed
+    // text rather than generated, because it is evidence — see lib/voice-consent.js.
+    start_speaker: 'agent',
+    begin_message: inboundOpeningLine(businessName),
+  };
+}
+
+/** The body of create-agent for a client: bound to its own LLM, the consent schema, voicemail hang-up. */
+export function clientAgentCreateBody({ businessName, llmId, voiceId }) {
+  return {
+    agent_name: businessName,
+    response_engine: { type: 'retell-llm', llm_id: llmId },
+    voice_id: voiceId,
+    max_call_duration_ms: MAX_CALL_DURATION_MS,
+    // Structured fields Retell extracts after each call (call_analysis.custom_analysis_data).
+    // Defined in lib/voice-consent.js, shared with scripts/update-agent-prompt.js, so a new agent
+    // and a backfilled one carry the identical schema the Make clone reads from.
+    post_call_analysis_data: buildPostCallAnalysisData(businessName),
+    // Hang up on voicemail. An API-created agent has detection OFF unless this is set, and then
+    // talks to the voicemail — see lib/voice-consent.js.
+    voicemail_option: VOICEMAIL_OPTION,
+  };
+}
 
 async function createRetellAgent(content, agentPrompt, clientDir) {
   log(7, `Create Retell AI agent`);
@@ -1121,8 +1184,16 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     }
   }
   if (DRY_RUN) {
-    dryLog(`would POST https://api.retellai.com/create-agent for "${content.brand.name}"`);
-    dryLog(`would patch RETELL_AGENT_ID into ${clientDir}/.env.local`);
+    // Reported from the same builders the real run sends, so the dry run shows what a new client
+    // actually gets rather than restating it.
+    const llm = clientLlmCreateBody({ agentPrompt, businessName: content.brand.name });
+    const agent = clientAgentCreateBody({ businessName: content.brand.name, llmId: '<new per-client LLM>', voiceId: '<default voice>' });
+    dryLog(`would create this client's OWN Retell LLM (cloned from the template's model + tools, never the template itself)`);
+    dryLog(`  opening line (begin_message): "${llm.begin_message}"`);
+    dryLog(`  prompt: the generator's — refused unless it carries the approved SMS consent ask word for word`);
+    dryLog(`would POST https://api.retellai.com/create-agent for "${content.brand.name}", bound to that LLM`);
+    dryLog(`  voicemail: ${agent.voicemail_option.action.type}; analysis fields: ${agent.post_call_analysis_data.map((x) => x.name).join(', ')}`);
+    dryLog(`would record the new LLM id and agent id in ${clientDir}/.env.local`);
     return '<dry-run-agent-id>';
   }
   const apiKey = requireEnv('RETELL_API_KEY');
@@ -1148,6 +1219,13 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
   // template to clone from, while `RETELL_LLM_ID` in the CLIENT .env.local is this client's own
   // LLM. readEnvLocal only ever reads the latter.
   let clientLlmId = readEnvLocal(clientDir).RETELL_LLM_ID || null;
+  // Never adopt the master template as this client's "own" LLM. A .env.local that names it (copied
+  // from the root, or hand-edited) would bind the new agent to the master — the growth fixture's
+  // agent ran exactly that way until 2026-11-04, so its prompt was every client's template.
+  if (clientLlmId && clientLlmId === templateLlmId) {
+    console.warn(`  ⚠ ${basename(clientDir)}/.env.local names the MASTER LLM as its own — creating a per-client LLM instead.`);
+    clientLlmId = null;
+  }
   if (clientLlmId) {
     const check = await fetch(`https://api.retellai.com/get-retell-llm/${clientLlmId}`, { headers: authHeaders });
     if (check.ok) {
@@ -1168,17 +1246,7 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     const llmRes = await fetch('https://api.retellai.com/create-retell-llm', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        model: tpl.model ?? 'gpt-4.1-mini',
-        ...(tpl.model_high_priority !== undefined ? { model_high_priority: tpl.model_high_priority } : {}),
-        ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
-        ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
-        general_prompt: agentPrompt,
-        // The recording disclosure, spoken verbatim before the caller can say anything. Fixed
-        // text rather than generated, because it is evidence — see lib/voice-consent.js.
-        start_speaker: 'agent',
-        begin_message: inboundOpeningLine(content.brand.name),
-      }),
+      body: JSON.stringify(clientLlmCreateBody({ tpl, agentPrompt, businessName: content.brand.name })),
     });
     if (!llmRes.ok) fail(7, `Retell create-retell-llm returned ${llmRes.status}: ${await llmRes.text()}`);
     const llmData = await llmRes.json();
@@ -1188,24 +1256,13 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     patchEnvLocal(clientDir, 'RETELL_LLM_ID', clientLlmId);
   }
 
-  // Structured fields Retell extracts after each call (call_analysis.custom_analysis_data).
-  // Defined in lib/voice-consent.js, shared with scripts/update-agent-prompt.js, so a new agent
-  // and a backfilled one carry the identical schema the Make clone reads from.
-  const postCallAnalysisData = buildPostCallAnalysisData(content.brand.name);
+  // Belt and braces: whatever happened above, the agent never binds to the template.
+  if (clientLlmId === templateLlmId) fail(7, 'refusing to bind a client agent to the MASTER Retell LLM');
 
   const res = await fetch('https://api.retellai.com/create-agent', {
     method: 'POST',
     headers: authHeaders,
-    body: JSON.stringify({
-      agent_name: content.brand.name,
-      response_engine: { type: 'retell-llm', llm_id: clientLlmId },
-      voice_id: voiceId,
-      max_call_duration_ms: MAX_CALL_DURATION_MS,
-      post_call_analysis_data: postCallAnalysisData,
-      // Hang up on voicemail. An API-created agent has detection OFF unless this is set, and then
-      // talks to the voicemail — see lib/voice-consent.js.
-      voicemail_option: VOICEMAIL_OPTION,
-    }),
+    body: JSON.stringify(clientAgentCreateBody({ businessName: content.brand.name, llmId: clientLlmId, voiceId })),
   });
 
   if (!res.ok) fail(7, `Retell create-agent returned ${res.status}: ${await res.text()}`);
@@ -3186,7 +3243,8 @@ async function main() {
     if (webOnly) {
       console.log(`\n  Skipping voice provisioning (website-only client, receptionist declined).`);
     } else {
-      const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug);
+      // Outbound rules only for an agent that places callbacks — the same rule as LEAD_CALLBACK.
+      const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug, { callbacks: placesCallbacks(intake.plan) });
       agentId = await createRetellAgent(site, agentPrompt, clientDir);
       twilioNumber = await provisionTwilioNumber(site, siteSlug, clientDir);
 
@@ -3335,6 +3393,9 @@ export {
   siteDirFor,
   siteTagFor,
   intakeIsWebOnly,
+  // Prompt regeneration for existing clients (scripts/regenerate-prompt.js)
+  loadIntake,
+  generateRetellPrompt,
   // Validation
   validateSite,
   validateIntake,

@@ -498,6 +498,28 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
           }),
         );
       }
+      if (air.missingColumns?.length) {
+        const names = air.missingColumns.map((n) => `"${n}"`).join(', ');
+        findings.push(
+          f({
+            id: 'airtable.missingColumns',
+            severity: 'red',
+            area: 'leads',
+            siteSlug,
+            title: `Call Log is missing ${air.missingColumns.length === 1 ? 'a column' : 'columns'}`,
+            detail:
+              `The Call Log has no ${names} column, so the post-call scenario's value for it is dropped from ` +
+              'every logged call, and re-running onboarding for this client refuses. Adding it is additive — ' +
+              'no existing column or row is touched; rows already logged stay empty in it.',
+            actual: air.missingColumns.join(', '),
+            fix: {
+              route: '/api/manage/repair',
+              body: { slug: a.ctx.slug, siteSlug, action: 'airtable.columns' },
+              label: `Add ${names}`,
+            },
+          }),
+        );
+      }
       if (air.needsSiteColumn && air.hasSiteColumn === false) {
         findings.push(
           f({

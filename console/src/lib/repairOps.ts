@@ -46,7 +46,7 @@ export interface RepairOpsModule {
   repairAirtableBase(args: {
     apiKey: string | null;
     baseId: string | null | undefined;
-    want: 'call-log' | 'site-column';
+    want: 'call-log' | 'site-column' | 'columns';
     siteTag?: string | null;
   }): Promise<RepairResult<string, string>>;
 }

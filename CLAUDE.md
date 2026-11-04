@@ -289,7 +289,28 @@ the prompt and binds the agent to it; the per-client LLM id is saved as
 LLM (`update-retell-llm`: prompt + the fixed `begin_message` recording disclosure) **and** the
 agent's `post_call_analysis_data` in one command, so a prompt that asks for SMS consent never
 runs on an agent with no field to record it. It refuses a prompt missing the approved consent
-ask; `--prompt-only` keeps the old prompt-alone behaviour.
+ask; `--prompt-only` keeps the old prompt-alone behaviour. It also **refuses an agent bound to
+the master LLM**, because the push would rewrite every client's template. And it takes the spoken
+business name from `agent_name` unless you pass `--business`: pass it whenever the agent's name
+isn't the business (the growth fixture's agent was called "Master Agent").
+
+**Changes to the consent wording don't reach existing clients by themselves.** onboard.js keeps
+the prompt on disk once an agent exists. `npm run regenerate-prompt -- --slug <slug>` writes a
+fresh one through the real generator (saving the old file beside it, local only), and
+`update-prompt` then pushes it. `npm run verify-agents` is the read-only guard: for every client
+agent, `checkLiveAgentSetup` reads the agent and the LLM it is **actually bound to**, and fails it
+if any of these are missing:
+- its own LLM (not the master);
+- the recording disclosure as `begin_message`;
+- the approved ask in the prompt;
+- an `sms_consent` field;
+- the voicemail hang-up.
+
+Found 2026-11-04 when both test agents failed every one, and the growth agent was on the master
+LLM. Retell refused to re-point it ("Cannot update response engine after agent versions have been
+created"), so it was replaced by a new agent bound to its own LLM. onboard.js now refuses to adopt
+or bind the master as a client's own LLM. A dry run reports the exact LLM and agent a new client
+gets, built by the same `clientLlmCreateBody` / `clientAgentCreateBody` the real run sends.
 
 **Every agent hangs up on voicemail** (`voicemail_option: { action: { type: "hangup" } }`, an
 *agent* field, `VOICEMAIL_OPTION` in `lib/voice-consent.js`). onboard.js sets it at creation and
@@ -320,7 +341,8 @@ Call type, Email, Address, Recording URL, Priority, SMS consent, Outcome
 **`SMS consent` is the caller's spoken answer to the closing SMS question** —
 `custom_analysis_data.sms_consent`, `granted`/`declined`/`unknown`, lowercase. `unknown` blocks
 and `declined` is sticky. The wording, the opening recording disclosure and the analysis schema
-all live in `lib/voice-consent.js`, word-for-word as the operator approved them on 2026-11-02;
+all live in `lib/voice-consent.js`, word-for-word as the operator approved them (the disclosure
+and schema on 2026-11-02; the current consent ask on 2026-11-04);
 don't reword them without sign-off. Every `custom_analysis_data.*` the master reads must be
 extracted by the agent (`checkAnalysisCoversBlueprint`): Email, Address and Priority were blank
 on every call until that was true. The master's mapping for this column was a deliberate,
@@ -333,6 +355,13 @@ client field id), because Airtable table and field ids are *base-scoped* — the
 `createAirtableBase` doesn't create is silently dropped from every logged call. Run
 `npm run verify-post-call` after touching either side; it diffs them against the live master
 and runs the real `patchPostCallBlueprint`.
+
+**A base created before a column existed doesn't gain it by itself** (e.g. `SMS consent` on bases
+older than 2026-11-02, which also makes `airtable.schemaCovers` refuse an onboard re-run).
+`npm run repair-call-log -- --slug <slug>` previews which `CALL_LOG_FIELDS` columns the table lacks;
+`--write` adds them exactly as onboard.js would and reads back. It is additive only: an existing
+column is never retyped, since Airtable's API can't edit a select's choices anyway. The console
+shows the same thing as the `airtable.missingColumns` finding, with an "Add …" button.
 
 Two gotchas worth keeping:
 

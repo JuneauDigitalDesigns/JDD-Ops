@@ -142,6 +142,15 @@ async function main() {
   if (!llmId) {
     fail(`Agent ${agentId} is not backed by a retell-llm engine (response_engine=${JSON.stringify(agent.response_engine)}). Cannot update prompt.`);
   }
+  // Never write to the MASTER LLM. In the root .env, RETELL_LLM_ID is the template every client's
+  // own LLM is cloned from; an agent bound to it (the growth fixture was, 2026-11-04) would have
+  // this push overwrite every future client's prompt. Re-point the agent at its own LLM first.
+  if (process.env.RETELL_LLM_ID && llmId === process.env.RETELL_LLM_ID) {
+    fail(
+      `Agent ${agentId} is bound to the MASTER Retell LLM (${llmId}). Refusing: this would rewrite every client's template.\n` +
+        'Bind the agent to its own LLM first (onboard.js creates one per client), then push again.',
+    );
+  }
 
   const llmPatch = { general_prompt: prompt };
 

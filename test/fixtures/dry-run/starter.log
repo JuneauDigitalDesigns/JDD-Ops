@@ -38,8 +38,12 @@
   [dry-run] would write <ROOT>/clients/fixture-starter/agent-prompt.txt
 
 [step 8] Create Retell AI agent
-  [dry-run] would POST https://api.retellai.com/create-agent for "Fixture Electric LLC"
-  [dry-run] would patch RETELL_agent_<ID> into <ROOT>/clients/fixture-starter/.env.local
+  [dry-run] would create this client's OWN Retell LLM (cloned from the template's model + tools, never the template itself)
+  [dry-run]   opening line (begin_message): "This call is recorded. Hi, this is Fixture Electric LLC — how can I help you today?"
+  [dry-run]   prompt: the generator's — refused unless it carries the approved SMS consent ask word for word
+  [dry-run] would POST https://api.retellai.com/create-agent for "Fixture Electric LLC", bound to that LLM
+  [dry-run]   voicemail: hangup; analysis fields: caller_name, callback_number, caller_email, caller_address, caller_priority, sms_consent
+  [dry-run] would record the new LLM id and agent id in <ROOT>/clients/fixture-starter/.env.local
 
 [step 9] Provision JDD Twilio number (human-first routing → Retell fallback)
   [dry-run] would search Twilio for local number (area code from brand.phone) then toll-free

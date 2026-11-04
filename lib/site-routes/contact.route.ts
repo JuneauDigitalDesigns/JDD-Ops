@@ -97,6 +97,22 @@ function outboundOpeningLine(businessName: string, name: string): string {
 }
 
 /** Place the Retell callback. Returns true when Retell accepted the call. */
+/**
+ * The callback number in words for the agent to repeat: "+12073181838" → "two zero seven, three one
+ * eight, one eight three eight". The model misread raw digits on live calls (207 → "four oh seven",
+ * then "seven oh seven"). "" when not a ten-digit US number, so the prompt falls back to
+ * {{user_number}}. A standalone copy of spokenPhoneDigits in lib/voice-consent.js (client repos
+ * have no @jdd dependency); test/agent-call-flow.test.mjs runs both and pins them equal.
+ */
+function spokenPhoneDigits(raw: unknown): string {
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+  const d = String(raw ?? '').replace(/\D/g, '');
+  const ten = d.length === 11 && d.startsWith('1') ? d.slice(1) : d;
+  if (ten.length !== 10) return '';
+  const say = (s: string) => [...s].map((c) => words[Number(c)]).join(' ');
+  return `${say(ten.slice(0, 3))}, ${say(ten.slice(3, 6))}, ${say(ten.slice(6))}`;
+}
+
 async function placeCallback(toNumber: string, leadName: unknown): Promise<boolean> {
   const apiKey = process.env.RETELL_API_KEY;
   const fromNumber = process.env.TWILIO_NUMBER;
@@ -122,7 +138,7 @@ async function placeCallback(toNumber: string, leadName: unknown): Promise<boole
           ? { agent_override: { retell_llm: { begin_message: outboundOpeningLine(businessName, name) } } }
           : {}),
         // So the prompt can use the name after the opening line. Values must be strings.
-        retell_llm_dynamic_variables: { lead_name: name },
+        retell_llm_dynamic_variables: { lead_name: name, callback_number_spoken: spokenPhoneDigits(toNumber) },
       }),
     });
     if (!res.ok) {
