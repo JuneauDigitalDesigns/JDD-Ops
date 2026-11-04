@@ -2,6 +2,7 @@ import 'server-only';
 import { Redis } from '@upstash/redis';
 import { readAgencyEnv, readOpsEnv, isTurnstileTestKey } from './env';
 import type { GoLiveCheck, GoLiveResult } from './types';
+import { STRIPE_PRICE_KEYS } from '../stripePriceKeys';
 
 /**
  * The green gate. Read-only. Reports whether every service is configured for PRODUCTION in
@@ -32,16 +33,9 @@ export async function runPreflight(): Promise<GoLiveResult> {
     detail: startsWith(agency.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, 'pk_test_') ? 'still pk_test_' : undefined,
   });
   checks.push({ label: 'Stripe webhook secret set', ok: startsWith(agency.STRIPE_WEBHOOK_SECRET, 'whsec_') });
-  for (const key of [
-    'STRIPE_PRICE_STARTER_MONTHLY',
-    'STRIPE_PRICE_STARTER_ONBOARDING',
-    'STRIPE_PRICE_GROWTH_MONTHLY',
-    'STRIPE_PRICE_ENTERPRISE_MONTHLY',
-    // Annual checkout and annual plan changes refuse without these.
-    'STRIPE_PRICE_STARTER_ANNUAL',
-    'STRIPE_PRICE_GROWTH_ANNUAL',
-    'STRIPE_PRICE_ENTERPRISE_ANNUAL',
-  ]) {
+  // All nine (stripePriceKeys.ts): checkout, annual billing and every plan's onboarding fee
+  // each refuse or fall back without theirs.
+  for (const key of STRIPE_PRICE_KEYS) {
     checks.push({ label: `${key} present`, ok: present(agency[key]) });
   }
 
