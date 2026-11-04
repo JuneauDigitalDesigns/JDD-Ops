@@ -19,7 +19,14 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { voiceConsentInstructions, callerDetailsInstructions, smsConsentAsk, inboundOpeningLine } from '../lib/voice-consent.js';
+import {
+  voiceConsentInstructions,
+  callerDetailsInstructions,
+  smsConsentAsk,
+  inboundOpeningLine,
+  spokenPhoneDigits,
+  SPELLING_RULE,
+} from '../lib/voice-consent.js';
 import { placesCallbacks, buildClientEnvLines } from '../lib/client-env.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -91,15 +98,14 @@ test('the agent confirms the number it is on instead of asking for one', () => {
     assert.match(x, /do NOT ask them to recite a number/);
     assert.match(x, /good number to reach them/);
     // Retell leaves an unset variable literal; the agent must not read "{{user_number}}" aloud.
-    assert.match(x, /placeholder in braces, ask for the best number/);
+    assert.match(x, /a placeholder too, ask for the best number/);
   }
 });
 
 test('"my name at gmail" is built from the name it already has', () => {
   const x = callerDetailsInstructions({ callbacks: true });
-  assert.match(x, /build it from the name you already have/);
   assert.match(x, /together, or with a dot in between/);
-  assert.match(x, /spell the actual address back letter by letter/);
+  assert.match(x, /work out the actual address yourself/);
 });
 
 test('the generator uses these rules, chosen by whether the agent places callbacks', () => {
@@ -134,17 +140,118 @@ test('the outbound checklist has no name step at all', () => {
   assert.match(outbound, /NEVER ask for their name/);
 });
 
-test('the number is read from {{user_number}} only — the 207 read back as "four oh seven"', () => {
-  assert.match(callerDetailsInstructions({ callbacks: true }), /EXACTLY the digits \{\{user_number\}\} contains/);
+test('no example phone number in the generator — the 207 read back as "four oh seven"', () => {
   const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
-  // The generator's own example number was 407; the agent swapped it in for the real area code.
   assert.doesNotMatch(src, /four oh seven/);
   assert.match(src, /never write an example phone number into the prompt/);
+  assert.match(src, /never "thanks for calling"/);
 });
 
-test('no bracketed placeholder is ever spoken — it said "[spelling out the email address]"', () => {
+/* ── the third test, 2026-11-04 16:53 ─────────────────────────────────────── */
+
+test('the number reaches the agent already in words — it then read 207 as "seven oh seven"', () => {
+  assert.equal(spokenPhoneDigits('+12073181838'), 'two zero seven, three one eight, one eight three eight');
+  assert.equal(spokenPhoneDigits('(207) 318-1838'), 'two zero seven, three one eight, one eight three eight');
+  assert.equal(spokenPhoneDigits('+442071234567'), '', 'not a US number: the prompt falls back');
+  assert.equal(spokenPhoneDigits(undefined), '');
+  for (const callbacks of [false, true]) {
+    const x = callerDetailsInstructions({ callbacks });
+    assert.match(x, /written out in words: \{\{callback_number_spoken\}\}\. Say exactly those words back/);
+    assert.match(x, /use \{\{user_number\}\} instead/);
+  }
+});
+
+/** The route's standalone copy, run for real: strip the TS annotations and evaluate it. */
+function routeSpokenPhoneDigits(file) {
+  const src = readFileSync(resolve(ROOT, 'lib/site-routes', file), 'utf8');
+  const m = /function spokenPhoneDigits\(raw: unknown\): string \{[\s\S]*?\n\}/.exec(src);
+  assert.ok(m, `${file} has no spokenPhoneDigits`);
+  const js = m[0].replace('(raw: unknown): string', '(raw)').replace('(s: string)', '(s)');
+  return new Function(`${js}; return spokenPhoneDigits;`)();
+}
+
+test('both routes pass callback_number_spoken, computed by a copy equal to the lib one', () => {
+  const cases = ['+12073181838', '2073181838', '12073181838', '+1 (407) 555-0100', '', null, '+15551234', 'abc'];
+  for (const file of ['contact.route.ts', 'no-answer.route.ts']) {
+    const fn = routeSpokenPhoneDigits(file);
+    for (const c of cases) assert.equal(fn(c), spokenPhoneDigits(c), `${file}: ${c}`);
+  }
+  const contact = readFileSync(resolve(ROOT, 'lib/site-routes/contact.route.ts'), 'utf8');
+  assert.match(contact, /retell_llm_dynamic_variables: \{ lead_name: name, callback_number_spoken: spokenPhoneDigits\(toNumber\) \}/);
+  const noAnswer = readFileSync(resolve(ROOT, 'lib/site-routes/no-answer.route.ts'), 'utf8');
+  assert.match(noAnswer, /retell_llm_dynamic_variables: \{ callback_number_spoken: spokenPhoneDigits\(fromNumber\) \}/);
+});
+
+test('the email is worked out from the name, and "my full name" is never part of it', () => {
+  // It said "your first and last name all together at G as in golf…", then offered the words
+  // "my full name" as the first part.
+  const growth = callerDetailsInstructions({ callbacks: true });
+  const [inbound, outbound] = growth.split(/OUTBOUND CALLBACK/);
+  assert.match(outbound, /the name is the one you already have — \{\{lead_name\}\}/);
+  assert.match(inbound, /the name is the one you already have — the name they gave you earlier in this call/);
+  assert.match(growth, /The words "my name" or "my full name" are NEVER part of the address/);
+  assert.match(growth, /read THAT address back/);
+});
+
+test('spelling uses plain letters — never "G as in golf, M as in Mike"', () => {
+  assert.match(SPELLING_RULE, /plain letters only/);
+  assert.match(SPELLING_RULE, /NEVER use phonetic or military alphabet words/);
+  assert.match(SPELLING_RULE, /never say "as in"/);
   const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
-  assert.match(src, /a quoted line must never contain a bracketed placeholder or stage direction/);
-  assert.match(src, /NEVER \(consolidated list\): sounding robotic or scripted; saying a bracketed placeholder or stage direction aloud;/);
-  assert.match(src, /never "thanks for calling"/);
+  assert.match(src, /\$\{SPELLING_RULE\}/);
+  assert.match(src, /spelling with phonetic or military alphabet words;/);
+});
+
+/* ── every fix above reaches a NEW client, not just the two test agents ───── */
+
+test("a new client's prompt generator is handed every live-test fix — Growth and Starter", async () => {
+  const { promptGeneratorSystem, loadIntake } = await import('../onboard.js');
+  for (const [shape, callbacks] of [['growth', true], ['starter', false]]) {
+    const intake = await loadIntake(resolve(ROOT, `test/fixtures/intake/fixture-${shape}/site.ts`));
+    assert.equal(placesCallbacks(intake.plan), callbacks, `${shape} fixture's plan`);
+    const content = intake.sites[0];
+    const sys = promptGeneratorSystem(content, { callbacks });
+    const biz = content.brand.name;
+    const why = (x) => `${shape}: ${x}`;
+    // Approved wording, verbatim.
+    assert.ok(sys.includes(smsConsentAsk(biz)), why('consent ask'));
+    assert.ok(sys.includes(inboundOpeningLine(biz)), why('inbound disclosure'));
+    // The callback number, in words, with the raw-digit fallback.
+    assert.match(sys, /\{\{callback_number_spoken\}\}/, why('spoken number'));
+    assert.doesNotMatch(sys, /four oh seven/, why('example number'));
+    // The email from the name; plain letters; nothing bracketed.
+    assert.match(sys, /"my full name" are NEVER part of the address/, why('email'));
+    assert.ok(sys.includes(SPELLING_RULE), why('spelling'));
+    assert.match(sys, /NO square brackets anywhere/, why('brackets rule'));
+    assert.doesNotMatch(sys, /[[\]]/, why('the instructions themselves hold no brackets to imitate'));
+    // Outbound rules for callback agents only.
+    if (callbacks) {
+      assert.match(sys, /This call's direction: \{\{direction\}\}\./, why('direction'));
+      assert.match(sys, /OUTBOUND CALLBACK \(\{\{direction\}\} is outbound\)/, why('outbound checklist'));
+      assert.match(sys, /never "thanks for calling"/, why('outbound goodbye'));
+    } else {
+      assert.doesNotMatch(sys, /\{\{direction\}\}|\{\{lead_name\}\}|OUTBOUND CALLBACKS/, why('no outbound branch'));
+      assert.match(sys, /ONLY answers inbound calls/, why('inbound only'));
+    }
+  }
+});
+
+test('onboard.js refuses a generated prompt with square brackets, and writes the current routes', () => {
+  const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  assert.match(src, /const system = promptGeneratorSystem\(content, \{ callbacks \}\);/);
+  assert.match(src, /if \(\/\[\[\\\]\]\/\.test\(prompt\)\) \{\n?\r?\n?\s*fail\(6, `the generated prompt contains square brackets/);
+  // Every run rewrites these from lib/site-routes, so callback_number_spoken reaches new clients.
+  assert.match(src, /\{ asset: 'contact\.route\.ts',\s+dest: 'src\/app\/api\/contact\/route\.ts' \}/);
+  assert.match(src, /\{ asset: 'no-answer\.route\.ts', dest: 'src\/app\/api\/voice\/no-answer\/route\.ts' \}/);
+});
+
+test('no square brackets in a prompt — it said "[spell the name letter by letter]" aloud', () => {
+  const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  assert.match(src, /the prompt must contain NO square brackets anywhere/);
+  // The previous rule GAVE bracketed examples ("[grouped number]"), and the agent imitated them.
+  assert.doesNotMatch(src, /"\[grouped number\]"/);
+  for (const callbacks of [false, true]) {
+    assert.doesNotMatch(callerDetailsInstructions({ callbacks }), /[[\]]/);
+    assert.doesNotMatch(voiceConsentInstructions(BIZ, { callbacks }), /[[\]]/);
+  }
 });

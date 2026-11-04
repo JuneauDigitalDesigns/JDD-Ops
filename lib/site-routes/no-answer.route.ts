@@ -9,6 +9,22 @@ import { NextRequest, NextResponse } from 'next/server';
 //      (RETELL_SIP_DOMAIN defaults to sip.retellai.com)
 //   3. Twilio connects the call to the Retell agent over SIP (no bridge needed).
 //      Must dial within 5 min of register-phone-call.
+/**
+ * The callback number in words for the agent to repeat: "+12073181838" → "two zero seven, three one
+ * eight, one eight three eight". The model misread raw digits on live calls (207 → "four oh seven",
+ * then "seven oh seven"). "" when not a ten-digit US number, so the prompt falls back to
+ * {{user_number}}. A standalone copy of spokenPhoneDigits in lib/voice-consent.js (client repos
+ * have no @jdd dependency); test/agent-call-flow.test.mjs runs both and pins them equal.
+ */
+function spokenPhoneDigits(raw: unknown): string {
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+  const d = String(raw ?? '').replace(/\D/g, '');
+  const ten = d.length === 11 && d.startsWith('1') ? d.slice(1) : d;
+  if (ten.length !== 10) return '';
+  const say = (s: string) => [...s].map((c) => words[Number(c)]).join(' ');
+  return `${say(ten.slice(0, 3))}, ${say(ten.slice(3, 6))}, ${say(ten.slice(6))}`;
+}
+
 export async function POST(req: NextRequest) {
   const formData   = await req.formData();
   const dialStatus = formData.get('DialCallStatus') as string | null;
@@ -46,6 +62,8 @@ export async function POST(req: NextRequest) {
         direction: 'inbound',
         ...(fromNumber ? { from_number: fromNumber } : {}),
         ...(toNumber ? { to_number: toNumber } : {}),
+        // So the agent repeats the caller's number in words instead of reading digits. Strings only.
+        retell_llm_dynamic_variables: { callback_number_spoken: spokenPhoneDigits(fromNumber) },
       }),
     });
     if (!res.ok) throw new Error(`register-phone-call ${res.status}: ${await res.text()}`);

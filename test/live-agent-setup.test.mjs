@@ -68,6 +68,8 @@ test('each missing piece is caught on its own', () => {
     [(x) => { x.llm.general_prompt = 'One last thing — is it okay if Your HVAC Co. texts you at that number about this request? Message and data rates may apply, and you can reply STOP anytime. A yes or no is fine.'; }, /consent ask/],
     [(x) => { x.agent.post_call_analysis_data = x.agent.post_call_analysis_data.filter((f) => f.name !== 'sms_consent'); }, /sms_consent/],
     [(x) => { x.agent.voicemail_option = null; }, /voicemail/],
+    // Said aloud to a caller on 2026-11-04: "That's [spell the name letter by letter] at G as in golf…"
+    [(x) => { x.llm.general_prompt += '\nThen say: "That\'s [spell the name letter by letter]."'; }, /square brackets/],
   ];
   for (const [breakIt, why] of cases) {
     const x = correct();
