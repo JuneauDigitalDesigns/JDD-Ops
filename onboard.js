@@ -923,7 +923,7 @@ function buildClientRepo(repoDir) {
 // Step 6: Generate Retell prompt via Claude
 // ───────────────────────────────────────────────────────────────────────────
 
-async function generateRetellPrompt(content, clientDir, siteSlug) {
+async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate = false } = {}) {
   log(6, `Claude → Retell agent prompt`);
 
   /**
@@ -942,8 +942,11 @@ async function generateRetellPrompt(content, clientDir, siteSlug) {
    * Keyed on the AGENT, not the file: if no agent exists the file is a leftover from a run that
    * died before creating one, and regenerating is correct.
    */
+  // `regenerate` is the deliberate exception (`npm run regenerate-prompt`): an agent whose prompt
+  // predates a wording change — the consent ask, the opening-line rules — must get a new one, and
+  // the caller has already saved the old file for review.
   const promptFile = resolve(clientDir, 'agent-prompt.txt');
-  if (readEnvLocal(clientDir).RETELL_AGENT_ID && existsSync(promptFile)) {
+  if (!regenerate && readEnvLocal(clientDir).RETELL_AGENT_ID && existsSync(promptFile)) {
     const existing = readFileSync(promptFile, 'utf8');
     console.log(`  Reusing ${promptFile} (${existing.length.toLocaleString()} chars) — agent already exists, so not regenerating`);
     console.log(`  To change the live prompt: npm run update-prompt -- --slug ${basename(clientDir)}`);
@@ -1063,6 +1066,43 @@ Keep everything warm, specific to this business, and grounded only in the provid
 // Step 7: Create Retell agent
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * The body of create-retell-llm for a client's OWN LLM: the master template's model and tools,
+ * this client's prompt, and the recording disclosure as the fixed opening line. Pure, and used by
+ * the real run, the dry run's report and the tests alike — so "what would a new client get?" has
+ * one answer.
+ */
+export function clientLlmCreateBody({ tpl = {}, agentPrompt, businessName }) {
+  return {
+    model: tpl.model ?? 'gpt-4.1-mini',
+    ...(tpl.model_high_priority !== undefined ? { model_high_priority: tpl.model_high_priority } : {}),
+    ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
+    ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
+    general_prompt: agentPrompt,
+    // The recording disclosure, spoken verbatim before the caller can say anything. Fixed
+    // text rather than generated, because it is evidence — see lib/voice-consent.js.
+    start_speaker: 'agent',
+    begin_message: inboundOpeningLine(businessName),
+  };
+}
+
+/** The body of create-agent for a client: bound to its own LLM, the consent schema, voicemail hang-up. */
+export function clientAgentCreateBody({ businessName, llmId, voiceId }) {
+  return {
+    agent_name: businessName,
+    response_engine: { type: 'retell-llm', llm_id: llmId },
+    voice_id: voiceId,
+    max_call_duration_ms: MAX_CALL_DURATION_MS,
+    // Structured fields Retell extracts after each call (call_analysis.custom_analysis_data).
+    // Defined in lib/voice-consent.js, shared with scripts/update-agent-prompt.js, so a new agent
+    // and a backfilled one carry the identical schema the Make clone reads from.
+    post_call_analysis_data: buildPostCallAnalysisData(businessName),
+    // Hang up on voicemail. An API-created agent has detection OFF unless this is set, and then
+    // talks to the voicemail — see lib/voice-consent.js.
+    voicemail_option: VOICEMAIL_OPTION,
+  };
+}
+
 async function createRetellAgent(content, agentPrompt, clientDir) {
   log(7, `Create Retell AI agent`);
   const existingAgentId = readEnvLocal(clientDir).RETELL_AGENT_ID;
@@ -1091,8 +1131,16 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     }
   }
   if (DRY_RUN) {
-    dryLog(`would POST https://api.retellai.com/create-agent for "${content.brand.name}"`);
-    dryLog(`would patch RETELL_AGENT_ID into ${clientDir}/.env.local`);
+    // Reported from the same builders the real run sends, so the dry run shows what a new client
+    // actually gets rather than restating it.
+    const llm = clientLlmCreateBody({ agentPrompt, businessName: content.brand.name });
+    const agent = clientAgentCreateBody({ businessName: content.brand.name, llmId: '<new per-client LLM>', voiceId: '<default voice>' });
+    dryLog(`would create this client's OWN Retell LLM (cloned from the template's model + tools, never the template itself)`);
+    dryLog(`  opening line (begin_message): "${llm.begin_message}"`);
+    dryLog(`  prompt: the generator's — refused unless it carries the approved SMS consent ask word for word`);
+    dryLog(`would POST https://api.retellai.com/create-agent for "${content.brand.name}", bound to that LLM`);
+    dryLog(`  voicemail: ${agent.voicemail_option.action.type}; analysis fields: ${agent.post_call_analysis_data.map((x) => x.name).join(', ')}`);
+    dryLog(`would record the new LLM id and agent id in ${clientDir}/.env.local`);
     return '<dry-run-agent-id>';
   }
   const apiKey = requireEnv('RETELL_API_KEY');
@@ -1118,6 +1166,13 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
   // template to clone from, while `RETELL_LLM_ID` in the CLIENT .env.local is this client's own
   // LLM. readEnvLocal only ever reads the latter.
   let clientLlmId = readEnvLocal(clientDir).RETELL_LLM_ID || null;
+  // Never adopt the master template as this client's "own" LLM. A .env.local that names it (copied
+  // from the root, or hand-edited) would bind the new agent to the master — the growth fixture's
+  // agent ran exactly that way until 2026-11-04, so its prompt was every client's template.
+  if (clientLlmId && clientLlmId === templateLlmId) {
+    console.warn(`  ⚠ ${basename(clientDir)}/.env.local names the MASTER LLM as its own — creating a per-client LLM instead.`);
+    clientLlmId = null;
+  }
   if (clientLlmId) {
     const check = await fetch(`https://api.retellai.com/get-retell-llm/${clientLlmId}`, { headers: authHeaders });
     if (check.ok) {
@@ -1138,17 +1193,7 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     const llmRes = await fetch('https://api.retellai.com/create-retell-llm', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        model: tpl.model ?? 'gpt-4.1-mini',
-        ...(tpl.model_high_priority !== undefined ? { model_high_priority: tpl.model_high_priority } : {}),
-        ...(tpl.tool_call_strict_mode !== undefined ? { tool_call_strict_mode: tpl.tool_call_strict_mode } : {}),
-        ...(Array.isArray(tpl.general_tools) ? { general_tools: tpl.general_tools } : {}),
-        general_prompt: agentPrompt,
-        // The recording disclosure, spoken verbatim before the caller can say anything. Fixed
-        // text rather than generated, because it is evidence — see lib/voice-consent.js.
-        start_speaker: 'agent',
-        begin_message: inboundOpeningLine(content.brand.name),
-      }),
+      body: JSON.stringify(clientLlmCreateBody({ tpl, agentPrompt, businessName: content.brand.name })),
     });
     if (!llmRes.ok) fail(7, `Retell create-retell-llm returned ${llmRes.status}: ${await llmRes.text()}`);
     const llmData = await llmRes.json();
@@ -1158,24 +1203,13 @@ async function createRetellAgent(content, agentPrompt, clientDir) {
     patchEnvLocal(clientDir, 'RETELL_LLM_ID', clientLlmId);
   }
 
-  // Structured fields Retell extracts after each call (call_analysis.custom_analysis_data).
-  // Defined in lib/voice-consent.js, shared with scripts/update-agent-prompt.js, so a new agent
-  // and a backfilled one carry the identical schema the Make clone reads from.
-  const postCallAnalysisData = buildPostCallAnalysisData(content.brand.name);
+  // Belt and braces: whatever happened above, the agent never binds to the template.
+  if (clientLlmId === templateLlmId) fail(7, 'refusing to bind a client agent to the MASTER Retell LLM');
 
   const res = await fetch('https://api.retellai.com/create-agent', {
     method: 'POST',
     headers: authHeaders,
-    body: JSON.stringify({
-      agent_name: content.brand.name,
-      response_engine: { type: 'retell-llm', llm_id: clientLlmId },
-      voice_id: voiceId,
-      max_call_duration_ms: MAX_CALL_DURATION_MS,
-      post_call_analysis_data: postCallAnalysisData,
-      // Hang up on voicemail. An API-created agent has detection OFF unless this is set, and then
-      // talks to the voicemail — see lib/voice-consent.js.
-      voicemail_option: VOICEMAIL_OPTION,
-    }),
+    body: JSON.stringify(clientAgentCreateBody({ businessName: content.brand.name, llmId: clientLlmId, voiceId })),
   });
 
   if (!res.ok) fail(7, `Retell create-agent returned ${res.status}: ${await res.text()}`);
@@ -3304,6 +3338,9 @@ export {
   siteDirFor,
   siteTagFor,
   intakeIsWebOnly,
+  // Prompt regeneration for existing clients (scripts/regenerate-prompt.js)
+  loadIntake,
+  generateRetellPrompt,
   // Validation
   validateSite,
   validateIntake,
