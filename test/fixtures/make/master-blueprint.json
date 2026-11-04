@@ -134,6 +134,10 @@
               {
                 "name": "caller_number",
                 "value": "{{if(1.call.direction = \"inbound\"; 1.call.from_number; 1.call.to_number)}}"
+              },
+              {
+                "name": "airtable_record_id",
+                "value": "{{8.id}}"
               }
             ],
             "requestCompressedContent": true
@@ -173,12 +177,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-11-03T19:58:02.866Z",
+    "last_edit": "2026-11-03T23:44:04.919Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
     "idSequence": 11,
-    "version": 44
+    "version": 45
   }
 }

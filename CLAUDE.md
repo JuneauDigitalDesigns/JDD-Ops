@@ -147,7 +147,7 @@ how onboard.js actually provisions. Don't "fix" it ahead of those.
 
 **The owner's end-of-call brief is sent by the agency, not by Make.** Each clone's last module
 is an `http:MakeRequest` that POSTs the call (form-encoded `call_id`, `caller_name`,
-`caller_priority`, `caller_number`) to `https://www.juneaudigitaldesigns.com/api/ingest/call`
+`caller_priority`, `caller_number`, `airtable_record_id`) to `https://www.juneaudigitaldesigns.com/api/ingest/call`
 with `Authorization: Bearer <this site's LEAD_INGEST_TOKEN>`. The agency resolves the account
 from the token, reads the owner's SMS consent **at send time** (the portal's `sms:consent:*`),
 texts once per Retell `call_id`, and sends on the account lane from its own
@@ -169,6 +169,24 @@ The master's HTTP module was built in the Make UI and recorded, never written fr
 `http:MakeRequest` saved with nothing filled in has no `mapper` at all, and one first saved
 with `method: "get"`, which the agency's route would have refused. If you rebuild it, re-record
 it with `npm run fixtures:refresh`.
+
+**`airtable_record_id` is `{{8.id}}`**, the row the Airtable module just wrote, picked in Make's
+mapping panel and recorded (2026-11-03). It is the portal's id for a call (`InboxItem.id`), so
+the owner's text can link to it. Retell's `call_id` is stored nowhere the portal can search: no
+column holds it, and the recording URL is an unrelated hash. `checkOwnerBriefViaAgency` requires
+the field to name THIS scenario's Airtable module. Clone module ids survive cloning, so a clone's
+`8` is its own row.
+
+**A master edit never reaches an existing clone**, because a clone is a copy taken at onboarding.
+`npm run repatch-post-call -- --slug <slug>` (add `--site site-N` for an enterprise site) brings
+one clone up to the current master:
+- It keeps the clone's own webhook trigger (`parameters.hook`). Copying the master wholesale would
+  bind the clone to the master's hook.
+- It rebuilds everything after the trigger through the real `patchPostCallBlueprint`.
+- It **previews unless `--write`**, runs every blueprint check first and refuses on any failure.
+- Before writing, it saves the old blueprint beside the client's `.env.local`. That file contains
+  the token, so it stays local.
+- It reads back and re-checks, and leaves the clone's on/off state as it was.
 
 **The site must advertise the Twilio number, not the owner's.** Two numbers with two jobs:
 

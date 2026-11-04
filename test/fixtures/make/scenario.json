@@ -21,7 +21,7 @@
       "airtable",
       "http"
     ],
-    "lastEdit": "2026-11-03T19:58:02.866Z",
+    "lastEdit": "2026-11-03T23:44:04.919Z",
     "scheduling": {
       "type": "immediately",
       "maximum_runs_per_minute": 100

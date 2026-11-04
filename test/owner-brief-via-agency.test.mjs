@@ -47,7 +47,8 @@ test('the recorded master posts form-encoded to the agency, with a placeholder t
   assert.match(m.url, /^https:\/\/www\.[^/]+\/api\/ingest\/call$/);
   assert.equal(m.contentType, 'urlEncoded');
   assert.equal(m.stopOnHttpError, false);
-  assert.deepEqual(m.urlEncodedBodyContent.map((f) => f.name), ['call_id', 'caller_name', 'caller_priority', 'caller_number']);
+  assert.deepEqual(m.urlEncodedBodyContent.map((f) => f.name), ['call_id', 'caller_name', 'caller_priority', 'caller_number', 'airtable_record_id']);
+  assert.equal(m.urlEncodedBodyContent.at(-1).value, '{{8.id}}', 'recorded from the Make UI: the Airtable module (8) record id');
   assert.deepEqual(m.headers, [{ name: 'Authorization', value: 'Bearer REPLACE_PER_CLIENT' }], 'never a real token in the master');
   assert.equal(masterBlueprint().flow.filter((x) => (x.module ?? '').startsWith('twilio')).length, 0);
 });
@@ -132,4 +133,23 @@ test('the token is never printed — not by the patcher, not in any check detail
     assert.ok(!text.includes(TOKEN) && !text.includes(OTHER_SITE_TOKEN), `token leaked: ${text}`);
     assert.doesNotMatch(text, /FAIL:/);
   }
+});
+
+test('a clone that sends no airtable_record_id fails: its texts could never link to the call', () => {
+  // The portal knows a call only by its Airtable record id; Retell's call_id is stored nowhere it
+  // can search. Every clone made before 2026-11-03 sends no such field.
+  const bp = patched();
+  const m = httpOf(bp).mapper;
+  m.urlEncodedBodyContent = m.urlEncodedBodyContent.filter((f) => f.name !== 'airtable_record_id');
+  const c = checkOwnerBriefViaAgency({ blueprint: bp, ingestToken: TOKEN });
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /airtable_record_id/);
+});
+
+test('an airtable_record_id that names another module fails', () => {
+  const bp = patched();
+  httpOf(bp).mapper.urlEncodedBodyContent.find((f) => f.name === 'airtable_record_id').value = '{{1.id}}';
+  const c = checkOwnerBriefViaAgency({ blueprint: bp, ingestToken: TOKEN });
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /\{\{8\.id\}\}/);
 });
