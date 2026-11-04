@@ -26,6 +26,7 @@ import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { loadIntake, generateRetellPrompt } from '../onboard.js';
+import { placesCallbacks } from '../lib/client-env.js';
 
 const arg = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -57,7 +58,14 @@ if (before !== null) {
   console.log(`Saved the current prompt to ${saved}`);
 }
 
-const after = await generateRetellPrompt(content, clientDir, slug, { regenerate: true });
+// Outbound rules only if this agent places callbacks. LEAD_CALLBACK in .env.local is what the site
+// actually does (a downgrade flips it); the plan is the fallback for a client without one.
+const envPath = resolve(clientDir, '.env.local');
+const recorded = existsSync(envPath) ? /^LEAD_CALLBACK=(on|off)s*$/m.exec(readFileSync(envPath, 'utf8'))?.[1] : null;
+const callbacks = recorded ? recorded === 'on' : placesCallbacks(intake.plan);
+console.log(`Callbacks: ${callbacks ? 'yes — inbound + outbound rules' : 'no — inbound only'} (${recorded ? `LEAD_CALLBACK=${recorded}` : `plan ${intake.plan}`})`);
+
+const after = await generateRetellPrompt(content, clientDir, slug, { regenerate: true, callbacks });
 console.log(`\nBusiness: "${content.brand.name}"`);
 console.log(`Prompt: ${before === null ? 'none' : `${before.length.toLocaleString()} chars`} → ${after.length.toLocaleString()} chars`);
 console.log(`Next: review the diff, then npm run update-prompt -- --slug ${slug} --business "${content.brand.name}"`);

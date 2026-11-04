@@ -71,7 +71,7 @@ import {
 // rather than here because onboard.js pulls in dotenv, Anthropic, Octokit, twilio and Clerk —
 // too heavy for a Next server route — so the console previously kept its own copy, and that
 // copy had already drifted to an unsafe ring window. See lib/client-env.js.
-import { buildClientEnvLines } from './lib/client-env.js';
+import { buildClientEnvLines, placesCallbacks } from './lib/client-env.js';
 import {
   extractContentObject,
   hasConsoleMarker,
@@ -110,6 +110,7 @@ import {
   smsConsentAsk,
   VOICEMAIL_OPTION,
   voiceConsentInstructions,
+  callerDetailsInstructions,
 } from './lib/voice-consent.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
 // Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
@@ -923,7 +924,7 @@ function buildClientRepo(repoDir) {
 // Step 6: Generate Retell prompt via Claude
 // ───────────────────────────────────────────────────────────────────────────
 
-async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate = false } = {}) {
+async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate = false, callbacks = false } = {}) {
   log(6, `Claude → Retell agent prompt`);
 
   /**
@@ -988,7 +989,7 @@ async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate =
     hours: content.extensions?.hours ?? null,
   };
 
-  const system = `You write the complete system prompt for a Retell AI voice agent that works the phones for a single local service business. The agent handles inbound calls and returns outbound callbacks placed within ~60 seconds of a website form submission.
+  const system = `You write the complete system prompt for a Retell AI voice agent that works the phones for a single local service business. ${callbacks ? 'The agent handles inbound calls and returns outbound callbacks placed within ~60 seconds of a website form submission.' : 'The agent ONLY answers inbound calls; it never places outbound calls or callbacks, so the prompt must contain no outbound or callback branches.'}
 
 Output ONLY the finished agent prompt as a Markdown document with "##" section headers, in this exact order:
 ROLE, CORE SPEAKING RULES, GREETING, IF ASKED WHETHER YOU'RE A REAL PERSON / AN AI, QUALIFICATION, NO SCHEDULING, CONTACT COLLECTION, ANSWERING QUESTIONS, SERVICES, FAQ, WHY CHOOSE, PRICING, CLOSING, EDGE CASES, NEVER.
@@ -1015,9 +1016,11 @@ CORE SPEAKING RULES (write as direct instructions to the agent) — this is a vo
 - Always use contractions; use light, occasional conversational fillers ("okay," "gotcha," "I see," "no problem") sparingly.
 - Spoken-number formatting: read phone numbers back in natural grouped chunks ("four oh seven… five five five… one two one two"), say times like a person ("tomorrow around two," not "14:00"), and when taking a callback number READ IT BACK GROUPED and confirm it's right.
 
-GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it.
+${callbacks
+  ? "GREETING: include an inbound variant and an outbound-callback variant (for website inquiries), both using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it."
+  : "GREETING: one inbound greeting using the persona name and the exact business name — written as the agent's FIRST OWN TURN after the fixed opening line below, not as a replacement for it."}
 
-${voiceConsentInstructions(content.brand.name)}
+${voiceConsentInstructions(content.brand.name, { callbacks })}
 
 QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time.
 
@@ -1025,13 +1028,13 @@ LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names
 
 NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
 
-CONTACT COLLECTION (do before ending every call), one item at a time: full name, best callback number (read back grouped and confirm), the service address or town when the job is at a location, and optionally email (never pressure; if given, spell it back to confirm).
+${callerDetailsInstructions({ callbacks })}
 
 ANSWERING QUESTIONS: answer only from provided data; for unknowns, offer to have the team follow up. SERVICES: list from the provided services. FAQ: derive from the provided FAQ data and answer in natural words, not verbatim. WHY CHOOSE: include only verifiable points grounded in the provided data (about/pillars/trust badges) — no invented awards, review counts, or guarantees. PRICING: never quote; defer to the team.
 
 CLOSING: warm, brief summary that the agent has what it needs and a person from the team will reach out to schedule / follow up — then the SMS CONSENT question exactly as specified above, as the last question of the call — then a short goodbye.
 
-EDGE CASES to cover: silence/no response; reaching voicemail on an outbound callback (hang up at once and leave NO message — the system normally hangs up on its own); an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
+EDGE CASES to cover: silence/no response; ${callbacks ? 'reaching voicemail on an outbound callback (hang up at once and leave NO message — the system normally hangs up on its own); ' : ''}an angry or frustrated caller; off-topic / non-service requests; and a caller who wants a human right now (reassure and capture details for a fast callback — never pretend to transfer if it can't).
 
 NEVER (consolidated list): sounding robotic or scripted; stacking questions; quoting prices; booking/scheduling/holding appointments or promising arrival times or ETAs; inventing hours, names, license numbers, or any fact; mentioning competitors; pressuring the caller; talking over an interruption.
 
@@ -3189,7 +3192,8 @@ async function main() {
     if (webOnly) {
       console.log(`\n  Skipping voice provisioning (website-only client, receptionist declined).`);
     } else {
-      const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug);
+      // Outbound rules only for an agent that places callbacks — the same rule as LEAD_CALLBACK.
+      const agentPrompt = await generateRetellPrompt(site, clientDir, siteSlug, { callbacks: placesCallbacks(intake.plan) });
       agentId = await createRetellAgent(site, agentPrompt, clientDir);
       twilioNumber = await provisionTwilioNumber(site, siteSlug, clientDir);
 

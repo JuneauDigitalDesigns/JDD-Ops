@@ -273,8 +273,9 @@ test('the repair allow-list accepts voicemail_option (and still refuses anything
 test('no prompt instruction tells the agent to leave a voicemail on a callback', () => {
   const onboard = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
   assert.doesNotMatch(onboard, /leaving a short friendly voicemail/);
-  assert.doesNotMatch(voiceConsentInstructions('Acme'), /leave the short voicemail/);
-  assert.match(voiceConsentInstructions('Acme'), /leave NO message — hang up/);
+  // Only an agent that places callbacks has an outbound voicemail rule at all.
+  assert.doesNotMatch(voiceConsentInstructions('Acme', { callbacks: true }), /leave the short voicemail/);
+  assert.match(voiceConsentInstructions('Acme', { callbacks: true }), /leave NO message — hang up/);
 });
 
 test('the consent ask is the wording approved on 2026-11-04, word for word', () => {
