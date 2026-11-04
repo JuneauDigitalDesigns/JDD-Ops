@@ -1,0 +1,3 @@
+# Font files are binary. A CRLF conversion would corrupt a woff2 without failing the build:
+# only the browser notices, by rejecting the font. See src/lib/fonts.loader.ts.
+*.woff2 binary

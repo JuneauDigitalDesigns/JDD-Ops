@@ -51,6 +51,7 @@ import {
   listProjectDomains,
 } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
+import { FONT_DIR, FONT_LOADER, googleFontImports, writeSiteFonts } from './lib/site-fonts.js';
 // toE164 comes from the package for the same reason vercelAppHost does: five copies had
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
@@ -842,6 +843,35 @@ function writeApiRoutes(repoDir) {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, readFileSync(src, 'utf8'), 'utf8');
     console.log(`  Wrote ${dest}`);
+  }
+}
+
+/**
+ * Step 3b, continued: the self-hosted fonts (lib/site-fonts.js has the why).
+ *
+ * Every client repo already in existence was copied from a template whose fonts.loader.ts
+ * imported next/font/google, so each of its Vercel builds downloaded seven families and failed
+ * at random. Writing the template's loader and font files here, every run, is how those repos get
+ * the fix: the run that deploys a repo makes its fonts current, exactly as writeApiRoutes does
+ * for the routes. Step 5's build then proves the result compiles before anything is pushed.
+ *
+ * Deliberately no log() of its own: it is part of step 3b's "onboard-owned files", and a new
+ * phase would have to be added to PHASE_MAP and expectedPhases() for no gain (see the phase
+ * contract in CLAUDE.md).
+ */
+function writeSelfHostedFonts(repoDir) {
+  if (DRY_RUN) {
+    dryLog(`would write ${FONT_LOADER} + ${FONT_DIR}/ (self-hosted fonts; the build never fetches from Google)`);
+    return;
+  }
+  const written = writeSiteFonts(repoDir, resolve(SCRIPT_DIR, 'template'));
+  console.log(`  Wrote ${FONT_LOADER} + ${written.length - 1} files in ${FONT_DIR}/ (self-hosted fonts)`);
+  // Not fatal: the site still builds, it just goes back to building only when Google answers.
+  // The hard gate is test/template-fonts.test.mjs, which covers the template and the console's
+  // catalog components, the two places a client repo's code comes from.
+  for (const rel of googleFontImports(repoDir)) {
+    console.warn(`  ⚠ ${rel} imports next/font/google, so this site's builds still download from Google and can fail at random.`);
+    console.warn(`    Vendor the family into template/src/lib/fonts/ (scripts/vendor-fonts.js) and load it with next/font/local.`);
   }
 }
 
@@ -3137,6 +3167,7 @@ async function main() {
     const { repoDir, repoUrl } = await createRepoFromLocal(siteSlug, site, clientDir);
     installClientSchema(repoDir, site);
     writeApiRoutes(repoDir);
+    writeSelfHostedFonts(repoDir);
     // The env lines are returned (and computed even in dry mode) so the correctness checks can
     // assert the tier matrix and the forward target without re-reading the file.
     const { lines: envLines } = writeClientEnvLocal(clientDir, siteSlug, intake.plan, site, webOnly);

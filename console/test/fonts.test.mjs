@@ -33,7 +33,9 @@ test('the template loader keeps preload:false on every family', () => {
   // Measured: blanket preload cost 292KB of woff2 and 84% of a 4.2s LCP in Render Delay.
   // See the header of template/src/lib/fonts.loader.ts and PERF.md.
   const tpl = readFileSync(path.join(OPS, 'template/src/lib/fonts.loader.ts'), 'utf8');
-  const families = tpl.match(/=\s*[A-Z][A-Za-z_]*\(\{[^}]*\}\)/g) ?? [];
+  // One `const x = loader({ … });` per line. The template is on next/font/local, whose nested
+  // `src` objects would stop a match at the first `}`, so this matches whole lines.
+  const families = tpl.match(/^const\s+\w+\s*=\s*\w+\(\{.*\}\);\s*$/gm) ?? [];
   // >= not ==: a two-family pairing (e.g. 'oswald') loads two families, so the family count can
   // exceed the pairing count. The invariant that matters is that EVERY loaded family is preload:false.
   assert.ok(families.length >= FONT_PAIRINGS.length, `expected at least ${FONT_PAIRINGS.length} families, found ${families.length}`);
@@ -68,7 +70,35 @@ test('typographyFor round-trips through pairingIdFromStack', () => {
   assert.equal(pairingIdFromStack('-apple-system, sans-serif'), null);
 });
 
+test('both loaders declare a face at every weight each pairing uses', () => {
+  // Both loaders self-host (next/font/local), so nothing validates weights at build time any
+  // more: a pairing weight with no declared face is not an error, it silently renders as the
+  // nearest face. Weights come from each family's literal `src` entries, one line per family.
+  for (const rel of ['template/src/lib/fonts.loader.ts', 'console/src/lib/fonts.loader.ts']) {
+    const src = readFileSync(path.join(OPS, rel), 'utf8');
+    const weightsFor = (varName) => {
+      const line = new RegExp(`^const \\w+\\s*=.*variable:\\s*'${varName}'.*$`, 'm').exec(src)?.[0];
+      assert.ok(line, `${rel} has no family with variable ${varName}`);
+      return [...line.matchAll(/weight:\s*'(\d+)'/g)].map((m) => m[1]);
+    };
+    for (const p of FONT_PAIRINGS) {
+      const display = weightsFor(p.displayVarName ?? p.varName);
+      const body = weightsFor(p.varName);
+      assert.ok(
+        display.includes(String(p.display.weight)),
+        `${rel}: ${p.id} has no ${p.display.weight} face for ${p.displayVarName ?? p.varName} (has ${display.join(', ')})`,
+      );
+      assert.ok(
+        body.includes(String(p.body.weight)),
+        `${rel}: ${p.id} has no ${p.body.weight} face for ${p.varName} (has ${body.join(', ')})`,
+      );
+    }
+  }
+});
+
 test('every pairing requests only weights its family actually ships', () => {
+  // Against Google's data: every file was vendored from Google (scripts/vendor-fonts.js), so a
+  // weight Google does not ship has no file to vendor either.
   // Asking next/font for a weight a family does not have is a BUILD error, and the build is slow
   // to run, so catch it here. Weights are read from the installed Next font-data.json, which is
   // the same source next/font validates against.

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Big_Shoulders_Display, Hanken_Grotesk, DM_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import ConsoleNav from '@/components/ConsoleNav';
 import ToolBar from '@/components/shell/ToolBar';
@@ -7,27 +7,42 @@ import CommandPalette from '@/components/CommandPalette';
 import { industryFontVars } from '@/lib/fonts.loader';
 
 // JDD site fonts (mirrors juneaudigitaldesigns.com): Big Shoulders (display),
-// Hanken Grotesk (body), DM Mono (labels). Next 14's bundled Google Fonts
-// metadata only exposes the "Big Shoulders Display" sub-family, not the plain
-// "Big Shoulders" variable family the live site (Next 16) uses — same typeface.
-const bigShoulders = Big_Shoulders_Display({
+// Hanken Grotesk (body), DM Mono (labels). The console has always used the
+// "Big Shoulders Display" sub-family, the one Next 14's Google font data knew;
+// same typeface as the live site's "Big Shoulders".
+//
+// Self-hosted from ./fonts/ (vendored by jdd-ops/scripts/vendor-fonts.js), so the
+// build never downloads from Google: on 2026-11-04 it failed doing exactly that.
+// Faces are declared as next/font/google generated them: Big Shoulders Display and
+// Hanken are one variable file listed once per weight, DM Mono is static.
+const bigShoulders = localFont({
+  src: [
+    { path: './fonts/big-shoulders-display.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/big-shoulders-display.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/big-shoulders-display.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/big-shoulders-display.woff2', weight: '800', style: 'normal' },
+    { path: './fonts/big-shoulders-display.woff2', weight: '900', style: 'normal' },
+  ],
   variable: '--font-big-shoulders',
-  subsets: ['latin'],
-  weight: ['500', '600', '700', '800', '900'],
   display: 'swap',
 });
 
-const hanken = Hanken_Grotesk({
+const hanken = localFont({
+  src: [
+    { path: './fonts/hanken-grotesk.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/hanken-grotesk.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/hanken-grotesk.woff2', weight: '600', style: 'normal' },
+  ],
   variable: '--font-hanken',
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
   display: 'swap',
 });
 
-const dmMono = DM_Mono({
+const dmMono = localFont({
+  src: [
+    { path: './fonts/dm-mono-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/dm-mono-500.woff2', weight: '500', style: 'normal' },
+  ],
   variable: '--font-dm-mono',
-  subsets: ['latin'],
-  weight: ['400', '500'],
   display: 'swap',
 });
 

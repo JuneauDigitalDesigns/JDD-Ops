@@ -82,6 +82,16 @@ web-only): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (in addition to `RETELL_API
 - After every code change in a client repo, run `npm run build` and fix all errors.
 - Never expose `RETELL_API_KEY`, `TWILIO_AUTH_TOKEN`, `AIRTABLE_API_KEY`, or any
   master credential in client-side code.
+- Never import `next/font/google` anywhere: not in `template/`, a catalog component, or the
+  console. A build must not touch the network for fonts: next/font/google downloads every
+  declared family on every build, and Next 14.2 crashes on the ~5% of Google responses whose
+  file URL has no extension, or the download simply fails (the console's own build did, on
+  2026-11-04, after the #16 patch for the first case). Everything loads committed woff2 files
+  via `next/font/local`, vendored by `scripts/vendor-fonts.js`: the pairing families in
+  `template/src/lib/fonts/` (the console's pairing loader points at those same files) and the
+  console's chrome fonts in `console/src/app/fonts/`. onboard.js writes the template's loader
+  and files into every client repo on every run (`lib/site-fonts.js`), which is how repos
+  copied before the fix get it. `test/template-fonts.test.mjs` enforces all of it.
 
 ## How components in client repos consume the schema
 
