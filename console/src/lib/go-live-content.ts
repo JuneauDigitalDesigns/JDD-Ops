@@ -8,6 +8,7 @@
 // and the Vercel Pro compliance upgrade last because it blocks nothing you can sell without.
 
 import type { Phase } from './runbook-content';
+import { STRIPE_PRICE_KEYS } from './stripePriceKeys';
 
 const DOMAIN = 'juneaudigitaldesigns.com';
 const SITE_URL = `https://${DOMAIN}`;
@@ -165,7 +166,7 @@ export function buildGoLive(): Phase[] {
         {
           id: 'stripe-prices',
           title: 'Create the live Stripe prices',
-          why: 'Test price IDs do not work in live mode. This clones your test products/prices into live exactly (Starter keeps its one-time onboarding fee), and returns the four live price IDs to paste into the env. Idempotent — a re-run reports the existing IDs rather than duplicating.',
+          why: 'Test price IDs do not work in live mode. This clones your test products/prices into live exactly (the monthly, annual and one-time onboarding price for every plan), and returns the nine live price IDs to paste into the env. Idempotent — a re-run reports the existing IDs rather than duplicating.',
           est: '~2 min',
           blocks: [
             {
@@ -178,12 +179,11 @@ export function buildGoLive(): Phase[] {
             {
               t: 'env',
               file: 'agency env (Vercel + .env.local)',
-              vars: [
-                { key: 'STRIPE_PRICE_STARTER_MONTHLY', value: 'price_… (from the run above)', pending: true },
-                { key: 'STRIPE_PRICE_STARTER_ONBOARDING', value: 'price_…', pending: true },
-                { key: 'STRIPE_PRICE_GROWTH_MONTHLY', value: 'price_…', pending: true },
-                { key: 'STRIPE_PRICE_ENTERPRISE_MONTHLY', value: 'price_…', pending: true },
-              ],
+              vars: STRIPE_PRICE_KEYS.map((key, i) => ({
+                key,
+                value: i === 0 ? 'price_… (from the run above)' : 'price_…',
+                pending: true,
+              })),
             },
           ],
         },

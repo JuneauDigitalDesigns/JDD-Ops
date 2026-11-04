@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readAgencyEnv, readOpsEnv, opsEnvPath } from './env';
 import type { GoLiveResult } from './types';
+import { STRIPE_PRICE_KEYS } from '../stripePriceKeys';
 
 /**
  * Keep jdd-ops/.env in step with the agency app for the handful of values whose source of
@@ -14,14 +15,9 @@ import type { GoLiveResult } from './types';
  * synced — the console runs on its own restricted read-only key on purpose.
  */
 const SYNC_KEYS = [
-  'STRIPE_PRICE_STARTER_MONTHLY',
-  'STRIPE_PRICE_STARTER_ONBOARDING',
-  'STRIPE_PRICE_GROWTH_MONTHLY',
-  'STRIPE_PRICE_ENTERPRISE_MONTHLY',
-  // Annual prices: without them the drift check flags every annual client as drifting.
-  'STRIPE_PRICE_STARTER_ANNUAL',
-  'STRIPE_PRICE_GROWTH_ANNUAL',
-  'STRIPE_PRICE_ENTERPRISE_ANNUAL',
+  // All nine prices (stripePriceKeys.ts). Annual ones matter to the drift check, which reads
+  // an annual client's price as drift without them.
+  ...STRIPE_PRICE_KEYS,
   'OPS_SHARED_SECRET',
 ] as const;
 

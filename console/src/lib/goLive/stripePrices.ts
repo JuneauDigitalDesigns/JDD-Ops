@@ -2,6 +2,7 @@ import 'server-only';
 import Stripe from 'stripe';
 import { readOpsEnv } from './env';
 import type { GoLiveResult } from './types';
+import { STRIPE_PRICE_SPECS, type PriceKeySpec } from '../stripePriceKeys';
 
 /**
  * Recreate the test products/prices in LIVE mode, mirroring their amounts exactly.
@@ -15,7 +16,7 @@ import type { GoLiveResult } from './types';
  *   live  = STRIPE_LIVE_SECRET_KEY, else STRIPE_SECRET_KEY when it's an sk_live_ key
  *
  * So for the one-time run you add STRIPE_LIVE_SECRET_KEY alongside the existing test key, run
- * it, paste the four returned IDs, then drop STRIPE_LIVE_SECRET_KEY.
+ * it, paste the nine returned IDs, then drop STRIPE_LIVE_SECRET_KEY.
  *
  * Idempotent: a live product is matched by name (created once), and a live price is reused
  * when one already exists on that product with the same amount + interval — so a re-run
@@ -24,18 +25,9 @@ import type { GoLiveResult } from './types';
 
 const API = '2025-10-29.clover' as Stripe.LatestApiVersion;
 
-interface TierSpec {
-  key: string; // the env var name to emit
-  tier: 'starter' | 'growth' | 'enterprise';
-  kind: 'monthly' | 'onboarding';
-}
-
-const SPECS: TierSpec[] = [
-  { key: 'STRIPE_PRICE_STARTER_MONTHLY', tier: 'starter', kind: 'monthly' },
-  { key: 'STRIPE_PRICE_STARTER_ONBOARDING', tier: 'starter', kind: 'onboarding' },
-  { key: 'STRIPE_PRICE_GROWTH_MONTHLY', tier: 'growth', kind: 'monthly' },
-  { key: 'STRIPE_PRICE_ENTERPRISE_MONTHLY', tier: 'enterprise', kind: 'monthly' },
-];
+// Every plan × monthly, annual and onboarding (stripePriceKeys.ts). The interval is read from
+// each test price, so an annual price is mirrored as yearly with no special case here.
+const SPECS: readonly PriceKeySpec[] = STRIPE_PRICE_SPECS;
 
 function resolveKeys(ops: Record<string, string>) {
   const s = ops.STRIPE_SECRET_KEY ?? '';
