@@ -5,6 +5,7 @@ import { applyEnvUpdates } from '@/lib/envFile';
 import { type StepResult } from '@/lib/teardownOps';
 import { buildPlanDowngradePreview, PlanDowngradeError } from '@/lib/planDowngrade';
 import { appendAudit } from '@/lib/audit';
+import { portalPlanOf } from '@/lib/portalPlanChange';
 import {
   brandContact,
   mirrorPlanToPortal,
@@ -15,13 +16,17 @@ import {
 } from '@/lib/planChange';
 
 /**
- * Downgrade a client growth → starter, destroying the voice tier.
+ * Downgrade a client growth → starter: the env and site.ts half, once it has taken effect.
  *
- * The narrow sibling of api/manage/teardown: that route destroys the whole client, this one
- * keeps the site, the repo, the Vercel project, the domain, and the content, and removes
- * only what the growth tier bought — the Twilio number and the Retell agent + per-client
- * LLM. **The Airtable base is never touched**; it holds the client's call history, which
- * outlives their voice plan.
+ * Destroys nothing (see step 1). It turns `LEAD_CALLBACK` off and moves site.ts to starter.
+ *
+ * It runs LAST. Contract v5.3 §15.4 puts a downgrade at the end of the period the client has
+ * already paid for, with no credit, so the change is first requested through ../request. That
+ * emails the client the Starter terms, and their acceptance schedules it in Stripe. When the
+ * period ends, Stripe moves the price and the agency webhook moves the portal record to
+ * starter. Until then this refuses: it used to flip the record here immediately, which took
+ * Growth away on the day it was asked for (and the billing sync that followed credited the
+ * unused month).
  *
  * Guards, in the order they run and for the reasons teardown/route.ts documents:
  *   • typed slug confirmation, so this can't fire from a stray fetch;
@@ -82,6 +87,19 @@ export async function POST(req: Request) {
   if (blocked) return NextResponse.json({ error: blocked }, { status: 400 });
 
   const site = ctx.sites[0];
+
+  // ── 0. Only once the downgrade has landed on the portal record ────────────
+  // A client billed through the portal moves to starter when Stripe does, at the end of the
+  // paid period. A site with no portal account has no portal billing to wait for.
+  const portalPlan = await portalPlanOf(site.env.CLERK_USER_ID, site.slug);
+  if (portalPlan && portalPlan !== 'starter') {
+    return NextResponse.json(
+      {
+        error: `The downgrade hasn't taken effect yet: the portal record still says ${portalPlan}. Request it first (it emails the client the Starter terms); run this once their paid period has ended and the portal shows starter.`,
+      },
+      { status: 409 },
+    );
+  }
 
   // ── 1. Nothing is destroyed ───────────────────────────────────────────────
   // There used to be three calls here: releaseTwilioNumber, deleteRetellAgent and

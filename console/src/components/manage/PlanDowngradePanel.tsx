@@ -16,14 +16,34 @@ import type { PlanDowngradePreview } from '@/lib/planDowngrade';
 import type { StepResult } from '@/lib/teardownOps';
 
 /**
- * The confirm flow for growth → starter. Same three states as DangerSection —
- * preview → typed confirmation → step results — scoped to the two resources a downgrade
- * actually destroys, and presented as a modal because it's launched from the plan pill
- * rather than from a nav section.
+ * Growth → starter, in two steps that happen weeks apart.
  *
- * The Airtable line is rendered in the neutral "kept" voice on purpose: an operator
- * scanning a destructive dialog should be able to see at a glance what is NOT going away.
+ *   1. Billing. "Email the client the Starter terms" asks the agency to send them the link
+ *      (contract v5.3 §15.2: they accept a new agreement). Their acceptance schedules the change
+ *      in Stripe for the end of the period they've paid for, with no credit (§15.4). The portal
+ *      record moves to starter when it lands. The console never touches Stripe.
+ *   2. Env and site.ts. Once the portal shows starter: preview → typed confirmation → results,
+ *      which turns LEAD_CALLBACK off and moves site.ts. Nothing is released or deleted; Starter
+ *      runs the same voice stack as Growth.
+ *
+ * Step 2 used to run at once and flip the portal record too, so the client lost Growth on the
+ * day it was asked for. Its copy also still described releasing the number and deleting the
+ * agent, which the route stopped doing after the 2026-10-12 reprice.
  */
+
+interface RequestState {
+  recordPlan?: string;
+  email?: string;
+  planChange?: {
+    status: 'awaiting-acceptance' | 'scheduled' | 'done' | 'cancelled';
+    effectiveAt: number;
+  } | null;
+  error?: string;
+}
+
+function day(ms: number): string {
+  return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
 
 interface ExecuteResponse {
   ok?: boolean;
@@ -55,6 +75,58 @@ export default function PlanDowngradePanel({
 
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ExecuteResponse | null>(null);
+  const [billing, setBilling] = useState<RequestState | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
+
+  const loadBilling = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/manage/plan/downgrade/request?slug=${encodeURIComponent(slug)}`, { cache: 'no-store' });
+      setBilling((await res.json()) as RequestState);
+    } catch (err) {
+      setBilling({ error: err instanceof Error ? err.message : 'Could not read the billing state.' });
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    void loadBilling();
+  }, [loadBilling]);
+
+  async function billingAction(method: 'POST' | 'DELETE') {
+    const ok = await confirmWrite(
+      method === 'POST'
+        ? {
+            title: 'Email the client the Starter terms',
+            effect: `Emails ${billing?.email ?? 'the client'} a link to accept the Starter terms. When they accept, Stripe moves ${slug} to Starter at the end of the period they have paid for. Nothing is charged or credited.`,
+          }
+        : {
+            title: 'Withdraw the downgrade',
+            effect: `Cancels the pending downgrade for ${slug}. If the client already accepted, the Stripe schedule is released and they stay on Growth.`,
+          },
+    );
+    if (!ok) return;
+    setBillingBusy(true);
+    try {
+      const res = await fetch('/api/manage/plan/downgrade/request', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      const body = (await res.json()) as RequestState;
+      if (body.error) setBilling((b) => ({ ...(b ?? {}), error: body.error }));
+      else await loadBilling();
+    } finally {
+      setBillingBusy(false);
+    }
+  }
+
+  // Step 2 waits for the change to land on the portal record. A client with no portal account
+  // (the request route answers with an error and no recordPlan) has no portal billing to wait for.
+  const pending =
+    billing?.planChange &&
+    (billing.planChange.status === 'awaiting-acceptance' || billing.planChange.status === 'scheduled')
+      ? billing.planChange
+      : null;
+  const landed = billing?.recordPlan === 'starter' || Boolean(billing?.error && !billing.recordPlan);
 
   const loadPreview = useCallback(async () => {
     setLoading(true);
@@ -91,9 +163,8 @@ export default function PlanDowngradePanel({
     if (!preview) return;
     if (
       !(await confirmWrite({
-        title: 'Downgrade plan to starter',
-        effect: `Releases the voice agent, phone number and Airtable base for ${slug} and updates the live portal account. Not reversible.`,
-        danger: true,
+        title: 'Switch env and site.ts to starter',
+        effect: `Turns LEAD_CALLBACK off and moves site.ts for ${slug} to starter, then redeploys. Nothing is released or deleted.`,
       }))
     ) {
       return;
@@ -188,8 +259,7 @@ export default function PlanDowngradePanel({
       {/* ── Running ────────────────────────────────────────────────────────── */}
       {!result && running && (
         <p className="flex items-center gap-2 text-xs text-fg3">
-          <SpinnerGap size={13} className="animate-spin" /> Releasing the Twilio number and deleting
-          the Retell agent…
+          <SpinnerGap size={13} className="animate-spin" /> Updating env and site.ts, then redeploying…
         </p>
       )}
 
@@ -211,8 +281,51 @@ export default function PlanDowngradePanel({
             </div>
           )}
 
+          <section className="mb-4 flex flex-col gap-2 border-b border-rule pb-4">
+            <span className="kicker">1 · Billing</span>
+            {!billing && <span className="text-xs text-fg3">Reading the portal record…</span>}
+            {billing?.error && (
+              <span className="flex items-start gap-2 text-xs" style={{ color: 'var(--warn)' }}>
+                <Warning size={12} className="mt-0.5 shrink-0" /> {billing.error}
+              </span>
+            )}
+            {billing && !billing.error && billing.recordPlan === 'starter' && (
+              <span className="text-xs text-fg2">The portal record is on starter: the change has taken effect.</span>
+            )}
+            {billing && !billing.error && billing.recordPlan !== 'starter' && !pending && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-fg2">
+                  Not requested. The client accepts the Starter terms, and Stripe moves them at the end of their paid period.
+                </span>
+                <button type="button" className="btn btn-sm shrink-0" disabled={billingBusy} onClick={() => void billingAction('POST')}>
+                  Email the client the Starter terms
+                </button>
+              </div>
+            )}
+            {pending && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-fg2">
+                  {pending.status === 'awaiting-acceptance'
+                    ? `Waiting for ${billing?.email} to accept. Once they do, it takes effect on ${day(pending.effectiveAt)}.`
+                    : `Scheduled: Stripe moves ${billing?.email} to Starter on ${day(pending.effectiveAt)}. The portal follows.`}
+                </span>
+                <div className="flex shrink-0 gap-2">
+                  {pending.status === 'awaiting-acceptance' && (
+                    <button type="button" className="btn btn-sm" disabled={billingBusy} onClick={() => void billingAction('POST')}>
+                      Resend
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-sm" disabled={billingBusy} onClick={() => void billingAction('DELETE')}>
+                    Withdraw
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
           {!loading && preview && (
             <div className="flex flex-col gap-4">
+              <span className="kicker">2 · Env and site.ts</span>
               {preview.warnings.length > 0 && (
                 <div className="flex flex-col gap-1">
                   {preview.warnings.map((w) => (
@@ -224,7 +337,7 @@ export default function PlanDowngradePanel({
               )}
 
               <section className="flex flex-col gap-1">
-                <span className="kicker">Will be destroyed</span>
+                <span className="kicker">Voice stack (kept, verified)</span>
                 <ResourceRow label="Twilio number" name={preview.twilio.number ?? '—'} exists={preview.twilio.owned} />
                 <ResourceRow label="Retell agent" name={preview.retell.agentId ?? '—'} exists={preview.retell.agentExists} />
                 <ResourceRow label="Retell LLM" name={preview.retell.llmId ?? '—'} exists={preview.retell.llmId ? true : null} />
@@ -264,8 +377,14 @@ export default function PlanDowngradePanel({
                   <button type="button" className="btn btn-sm" onClick={onClose}>
                     Cancel
                   </button>
-                  <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirming(true)}>
-                    <Warning size={13} weight="fill" /> Downgrade to starter
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    disabled={!landed}
+                    title={landed ? undefined : 'Runs once the portal record shows starter'}
+                    onClick={() => setConfirming(true)}
+                  >
+                    <Warning size={13} weight="fill" /> Switch env and site.ts
                   </button>
                 </div>
               </div>
@@ -284,11 +403,10 @@ export default function PlanDowngradePanel({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <h4 className="mb-3 font-display text-base font-medium">Release these for real?</h4>
+            <h4 className="mb-3 font-display text-base font-medium">Switch {slug} to starter?</h4>
             <p className="mb-4 text-xs leading-[1.6] text-fg2">
-              The Twilio number is returned to the pool and <strong>cannot be re-acquired</strong> —
-              re-upgrading later gets a different number. The Retell agent and its LLM are deleted,
-              including the tuned prompt. The Airtable base is kept.
+              Turns LEAD_CALLBACK off and moves site.ts to starter, then redeploys. The number, the
+              agent, its LLM and the Airtable base all stay.
             </p>
             <label className="mb-4 block">
               <span className="field-label">
@@ -312,7 +430,7 @@ export default function PlanDowngradePanel({
                 disabled={!canArm}
                 onClick={() => void execute()}
               >
-                <Warning size={13} weight="fill" /> Yes, downgrade {slug}
+                <Warning size={13} weight="fill" /> Yes, switch {slug}
               </button>
             </div>
           </motion.div>
