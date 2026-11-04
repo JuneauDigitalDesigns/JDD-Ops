@@ -5,6 +5,7 @@ import { applyEnvUpdates } from '@/lib/envFile';
 import { loadClientEnv, envLinesToObject } from '@/lib/clientEnv';
 import { loadRetellApiKey } from '@/lib/opsSecrets';
 import { appendAudit } from '@/lib/audit';
+import { callPortalOps } from '@/lib/portalPlanChange';
 import {
   brandContact,
   mirrorPlanToPortal,
@@ -28,8 +29,11 @@ import {
  * renders a standing banner until the ids appear. syncEnvToVercel raises the same warning
  * from its side; both are surfaced rather than one being swallowed.
  *
- * Downgrades go the other way through ./downgrade/*, which needs a preview and a typed
- * confirmation because it destroys resources.
+ * Billing moves in the same action, through the agency's /api/ops/plan-sync (step 3b).
+ *
+ * Downgrades go the other way through ./downgrade/*. They are requested first (the client
+ * accepts the Starter terms and Stripe moves them at the end of their paid period), and the
+ * env/site.ts half runs once that has happened. Nothing is destroyed either way.
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -128,6 +132,32 @@ export async function POST(req: Request) {
   // ── 3. The portal account record ──────────────────────────────────────────
   const kv = await mirrorPlanToPortal(site.slug, site.env.CLERK_USER_ID, 'growth');
 
+  // ── 3b. Billing, in the same action ───────────────────────────────────────
+  // The agency's webhook takes a site's plan from the price Stripe bills, so a KV-only upgrade
+  // would be put back to starter by the next subscription event (a renewal, a card update).
+  // Syncing here moves Stripe to Growth now, prorated, through the agency; the console still
+  // never touches Stripe. A declined card is reported, not hidden.
+  let billing: { ok: boolean; changed?: boolean; error?: string } | null = null;
+  if (kv.ok && kv.email) {
+    const out = await callPortalOps<{ ok?: boolean; changed?: boolean }>('/api/ops/plan-sync', {
+      method: 'POST',
+      body: { email: kv.email, slug: site.slug, plan: 'growth' },
+    });
+    billing = out.ok ? { ok: true, changed: Boolean(out.body.changed) } : { ok: false, error: out.error };
+    appendAudit({
+      slug,
+      siteSlug: site.slug,
+      action: 'plan.billing.sync',
+      ok: billing.ok,
+      summary: billing.ok
+        ? billing.changed
+          ? 'Billing synced to growth in Stripe'
+          : 'Billing already on growth — no change'
+        : `Billing sync to growth failed: ${billing.error}`,
+      detail: { plan: 'growth', changed: Boolean(billing.changed) },
+    });
+  }
+
   // ── 4. Vercel ─────────────────────────────────────────────────────────────
   const envPush = await pushEnvAndRedeploy({ siteSlug: site.slug, dir, brandName: ctx.brandName });
 
@@ -150,10 +180,13 @@ export async function POST(req: Request) {
     plan: 'growth',
     written,
     kv,
+    billing,
     ...envPush,
     needsOnboarding: missing.length > 0,
     missing,
-    note: missing.length
+    note: billing && !billing.ok
+      ? `Plan set to growth, but billing did not move: ${billing.error} Stripe is still billing starter; sync billing from the Billing panel once that is fixed.`
+      : missing.length
       ? `Nothing was provisioned. ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} still unset, so the live site's /api/contact cannot place a callback — lead capture is broken until you re-run onboarding for this client (npm run onboard -- --schema clients/${slug}/site.ts).`
       : 'Plan flipped to growth; the voice infrastructure was already provisioned.',
   });

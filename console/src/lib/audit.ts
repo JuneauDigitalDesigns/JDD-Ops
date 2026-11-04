@@ -35,6 +35,8 @@ export type AuditAction =
   | 'canonical.set'
   | 'plan.upgrade'
   | 'plan.downgrade'
+  | 'plan.downgrade.request'
+  | 'plan.downgrade.withdraw'
   | 'plan.billing.sync'
   | 'twilio.repair'
   | 'retell.repair'

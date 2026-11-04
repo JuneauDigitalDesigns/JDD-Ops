@@ -17,9 +17,11 @@ import type { ClientContext } from '@/lib/types';
  * couldn't be read) get the plain display chip with no affordance, rather than a disabled
  * control implying the operation exists somewhere.
  *
- * The two directions are asymmetric on purpose and that asymmetry is the whole design:
- * upgrading only writes fields, so it confirms inline; downgrading destroys a Twilio number
- * and a Retell agent, so it goes through PlanDowngradePanel's probe → typed-slug flow.
+ * The two directions are asymmetric on purpose (contract v5.3 §15.4). An upgrade takes effect
+ * now, so it confirms inline and moves billing in the same action. A downgrade takes effect at
+ * the end of the client's paid period and needs them to accept the Starter terms, so it goes
+ * through PlanDowngradePanel: request it, then switch env and site.ts once it has landed.
+ * Neither direction destroys anything; Starter runs the same voice stack as Growth.
  */
 
 interface UpgradeResponse {
@@ -63,7 +65,7 @@ export default function PlanControl({ ctx, onChanged }: { ctx: ClientContext; on
     if (
       !(await confirmWrite({
         title: 'Upgrade plan to growth',
-        effect: `Changes ${ctx.slug} to the growth plan: provisions a voice agent and phone number and updates the live portal account. Billing is synced separately.`,
+        effect: `Changes ${ctx.slug} to the growth plan: turns the web-form callback on, updates the live portal account, and moves Stripe billing to Growth now (prorated, through the portal app). This moves real money.`,
       }))
     ) {
       return;
@@ -123,8 +125,8 @@ export default function PlanControl({ ctx, onChanged }: { ctx: ClientContext; on
             <span className="text-xs text-fg">Switch to {target}</span>
             <span className="text-2xs text-fg3">
               {target === 'growth'
-                ? 'Adds voice tier — needs provisioning'
-                : 'Releases the number and agent'}
+                ? 'Turns the callback on; bills Growth now'
+                : 'Client accepts Starter terms; takes effect at period end'}
             </span>
           </button>
         </div>
