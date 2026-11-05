@@ -709,3 +709,8 @@
   @keyframes moto-spin { to { transform: rotate(360deg); } }
 }
 .btn.moto-quiet { border-color: transparent; background: transparent; color: var(--fg-2); font-weight: 500; padding-left: 4px; padding-right: 4px; text-decoration: underline; text-underline-offset: 3px; }
+/* Stripe's card field in the checkout: number on top, expiry | CVC beneath, like a hosted checkout. */
+.moto-cardfield > div { display: block; padding: 12px 13px; }
+.moto-cardfield .moto-cardfield-row { display: grid; grid-template-columns: 1fr 1fr; padding: 0; }
+.moto-cardfield .moto-cardfield-row > div { padding: 12px 13px; }
+.moto-cardfield .moto-cardfield-row > div + div { border-left: 1px solid var(--rule); }

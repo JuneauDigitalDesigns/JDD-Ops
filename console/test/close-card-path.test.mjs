@@ -36,17 +36,33 @@ test('the checkout unlocks only once Stripe says a card was added, and the wizar
   assert.match(flow, /disabled=\{!cardAdded \|\| busy\}[^>]*onClick=\{toCheckout\}/);
 });
 
-test('Subscribe sends back the amount the agency previewed, and nothing else', () => {
+test('Subscribe sends back the amount the agency previewed, and at most a Stripe card id', () => {
   assert.match(wizard, /amountCents: preview\.amountCents/);
-  // The proxy rebuilds the body from the amount alone, so nothing else can ride along.
-  assert.match(proxy, /body: \{ amountCents: body\.amountCents \}/);
+  // The proxy rebuilds the body from the amount and a pm_… id alone, so nothing else rides along.
+  assert.match(proxy, /body: \{ amountCents: body\.amountCents, \.\.\.\(paymentMethodId \? \{ paymentMethodId \} : \{\}\) \}/);
+  assert.match(proxy, /\/\^pm_\[A-Za-z0-9\]\{8,\}\$\//);
   assert.doesNotMatch(proxy, /body: body\b/);
 });
 
 test('the card never passes through the console', () => {
-  for (const src of [wizard, proxy]) {
-    assert.doesNotMatch(src, /cardNumber|card_number|cvc|cvv/i);
-  }
+  // The proxy knows nothing about cards beyond Stripe's id.
+  assert.doesNotMatch(proxy, /cardNumber|card_number|cvc|cvv|exp_month/i);
+  // The wizard's card field is Stripe's own iframes; what leaves it is Stripe's pm_… id.
+  const field = section('function StripeCardField', 'function LockIcon');
+  assert.match(field, /elements\.create\('cardNumber'/);
+  assert.match(field, /stripe\.createPaymentMethod\(/);
+  assert.match(field, /\{ id: r\.paymentMethod\.id \}/);
+  assert.doesNotMatch(wizard, /card_number|exp_month|cvv|\.value\b.*card/i);
+});
+
+test('with phone orders on, the card is typed in the checkout; without, the Dashboard form stays', () => {
+  const flow = section('function CardFlow', 'function CardCheckout');
+  assert.match(flow, /data\.cardEntry\?\.inline && data\.cardEntry\.publishableKey/);
+  assert.match(flow, /setStage\('checkout'\)/);
+  // Stripe refusing the phone-order flag puts the wizard back on the Dashboard form.
+  assert.match(flow, /data\.code === 'moto-unavailable'[\s\S]{0,120}setStage\('entry'\)/);
+  // Subscribe waits for a complete card in the field.
+  assert.match(wizard, /disabled=\{busy \|\| stripeDisagrees \|\| !cardReady\}/);
 });
 
 test('the whole order is on screen before Subscribe', () => {
@@ -56,4 +72,23 @@ test('the whole order is on screen before Subscribe', () => {
     const at = checkout.indexOf(shown);
     assert.ok(at > 0 && at < button, `"${shown}" comes before the Subscribe button`);
   }
+});
+
+// ── Before the payment step ─────────────────────────────────────────────────
+//
+// Xander, 2026-11-04: the information steps collect information; "the only time we should see
+// a dollar amount is on the payment step". The Order step showed the plan price on each chip, the
+// annual price, and a "Due today / Then" panel. And a Starter close showed an "SMS registration"
+// step in the stepper until the order was first saved, because the stepper read only the saved
+// order and defaulted to Growth.
+
+test('the Order step shows no amounts', () => {
+  const step = section('function OrderStep', 'function TermsStep');
+  assert.doesNotMatch(step, /money\(|cents\(|\$\{?\s*\d|Due today/);
+});
+
+test('the stepper follows the plan being chosen, so Starter has no SMS step from the start', () => {
+  assert.match(wizard, /onPlanChange=\{setDraftPlan\}/);
+  assert.match(wizard, /\(step === 'order' \? draftPlan : null\) \?\?/);
+  assert.match(wizard, /closeHasSmsStep\(plan\) \? \(\['sms'\] as CloseStep\[\]\) : \[\]/);
 });

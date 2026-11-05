@@ -19,6 +19,7 @@
     "@jdd/schema": "github:JuneauDigitalDesigns/jdd-schema#v1.31.0",
     "@jdd/ui": "github:JuneauDigitalDesigns/jdd-ui#v1.3.0",
     "@phosphor-icons/react": "^2.1.7",
+    "@stripe/stripe-js": "9.6.0",
     "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.8.0",
     "framer-motion": "^11.0.0",
