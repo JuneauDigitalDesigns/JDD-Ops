@@ -89,6 +89,7 @@
               "fld9ONpSErMn97LP6": "{{1.call.call_analysis.call_summary}}",
               "fldMGK569tnD647g2": "{{1.call.call_analysis.custom_analysis_data.caller_name}}",
               "fldVbJMLbBiDzEvZF": "{{if(1.call.call_analysis.custom_analysis_data.caller_priority = \"emergency\"; \"emergency\"; \"callback\")}}",
+              "fldbn5w6HrufT4aub": "{{1.call.call_analysis.custom_analysis_data.callback_number}}",
               "fldtqHttzKEPSQazh": "{{round(ifempty(1.call.duration_ms; 0) / 1000)}}",
               "fldxb2nunz4Pt1SJT": "{{1.call.recording_url}}"
             },
@@ -177,12 +178,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-11-03T23:44:04.919Z",
+    "last_edit": "2026-11-05T22:13:31.339Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
     "idSequence": 11,
-    "version": 45
+    "version": 46
   }
 }

@@ -120,6 +120,11 @@
         },
         "id": "fld7ZxMBb9uT1Lxsd",
         "name": "SMS consent"
+      },
+      {
+        "type": "phoneNumber",
+        "id": "fldbn5w6HrufT4aub",
+        "name": "Callback number"
       }
     ],
     "views": [

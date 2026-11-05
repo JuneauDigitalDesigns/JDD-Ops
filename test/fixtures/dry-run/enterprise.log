@@ -82,12 +82,13 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
-  ✓ analysis.coversBlueprint — all 5 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority
+  ✓ analysis.coversBlueprint — all 6 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority, callback_number
   ✓ blueprint.selectsTotal — all 3 singleSelect mapping(s) can only emit a valid choice
   ✓ post-call scenario logs only connected calls — 17 call outcomes: connected calls logged, unanswered / voicemail callbacks dropped
   ? post-call brief goes through the agency — no credentials to resolve the blueprint, or nothing provisioned yet
+  ✓ blueprint.callbackNumber — "Callback number" keeps the number the caller asked to be reached at
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  6 passed, 1 failed, 7 not checked
+  7 passed, 1 failed, 7 not checked
 
 [step 14 site 1/2] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Mechanical Orlando" && git push origin main
@@ -169,12 +170,13 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
-  ✓ analysis.coversBlueprint — all 5 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority
+  ✓ analysis.coversBlueprint — all 6 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority, callback_number
   ✓ blueprint.selectsTotal — all 3 singleSelect mapping(s) can only emit a valid choice
   ✓ post-call scenario logs only connected calls — 17 call outcomes: connected calls logged, unanswered / voicemail callbacks dropped
   ? post-call brief goes through the agency — no credentials to resolve the blueprint, or nothing provisioned yet
+  ✓ blueprint.callbackNumber — "Callback number" keeps the number the caller asked to be reached at
   ? airtable.schemaCovers — no credentials to read one of the base schemas
-  6 passed, 1 failed, 7 not checked
+  7 passed, 1 failed, 7 not checked
 
 [step 29 site 2/2] Commit + push client repo
   [dry-run] would: git add -A && git commit -m "feat: initial provisioning for Fixture Mechanical Tampa" && git push origin main

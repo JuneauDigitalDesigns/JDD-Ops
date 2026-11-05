@@ -34,11 +34,13 @@ test('the recorded pre-consent base is refused by onboard.js, for the SMS consen
   assert.match(c.detail, /SMS consent/);
 });
 
-test('the only column it lacks is SMS consent, with its lowercase choices', () => {
+test('it lacks the two later columns, with the right types and lowercase choices', () => {
   const missing = missingCallLogFields(callLogOf(recorded()));
-  assert.deepEqual(missing.map((f) => f.name), ['SMS consent']);
-  assert.equal(missing[0].type, 'singleSelect');
-  assert.deepEqual(missing[0].options.choices.map((c) => c.name), SMS_CONSENT_CHOICES);
+  assert.deepEqual(missing.map((f) => f.name), ['Callback number', 'SMS consent']);
+  const consent = missing.find((f) => f.name === 'SMS consent');
+  assert.equal(consent.type, 'singleSelect');
+  assert.deepEqual(consent.options.choices.map((c) => c.name), SMS_CONSENT_CHOICES);
+  assert.equal(missing.find((f) => f.name === 'Callback number').type, 'phoneNumber');
   assert.deepEqual(SMS_CONSENT_CHOICES, ['granted', 'declined', 'unknown']);
   // And a complete table lacks nothing.
   assert.deepEqual(missingCallLogFields({ fields: CALL_LOG_FIELDS }), []);
@@ -60,7 +62,7 @@ async function withRecordedBase(schema, run) {
   }
 }
 
-test('the columns repair adds exactly SMS consent, and then onboard.js accepts the base', async () => {
+test('the columns repair adds exactly what is missing, and then onboard.js accepts the base', async () => {
   const schema = recorded();
   const table = callLogOf(schema);
   const { result, writes } = await withRecordedBase(schema, () =>
@@ -68,20 +70,22 @@ test('the columns repair adds exactly SMS consent, and then onboard.js accepts t
   );
   assert.equal(result.ok, true, result.reason);
   assert.match(result.after, /SMS consent/);
-  // One write, a create-field on the existing table — nothing modified, nothing removed.
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].method, 'POST');
-  assert.ok(writes[0].url.endsWith(`/v0/meta/bases/appRECORDED/tables/${table.id}/fields`), writes[0].url);
-  assert.deepEqual(writes[0].body, CALL_LOG_FIELDS.find((f) => f.name === 'SMS consent'));
+  // Only create-field writes on the existing table — nothing modified, nothing removed.
+  assert.equal(writes.length, 2);
+  for (const w of writes) {
+    assert.equal(w.method, 'POST');
+    assert.ok(w.url.endsWith(`/v0/meta/bases/appRECORDED/tables/${table.id}/fields`), w.url);
+    assert.deepEqual(w.body, CALL_LOG_FIELDS.find((f) => f.name === w.body.name));
+  }
 
   // The table as it would read back: onboard.js's schema check now passes.
-  const after = coverage([...table.fields, writes[0].body]);
+  const after = coverage([...table.fields, ...writes.map((w) => w.body)]);
   assert.equal(after.ok, true, after.detail);
 });
 
 test('a complete base is a no-op — no write at all', async () => {
   const schema = recorded();
-  callLogOf(schema).fields.push(CALL_LOG_FIELDS.find((f) => f.name === 'SMS consent'));
+  callLogOf(schema).fields.push(...missingCallLogFields(callLogOf(schema)));
   const { result, writes } = await withRecordedBase(schema, () =>
     repairAirtableBase({ apiKey: 'k', baseId: 'appRECORDED', want: 'columns' }),
   );
