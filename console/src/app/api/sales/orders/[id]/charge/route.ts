@@ -20,11 +20,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   if (!isLoopback(req)) return NextResponse.json({ error: 'Available on localhost only.' }, { status: 403 });
-  const body = (await req.json().catch(() => ({}))) as { amountCents?: unknown };
-  // Only the amount travels. Nothing about the card is ever sent from here.
+  const body = (await req.json().catch(() => ({}))) as { amountCents?: unknown; paymentMethodId?: unknown };
+  // Only the amount travels, plus Stripe's pm_… id for a card typed into Stripe's card field.
+  // Card details never reach the console: the field is Stripe's, and Stripe returns only the id.
+  const paymentMethodId =
+    typeof body.paymentMethodId === 'string' && /^pm_[A-Za-z0-9]{8,}$/.test(body.paymentMethodId) ? body.paymentMethodId : undefined;
   const out = await agencyOrders(`/${encodeURIComponent(params.id)}/charge`, {
     method: 'POST',
-    body: { amountCents: body.amountCents },
+    body: { amountCents: body.amountCents, ...(paymentMethodId ? { paymentMethodId } : {}) },
   });
 
   const order = out.body.order as { siteSlug?: string } | undefined;

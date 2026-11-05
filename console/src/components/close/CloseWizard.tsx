@@ -14,6 +14,7 @@ import { A2pRegistrationPanel } from '@/components/manage/MessagingSection';
 import { slugify } from '@/lib/slugify';
 import { checkSiteId } from '@/lib/siteId';
 import ReadinessStrip from './ReadinessStrip';
+import { loadStripe, type Stripe as StripeJs, type StripeCardNumberElement } from '@stripe/stripe-js';
 
 /**
  * Close a lead on a sales call. The approved mockup is the spec:
@@ -102,7 +103,15 @@ export default function CloseWizard({
       .catch(() => {});
   }, [order, terms]);
 
-  const plan: Plan = (order?.plan as Plan) ?? 'growth';
+  // The plan chosen on the Order step drives the stepper live: pick Starter and the SMS step is
+  // gone before anything is saved. It used to read only the saved order, so until the first save
+  // a Starter close showed an SMS registration step it would never have.
+  const [draftPlan, setDraftPlan] = useState<Plan | null>(null);
+  const plan: Plan =
+    (step === 'order' ? draftPlan : null) ??
+    (order?.plan as Plan) ??
+    draftPlan ??
+    (lead.planInterest === 'starter' ? 'starter' : 'growth');
   const steps = useMemo<CloseStep[]>(
     () => ['order', 'terms', 'payment', 'setup', ...(closeHasSmsStep(plan) ? (['sms'] as CloseStep[]) : []), 'done'],
     [plan],
@@ -128,6 +137,7 @@ export default function CloseWizard({
             order={order}
             prices={prices}
             verticals={verticals}
+            onPlanChange={setDraftPlan}
             onSaved={(o, t) => {
               setOrder(o);
               setTerms(t);
@@ -307,17 +317,20 @@ function OrderStep({
   order,
   prices,
   verticals,
+  onPlanChange,
   onSaved,
 }: {
   lead: LeadInfo;
   order: OperatorOrder | null;
   prices: Prices | null;
   verticals: { id: string; label: string }[];
+  onPlanChange: (plan: Plan) => void;
   onSaved: (order: OperatorOrder, terms: TermsView) => void;
 }) {
   const c = order?.client;
   const [plan, setPlan] = useState<Plan>((order?.plan as Plan) ?? (lead.planInterest === 'starter' ? 'starter' : 'growth'));
   const [period, setPeriod] = useState<Period>(order?.period ?? 'monthly');
+  useEffect(() => onPlanChange(plan), [plan, onPlanChange]);
   const [legalName, setLegalName] = useState(c?.legalName ?? lead.businessName);
   const [dba, setDba] = useState(c?.dba ?? lead.businessName);
   const [entityType, setEntityType] = useState(c?.entityType ?? 'LLC');
@@ -352,8 +365,6 @@ function OrderStep({
     if (plan !== 'starter' && mode === 'declined') setMode('forwarded');
   }, [plan, mode]);
 
-  const p = prices?.[plan];
-  const recurring = p ? (period === 'annual' ? p.annual : p.monthly) : null;
 
   async function save(): Promise<void> {
     setBusy(true);
@@ -388,7 +399,6 @@ function OrderStep({
             {(['starter', 'growth'] as Plan[]).map((id) => (
               <Chip key={id} on={plan === id} onClick={() => setPlan(id)}>
                 <span className="font-bold">{prices?.[id]?.name ?? (id === 'starter' ? 'Starter' : 'Growth')}</span>
-                <span className="text-xs text-fg2">{prices?.[id] ? `${money(prices[id].monthly)}/mo` : ' '}</span>
               </Chip>
             ))}
             <Chip on={false} onClick={() => {}} disabled>
@@ -402,34 +412,14 @@ function OrderStep({
           <div className="flex flex-wrap gap-1.5">
             <Chip on={period === 'monthly'} onClick={() => setPeriod('monthly')}>
               <span className="font-bold">Monthly</span>
-              <span className="text-xs text-fg2">{p ? `${money(p.monthly)}/mo` : ' '}</span>
             </Chip>
             <Chip on={period === 'annual'} onClick={() => setPeriod('annual')}>
               <span className="font-bold">Annual</span>
-              <span className="text-xs text-fg2">{p ? `${money(p.annual)}/yr · 2 months free` : ' '}</span>
+              <span className="text-xs text-fg2">2 months free</span>
             </Chip>
           </div>
         </div>
       </div>
-
-      {p && recurring != null && (
-        <div className="flex flex-wrap gap-8 rounded-[10px] bg-[var(--panel-2)] px-4 py-3.5">
-          <div>
-            <div className="field-label">Due today</div>
-            <div className="font-display text-3xl font-bold leading-tight">{money(recurring + p.onboardingFee)}</div>
-            <div className="text-xs text-fg2">
-              {period === 'annual' ? 'First year' : 'First month'} {money(recurring)} + onboarding {money(p.onboardingFee)}
-            </div>
-          </div>
-          <div>
-            <div className="field-label">Then</div>
-            <div className="font-display text-3xl font-bold leading-tight">
-              {money(recurring)}/{period === 'annual' ? 'yr' : 'mo'}
-            </div>
-            <div className="text-xs text-fg2">Renews automatically · cancel any time</div>
-          </div>
-        </div>
-      )}
 
       <h2 className="text-base font-semibold text-fg">Business</h2>
       <div className="-mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -815,19 +805,39 @@ function CardFlow({
   const [needsLink, setNeedsLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const charging = useRef(false);
+  /** Stripe's card field in the checkout, when the account takes phone orders through the API. */
+  const [cardField, setCardField] = useState<{ publishableKey: string } | null>(null);
+  const [cardComplete, setCardComplete] = useState(false);
+  const cardTokenizer = useRef<CardTokenizer | null>(null);
 
   // The Customer exists before the Dashboard does. Idempotent at the agency, which also closes a
   // live payment link first.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { ok, data } = await post<{ order: OperatorOrder; dashboardUrl: string }>(`/api/sales/orders/${order.id}/payment`, {
+      const { ok, data } = await post<{
+        order: OperatorOrder;
+        dashboardUrl: string;
+        cardEntry?: { inline: boolean; publishableKey: string | null };
+      }>(`/api/sales/orders/${order.id}/payment`, {
         method: 'dashboard-moto',
       });
       if (cancelled) return;
       if (!ok) return setError(data.error ?? 'Could not set up card entry.');
       setDashboardUrl(data.dashboardUrl);
       if (data.order) onOrder(data.order);
+      // One screen: when Stripe takes phone orders through the API, the card is typed into
+      // Stripe's own field on the checkout. Otherwise the Dashboard form below.
+      if (data.cardEntry?.inline && data.cardEntry.publishableKey) {
+        const res = await fetch(`/api/sales/orders/${order.id}/charge`, { cache: 'no-store' });
+        const pv = (await res.json().catch(() => null)) as ChargePreview | null;
+        if (cancelled) return;
+        if (res.ok && pv) {
+          setPreview(pv);
+          setCardField({ publishableKey: data.cardEntry.publishableKey });
+          setStage('checkout');
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -837,7 +847,7 @@ function CardFlow({
 
   // Watch for the card while it's being typed into Stripe.
   useEffect(() => {
-    if (stage !== 'entry' || !dashboardUrl || cardAdded) return;
+    if (stage !== 'entry' || !dashboardUrl || cardAdded || cardField) return;
     let stop = false;
     const check = async () => {
       const d = await fetch(`/api/sales/orders/${order.id}/charge?detect=1`, { cache: 'no-store' })
@@ -877,18 +887,41 @@ function CardFlow({
   }
 
   async function subscribe() {
-    if (!preview?.card || charging.current) return;
+    if (!preview || charging.current) return;
+    if (!cardField && !preview.card) return;
     charging.current = true; // one request per click; the agency refuses a second one anyway
     setBusy(true);
     setError(null);
+    // The typed card goes from Stripe's field to Stripe, which hands back only a pm_… id.
+    let paymentMethodId: string | undefined;
+    if (cardField) {
+      const t = await cardTokenizer.current?.tokenize();
+      if (!t || 'error' in t) {
+        setBusy(false);
+        charging.current = false;
+        return setError(t?.error ?? 'The card field is not ready yet.');
+      }
+      paymentMethodId = t.id;
+    }
     const { ok, data } = await post<{
       order?: OperatorOrder;
       outcome?: string;
+      code?: string;
       receipt?: ChargeReceipt | null;
       statementDescriptor?: string | null;
-    }>(`/api/sales/orders/${order.id}/charge`, { amountCents: preview.amountCents });
+    }>(`/api/sales/orders/${order.id}/charge`, {
+      amountCents: preview.amountCents,
+      ...(paymentMethodId ? { paymentMethodId } : {}),
+    });
     setBusy(false);
     charging.current = false;
+    // Stripe hasn't switched on phone orders through the API after all: back to the Dashboard form.
+    if (data.code === 'moto-unavailable') {
+      setCardField(null);
+      setPreview(null);
+      setStage('entry');
+      return setError(data.error ?? 'Add the card in Stripe instead.');
+    }
     if (ok && data.outcome === 'paid' && data.order) {
       onOrder(data.order);
       setPaid({ order: data.order, receipt: data.receipt ?? null, statementDescriptor: data.statementDescriptor ?? null });
@@ -907,11 +940,22 @@ function CardFlow({
   }, [stage, paid, onPaid]);
 
   if (stage === 'paid' && paid) return <CardPaid order={order} preview={preview} paid={paid} />;
-  if (stage === 'checkout' && preview?.card) {
+  if (stage === 'checkout' && preview && (preview.card || cardField)) {
     return (
       <CardCheckout
         order={order}
         preview={preview}
+        cardField={
+          cardField ? (
+            <StripeCardField
+              publishableKey={cardField.publishableKey}
+              billing={{ name: order.client.legalName, email: order.client.email, line1: order.client.address }}
+              tokenizer={cardTokenizer}
+              onComplete={setCardComplete}
+            />
+          ) : null
+        }
+        cardReady={cardField ? cardComplete : true}
         termsVersion={termsVersion}
         busy={busy}
         needsLink={needsLink}
@@ -985,6 +1029,96 @@ function CardFlow({
   );
 }
 
+type CardTokenizer = { tokenize: () => Promise<{ id: string } | { error: string }> };
+
+/**
+ * Stripe's card field (Stripe Elements), laid out like a hosted checkout's "Card information":
+ * number on top, expiry and CVC beneath. Each part is an iframe served by Stripe, so the card
+ * number, expiry and CVC are typed into Stripe's page, never into this one: this component can't
+ * read them, and nothing here or in the console ever holds them. `tokenize` asks Stripe to turn
+ * what was typed into a PaymentMethod and hands back only its `pm_…` id.
+ */
+function StripeCardField({
+  publishableKey,
+  billing,
+  tokenizer,
+  onComplete,
+}: {
+  publishableKey: string;
+  billing: { name: string; email: string; line1: string };
+  tokenizer: React.MutableRefObject<CardTokenizer | null>;
+  onComplete: (complete: boolean) => void;
+}) {
+  const numberRef = useRef<HTMLDivElement>(null);
+  const expiryRef = useRef<HTMLDivElement>(null);
+  const cvcRef = useRef<HTMLDivElement>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let stripe: StripeJs | null = null;
+    let number: StripeCardNumberElement | null = null;
+    let destroyed = false;
+    const done = { number: false, expiry: false, cvc: false };
+    (async () => {
+      stripe = await loadStripe(publishableKey);
+      if (!stripe || destroyed || !numberRef.current || !expiryRef.current || !cvcRef.current) return;
+      const elements = stripe.elements();
+      const style = {
+        base: { fontSize: '15px', color: '#14120c', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', '::placeholder': { color: '#9a917a' } },
+        invalid: { color: '#d2542f' },
+      };
+      number = elements.create('cardNumber', { style, showIcon: true });
+      const expiry = elements.create('cardExpiry', { style });
+      const cvc = elements.create('cardCvc', { style });
+      number.mount(numberRef.current);
+      expiry.mount(expiryRef.current);
+      cvc.mount(cvcRef.current);
+      const watch = (key: keyof typeof done) => (e: { complete: boolean; error?: { message?: string } }) => {
+        done[key] = e.complete;
+        setFieldError(e.error?.message ?? null);
+        onComplete(done.number && done.expiry && done.cvc);
+      };
+      number.on('change', watch('number'));
+      expiry.on('change', watch('expiry'));
+      cvc.on('change', watch('cvc'));
+      tokenizer.current = {
+        tokenize: async () => {
+          if (!stripe || !number) return { error: 'The card field is not ready yet.' };
+          const r = await stripe.createPaymentMethod({
+            type: 'card',
+            card: number,
+            billing_details: { name: billing.name, email: billing.email, address: { line1: billing.line1 } },
+          });
+          return r.error ? { error: r.error.message ?? 'Stripe could not read the card.' } : { id: r.paymentMethod.id };
+        },
+      };
+    })();
+    return () => {
+      destroyed = true;
+      tokenizer.current = null;
+      number?.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishableKey]);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="moto-box moto-cardfield">
+        <div ref={numberRef} />
+        <div className="moto-cardfield-row">
+          <div ref={expiryRef} />
+          <div ref={cvcRef} />
+        </div>
+      </div>
+      {fieldError && (
+        <div role="alert" className="text-[13px]" style={{ color: 'var(--danger)' }}>
+          {fieldError}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LockIcon({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="mt-0.5 flex-none">
@@ -997,6 +1131,8 @@ function LockIcon({ size }: { size: number }) {
 function CardCheckout({
   order,
   preview,
+  cardField,
+  cardReady,
   termsVersion,
   busy,
   needsLink,
@@ -1007,6 +1143,9 @@ function CardCheckout({
 }: {
   order: OperatorOrder;
   preview: ChargePreview;
+  /** Stripe's card field, when the card is typed here rather than on the Dashboard. */
+  cardField: React.ReactNode;
+  cardReady: boolean;
   termsVersion: string | null;
   busy: boolean;
   needsLink: boolean;
@@ -1015,7 +1154,7 @@ function CardCheckout({
   onDifferentCard: () => void;
   onUseLink: () => void;
 }) {
-  const card = preview.card!;
+  const card = preview.card;
   const unit = preview.period === 'annual' ? 'year' : 'month';
   const onboardingCents = preview.amountCents - preview.recurringCents;
   const planName = order.plan.charAt(0).toUpperCase() + order.plan.slice(1);
@@ -1082,17 +1221,24 @@ function CardCheckout({
           <h3 className="text-[15px] font-semibold">Contact information</h3>
           <div className="moto-box"><div><span className="moto-k">Email</span><span>{order.client.email}</span></div></div>
         </div>
-        <div className="flex flex-col gap-2">
-          <h3 className="text-[15px] font-semibold">Payment method</h3>
-          <div className="moto-box">
-            <div>
-              <span className="moto-radio" aria-hidden="true" />
-              <span className="moto-brand" aria-hidden="true">{card.brand.toUpperCase().slice(0, 4)}</span>
-              <span>{cardName(card.brand)} •••• {card.last4}</span>
-              <span className="ml-auto text-xs font-semibold" style={{ color: 'var(--ok)' }}>Card added</span>
+        {cardField ? (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-[15px] font-semibold">Card information</h3>
+            {cardField}
+          </div>
+        ) : card ? (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-[15px] font-semibold">Payment method</h3>
+            <div className="moto-box">
+              <div>
+                <span className="moto-radio" aria-hidden="true" />
+                <span className="moto-brand" aria-hidden="true">{card.brand.toUpperCase().slice(0, 4)}</span>
+                <span>{cardName(card.brand)} •••• {card.last4}</span>
+                <span className="ml-auto text-xs font-semibold" style={{ color: 'var(--ok)' }}>Card added</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
         <div className="flex flex-col gap-2">
           <h3 className="text-[15px] font-semibold">Billing details</h3>
           <div className="moto-box">
@@ -1114,7 +1260,7 @@ function CardCheckout({
             Stripe&apos;s price doesn&apos;t match this order, so payment is blocked. Check the plan prices in Stripe.
           </div>
         )}
-        <button type="button" className="btn btn-primary w-full py-[15px] text-base" disabled={busy || stripeDisagrees} onClick={onSubscribe}>
+        <button type="button" className="btn btn-primary w-full py-[15px] text-base" disabled={busy || stripeDisagrees || !cardReady} onClick={onSubscribe}>
           {busy ? 'Processing…' : 'Subscribe'}
         </button>
         <p className="m-0 text-center text-xs text-fg3">
@@ -1127,9 +1273,11 @@ function CardCheckout({
         </div>
         <ErrorLine text={error} />
         <div className="flex flex-wrap justify-center gap-[18px]">
-          <button type="button" className="btn moto-quiet" disabled={busy} onClick={onDifferentCard}>
-            Use a different card
-          </button>
+          {!cardField && (
+            <button type="button" className="btn moto-quiet" disabled={busy} onClick={onDifferentCard}>
+              Use a different card
+            </button>
+          )}
           <button type="button" className={`btn ${needsLink ? '' : 'moto-quiet'}`} disabled={busy} onClick={onUseLink}>
             Send a payment link instead
           </button>
