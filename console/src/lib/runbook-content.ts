@@ -538,12 +538,12 @@ export function buildPartA(config: OpsConfig = {}): Phase[] {
                 detail: 'The column list is CALL_LOG_FIELDS in onboard.js, and each client’s onboarding page shows the full mapping replica. Run npm run verify-post-call after touching either side — it diffs them against this master.',
               },
               {
-                text: 'Module: Twilio → Send a Message (JDD SID/auth connection), sending from a phone number. Leave From and To as PLACEHOLDERS — onboard.js stamps both on every clone.',
-                detail: 'From = TWILIO_NOTIFICATION_NUMBER, the same JDD number in every clone. To = the owner’s SMS-consent number. If the owner never opted in, onboard.js removes this module from the clone entirely. Because From is overwritten per clone, editing it here changes nothing.',
+                text: 'Module: HTTP → Make a request, the last module. POST to https://www.juneaudigitaldesigns.com/api/ingest/call with Authorization: Bearer REPLACE_PER_CLIENT. Do NOT add a Twilio module.',
+                detail: 'The agency sends the owner’s end-of-call text, not Make. Form-encoded fields: call_id, caller_name, caller_priority, caller_number, airtable_record_id ({{8.id}}, the row the Airtable module just wrote). Keep “evaluate all states as errors” OFF. Use www, because the apex redirects and loses the header. onboard.js swaps in each site’s LEAD_INGEST_TOKEN on the clone and removes any Twilio module it finds. Run npm run verify-post-call after any change.',
               },
               {
-                text: 'SMS body MUST identify the sender, carry opt-out language, and match the sample message submitted with JDD’s A2P campaign and juneaudigitaldesigns.com/sms-terms.',
-                detail: 'Not met today. The campaign’s registered samples (read from Twilio 2026-11-02) open with “Juneau Digital Designs call alert”, then Name / Status / Phone / About, then close with “Reply STOP to opt out, HELP for help”. The live body has the middle four lines only — no sender line, no opt-out line — and its Status renders blank on every call. Closing that gap is a master edit awaiting the operator’s sign-off; until then this body is not pinned here.',
+                text: 'Nothing here composes the SMS. The agency writes it, checks the owner’s consent at send time, and sends it from TWILIO_NOTIFICATION_NUMBER.',
+                detail: 'The wording lives in the agency’s app/lib/call-brief.ts. It does not match the samples on JDD’s approved A2P campaign, which were read from Twilio on 2026-11-05 and still open with “Juneau Digital Designs call alert”. Twilio confirmed on 2026-11-05 that an approved campaign’s samples, description, message flow and embedded links cannot be edited: changing them takes a new campaign, submitted for review.',
               },
               { text: 'Save, then Deactivate the master (only per-client clones run).' },
             ],
