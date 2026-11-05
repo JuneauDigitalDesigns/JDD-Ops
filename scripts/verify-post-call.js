@@ -38,6 +38,7 @@ import { patchPostCallBlueprint, airtableFieldMap, CALL_LOG_FIELDS } from '../on
 import {
   checkAnalysisCoversBlueprint,
   checkSelectMappingsTotal,
+  checkCallbackNumberColumn,
   checkOwnerBriefViaAgency,
   checkConnectedCallsOnly,
 } from '../lib/onboard-checks.js';
@@ -138,6 +139,10 @@ async function main() {
   // Every singleSelect mapping must be unable to emit an invalid option — a bare analysis field
   // that comes back "" fails the whole row (2026-11-03). Checked on the master, before the patch
   // mutates it, against the master's own base: every clone inherits these expressions.
+  const callbackNumber = checkCallbackNumberColumn({ blueprint, fieldMap: masterMap });
+  if (callbackNumber.ok) note(`  ✓ ${callbackNumber.detail}`);
+  else bad(callbackNumber.detail);
+
   const selects = checkSelectMappingsTotal({ blueprint, fieldMap: masterMap });
   if (selects.ok) note(`✓ ${selects.detail}`);
   else bad(selects.detail);

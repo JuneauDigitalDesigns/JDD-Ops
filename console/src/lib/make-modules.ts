@@ -132,6 +132,13 @@ function airtableFields(ctx: ClientContext, site: SiteInfo): MakeField[] {
       },
     },
     {
+      label: 'Callback number',
+      expr: {
+        raw: '{{1.call.call_analysis.custom_analysis_data.callback_number}}',
+        lines: [[callVar('call_analysis.custom_analysis_data.callback_number')]],
+      },
+    },
+    {
       label: 'Summary',
       expr: {
         raw: '{{1.call.call_analysis.call_summary}}',

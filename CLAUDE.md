@@ -304,7 +304,18 @@ if any of these are missing:
 - the recording disclosure as `begin_message`;
 - the approved ask in the prompt;
 - an `sms_consent` field;
-- the voicemail hang-up.
+- the voicemail hang-up;
+- analysis fields worded exactly as a new client gets them.
+
+**What a client gets and what the tuned fixtures run are held to one definition.**
+`checkPromptParity` compares what is fixed in a Claude-written prompt, since two correct ones are
+never byte-equal: `PROMPT_SECTIONS` in order, the approved ask, no square brackets, the spoken
+number with its `{{user_number}}` fallback, the email and plain-letter spelling rules, and the
+outbound rules on callback agents only. onboard.js refuses a freshly generated prompt that fails
+it, and `verify-agents` runs it on every live agent. `generateRetellPrompt` keeps an existing file,
+so a rule learned by tuning one agent reaches nobody else on its own: put it in
+`promptGeneratorSystem` and in the check. The first run against the real generator failed: Starter
+prompts grew a 16th section from a generator paragraph that read like a header.
 
 Found 2026-11-04 when both test agents failed every one, and the growth agent was on the master
 LLM. Retell refused to re-point it ("Cannot update response engine after agent versions have been
@@ -333,10 +344,20 @@ after.
 
 Base name: `{brand.name} — Calls`
 Table: `Call Log`
-Fields: Date, Caller name, Caller number, Summary, Duration (seconds),
+Fields: Date, Caller name, Caller number, Callback number, Summary, Duration (seconds),
 Call type, Email, Address, Recording URL, Priority, SMS consent, Outcome
 (+ `Site` for enterprise). The list lives once, in `lib/call-log-fields.js`; `onboard.js` and
 `lib/repair-ops.js` both import it. Never copy it — the repair copy once drifted to 7 columns.
+
+**`Caller number` is the line the call was on; `Callback number` is the number the caller asked to
+be reached at.** Told "no, use my cell", the agent took the number and Retell extracted it, and
+until 2026-11-05 it was then stored nowhere, so the owner got the number the caller had just
+refused. The column is mapped plain, `{{…custom_analysis_data.callback_number}}`, and
+`checkCallbackNumberColumn` enforces it. It is free text, so an empty extraction leaves the cell
+empty (written and confirmed against a real base) rather than losing the row. The extraction's
+description says "Empty string if none was spoken": it used to fall back to "the number they called
+from", which on a callback the agent placed is the client's own Twilio number. The portal shows
+the column only when it differs from `Caller number`.
 
 **`SMS consent` is the caller's spoken answer to the closing SMS question** —
 `custom_analysis_data.sms_consent`, `granted`/`declined`/`unknown`, lowercase. `unknown` blocks
@@ -539,7 +560,8 @@ clones, and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refr
 `make/master-blueprint.json` and `make/scenario.json` unchanged after a run is the proof.
 Deliberate, operator-approved edits do happen. Each one is re-recorded and committed with its
 reason, so its diff never looks like drift. So far: the SMS consent mapping, the total select
-mappings, and replacing the Twilio module with the agency HTTP module (2026-11-02 / 03).
+mappings, replacing the Twilio module with the agency HTTP module (2026-11-02 / 03), and the
+`Callback number` column and mapping (2026-11-05).
 
 **A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
 attach the clone to the master's hook, which already belongs to the master, and refuses with

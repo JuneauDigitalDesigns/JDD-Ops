@@ -91,6 +91,8 @@ import {
   checkAnalysisCoversBlueprint,
   checkPromptHasConsentAsk,
   checkSelectMappingsTotal,
+  checkCallbackNumberColumn,
+  checkPromptParity,
   checkOwnerBriefViaAgency,
   checkConnectedCallsOnly,
   checkAirtableSchemaCovers,
@@ -113,6 +115,7 @@ import {
   voiceConsentInstructions,
   callerDetailsInstructions,
   SPELLING_RULE,
+  PROMPT_SECTIONS,
 } from './lib/voice-consent.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
 // Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
@@ -966,8 +969,8 @@ export function promptGeneratorSystem(content, { callbacks = false } = {}) {
   return `You write the complete system prompt for a Retell AI voice agent that works the phones for a single local service business. ${callbacks ? 'The agent handles inbound calls and returns outbound callbacks placed within ~60 seconds of a website form submission.' : 'The agent ONLY answers inbound calls; it never places outbound calls or callbacks, so the prompt must contain no outbound or callback branches.'}
 
 Output ONLY the finished agent prompt as a Markdown document with "##" section headers, in this exact order:
-ROLE, CORE SPEAKING RULES, GREETING, IF ASKED WHETHER YOU'RE A REAL PERSON / AN AI, QUALIFICATION, NO SCHEDULING, CONTACT COLLECTION, ANSWERING QUESTIONS, SERVICES, FAQ, WHY CHOOSE, PRICING, CLOSING, EDGE CASES, NEVER.
-No preamble, no explanation, no code fences — just the prompt itself, written as direct second-person instructions to the agent ("You are…", "You never…").
+${PROMPT_SECTIONS.join(', ')}.
+Use exactly these "##" headers and no others; everything below goes inside one of them. No preamble, no explanation, no code fences — just the prompt itself, written as direct second-person instructions to the agent ("You are…", "You never…").
 
 PERSONA
 - Give the agent ONE warm first name and use that same name everywhere (greeting, callbacks, every example). If an agentName is provided in the context, use it exactly. If it is null, choose one natural, friendly first name and never switch names.
@@ -999,7 +1002,7 @@ ${voiceConsentInstructions(content.brand.name, { callbacks })}
 
 QUALIFICATION: let the caller describe the problem first, then fill gaps ONE question at a time — what they need (map to the provided services), timeline/urgency, and location. Define a short list of URGENT triggers appropriate to THIS business's trade (infer from the services/industry — e.g. for HVAC: no heat/AC in dangerous weather, burning smells, sparking or electrical issues, heavy water leaks, vulnerable people in the home). For urgent calls, tell the agent to stay calm, reassure the caller the team prioritizes emergencies, and collect details quickly — but STILL never promise an arrival time.
 
-LOCATION / SERVICE AREA: if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
+SERVICE AREA (part of the QUALIFICATION section, not a section of its own): if a serviceArea list is provided, use those town names; otherwise refer to the business's city (from its address) and "the surrounding area." If a caller is outside it, be gracious and say the team will confirm whether they can help.
 
 NO SCHEDULING (its own section): state plainly that the agent collects details and hands off to a human for scheduling; it never offers, holds, or confirms a time. Give one or two example lines of redirecting a caller who wants to book right now.
 
@@ -1106,10 +1109,11 @@ async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate =
   if (askCheck.ok === false) {
     fail(6, `${askCheck.detail}. Delete ${promptPath} and re-run to regenerate.`);
   }
-  // The voice model reads bracketed fill-ins aloud (2026-11-04: "[spell the name letter by letter]").
-  // checkLiveAgentSetup flags the same thing on live agents; refuse it before an agent is built.
-  if (/[[\]]/.test(prompt)) {
-    fail(6, `the generated prompt contains square brackets, which the agent reads aloud. Delete ${promptPath} and re-run to regenerate.`);
+  // The same predicate verify-agents holds live agents to, so a new client can't start below the
+  // bar the test fixtures were tuned to. The generator is Claude: check what it actually wrote.
+  const parity = checkPromptParity({ prompt, business: content.brand.name, callbacks });
+  if (parity.ok === false) {
+    fail(6, `${parity.detail}. Delete ${promptPath} and re-run to regenerate.`);
   }
   console.log(`  Review this before Checkpoint 2 — you will tune it on a test call`);
   return prompt;
@@ -2193,6 +2197,13 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
         blueprint: preview?.blueprint ?? null,
         ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
       }),
+      // As with the selects: the patched clone when both exist, otherwise the master it comes from.
+      preview?.blueprint && preview?.clientMap
+        ? checkCallbackNumberColumn({ blueprint: preview.blueprint, fieldMap: preview.clientMap })
+        : checkCallbackNumberColumn({
+            blueprint: (await resolveMasterResources())?.blueprint ?? null,
+            fieldMap: preview?.masterMap ?? null,
+          }),
       checkAirtableSchemaCovers({
         masterMap: preview?.masterMap ?? null,
         clientMap: preview?.clientMap ?? null,

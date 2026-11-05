@@ -239,7 +239,9 @@ test("a new client's prompt generator is handed every live-test fix — Growth a
 test('onboard.js refuses a generated prompt with square brackets, and writes the current routes', () => {
   const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
   assert.match(src, /const system = promptGeneratorSystem\(content, \{ callbacks \}\);/);
-  assert.match(src, /if \(\/\[\[\\\]\]\/\.test\(prompt\)\) \{\n?\r?\n?\s*fail\(6, `the generated prompt contains square brackets/);
+  // checkPromptParity refuses brackets, and much more: see test/prompt-parity.test.mjs.
+  assert.match(src, /const parity = checkPromptParity\(/);
+  assert.match(src, /if \(parity\.ok === false\) \{/);
   // Every run rewrites these from lib/site-routes, so callback_number_spoken reaches new clients.
   assert.match(src, /\{ asset: 'contact\.route\.ts',\s+dest: 'src\/app\/api\/contact\/route\.ts' \}/);
   assert.match(src, /\{ asset: 'no-answer\.route\.ts', dest: 'src\/app\/api\/voice\/no-answer\/route\.ts' \}/);

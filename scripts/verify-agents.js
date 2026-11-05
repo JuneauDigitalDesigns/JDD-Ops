@@ -8,7 +8,9 @@
  *
  * For each agent it reads the agent and the LLM it is actually BOUND to, and runs
  * `checkLiveAgentSetup`: not on the master LLM, the recording disclosure as its opening line,
- * the approved consent ask in its prompt, an `sms_consent` field, the voicemail hang-up.
+ * the approved consent ask in its prompt, an `sms_consent` field, the voicemail hang-up, and the
+ * analysis fields exactly as a new client gets them. `checkPromptParity` then holds its prompt to
+ * the rules a new client's prompt is generated under.
  *
  * Found 2026-11-04: the consent work reached new clients only, and the growth fixture's agent ran
  * on the master LLM. Nothing reported either — this is the report. GETs only; changes nothing.
@@ -23,7 +25,8 @@ import { readdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { readEnvLocal } from '../onboard.js';
-import { checkLiveAgentSetup, formatCheckLines } from '../lib/onboard-checks.js';
+import { checkLiveAgentSetup, checkPromptParity, formatCheckLines } from '../lib/onboard-checks.js';
+import { recoverBusinessName } from '../lib/voice-consent.js';
 
 const apiKey = process.env.RETELL_API_KEY;
 const masterLlmId = process.env.RETELL_LLM_ID || null; // in the ROOT .env this is the master template
@@ -51,7 +54,7 @@ function agentDirs() {
     }
     for (const dir of dirs) {
       const id = readEnvLocal(dir).RETELL_AGENT_ID;
-      if (id) out.push({ label: dir.slice(root.length + 1).replace(/\\/g, '/'), agentId: id });
+      if (id) out.push({ label: dir.slice(root.length + 1).replace(/\\/g, '/'), agentId: id, leadCallback: readEnvLocal(dir).LEAD_CALLBACK });
     }
   }
   return out;
@@ -66,14 +69,21 @@ const getJson = async (url) => {
 let failed = 0;
 const dirs = agentDirs();
 if (!dirs.length) console.log('No client agents found.');
-for (const { label, agentId } of dirs) {
+for (const { label, agentId, leadCallback } of dirs) {
   const agent = await getJson(`https://api.retellai.com/get-agent/${agentId}`);
   const llmId = agent?.response_engine?.llm_id;
   const llm = llmId ? await getJson(`https://api.retellai.com/get-retell-llm/${llmId}`) : null;
   const c = checkLiveAgentSetup({ agent, llm, masterLlmId });
-  if (c.ok !== true) failed++;
+  // The rules a new client's prompt is generated under. Hand-tuning that never reached the
+  // generator, or a generator rule that never reached this agent, shows up here.
+  const parity = checkPromptParity({
+    prompt: llm?.general_prompt,
+    business: recoverBusinessName(llm?.begin_message),
+    callbacks: leadCallback === 'on',
+  });
+  if (c.ok !== true || parity.ok !== true) failed++;
   console.log(`${label} (${agentId}, LLM ${llmId ?? '?'})`);
-  for (const line of formatCheckLines([c])) console.log(`  ${line}`);
+  for (const line of formatCheckLines([c, parity])) console.log(`  ${line}`);
 }
 console.log(failed ? `\n✗ ${failed} of ${dirs.length} agent(s) need attention.` : `\n✓ All ${dirs.length} agent(s) carry the consent setup.`);
 process.exit(failed ? 1 : 0);
