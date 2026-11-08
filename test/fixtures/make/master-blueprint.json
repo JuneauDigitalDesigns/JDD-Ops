@@ -76,6 +76,240 @@
         },
         {
           "id": 8,
+          "filter": {
+            "name": "Connected, and the caller gave something",
+            "conditions": [
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.sms_consent}}",
+                  "b": "granted",
+                  "o": "text:equal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.sms_consent}}",
+                  "b": "declined",
+                  "o": "text:equal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.caller_priority}}",
+                  "b": "emergency",
+                  "o": "text:equal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.caller_address}}",
+                  "b": "",
+                  "o": "text:notequal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.caller_email}}",
+                  "b": "",
+                  "o": "text:notequal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.callback_number}}",
+                  "b": "",
+                  "o": "text:notequal"
+                }
+              ],
+              [
+                {
+                  "a": "{{1.event}}",
+                  "b": "call_analyzed",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.in_voicemail}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "voicemail_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.disconnection_reason}}",
+                  "b": "ivr_reached",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.direction}}",
+                  "b": "outbound",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{1.call.call_analysis.custom_analysis_data.caller_name}}",
+                  "b": "",
+                  "o": "text:notequal"
+                }
+              ]
+            ]
+          },
           "mapper": {
             "base": "appurtlGfg7Z5UuAI",
             "table": "tbl3YWgGdVXNPz3Eg",
@@ -178,12 +412,12 @@
     },
     "concept": false,
     "created": "2026-06-07T15:29:26.744Z",
-    "last_edit": "2026-11-05T22:13:31.339Z",
+    "last_edit": "2026-11-08T19:55:55.964Z",
     "metadata": {
       "input_spec": [],
       "output_spec": []
     },
     "idSequence": 11,
-    "version": 46
+    "version": 47
   }
 }
