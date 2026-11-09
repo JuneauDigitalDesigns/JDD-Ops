@@ -590,8 +590,8 @@ clones, and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refr
 Deliberate, operator-approved edits do happen. Each one is re-recorded and committed with its
 reason, so its diff never looks like drift. So far: the SMS consent mapping, the total select
 mappings, replacing the Twilio module with the agency HTTP module (2026-11-02 / 03), the
-`Callback number` column and mapping (2026-11-05), and the Airtable module's dropped-call filter
-(2026-11-08).
+`Callback number` column and mapping (2026-11-05), the Airtable module's dropped-call filter
+(2026-11-08), and adding those two columns to that module's saved field list (2026-11-09).
 
 **A master mapping added by API runs but doesn't show in Make's editor.** A module's blueprint
 holds what runs (`mapper.record`) and, separately, the form the editor draws (`metadata.expect` and

@@ -79,6 +79,17 @@
           "name": "fldVbJMLbBiDzEvZF",
           "type": "select",
           "label": "Priority"
+        },
+        {
+          "mode": "edit",
+          "name": "fld7ZxMBb9uT1Lxsd",
+          "type": "select",
+          "label": "SMS consent"
+        },
+        {
+          "name": "fldbn5w6HrufT4aub",
+          "type": "text",
+          "label": "Callback number"
         }
       ],
       "type": "collection",
@@ -173,6 +184,33 @@
                   }
                 ],
                 "validate": false
+              },
+              {
+                "mode": "edit",
+                "name": "fld7ZxMBb9uT1Lxsd",
+                "type": "select",
+                "label": "SMS consent",
+                "dynamic": true,
+                "options": [
+                  {
+                    "label": "granted",
+                    "value": "granted"
+                  },
+                  {
+                    "label": "declined",
+                    "value": "declined"
+                  },
+                  {
+                    "label": "unknown",
+                    "value": "unknown"
+                  }
+                ],
+                "validate": false
+              },
+              {
+                "name": "fldbn5w6HrufT4aub",
+                "type": "text",
+                "label": "Callback number"
               }
             ],
             "type": "collection",
@@ -183,6 +221,9 @@
       "record": {
         "nested": {
           "fld2HEMxzE7SFhniW": {
+            "mode": "edit"
+          },
+          "fld7ZxMBb9uT1Lxsd": {
             "mode": "edit"
           },
           "fldVbJMLbBiDzEvZF": {
