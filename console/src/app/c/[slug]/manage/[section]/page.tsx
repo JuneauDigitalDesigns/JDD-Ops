@@ -12,6 +12,7 @@ import VoiceAgentSection from '@/components/manage/VoiceAgentSection';
 import MessagingSection from '@/components/manage/MessagingSection';
 import { loadA2pEnums } from '@/lib/a2pChain';
 import PortalSection from '@/components/manage/PortalSection';
+import AgreementSection from '@/components/manage/AgreementSection';
 import FeaturedSection from '@/components/manage/FeaturedSection';
 import DangerSection from '@/components/manage/DangerSection';
 import SectionPlaceholder from '@/components/manage/SectionPlaceholder';
@@ -102,6 +103,8 @@ export default async function ManageSectionPage({
       return <MessagingSection enums={await loadA2pEnums()} />;
     case 'portal':
       return <PortalSection />;
+    case 'agreement':
+      return <AgreementSection />;
     case 'featured':
       return <FeaturedSection />;
     case 'danger':

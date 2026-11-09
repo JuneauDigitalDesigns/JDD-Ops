@@ -2,6 +2,8 @@ import 'server-only';
 import { Redis } from '@upstash/redis';
 import {
   A2P_STATUSES,
+  ORDERS_INDEX_KEY,
+  isOrderPaid,
   orderByLeadKey,
   orderKey,
   readinessFor,
@@ -76,6 +78,19 @@ export async function readOrder(id: string): Promise<OperatorOrder | null> {
   if (!redis) return null;
   const parsed = zOperatorOrder.safeParse(await redis.get<unknown>(orderKey(id)));
   return parsed.success ? parsed.data : null;
+}
+
+/** Paid operator orders for one site, newest first. Only a paid agreement is kept for good. */
+export async function readPaidOrdersForSite(siteSlug: string): Promise<OperatorOrder[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  const ids = await redis.zrange<string[]>(ORDERS_INDEX_KEY, 0, -1, { rev: true });
+  const orders: OperatorOrder[] = [];
+  for (const id of ids) {
+    const order = await readOrder(id);
+    if (order && order.siteSlug === siteSlug && order.agreementId && isOrderPaid(order.status)) orders.push(order);
+  }
+  return orders;
 }
 
 export async function readOrderByLead(leadId: string): Promise<OperatorOrder | null> {

@@ -44,7 +44,7 @@ interface Prices {
 }
 
 interface TermsView {
-  script: { version: string; hash: string; lines: string[] };
+  script: { version: string; hash: string; recordingNotice: string; recordingOpener: string; lines: string[] };
   termsHash: string;
   totals: { today: number; recurring: number; period: Period; nextPaymentAt?: number };
 }
@@ -60,9 +60,9 @@ const STEP_LABELS: Record<CloseStep, string> = {
 
 const money = (n: number) => `$${n.toLocaleString('en-US')}`;
 
-async function post<T = Record<string, unknown>>(url: string, body: unknown = {}): Promise<{ ok: boolean; data: T & { error?: string } }> {
+async function post<T = Record<string, unknown>>(url: string, body: unknown = {}): Promise<{ ok: boolean; data: T & { error?: string; code?: string } }> {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; code?: string };
   return { ok: res.ok, data };
 }
 
@@ -154,6 +154,7 @@ export default function CloseWizard({
             totals={terms?.totals ?? null}
             termsVersion={terms?.script.version.split('-')[0] ?? null}
             onOrder={setOrder}
+            onRecordingRunning={() => setStep('terms')}
             onPaid={(o) => {
               setOrder(o);
               setStep('setup');
@@ -444,7 +445,7 @@ function OrderStep({
         </Field>
         <Field label="Contact name"><input className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} /></Field>
         <Field label="Title"><input className="input" value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} /></Field>
-        <Field label="Email (portal login)"><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="Email (portal login)" hint={<span className="text-xs text-fg2">Receives the portal login, as well as the agreement.</span>}><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Contact mobile"><input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
       </div>
 
@@ -499,6 +500,8 @@ interface AgreementSummary {
   businessName: string;
   version: string;
   emailedTo: string;
+  /** Read-aloud only. */
+  call: { recordingConsentAt: string | null; recordingStoppedAt: string | null; recording: unknown | null } | null;
 }
 
 type TermsMode = 'options' | 'aloud' | 'link' | 'recorded' | 'confirm';
@@ -520,7 +523,11 @@ function TermsStep({
   onContinue: () => void;
 }) {
   const [mode, setMode] = useState<TermsMode>(order.status !== 'draft' ? 'confirm' : 'options');
-  const [read, setRead] = useState<boolean[]>(() => terms.script.lines.map(() => false));
+  // The opener is read first, on the recording, and ticked off like every other line.
+  const spoken = [terms.script.recordingOpener, ...terms.script.lines];
+  const [read, setRead] = useState<boolean[]>(() => spoken.map(() => false));
+  const [consentAt, setConsentAt] = useState<string | null>(null);
+  const [stopped, setStopped] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -535,12 +542,27 @@ function TermsStep({
       confirmed: true,
       scriptHash: terms.script.hash,
       termsHash: terms.termsHash,
+      recordingConsentAt: consentAt,
     });
     setBusy(false);
     if (!ok || !data.order) return setError(data.error ?? 'Could not record the agreement.');
     setSummary(data.agreement ?? null);
     onAccepted(data.order);
     setMode('confirm');
+  }
+
+  // The recording has to be off before payment: card details must never be on it.
+  const needsStop = Boolean(summary?.call?.recordingConsentAt && !summary.call.recordingStoppedAt);
+
+  async function continueToPayment() {
+    if (needsStop) {
+      setBusy(true);
+      setError(null);
+      const { ok, data } = await post(`/api/sales/orders/${order.id}/recording-stopped`);
+      setBusy(false);
+      if (!ok) return setError(data.error ?? 'Could not save.');
+    }
+    onContinue();
   }
 
   async function openLink(fresh = false) {
@@ -680,6 +702,9 @@ function TermsStep({
               <dt>Document</dt><dd>{document}</dd>
               <dt>Copy sent to</dt><dd>{summary.emailedTo}</dd>
               <dt>Client record</dt><dd>Saved</dd>
+              {summary.call?.recordingConsentAt && (
+                <><dt>Recording</dt><dd>{summary.call.recording ? 'Attached' : 'To attach'}</dd></>
+              )}
             </dl>
           ) : (
             <div className="text-fg2">…</div>
@@ -692,8 +717,15 @@ function TermsStep({
             </div>
           </div>
         </div>
+        {needsStop && (
+          <label className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-[var(--rule-strong)] bg-[var(--panel)] px-4 py-3.5">
+            <input type="checkbox" className="h-[22px] w-[22px] flex-none accent-[var(--accent)]" checked={stopped} onChange={() => setStopped((s) => !s)} />
+            <span className="text-base font-bold">Recording stopped</span>
+          </label>
+        )}
+        <ErrorLine text={error} />
         <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={onContinue}>Continue</button>
+          <button type="button" className="btn btn-primary" disabled={busy || (needsStop && !stopped)} onClick={continueToPayment}>Continue</button>
         </div>
       </Card>
     );
@@ -701,8 +733,22 @@ function TermsStep({
 
   return (
     <Card>
-      <ol className="flex flex-col gap-2">
-        {terms.script.lines.map((line, i) => (
+      <div className="flex flex-col gap-2.5 rounded-[10px] border border-[var(--rule-strong)] bg-[var(--panel)] p-4">
+        <div className="field-label">Recording notice</div>
+        <p className="m-0 text-base leading-normal text-fg">{terms.script.recordingNotice}</p>
+        <label className="flex cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            className="h-[22px] w-[22px] flex-none accent-[var(--accent)]"
+            checked={consentAt !== null}
+            onChange={() => setConsentAt((at) => (at ? null : new Date().toISOString()))}
+          />
+          <span className="text-base font-bold">Client consented to recording</span>
+        </label>
+      </div>
+
+      <ol className="flex flex-col gap-2" style={consentAt ? undefined : { opacity: 0.5 }}>
+        {spoken.map((line, i) => (
           <li key={i}>
             <label
               className="flex cursor-pointer items-start gap-3 rounded-[10px] border px-3.5 py-3"
@@ -716,6 +762,7 @@ function TermsStep({
                 type="checkbox"
                 className="mt-1 h-5 w-5 flex-none accent-[var(--accent)]"
                 checked={read[i]}
+                disabled={!consentAt}
                 onChange={() => setRead((r) => r.map((v, j) => (j === i ? !v : v)))}
               />
               <span className="text-base leading-normal">{line}</span>
@@ -732,7 +779,7 @@ function TermsStep({
       <ErrorLine text={error} />
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <button type="button" className="btn moto-quiet" onClick={showLink}>Switch to agreement link</button>
-        <button type="button" className="btn btn-primary" disabled={busy || !agreed || !read.every(Boolean)} onClick={accept}>
+        <button type="button" className="btn btn-primary" disabled={busy || !consentAt || !agreed || !read.every(Boolean)} onClick={accept}>
           {busy ? 'Saving…' : 'Accept terms'}
         </button>
       </div>
@@ -747,10 +794,12 @@ function PaymentStep({
   totals,
   termsVersion,
   onOrder,
+  onRecordingRunning,
   onPaid,
   onCancelled,
 }: {
   order: OperatorOrder;
+  onRecordingRunning: () => void;
   totals: TermsView['totals'] | null;
   /** "v5.3": the Terms of Service version the checkout says was accepted. */
   termsVersion: string | null;
@@ -776,6 +825,8 @@ function PaymentStep({
     (async () => {
       const { ok, data } = await post<{ order: OperatorOrder; shortUrl: string }>(`/api/sales/orders/${order.id}/payment`, { method: 'link' });
       if (cancelled) return;
+      // Reopened on Payment with the recording not confirmed stopped: back to that tick.
+      if (data.code === 'recording-running') return onRecordingRunning();
       if (!ok) return setError(data.error ?? 'Could not open a payment link.');
       setError(null);
       setShortUrl(data.shortUrl);

@@ -57,6 +57,8 @@ export function middleware(req: NextRequest) {
   );
 }
 
+// Every API route but one. To hand a body on, Next's middleware adapter reads all of it into
+// memory first, so a video upload can't pass through here. That route runs its own loopback check.
 export const config = {
-  matcher: '/api/:path*',
+  matcher: '/api/((?!manage/agreement/upload/).*)',
 };
