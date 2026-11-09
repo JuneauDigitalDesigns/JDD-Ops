@@ -593,6 +593,14 @@ mappings, replacing the Twilio module with the agency HTTP module (2026-11-02 / 
 `Callback number` column and mapping (2026-11-05), and the Airtable module's dropped-call filter
 (2026-11-08).
 
+**A master mapping added by API runs but doesn't show in Make's editor.** A module's blueprint
+holds what runs (`mapper.record`) and, separately, the form the editor draws (`metadata.expect` and
+`metadata.restore`), and the editor draws that saved form without re-reading Airtable. On 2026-11-09
+`SMS consent` and `Callback number` were writing real rows and were invisible in the module. The
+form can only submit what it drew, so OK is unsafe there; saving the scenario without opening the
+module is not (four such saves left it byte-identical). `checkEditorShowsMappings` makes
+`verify-post-call` fail on this, and `withEditorFields` (`lib/make-editor-fields.js`) is the repair.
+
 **A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
 attach the clone to the master's hook, which already belongs to the master, and refuses with
 `{"detail":"The hook already has a scenario assigned.","code":"IM000"}`. So step 8c creates a

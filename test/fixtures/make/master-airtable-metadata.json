@@ -1,0 +1,210 @@
+{
+  "expect": [
+    {
+      "name": "base",
+      "type": "select",
+      "label": "Base",
+      "required": true
+    },
+    {
+      "name": "typecast",
+      "type": "boolean",
+      "label": "Smart links",
+      "required": true
+    },
+    {
+      "name": "useColumnId",
+      "type": "boolean",
+      "label": "Use Column ID",
+      "required": true
+    },
+    {
+      "name": "table",
+      "type": "select",
+      "label": "Table",
+      "required": true
+    },
+    {
+      "name": "record",
+      "spec": [
+        {
+          "name": "fld8sG3TSj5Va42yI",
+          "time": true,
+          "type": "date",
+          "label": "Date"
+        },
+        {
+          "name": "fldMGK569tnD647g2",
+          "type": "text",
+          "label": "Caller name"
+        },
+        {
+          "name": "fld2smPri8IPvoNwh",
+          "type": "text",
+          "label": "Caller number"
+        },
+        {
+          "name": "fld9ONpSErMn97LP6",
+          "type": "text",
+          "label": "Summary"
+        },
+        {
+          "name": "fldtqHttzKEPSQazh",
+          "type": "number",
+          "label": "Duration (seconds)"
+        },
+        {
+          "mode": "edit",
+          "name": "fld2HEMxzE7SFhniW",
+          "type": "select",
+          "label": "Call type"
+        },
+        {
+          "name": "fld7GZx09e7dnHNIU",
+          "type": "text",
+          "label": "Email"
+        },
+        {
+          "name": "fld3xCSY4BXXEkdMM",
+          "type": "text",
+          "label": "Address"
+        },
+        {
+          "name": "fldxb2nunz4Pt1SJT",
+          "type": "text",
+          "label": "Recording URL"
+        },
+        {
+          "mode": "edit",
+          "name": "fldVbJMLbBiDzEvZF",
+          "type": "select",
+          "label": "Priority"
+        }
+      ],
+      "type": "collection",
+      "label": "Record"
+    }
+  ],
+  "restore": {
+    "expect": {
+      "base": {
+        "label": "Your HVAC Co. — Calls"
+      },
+      "table": {
+        "label": "Call Log",
+        "nested": [
+          {
+            "name": "record",
+            "spec": [
+              {
+                "name": "fld8sG3TSj5Va42yI",
+                "time": true,
+                "type": "date",
+                "label": "Date"
+              },
+              {
+                "name": "fldMGK569tnD647g2",
+                "type": "text",
+                "label": "Caller name"
+              },
+              {
+                "name": "fld2smPri8IPvoNwh",
+                "type": "text",
+                "label": "Caller number"
+              },
+              {
+                "name": "fld9ONpSErMn97LP6",
+                "type": "text",
+                "label": "Summary",
+                "multiline": true
+              },
+              {
+                "name": "fldtqHttzKEPSQazh",
+                "type": "number",
+                "label": "Duration (seconds)"
+              },
+              {
+                "mode": "edit",
+                "name": "fld2HEMxzE7SFhniW",
+                "type": "select",
+                "label": "Call type",
+                "dynamic": true,
+                "options": [
+                  {
+                    "label": "inbound",
+                    "value": "inbound"
+                  },
+                  {
+                    "label": "outbound",
+                    "value": "outbound"
+                  }
+                ],
+                "validate": false
+              },
+              {
+                "name": "fld7GZx09e7dnHNIU",
+                "type": "text",
+                "label": "Email"
+              },
+              {
+                "name": "fld3xCSY4BXXEkdMM",
+                "type": "text",
+                "label": "Address"
+              },
+              {
+                "name": "fldxb2nunz4Pt1SJT",
+                "type": "text",
+                "label": "Recording URL"
+              },
+              {
+                "mode": "edit",
+                "name": "fldVbJMLbBiDzEvZF",
+                "type": "select",
+                "label": "Priority",
+                "dynamic": true,
+                "options": [
+                  {
+                    "label": "emergency",
+                    "value": "emergency"
+                  },
+                  {
+                    "label": "callback",
+                    "value": "callback"
+                  }
+                ],
+                "validate": false
+              }
+            ],
+            "type": "collection",
+            "label": "Record"
+          }
+        ]
+      },
+      "record": {
+        "nested": {
+          "fld2HEMxzE7SFhniW": {
+            "mode": "edit"
+          },
+          "fldVbJMLbBiDzEvZF": {
+            "mode": "edit"
+          }
+        }
+      },
+      "typecast": {
+        "mode": "chose"
+      },
+      "useColumnId": {
+        "mode": "chose"
+      }
+    },
+    "parameters": {
+      "__IMTCONN__": {
+        "data": {
+          "scoped": "true",
+          "connection": "airtable2"
+        },
+        "label": "e2e PAT -7/1"
+      }
+    }
+  }
+}
