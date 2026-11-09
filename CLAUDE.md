@@ -515,6 +515,17 @@ after-call run and nothing in the client's portal. Both halves enforce it:
   Retell's documented never-connected ones, and a newly recorded outcome with no case fails the
   suite.
 
+**A call that drops before anything useful is collected counts the same (operator decision,
+2026-11-08).** Retell analyses it anyway, and an 18-second callback that dropped after the name
+check logged a row and texted the owner. So the master's **Airtable module** carries its own
+complete filter, `postCallGateFilter` in `lib/call-outcomes.js`: connected, and at least one of
+consent answered, emergency, a number, an address, an email, or (inbound only) a name. On a callback
+`caller_name` comes from the opening line, so it proves nothing there. The owner's text is the module
+after the row, so no row means no text. A clone has one filter slot before its row, which is why
+this repeats the connected-call conditions instead of leaving them to the datastore module's filter.
+What the rule gives up: an inbound caller who describes the problem and drops before giving any of
+those leaves no trace.
+
 **Why this replaced "always record".** Recording every submission was itself a fix. The route
 before it placed the callback and persisted nothing, so a callback Retell refused lost the lead
 without a trace. That case is still recorded. But "always record" put an answered callback in the
@@ -560,8 +571,9 @@ clones, and patches *the copy*; cloning stays byte-exact. `npm run fixtures:refr
 `make/master-blueprint.json` and `make/scenario.json` unchanged after a run is the proof.
 Deliberate, operator-approved edits do happen. Each one is re-recorded and committed with its
 reason, so its diff never looks like drift. So far: the SMS consent mapping, the total select
-mappings, replacing the Twilio module with the agency HTTP module (2026-11-02 / 03), and the
-`Callback number` column and mapping (2026-11-05).
+mappings, replacing the Twilio module with the agency HTTP module (2026-11-02 / 03), the
+`Callback number` column and mapping (2026-11-05), and the Airtable module's dropped-call filter
+(2026-11-08).
 
 **A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
 attach the clone to the master's hook, which already belongs to the master, and refuses with

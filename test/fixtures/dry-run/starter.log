@@ -77,9 +77,9 @@
   ? blueprint.fieldsResolve — no credentials to resolve the blueprint or base schema
   ? blueprint.eventFilter — no credentials to resolve the blueprint
   ? blueprint.noDatastore — no credentials to resolve the blueprint
-  ✓ analysis.coversBlueprint — all 6 analysis field(s) the scenario reads are extracted: caller_address, caller_email, sms_consent, caller_name, caller_priority, callback_number
+  ✓ analysis.coversBlueprint — all 6 analysis field(s) the scenario reads are extracted: sms_consent, caller_priority, caller_address, caller_email, callback_number, caller_name
   ✓ blueprint.selectsTotal — all 3 singleSelect mapping(s) can only emit a valid choice
-  ✓ post-call scenario logs only connected calls — 17 call outcomes: connected calls logged, unanswered / voicemail callbacks dropped
+  ✓ post-call scenario logs only connected calls — 26 call outcomes: connected calls with details logged; unanswered, voicemail and dropped calls produce nothing
   ? post-call brief goes through the agency — no credentials to resolve the blueprint, or nothing provisioned yet
   ✓ blueprint.callbackNumber — "Callback number" keeps the number the caller asked to be reached at
   ? airtable.schemaCovers — no credentials to read one of the base schemas

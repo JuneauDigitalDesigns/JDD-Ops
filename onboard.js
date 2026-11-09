@@ -1959,8 +1959,8 @@ function patchPostCallBlueprint(
   // the module it gates entry to, and this one carries `{{1.event}} = call_analyzed` —
   // Retell posts call_started and call_ended to the same webhook, so dropping the module
   // and its filter together would log three rows per call, two of them with no transcript
-  // or summary. So the filter is carried forward onto the next module that doesn't define
-  // one of its own.
+  // or summary. So the filter is carried forward onto the next module, unless that module has
+  // its own, which then has to be complete (`postCallGateFilter`; checkConnectedCallsOnly runs it).
   if (Array.isArray(blueprint.flow)) {
     const kept = [];
     let carriedFilter = null;
@@ -1971,8 +1971,8 @@ function patchPostCallBlueprint(
         removed += 1;
         continue;
       }
-      if (carriedFilter && !mod.filter) {
-        mod.filter = carriedFilter;
+      if (carriedFilter) {
+        if (!mod.filter) mod.filter = carriedFilter;
         carriedFilter = null;
       }
       kept.push(mod);
