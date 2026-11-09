@@ -332,6 +332,24 @@ An API-created agent has voicemail detection OFF
 unless the field is set; the dashboard's hang-up default doesn't apply. On 2026-11-03 the growth
 fixture's agent spent 48 s talking to an unanswered lead's voicemail.
 
+**Every agent's recording links expire** (`SIGNED_RECORDING_SETTINGS` in `lib/voice-consent.js`:
+`opt_in_signed_url: true`, `signed_url_expiration_ms` of 15 minutes). onboard.js sets them at
+creation, `verify-agents` fails an agent without them, and
+`npm run update-prompt -- --slug <slug> --signed-recordings-only` gives them to an existing agent and
+changes nothing else. Normal `update-prompt` runs push them too. Measured 2026-11-09: with this off,
+a `recording_url` and a `public_log_url` open with no login, for good.
+
+**The portal must be deployed first.** Turning this on kills the link Make stores in `Recording URL`
+after 15 minutes. The portal plays recordings through `/api/portal/calls/{recordId}/recording`, which
+checks the account, finds the call in Retell by the row's `Date` (it equals `start_timestamp` to the
+millisecond) and streams the audio, so the vendor's link never reaches a browser. No column or Make
+mapping was added. `Recording URL` is now the fallback for calls Retell can't match, and the sign that
+a row has a recording at all.
+
+**It does not reach back.** Retell keeps serving files made before opt-in without a signature. Those
+links stay valid for anyone who already has one, until the recording is deleted from Retell. The demo
+line is deliberately not opted in: its recordings play in the operator console from the stored link.
+
 **Live calls use the agent's latest draft.** The fixture agent is `is_published: false` at
 version 9, and its calls ran on version 9. So `update-agent` / `update-retell-llm` take effect
 with no publish step.

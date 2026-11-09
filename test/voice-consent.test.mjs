@@ -246,11 +246,15 @@ test('the voicemail hang-up is pushed whatever happens to the prompt', async () 
   // It used to ride inside the consent push, so --prompt-only skipped it and a prompt without the
   // consent ask refused the run before it — i.e. every pre-consent agent, the ones that lacked it.
   const { planAgentUpdate } = await import('../scripts/update-agent-prompt.js');
-  assert.deepEqual(planAgentUpdate({ slug: 'acme' }), { voicemail: true, prompt: true, consent: true });
-  assert.deepEqual(planAgentUpdate({ slug: 'acme', promptOnly: true }), { voicemail: true, prompt: true, consent: false });
-  assert.deepEqual(planAgentUpdate({ slug: 'acme', voicemailOnly: true }), { voicemail: true, prompt: false, consent: false });
+  assert.deepEqual(planAgentUpdate({ slug: 'acme' }), { voicemail: true, signedRecordings: true, prompt: true, consent: true });
+  assert.deepEqual(planAgentUpdate({ slug: 'acme', promptOnly: true }), { voicemail: true, signedRecordings: true, prompt: true, consent: false });
+  assert.deepEqual(planAgentUpdate({ slug: 'acme', voicemailOnly: true }), { voicemail: true, signedRecordings: false, prompt: false, consent: false });
+  // The way to give an existing agent signed links and touch nothing else on it.
+  assert.deepEqual(planAgentUpdate({ slug: 'acme', signedRecordingsOnly: true }), { voicemail: false, signedRecordings: true, prompt: false, consent: false });
   // JDD's own demo line is not a client callback agent.
   assert.equal(planAgentUpdate({ file: 'demo/agent-prompt.txt' }).voicemail, false);
+  // The demo line's recordings play in the operator console from the stored link, so it stays out.
+  assert.equal(planAgentUpdate({ file: 'demo/agent-prompt.txt' }).signedRecordings, false);
 });
 
 test('the voicemail push runs before the prompt is read or checked', () => {
@@ -261,6 +265,35 @@ test('the voicemail push runs before the prompt is read or checked', () => {
   assert.ok(vm > 0, 'voicemail is pushed on its own');
   assert.ok(vm < main.indexOf('readFileSync(promptPath'), 'before the prompt is read');
   assert.ok(vm < main.indexOf('checkPromptHasConsentAsk('), 'before the consent check can refuse');
+});
+
+test('signed recording links are pushed before the prompt is read or checked', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts/update-agent-prompt.js'), 'utf8');
+  const main = src.slice(src.indexOf('async function main()'));
+  const push = main.indexOf('patch: SIGNED_RECORDING_SETTINGS');
+  assert.ok(push > 0, 'pushed on its own');
+  assert.ok(push < main.indexOf('readFileSync(promptPath'), 'before the prompt is read');
+  assert.ok(push < main.indexOf('checkPromptHasConsentAsk('), 'before the consent check can refuse');
+});
+
+test('the repair allow-list accepts the signed recording settings', async () => {
+  // A key missing here makes the push refuse with "Not settable", before any request is made.
+  const { setRetellAgentConfig } = await import('../lib/repair-ops.js');
+  const { SIGNED_RECORDING_SETTINGS } = await import('../lib/voice-consent.js');
+  const realFetch = globalThis.fetch;
+  const sent = [];
+  globalThis.fetch = async (url, init = {}) => {
+    sent.push({ url: String(url), method: init.method ?? 'GET', body: init.body });
+    return Response.json(init.method === 'PATCH' ? JSON.parse(init.body) : { opt_in_signed_url: false });
+  };
+  try {
+    const res = await setRetellAgentConfig({ apiKey: 'k', agentId: 'a', patch: SIGNED_RECORDING_SETTINGS });
+    assert.equal(res.ok, true, res.reason);
+    assert.deepEqual(res.after, SIGNED_RECORDING_SETTINGS);
+    assert.deepEqual(JSON.parse(sent.at(-1).body), SIGNED_RECORDING_SETTINGS);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('the repair allow-list accepts voicemail_option (and still refuses anything else)', async () => {
