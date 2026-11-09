@@ -92,6 +92,7 @@ import {
   checkPromptHasConsentAsk,
   checkSelectMappingsTotal,
   checkCallbackNumberColumn,
+  checkEditorShowsMappings,
   checkPromptParity,
   checkOwnerBriefViaAgency,
   checkConnectedCallsOnly,
@@ -119,6 +120,7 @@ import {
   PROMPT_SECTIONS,
 } from './lib/voice-consent.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
+import { remapEditorFields } from './lib/make-editor-fields.js';
 // Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
 import { CALL_OUTCOME_CASES, shouldLog } from './lib/call-outcomes.js';
 
@@ -1930,6 +1932,21 @@ function patchPostCallBlueprint(
         }
 
         mod.mapper.record = remapped;
+        // The form Make's editor draws uses the same base-scoped ids, so it moves too.
+        remapEditorFields(mod, {
+          masterMap,
+          clientMap,
+          fields: [
+            ...CALL_LOG_FIELDS,
+            ...(clientMap.byName.Site
+              ? [
+                  clientMap.choices?.Site
+                    ? { name: 'Site', type: 'singleSelect', options: { choices: clientMap.choices.Site.map((name) => ({ name })) } }
+                    : { name: 'Site', type: 'singleLineText' },
+                ]
+              : []),
+          ],
+        });
         if (dropped.length) {
           warn(`  ⚠ Dropped unmapped Airtable column(s): ${dropped.join(', ')} — add them to createAirtableBase.`);
         }
@@ -2196,6 +2213,7 @@ async function runCorrectnessChecks({ envLines, plan, webOnly, twilioNumber, pho
         cases: CALL_OUTCOME_CASES,
         shouldLog,
       }),
+      checkEditorShowsMappings({ blueprint: preview?.blueprint ?? null, fieldMap: preview?.clientMap ?? null }),
       checkOwnerBriefViaAgency({
         blueprint: preview?.blueprint ?? null,
         ingestToken: readEnvLocal(clientDir).LEAD_INGEST_TOKEN || '',
