@@ -600,6 +600,8 @@ holds what runs (`mapper.record`) and, separately, the form the editor draws (`m
 form can only submit what it drew, so OK is unsafe there; saving the scenario without opening the
 module is not (four such saves left it byte-identical). `checkEditorShowsMappings` makes
 `verify-post-call` fail on this, and `withEditorFields` (`lib/make-editor-fields.js`) is the repair.
+The form's field ids are base-scoped like the mappings, so `patchPostCallBlueprint` moves it to the
+client's ids (`remapEditorFields`). Until it did, every clone's editor listed the master's ids.
 
 **A webhook-triggered scenario cannot be cloned without supplying a new hook.** Make tries to
 attach the clone to the master's hook, which already belongs to the master, and refuses with

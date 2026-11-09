@@ -12,12 +12,18 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { CALL_LOG_FIELDS } from '../lib/call-log-fields.js';
 import { checkEditorShowsMappings } from '../lib/onboard-checks.js';
 import { savedFieldLists, withEditorFields } from '../lib/make-editor-fields.js';
+import { fieldMapFromSpec } from '../lib/onboard-checks.js';
+import { rebuildCloneBlueprint } from '../lib/post-call-repatch.js';
 import { loadFixture, masterBlueprint, masterFieldMap } from './helpers/fixtures.mjs';
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fieldMap = masterFieldMap();
 const SMS = fieldMap.byName['SMS consent'];
 const CALLBACK = fieldMap.byName['Callback number'];
@@ -110,3 +116,73 @@ test('a blueprint without metadata is "could not check", never a pass', () => {
   assert.equal(check(masterBlueprint()).ok, null, 'the scrubbed fixture has no metadata');
   assert.equal(checkEditorShowsMappings({ blueprint: null, fieldMap }).ok, null);
 });
+
+/* ── what a clone's editor draws ────────────────────────────────────────── */
+
+const isAirtable = (m) => (m.module ?? '').startsWith('airtable');
+const clientSpec = (extra = []) => fieldMapFromSpec([...CALL_LOG_FIELDS, ...extra], { tableId: 'tblCLIENT00000001' });
+
+/** A clone built by the real path, from the master WITH its recorded form. */
+function buildClone({ clientMap = clientSpec(), siteTag = null } = {}) {
+  const master = drifted().bp;
+  const clone = masterBlueprint();
+  clone.flow[0].parameters = { ...clone.flow[0].parameters, hook: 3013197 };
+  const next = rebuildCloneBlueprint({ clone, master, baseId: 'appCLIENTbase0001', siteTag, ingestToken: '9'.repeat(64), masterMap: fieldMap, clientMap });
+  return { next, clientMap, mod: next.flow.find(isAirtable) };
+}
+
+test("a clone's saved list names its own base's columns, and its editor shows every mapping", () => {
+  // Found 2026-11-09: patchPostCallBlueprint remapped mapper.record and left metadata as the
+  // master's ids, so all 12 of each clone's mapped columns were missing from its editor.
+  const { next, clientMap, mod } = buildClone();
+  const c = checkEditorShowsMappings({ blueprint: next, fieldMap: clientMap });
+  assert.equal(c.ok, true, c.detail);
+  for (const list of Object.values(savedFieldLists(mod))) {
+    assert.equal(list.length, Object.keys(mod.mapper.record).length);
+    for (const entry of list) assert.equal(clientMap.byId[entry.name], entry.label, `${entry.label} points at another base`);
+  }
+});
+
+test('a clone keeps each entry as the master described it, under its own id', () => {
+  const { clientMap, mod } = buildClone();
+  const { restore } = savedFieldLists(mod);
+  const master = savedFieldLists(drifted().mod).restore.find((e) => e.label === 'Priority');
+  assert.deepEqual(restore.find((e) => e.label === 'Priority'), { ...master, name: clientMap.byName.Priority });
+});
+
+test("a clone's mapped selects stay in edit mode, under its own ids", () => {
+  const { clientMap, mod } = buildClone();
+  const nested = mod.metadata.restore.expect.record.nested;
+  assert.deepEqual(Object.keys(nested).sort(), ['Call type', 'Priority', 'SMS consent'].map((n) => clientMap.byName[n]).sort());
+});
+
+test('the master is not touched by building a clone from it', () => {
+  const { bp } = drifted();
+  const before = structuredClone(bp);
+  const clone = masterBlueprint();
+  rebuildCloneBlueprint({ clone, master: bp, baseId: 'appCLIENTbase0001', ingestToken: '9'.repeat(64), masterMap: fieldMap, clientMap: clientSpec() });
+  assert.deepEqual(bp, before);
+});
+
+test("an enterprise clone's Site column shows too", () => {
+  const site = { name: 'Site', type: 'singleSelect', options: { choices: [{ name: 'site-1' }] } };
+  const { next, clientMap, mod } = buildClone({ clientMap: clientSpec([site]), siteTag: 'site-1' });
+  const c = checkEditorShowsMappings({ blueprint: next, fieldMap: clientMap });
+  assert.equal(c.ok, true, c.detail);
+  assert.ok(savedFieldLists(mod).expect.some((e) => e.label === 'Site'));
+});
+
+test("a saved list naming another base's columns is caught, even when nothing is missing", () => {
+  const { next, clientMap, mod } = buildClone();
+  savedFieldLists(mod).expect.push({ name: 'fldMASTERonly00000', type: 'text', label: 'Caller name' });
+  const c = checkEditorShowsMappings({ blueprint: next, fieldMap: clientMap });
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /another base/);
+});
+
+test('re-patch and the dry run both hold a clone to this', () => {
+  const repatch = readFileSync(resolve(ROOT, 'scripts/repatch-post-call.js'), 'utf8');
+  assert.match(repatch, /checkEditorShowsMappings\(\{ blueprint, fieldMap: clientMap \}\)/);
+  assert.match(readFileSync(resolve(ROOT, 'onboard.js'), 'utf8'), /checkEditorShowsMappings\(/);
+});
+
