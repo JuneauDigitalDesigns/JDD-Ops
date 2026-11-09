@@ -332,6 +332,23 @@ An API-created agent has voicemail detection OFF
 unless the field is set; the dashboard's hang-up default doesn't apply. On 2026-11-03 the growth
 fixture's agent spent 48 s talking to an unanswered lead's voicemail.
 
+**The AI statement is a per-client choice, not a prompt edit.** Contract v5.4: on a client's
+written request, the agent says near the start of each call that it is an AI. The Voice agent tab
+turns it on or off per site. The sentence is `aiStatementSentence` in `lib/voice-consent.js`,
+approved word for word on 2026-11-09; don't reword it without sign-off.
+- It is **one managed line at the top of GREETING**, written by `lib/ai-statement.js`. Not
+  `begin_message`, which stays the approved disclosure and can't reach outbound callbacks. Not a
+  `##` section, which `checkPromptParity` would fail. The model speaks it, so it is not guaranteed
+  verbatim the way `begin_message` is.
+- The choice is `ai-statement.json` beside `agent-prompt.txt` (each `site-N` has its own). Every
+  prompt writer goes through `applyStoredAiStatement`: `generateRetellPrompt` (so `regenerate-prompt`
+  and an onboard.js re-run), `update-prompt` and the console's editor. **A new writer must too.**
+  An unreadable file refuses the write, because read as "off" it would strip the line.
+- The control reads the LLM the agent is actually bound to, shows the exact change, refuses the
+  master (and refuses if it can't tell which LLM is the master), and refuses if the live prompt
+  moved after the preview. The file gets the same edit to its own text, so drift stays visible.
+  Off gives both back byte for byte. `verify-agents` reports on/off and fails on any mismatch.
+
 **Every agent's recording links expire** (`SIGNED_RECORDING_SETTINGS` in `lib/voice-consent.js`:
 `opt_in_signed_url: true`, `signed_url_expiration_ms` of 15 minutes). onboard.js sets them at
 creation, `verify-agents` fails an agent without them, and
@@ -461,7 +478,7 @@ shell at `/manage/{slug}/{section}` (enterprise site selection rides on `?site=`
 | Overview | Health tiles (deploy, domain attached+verified, env drift) + recent activity |
 | Environment | Edit `.env.local` → push to Vercel → redeploy |
 | Deployments | Last 10 builds, redeploy |
-| Voice agent | Edit `agent-prompt.txt`, push to the client's Retell LLM (any client with a receptionist, i.e. every tier except web-only) |
+| Voice agent | Edit `agent-prompt.txt`, push to the client's Retell LLM, turn the AI statement on or off (any client with a receptionist, i.e. every tier except web-only) |
 | Portal | Which account the client signs in with; attach/repair |
 
 Things worth knowing:

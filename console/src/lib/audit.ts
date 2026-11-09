@@ -30,6 +30,7 @@ export type AuditAction =
   | 'portal.detach'
   | 'agent.prompt.save'
   | 'agent.prompt.push'
+  | 'agent.ai_statement'
   | 'domain.add'
   | 'domain.verify'
   | 'canonical.set'

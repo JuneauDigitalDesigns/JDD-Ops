@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle, CloudArrowUp, FloppyDisk, Info, Question, SpinnerGap, Warning, XCircle } from '@phosphor-icons/react';
 import { useManage } from './ManageContext';
 import SectionHeader from './SectionHeader';
+import AiStatementPanel from './AiStatementPanel';
 
 /**
  * The Retell agent prompt.
@@ -110,16 +111,22 @@ export default function VoiceAgentSection() {
         pushed?: boolean;
         pushError?: string;
         llmId?: string;
+        prompt?: string;
+        aiStatementChange?: string | null;
         error?: string;
       };
       if (body.error) {
         setResult({ ok: false, text: body.error });
         return;
       }
-      setOriginal(prompt);
-      if (body.pushError) setResult({ ok: false, text: `Saved to disk, but the push failed: ${body.pushError}` });
-      else if (body.pushed) setResult({ ok: true, text: `Saved and pushed to Retell LLM ${body.llmId}.` });
-      else setResult({ ok: true, text: 'Saved to agent-prompt.txt. Not pushed to Retell yet.' });
+      // What was written, which differs from what was typed if the AI statement line was restored.
+      const written = body.prompt ?? prompt;
+      setPrompt(written);
+      setOriginal(written);
+      const note = body.aiStatementChange ? ` AI statement ${body.aiStatementChange}, per this client's setting.` : '';
+      if (body.pushError) setResult({ ok: false, text: `Saved to disk, but the push failed: ${body.pushError}${note}` });
+      else if (body.pushed) setResult({ ok: true, text: `Saved and pushed to Retell LLM ${body.llmId}.${note}` });
+      else setResult({ ok: true, text: `Saved to agent-prompt.txt. Not pushed to Retell yet.${note}` });
     } catch (err) {
       setResult({ ok: false, text: err instanceof Error ? err.message : 'Save failed.' });
     } finally {
@@ -169,6 +176,8 @@ export default function VoiceAgentSection() {
           )}
         </span>
       </div>
+
+      <AiStatementPanel blocked={dirty || busy !== null} onChanged={() => void load()} />
 
       {result && (
         <div
