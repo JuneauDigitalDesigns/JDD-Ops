@@ -24,7 +24,10 @@ export async function GET(req: Request) {
   }
 
   const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 10) || 10, 1), 50);
+  // `target=any` includes preview builds: the studio's deploy dialog looks for the build of the
+  // commit it just pushed, and a push to a non-production branch is still a build to show.
+  const deployTarget = url.searchParams.get('target') === 'any' ? null : 'production';
   const { listDeployments } = await loadVercelSync();
   // listDeployments never throws — a missing project comes back as { ok:false, reason }.
-  return NextResponse.json(await listDeployments(target.resolved.site.slug, { limit }));
+  return NextResponse.json(await listDeployments(target.resolved.site.slug, { limit, target: deployTarget }));
 }

@@ -329,6 +329,7 @@ export default function PageStudio({
             effective={effective}
             lockedSlug={slug}
             onClose={() => setLaunchOpen(false)}
+            onDeploy={alreadyDeployed ? () => { setLaunchOpen(false); setDeployOpen(true); } : undefined}
           />
         )}
       </AnimatePresence>

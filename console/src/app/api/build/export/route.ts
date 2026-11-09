@@ -20,8 +20,17 @@ import {
   verifyCatalogImports,
   verifyUiPinsFor,
   verifyUiLockFor,
+  verifyRepoUiLockFor,
   type Entry,
 } from '@/lib/export';
+import {
+  checkRepoFormRoutePairing,
+  decideUpgrade,
+  describeUpgrade,
+  planSharedLibUpgrade,
+  type SharedLibUpgrade,
+} from '@/lib/sharedLibs';
+import { loadUiPinRules } from '@/lib/uiPinRules';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
 import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import type { SiteContent } from '@/data/site';
@@ -43,6 +52,8 @@ const GIT_TIMEOUT_MS = 30_000;
 const PUSH_TIMEOUT_MS = 120_000;
 /** Cadence for keeping the stream (and the client's idle watchdog) alive during npm steps. */
 const HEARTBEAT_MS = 10_000;
+/** What runNpm will put on a shell command line besides its own literals: no spaces, quotes or metacharacters. */
+const SHELL_SAFE_ARG = /^[A-Za-z0-9:_./#-]+$/;
 
 /**
  * Fill empty/preset-picsum image slots with the vertical's curated stock and record what was
@@ -96,6 +107,11 @@ type Body = {
   deploy?: boolean;
   /** Written verbatim as the commit message. Required when `deploy` is set. */
   commitMessage?: string;
+  /**
+   * The shared-library update the operator confirmed, exactly as /api/build/export/plan showed
+   * it. Applied only when it names the update that is due right now; see confirmsUpgrade.
+   */
+  uiUpgrade?: { from?: string; to?: string };
 };
 
 export async function POST(req: Request) {
@@ -116,7 +132,7 @@ export async function POST(req: Request) {
   }
 
   const slug = (body.slug ?? '').trim();
-  const overwrite = Boolean(body.overwrite);
+  const overwriteRequested = Boolean(body.overwrite);
   const selections = Array.isArray(body.selections) ? body.selections : [];
   // Multi-page export path when a composition is supplied; else the legacy single-page path.
   const composition = body.composition && typeof body.composition === 'object' && Array.isArray(body.composition.pages)
@@ -148,7 +164,7 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
       const step = (message: string) => send({ type: 'step', message });
       /** Set once a push succeeds, so `done` can report what actually reached the remote. */
-      let pushed: { branch: string; sha: string | null } | null = null;
+      let pushed: { branch: string; sha: string | null; fullSha: string | null } | null = null;
 
       try {
         if (!slug) throw new Error('Choose or name a client first.');
@@ -222,6 +238,44 @@ export async function POST(req: Request) {
         }
 
         /**
+         * The shared-library update, decided BEFORE anything is written.
+         *
+         * A repo whose @jdd/ui is behind the template's used to get as far as rewriting site.ts,
+         * the routes and the components before the pin check refused it, which left the repo
+         * half-exported on disk. Now an unconfirmed update stops here with nothing changed, and
+         * hands the dialog the exact list to show. A confirmed one must name this very update:
+         * if the template moved since the dialog opened, the operator never saw the new target.
+         */
+        let upgrade: SharedLibUpgrade | null = null;
+        if (repoExists(repoRoot, slug)) {
+          const decision = decideUpgrade(
+            planSharedLibUpgrade({
+              opsRoot: repoRoot,
+              repoDir: repoDirFor(repoRoot, slug),
+              rules: await loadUiPinRules(),
+            }),
+            body.uiUpgrade,
+          );
+          if (decision.kind === 'refuse') {
+            const due = decision.plan;
+            send({
+              type: 'error',
+              message: `This client’s repo uses @jdd/ui ${due.fromTag ?? due.from}; the template uses ${due.toTag ?? due.to}. Nothing was changed.`,
+              detail: `Pending shared-library update:\n${describeUpgrade(due)}`,
+              next: 'Tick “Update shared libraries” to confirm the changes listed, then run this again.',
+              uiUpgrade: due,
+            });
+            return;
+          }
+          if (decision.kind === 'apply') upgrade = decision.plan;
+        }
+        if (upgrade) {
+          step(
+            `Updating shared libraries (confirmed): @jdd/ui ${upgrade.fromTag ?? upgrade.from} → ${upgrade.toTag ?? upgrade.to}, with src/lib refreshed from the template.`,
+          );
+        }
+
+        /**
          * Snapshot what PROVISIONING put in this repo's site.ts, before anything overwrites it.
          *
          * Must happen before `copyTemplate`: `src/data/site.ts` is in TEMPLATE_OWNED_FILES, so
@@ -248,8 +302,10 @@ export async function POST(req: Request) {
           return merged;
         };
 
-        // 1. Copy (or reuse) the template repo.
+        // 1. Copy (or reuse) the template repo. A confirmed update refreshes the template-owned
+        //    files too: the new @jdd/ui is only half an update while src/lib is the old shims.
         const existed = repoExists(repoRoot, slug);
+        const overwrite = overwriteRequested || upgrade !== null;
         if (existed && !overwrite) {
           step(`Found an existing repo at clients/${slug}/repo — reusing it and refreshing components…`);
         } else if (existed && overwrite) {
@@ -278,6 +334,47 @@ export async function POST(req: Request) {
         const merged = mergePackageJson(repoRoot, slug);
         if (merged.added.length > 0) {
           step(`Added ${merged.added.length} new dependency/ies from the template: ${merged.added.join(', ')}.`);
+        }
+
+        const repoDir = repoDirFor(repoRoot, slug);
+        const beat = () => send({ type: 'heartbeat', at: Date.now() });
+
+        // 1a3. The confirmed @jdd/ui move, the way onboard.js's refreshUiPin makes it: the spec is
+        //      named on the command line, because npm does not re-resolve a github: dependency
+        //      when only the tag in package.json moves. This writes package.json and the lockfile
+        //      and installs everything else, so step 4's plain install is skipped after it.
+        let installed = false;
+        if (upgrade) {
+          step(`Installing @jdd/ui ${upgrade.toTag ?? upgrade.to} with a lockfile (this can take a minute)…`);
+          const pinBeat = setInterval(beat, HEARTBEAT_MS);
+          const pin = await runNpm({ install: upgrade.to }, repoDir, { timeoutMs: NPM_TIMEOUT_MS }).finally(
+            () => clearInterval(pinBeat),
+          );
+          if (pin.code !== 0) {
+            send({
+              type: 'error',
+              message: pin.timedOut
+                ? `Installing @jdd/ui ${upgrade.toTag} ran for 10 minutes and was stopped. Nothing was committed or pushed.`
+                : `Installing @jdd/ui ${upgrade.toTag} failed. Nothing was committed or pushed.`,
+              detail: pin.tail,
+              next: `The repo’s files were rewritten but nothing was committed. Check that this machine can fetch ${upgrade.to}, then run this again.`,
+            });
+            return;
+          }
+          installed = true;
+          // The lock npm just wrote is what gets committed, so it must resolve the tag's commit.
+          const repoLock = await verifyRepoUiLockFor(repoRoot, slug);
+          for (const why of repoLock.uncheckable) step(`Note: ${why}`);
+          if (repoLock.problems.length > 0) {
+            send({
+              type: 'error',
+              message: 'The client repo’s new lockfile does not resolve the @jdd/ui version its package.json pins. Nothing was committed or pushed.',
+              detail: repoLock.problems.map((p) => p.message).join('\n'),
+              next: 'Nothing was pushed. Run this again; if it repeats, the tag on github.com/JuneauDigitalDesigns/jdd-ui has moved and needs a developer.',
+            });
+            return;
+          }
+          step(`@jdd/ui is now ${upgrade.toTag ?? upgrade.to} in package.json and package-lock.json.`);
         }
 
         // 1b. Install the content schema into the new repo. Priority: the edited content from
@@ -373,6 +470,7 @@ export async function POST(req: Request) {
             detail:
               locks.problems.map((p) => p.message).join('\n') +
               '\n\nnpm does not re-resolve a github: dependency when only the tag moves, so editing the pin and running "npm install" is not enough — the spec has to be passed explicitly.',
+            next: 'Needs a developer: the lockfile is in jdd-ops (template/ or console/), not the client repo. Once it is fixed and the console rebuilt, run this again.',
           });
           return;
         }
@@ -391,8 +489,11 @@ export async function POST(req: Request) {
               libProblems.map((p) => p.message).join('\n') +
               '\n\n' +
               (stale
-                ? 'Fix: bump "@jdd/ui" in the client repo’s package.json to match template/package.json, then export again with “overwrite” enabled (which refreshes the repo’s src/lib from template/). package.json is not template-owned, so the export will not change the pin for you.'
+                ? 'The repo’s src/lib is an older copy than template/src/lib. An export with overwrite refreshes it from the template.'
                 : 'Fix: most shared libs are re-export shims of @jdd/ui — add the missing export there, tag it, and bump the "@jdd/ui" pin in both template/package.json and console/package.json. For a lib that is a real file rather than a shim, copy the missing export(s) from console/src/lib into template/src/lib. Then export again.'),
+            next: stale
+              ? 'Tick “Overwrite the existing repo with a fresh template copy” and run this again (Deploy always overwrites).'
+              : 'Needs a developer: the template is missing what the component imports. Once it is fixed, run this again.',
           });
           return;
         }
@@ -406,27 +507,43 @@ export async function POST(req: Request) {
           wirePage(repoRoot, slug, entries);
         }
 
-        const repoDir = repoDirFor(repoRoot, slug);
-
-        // 4. Install dependencies.
+        // 4. Install dependencies (already done by the confirmed @jdd/ui install, when there was one).
         //    Heartbeats keep the NDJSON stream (and the client's idle watchdog) alive across a
         //    step that can legitimately run for minutes without saying anything.
-        step('Installing dependencies (this can take a minute)…');
-        const beat = () => send({ type: 'heartbeat', at: Date.now() });
-        const installBeat = setInterval(beat, HEARTBEAT_MS);
-        const install = await runNpm('install', repoDir, { timeoutMs: NPM_TIMEOUT_MS }).finally(
-          () => clearInterval(installBeat),
-        );
-        if (install.code !== 0) {
+        if (!installed) {
+          step('Installing dependencies (this can take a minute)…');
+          const installBeat = setInterval(beat, HEARTBEAT_MS);
+          const install = await runNpm('install', repoDir, { timeoutMs: NPM_TIMEOUT_MS }).finally(
+            () => clearInterval(installBeat),
+          );
+          if (install.code !== 0) {
+            send({
+              type: 'error',
+              message: install.timedOut
+                ? 'Dependency install ran for 10 minutes without finishing and was stopped. Nothing was committed or pushed.'
+                : 'Dependency install failed. Nothing was committed or pushed.',
+              detail: install.tail,
+              next: 'Nothing was pushed. Check this machine’s network and npm access, then run this again.',
+            });
+            return;
+          }
+        }
+
+        // 4b. The lead form and /api/contact must agree before anything is built or shipped.
+        //     The route was just rewritten from lib/site-routes (step 1a), exactly as onboard.js
+        //     writes it; the form is whatever @jdd/ui the repo really installed. A repo whose pin
+        //     is a branch, or whose lock resolves an older commit, gets here with a mismatch.
+        const pairing = checkRepoFormRoutePairing(repoDir);
+        if (!pairing.ok) {
           send({
             type: 'error',
-            message: install.timedOut
-              ? 'Dependency install ran for 10 minutes without finishing and was stopped. Nothing was committed or pushed.'
-              : 'Dependency install failed.',
-            detail: install.tail,
+            message: 'The site’s lead form and its /api/contact route don’t match, so this would not be safe to deploy. Nothing was committed or pushed.',
+            detail: pairing.reason,
+            next: 'Open this client again and use “Update shared libraries” if it is offered. If it is not, the repo’s @jdd/ui pin is not a version tag and needs a developer.',
           });
           return;
         }
+        step(`Checked the lead form against /api/contact: both use AI-call consent “${pairing.version}”.`);
 
         // 5. Build to verify it compiles.
         step('Building the site to make sure everything compiles…');
@@ -439,8 +556,9 @@ export async function POST(req: Request) {
             type: 'error',
             message: build.timedOut
               ? 'The build ran for 10 minutes without finishing and was stopped. Nothing was committed or pushed.'
-              : 'The site was assembled but the build failed — see details below.',
+              : 'The site was assembled but the build failed — see details below. Nothing was committed or pushed.',
             detail: build.tail,
+            next: 'Nothing was pushed. Change the section or file the build log names, then run this again.',
           });
           return;
         }
@@ -466,6 +584,7 @@ export async function POST(req: Request) {
                 `clients/${slug}/repo/src/app/api/contact/route.ts is byte-identical to template/src/app/api/contact/route.ts.\n\n` +
                 'The real route is owned by provisioning (jdd-ops/lib/site-routes/contact.route.ts). ' +
                 'It should have been restored automatically — if you are seeing this, lib/site-routes is missing from the ops root.',
+              next: 'Needs a developer: restore jdd-ops/lib/site-routes, then Deploy again.',
             });
             return;
           }
@@ -485,6 +604,7 @@ export async function POST(req: Request) {
             send({
               type: 'error',
               message: `clients/${slug}/repo is not a git repository, so there is nothing to deploy.`,
+              next: 'The site was built but not committed. Provisioning (onboard.js) creates the GitHub repo; once it has run for this client, Deploy again.',
             });
             return;
           }
@@ -493,6 +613,7 @@ export async function POST(req: Request) {
               type: 'error',
               message: 'Refusing to deploy: this folder is not its own git repository.',
               detail: `git resolves clients/${slug}/repo to ${target.toplevel}. Committing here would commit and push THAT repository, not the client's. Run \`git init\` in the client repo and set its origin — onboard.js normally does this during provisioning.`,
+              next: 'Nothing was committed. Provisioning (onboard.js) gives the client repo its own git repository; once it has, Deploy again.',
             });
             return;
           }
@@ -501,6 +622,7 @@ export async function POST(req: Request) {
               type: 'error',
               message: `clients/${slug}/repo has no \`origin\` remote — there is nowhere to push to.`,
               detail: 'Provisioning normally creates the GitHub repo and sets origin.',
+              next: 'Nothing was committed. Once provisioning (onboard.js) has set origin for this client, Deploy again.',
             });
             return;
           }
@@ -528,6 +650,7 @@ export async function POST(req: Request) {
                 `  git fetch origin\n` +
                 `  git rebase origin/${target.remoteBranch}\n\n` +
                 `Then deploy again.`,
+              next: 'Run the three commands above, then re-check and Deploy again.',
             });
             return;
           }
@@ -538,7 +661,12 @@ export async function POST(req: Request) {
           step('Committing the change…');
           const add = await runGit(repoDir, ['add', '-A'], { timeout: GIT_TIMEOUT_MS });
           if (add.code !== 0) {
-            send({ type: 'error', message: 'git add failed.', detail: gitTail(add) });
+            send({
+              type: 'error',
+              message: 'git add failed. Nothing was committed or pushed.',
+              detail: gitTail(add),
+              next: `Check clients/${slug}/repo with \`git status\` (a stale .git/index.lock is the usual cause), then Deploy again.`,
+            });
             return;
           }
 
@@ -553,7 +681,12 @@ export async function POST(req: Request) {
           const commitOut = gitTail(commit);
           const nothingToCommit = /nothing to commit|working tree clean/i.test(commitOut);
           if (commit.code !== 0 && !nothingToCommit) {
-            send({ type: 'error', message: 'git commit failed.', detail: commitOut });
+            send({
+              type: 'error',
+              message: 'git commit failed. Nothing was pushed.',
+              detail: commitOut,
+              next: `Check clients/${slug}/repo with \`git status\`, then Deploy again.`,
+            });
             return;
           }
 
@@ -593,6 +726,7 @@ export async function POST(req: Request) {
                 ? 'The push ran for two minutes without finishing and was stopped. The commit is still here locally; the live site is unchanged.'
                 : 'Committed locally, but the push failed — the live site is unchanged. Check the repo’s remote and credentials.',
               detail: redact(gitTail(push), token),
+              next: 'The commit is saved in the client repo. Deploy again to retry the push.',
             });
             return;
           }
@@ -614,6 +748,8 @@ export async function POST(req: Request) {
           pushed = {
             branch: target.remoteBranch,
             sha: sync?.headSha ? sync.headSha.slice(0, 7) : null,
+            // The full sha, so the dialog can find this exact build in Vercel's deployment list.
+            fullSha: sync?.headSha ?? null,
           };
           step(`Pushed ${pushed.sha ?? ''} to origin/${target.remoteBranch}.`);
         }
@@ -630,7 +766,11 @@ export async function POST(req: Request) {
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown export error.';
-        send({ type: 'error', message });
+        send({
+          type: 'error',
+          message,
+          next: 'Nothing was pushed. Fix what the message names and run this again.',
+        });
       } finally {
         // The SINGLE place this stream is closed. The failure branches above only `return`
         // — they used to close here too, and closing twice throws ERR_INVALID_STATE
@@ -668,10 +808,16 @@ export async function POST(req: Request) {
  * cmd.exe and leave the `node`/`next build` process beneath it running.
  */
 function runNpm(
-  script: 'install' | 'run build',
+  script: 'install' | 'run build' | { install: string },
   cwd: string,
   opts: { timeoutMs: number; onOutput?: (line: string) => void },
 ): Promise<{ code: number; tail: string; timedOut: boolean }> {
+  // The one argument that isn't a source literal: an @jdd/ui spec read from template/package.json.
+  // planSharedLibUpgrade already refused anything else; this is the second lock on the same door,
+  // because what follows is a shell.
+  if (typeof script === 'object' && !SHELL_SAFE_ARG.test(script.install)) {
+    return Promise.resolve({ code: 1, tail: `Refused to install "${script.install}".`, timedOut: false });
+  }
   return new Promise((resolvePromise) => {
     // Strip NODE_ENV so it doesn't leak `development` from the dev server into the child.
     // Unset means: `npm install` still pulls devDependencies (needed to compile), and
@@ -679,7 +825,8 @@ function runNpm(
     // static prerender with a null `useContext` dispatcher.
     const { NODE_ENV: _drop, ...strippedEnv } = process.env;
     const env = strippedEnv as NodeJS.ProcessEnv;
-    const args = script === 'install' ? ['install'] : ['run', 'build'];
+    const args =
+      typeof script === 'object' ? ['install', script.install] : script === 'install' ? ['install'] : ['run', 'build'];
     const child = spawn('npm', args, { cwd, shell: true, env, windowsHide: true });
 
     const lines: string[] = [];
