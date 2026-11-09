@@ -18,6 +18,7 @@ export type SectionId =
   | 'voice-agent'
   | 'messaging'
   | 'portal'
+  | 'agreement'
   | 'featured'
   | 'danger';
 
@@ -27,7 +28,7 @@ export interface ManageSection {
   /** One line under the section title. */
   lede: string;
   /** Key into ManageRail's icon map. */
-  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'chat' | 'portal' | 'warning' | 'quotes';
+  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'chat' | 'portal' | 'agreement' | 'warning' | 'quotes';
   /** Which plans get this section. */
   plans: Plan[];
   /** Rendered visually apart, after a spacer and rule, with a danger-toned icon. */
@@ -93,6 +94,13 @@ export const MANAGE_SECTIONS: ManageSection[] = [
     label: 'Portal',
     lede: 'Which account this client signs into the portal with.',
     icon: 'portal',
+    plans: ALL,
+  },
+  {
+    id: 'agreement',
+    label: 'Agreement',
+    lede: 'Accepted terms from a phone close, the call, and its recording.',
+    icon: 'agreement',
     plans: ALL,
   },
   {

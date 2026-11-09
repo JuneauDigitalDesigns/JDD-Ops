@@ -9,6 +9,7 @@ import {
   Lock,
   Microphone,
   ChatCircleText,
+  FileText,
   Quotes,
   RocketLaunch,
   Sliders,
@@ -41,6 +42,7 @@ const ICONS: Record<ManageSection['icon'], Icon> = {
   microphone: Microphone,
   chat: ChatCircleText,
   portal: UserCircle,
+  agreement: FileText,
   warning: Warning,
   quotes: Quotes,
 };
