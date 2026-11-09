@@ -29,6 +29,7 @@ import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
+import { newerBundle } from '@/lib/wizardBundle';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
 const bundleKey = (slug: string) => `jdd-wizard:${slug}`;
@@ -81,6 +82,8 @@ type WizardBundle = {
   /** The multi-page composition (chrome + pages). Lifted from legacy selections/order for
    *  bundles that predate it. */
   siteComposition: SiteComposition;
+  /** Epoch ms of this save, so the newer of this browser's copy and the server draft opens. */
+  savedAt?: number;
 };
 
 /**
@@ -157,6 +160,8 @@ export default function BuildWizard({
   manifest,
   composition,
   draftBundle,
+  hasRepo = false,
+  exportedContent = null,
 }: {
   slug: string;
   seed: SiteContent | null;
@@ -174,12 +179,28 @@ export default function BuildWizard({
   composition: StudioReadBack | null;
   /** Server-side draft saved by the last session. Survives cache clears and mid-generation refreshes. */
   draftBundle: Record<string, unknown> | null;
+  /**
+   * clients/{slug}/repo exists. A client provisioned by onboard.js has a live repo the console
+   * never exported (no manifest, a page.tsx that doesn't parse), and it still needs Re-export
+   * and Deploy rather than a first-time Launch.
+   */
+  hasRepo?: boolean;
+  /**
+   * What the console last exported (the repo's console-written site.ts), or null. For an
+   * exported client this is the content baseline, not the intake: see readExportedContent.
+   */
+  exportedContent?: SiteContent | null;
 }) {
   const reduce = useReducedMotion();
 
   /** This client has an exported site on disk, by either record. Drives the opening step and
    *  whether the Studio's primary action is Deploy rather than Launch. */
   const exported = Boolean(manifest || composition);
+  /**
+   * The repo is on disk, so the Studio offers Re-export + Deploy instead of Launch. State, not a
+   * prop: a first Launch creates the repo, and Deploy has to be reachable without a reload.
+   */
+  const [repoOnDisk, setRepoOnDisk] = useState(hasRepo || exported);
 
   // ── Wizard position ────────────────────────────────────────────────────────
   // A client that has already been exported opens on STUDIO, not Intake. Intake is a
@@ -297,6 +318,7 @@ export default function BuildWizard({
     const bundle: WizardBundle = {
       vertical, imported, generated, edits, selections, skins, order,
       intakeStage, brief, copyModel, siteComposition,
+      savedAt: Date.now(),
     };
     try {
       window.localStorage.setItem(bundleKey(slug), JSON.stringify(bundle));
@@ -691,7 +713,8 @@ export default function BuildWizard({
       // yielded nothing. "Disk wins" must never mean "disk said nothing, so ship nothing".
       applyBundle({
         vertical: DEFAULT_VERTICAL,
-        imported: seed,
+        // What was exported, palette and type included — not the intake, which never saw them.
+        imported: exportedContent ?? seed,
         generated: null,
         edits: {},
         siteComposition: manifest ?? undefined,
@@ -704,7 +727,8 @@ export default function BuildWizard({
       });
     } else {
       // ── Never exported: local storage wins, then the server draft, then a fresh start. ──
-      applyBundle(saved ?? draftBundle ?? freshBundle(seed));
+      // The NEWER of the two, not this browser's by default: see newerBundle.
+      applyBundle(newerBundle(saved, draftBundle as Partial<WizardBundle> | null) ?? freshBundle(seed));
     }
 
     // Undo across a client switch would restore another client's content into this one.
@@ -866,9 +890,10 @@ export default function BuildWizard({
                   onRedo={studioHistory.redo}
                   canUndo={studioHistory.canUndo}
                   canRedo={studioHistory.canRedo}
-                  // A composition read back from disk means this client is already live,
-                  // so the studio's primary action becomes Deploy rather than Launch.
-                  alreadyDeployed={exported}
+                  // A repo on disk means this client already has a site, whether the console
+                  // or onboard.js made it: Re-export + Deploy, not Launch.
+                  alreadyDeployed={repoOnDisk}
+                  onExported={() => setRepoOnDisk(true)}
                   brandName={effective.brand?.name}
                   reverts={reverts}
                 />

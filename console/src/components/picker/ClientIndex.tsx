@@ -134,6 +134,8 @@ export default function ClientIndex() {
    * it changes what THIS grid shows, and the bar is shared with every other route.
    */
   const [showFixtures, setShowFixtures] = useState(false);
+  /** Test-client folders the server left out of this list (0 when the toggle is on). */
+  const [hiddenFixtures, setHiddenFixtures] = useState(0);
   /** Whether we've ever successfully loaded — decides fatal error vs. soft warning. */
   const hasData = useRef(false);
 
@@ -170,6 +172,7 @@ export default function ClientIndex() {
         clients?: ClientContext[];
         config?: OpsConfig;
         activity?: Record<string, string>;
+        hiddenFixtures?: number;
         error?: string;
       };
       const list = data.clients ?? [];
@@ -177,6 +180,7 @@ export default function ClientIndex() {
       hasData.current = list.length > 0;
       setConfig(data.config ?? {});
       setActivity(data.activity ?? {});
+      setHiddenFixtures(data.hiddenFixtures ?? 0);
       if (data.error) {
         if (list.length === 0) setError(data.error);
         else setWarning(data.error);
@@ -472,6 +476,7 @@ export default function ClientIndex() {
               onToggleFixtures={toggleFixtures}
               shown={entries.length}
               total={clients.length + intakes.length + pendingOnboard.length}
+              hiddenTest={hiddenFixtures}
             />
 
             {intakeError && (

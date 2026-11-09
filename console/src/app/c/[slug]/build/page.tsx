@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { redirect } from 'next/navigation';
 import type { SiteContent } from '@/data/site';
@@ -8,6 +9,7 @@ import { clientDir } from '@/lib/paths';
 import { readDraft } from '@/lib/draft';
 import { readStudioComposition } from '@/lib/studio-readback';
 import { readCompositionManifest } from '@/lib/composition-manifest';
+import { loadProvisionedFields } from '@/lib/provisionedFields';
 import BuildWizard from './BuildWizard';
 
 /**
@@ -20,6 +22,28 @@ import BuildWizard from './BuildWizard';
  * starting point for a client that has never been opened.
  */
 export const dynamic = 'force-dynamic';
+
+/**
+ * The content the console last exported, read from the repo's src/data/site.ts — but only when
+ * the console wrote that file (its provenance marker). onboard.js's own site.ts is not studio
+ * content and stays out of this.
+ *
+ * Reopening an exported client used to rebuild the studio from the INTAKE (clients/{slug}/site.ts)
+ * with an empty edit layer, because the export deletes the draft that held the edits. The
+ * template's palette and type live in that edit layer, so a reload showed the template's sections
+ * in the intake's colours, and a Deploy from there shipped that instead of what was previewed.
+ */
+async function readExportedContent(repoDir: string): Promise<Record<string, unknown> | null> {
+  const file = resolve(repoDir, 'src', 'data', 'site.ts');
+  if (!existsSync(file)) return null;
+  try {
+    const src = readFileSync(file, 'utf8');
+    const pf = await loadProvisionedFields();
+    return pf.hasConsoleMarker(src) ? pf.extractContentObject(src) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function BuildPage({ params }: { params: { slug: string } }) {
   // Second layer of the onboarding gate (the tab is dimmed in the layout, but a typed URL
@@ -45,6 +69,12 @@ export default async function BuildPage({ params }: { params: { slug: string } }
   const manifest = readCompositionManifest(repoDir);
   const composition = readStudioComposition(params.slug);
   const draftBundle = readDraft(params.slug);
+  // The repo itself, independent of whether the console ever exported it. onboard.js
+  // provisions a repo the read-backs above can't parse, and that client is still live.
+  const hasRepo = existsSync(resolve(repoDir, 'package.json'));
+  const exportedRaw = manifest || composition ? await readExportedContent(repoDir) : null;
+  // Same plan stamp as the seed, so the Studio offers the same lead-capture components.
+  const exportedContent = exportedRaw ? (withPlan(exportedRaw as Parameters<typeof withPlan>[0], intake?.plan) as SiteContent | null) : null;
 
   return (
     <BuildWizard
@@ -53,6 +83,8 @@ export default async function BuildPage({ params }: { params: { slug: string } }
       manifest={manifest}
       composition={composition}
       draftBundle={draftBundle}
+      hasRepo={hasRepo}
+      exportedContent={exportedContent}
     />
   );
 }

@@ -2,6 +2,7 @@
 
 import { Flask, MagnifyingGlass, Warning } from '@phosphor-icons/react';
 import type { Plan } from '@/lib/types';
+import { rosterCountLabel } from '@/lib/rosterCount';
 
 export type SortKey = 'touched' | 'name' | 'status' | 'health';
 
@@ -33,7 +34,7 @@ export default function IndexControls({
   attentionOnly, onToggleAttentionOnly,
   attentionCount,
   showFixtures, onToggleFixtures,
-  shown, total,
+  shown, total, hiddenTest = 0,
 }: {
   query: string;
   onQuery: (v: string) => void;
@@ -48,6 +49,8 @@ export default function IndexControls({
   onToggleFixtures: () => void;
   shown: number;
   total: number;
+  /** Test clients the list is hiding; said beside the count so the filter is never invisible. */
+  hiddenTest?: number;
 }) {
   return (
     <div className="mb-6 flex flex-col gap-3">
@@ -160,7 +163,7 @@ export default function IndexControls({
         </button>
 
         <span className="meta ml-auto text-fg3">
-          {shown === total ? `${total} client${total === 1 ? '' : 's'}` : `${shown} of ${total}`}
+          {rosterCountLabel(shown, total, hiddenTest)}
         </span>
       </div>
     </div>

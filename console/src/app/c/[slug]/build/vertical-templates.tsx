@@ -306,6 +306,24 @@ export function verticalTemplateFor(vertical: VerticalId): VerticalTemplate | nu
   return VERTICAL_TEMPLATES[vertical] ?? null;
 }
 
+/**
+ * The template a composition was built from, or null when it is not one of them.
+ *
+ * Matched on the chrome (nav + footer), which every template sets and which is unique to it.
+ * The Templates popover used to highlight the INTAKE vertical instead, so after applying another
+ * vertical's template it still marked the intake one as chosen.
+ */
+export function templateIdFor(composition: SiteComposition): VerticalId | null {
+  for (const [id, t] of Object.entries(VERTICAL_TEMPLATES)) {
+    if (!t) continue;
+    const { chrome } = t.build();
+    if (chrome.nav.name === composition.chrome.nav.name && chrome.footer.name === composition.chrome.footer.name) {
+      return id as VerticalId;
+    }
+  }
+  return null;
+}
+
 /** Build the whole-site composition for a vertical, or null when it has no template. */
 export function applyVerticalTemplate(vertical: VerticalId): SiteComposition | null {
   return verticalTemplateFor(vertical)?.build() ?? null;
