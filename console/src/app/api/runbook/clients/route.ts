@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listClientContexts } from '@/lib/clients';
+import { countFixtureFolders, listClientContexts } from '@/lib/clients';
 import { fixturesParam, resolveIncludeFixtures } from '@/lib/fixtures';
 import { readOpsConfig } from '@/lib/opsConfig';
 import { lastTouchedBySlug } from '@/lib/activity';
@@ -26,7 +26,9 @@ export async function GET(req: Request) {
     const clients = await listClientContexts({ includeFixtures });
     const config = readOpsConfig();
     const activity = lastTouchedBySlug();
-    return NextResponse.json({ clients, config, activity });
+    // What the filter left out, so the roster can say it is hiding something.
+    const hiddenFixtures = includeFixtures ? 0 : countFixtureFolders();
+    return NextResponse.json({ clients, config, activity, hiddenFixtures });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to read clients.';
     return NextResponse.json(

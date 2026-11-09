@@ -16,7 +16,7 @@ import { homeLegacyView, navLinksFor, styleKeyFor, rhythmClass } from '@/lib/pag
 import { defaultSkin, supportsSkin, type SkinId } from '@/lib/skins';
 import { EditProvider } from '@/lib/editable';
 import { sectionVars } from '@/lib/palette';
-import { VERTICAL_TEMPLATES } from './vertical-templates';
+import { VERTICAL_TEMPLATES, templateIdFor } from './vertical-templates';
 import { renderSection } from './compose-page';
 import SectionControlPanel from './SectionControlPanel';
 import PreviewFrame from './PreviewFrame';
@@ -39,7 +39,7 @@ export default function PageStudio({
   onSetChrome, onSetSectionSkin, onSetSectionVariant,
   onResetEdits, onResetStyles, setField,
   onUndo, onRedo, canUndo, canRedo,
-  alreadyDeployed = false, brandName, reverts,
+  alreadyDeployed = false, onExported, brandName, reverts,
 }: {
   stepNav?: React.ReactNode;
   composition: SiteComposition;
@@ -59,6 +59,8 @@ export default function PageStudio({
   canUndo: boolean;
   canRedo: boolean;
   alreadyDeployed?: boolean;
+  /** Called after a successful export, so a first Launch turns into Re-export + Deploy in place. */
+  onExported?: () => void;
   brandName?: string;
   reverts: StudioReverts;
 }) {
@@ -104,6 +106,9 @@ export default function PageStudio({
 
   // Interim single-page export payload (home + chrome). Removed in Phase E.
   const legacy = useMemo(() => homeLegacyView(composition), [composition]);
+  // The template this composition was built from — what the popover marks as applied. Not the
+  // intake vertical: applying another vertical's template must show THAT one as chosen.
+  const appliedTemplate = useMemo(() => templateIdFor(composition), [composition]);
   const exportEntries = useMemo(() => {
     const out: { categoryId: string; name: string; label?: string; skin?: string }[] = [];
     for (const id of [...legacy.order, 'seo']) {
@@ -291,22 +296,25 @@ export default function PageStudio({
                   key={id}
                   type="button"
                   onClick={() => { onApplyVerticalTemplate(id); setTemplatesOpen(false); }}
+                  aria-pressed={id === appliedTemplate}
                   className={[
                     'flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
-                    id === vertical
+                    id === appliedTemplate
                       ? 'border-accent/60 bg-surface hover:border-accent'
                       : 'border-rule bg-surface/50 hover:border-accent/50',
                   ].join(' ')}
                 >
                   <span className={[
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                    id === vertical ? 'bg-accent text-[var(--accent-ink)]' : 'bg-surface text-fg3',
+                    id === appliedTemplate ? 'bg-accent text-[var(--accent-ink)]' : 'bg-surface text-fg3',
                   ].join(' ')}>
                     <Cards size={20} weight="bold" />
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-fg">{tmpl.label}</span>
-                    <span className="block text-xs text-fg3">Layout · colors · type</span>
+                    <span className="block text-xs text-fg3">
+                      {id === appliedTemplate ? 'Applied · layout · colors · type' : 'Layout · colors · type'}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -329,7 +337,10 @@ export default function PageStudio({
             effective={effective}
             lockedSlug={slug}
             onClose={() => setLaunchOpen(false)}
-            onDeploy={alreadyDeployed ? () => { setLaunchOpen(false); setDeployOpen(true); } : undefined}
+            onExported={onExported}
+            hasRepo={alreadyDeployed}
+            // Offered after any successful export: the repo exists by then, even on a first Launch.
+            onDeploy={() => { setLaunchOpen(false); setDeployOpen(true); }}
           />
         )}
       </AnimatePresence>

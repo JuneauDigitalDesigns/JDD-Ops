@@ -25,7 +25,7 @@ type Status =
   | { kind: 'error'; message: string; detail?: string; next?: string; steps: string[] };
 
 export default function LaunchDialog({
-  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy,
+  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy, onExported, hasRepo = false,
 }: {
   categories: CategoryEntry[];
   selections: Selections;
@@ -38,8 +38,12 @@ export default function LaunchDialog({
   effective: SiteContent;
   lockedSlug?: string;
   onClose: () => void;
-  /** Opens the Deploy dialog for this client; offered once an export of an existing repo succeeds. */
+  /** Opens the Deploy dialog for this client; offered once an export succeeds. */
   onDeploy?: () => void;
+  /** Told when an export succeeds, so the Studio can switch Launch to Re-export + Deploy. */
+  onExported?: () => void;
+  /** The Studio already knows lockedSlug's repo exists; don't wait for the client list to say so. */
+  hasRepo?: boolean;
 }) {
   const reduce = useReducedMotion();
   const [clients, setClients] = useState<ClientInfo[]>([]);
@@ -85,7 +89,8 @@ export default function LaunchDialog({
   const exportEntries = seoEntry ? [...bodyEntries, seoEntry] : bodyEntries;
 
   const effectiveSlug = (lockedSlug ?? (mode === 'new' ? newSlug : selectedSlug)).trim();
-  const slugHasRepo = clients.find((c) => c.slug === effectiveSlug)?.hasRepo ?? false;
+  const slugHasRepo =
+    (Boolean(lockedSlug) && hasRepo) || (clients.find((c) => c.slug === effectiveSlug)?.hasRepo ?? false);
   const busy = status.kind === 'running';
 
   // A repo behind the template's @jdd/ui is offered the update; the export refuses it unconfirmed.
@@ -155,6 +160,7 @@ export default function LaunchDialog({
           });
           // The update is applied now; nothing is pending any more.
           libs.reload();
+          onExported?.();
         } else if (msg.type === 'error') {
           setStatus({
             kind: 'error',
@@ -305,7 +311,7 @@ export default function LaunchDialog({
                   {status.repoPath}
                 </code>
               </p>
-              {onDeploy && slugHasRepo && (
+              {onDeploy && (
                 <p className="mt-1 text-xs">Built locally only. Nothing is committed or pushed until Deploy.</p>
               )}
             </div>
@@ -335,7 +341,7 @@ export default function LaunchDialog({
           {libsBlocked && !busy && (
             <span className="ml-auto text-xs text-fg3">Shared libraries · confirmation required</span>
           )}
-          {status.kind === 'done' && onDeploy && slugHasRepo ? (
+          {status.kind === 'done' && onDeploy ? (
             <button type="button" onClick={onDeploy} className="btn btn-primary">
               <Rocket size={17} /> Deploy
             </button>

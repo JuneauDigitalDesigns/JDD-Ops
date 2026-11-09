@@ -156,6 +156,13 @@ export function isFixtureSlug(slug: string): boolean {
  * getClientContext() deliberately does NOT apply this: a fixture stays openable by URL, so
  * /c/_e2e-starter works whether or not the index is showing it.
  */
+/** How many `_`-prefixed test-client folders exist, so a roster hiding them can say so. */
+export function countFixtureFolders(): number {
+  const dir = clientsDir();
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && isFixtureSlug(d.name)).length;
+}
+
 export async function listClientContexts(
   { includeFixtures = false }: { includeFixtures?: boolean } = {},
 ): Promise<ClientContext[]> {
