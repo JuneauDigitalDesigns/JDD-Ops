@@ -4,6 +4,7 @@ import type { ClientContext } from './types';
 import { loadIdentity, loadRegister, loadStore, type A2pBatchForm, type A2pBatchStepResult } from './a2pChain';
 import { loadA2pEnv } from './opsSecrets';
 import { appendAudit } from './audit';
+import { a2pTestMode } from './a2pFormRules';
 
 /**
  * Server-side glue the A2P routes share: which of a client's sites have a number to attach,
@@ -190,14 +191,17 @@ export async function runA2pBatchForClient(
   try {
     const before = await store.readRegistration({ slug: ctx.slug });
     const statusBefore = register.portalStatusFor(before);
+    const env = loadA2pEnv();
+    const testMode = a2pTestMode(env);
     const out = await register.runBatch({
+      dryRun: testMode,
       mode,
       form,
       slug: ctx.slug,
       plan: ctx.plan,
       record: before,
       siteSlugs: Object.keys(siteNumbers(ctx)),
-      env: loadA2pEnv(),
+      env,
       persist: (patch, current) => store.writeRegistration({ slug: ctx.slug, patch, current }),
       onStep: (r) =>
         audit(store, {
@@ -212,7 +216,7 @@ export async function runA2pBatchForClient(
     const portal = statusAfter !== statusBefore ? await syncPortalStatus(ctx, statusAfter) : [];
     return {
       status: out.ok ? 200 : out.invalid ? 400 : 502,
-      json: { ok: out.ok, invalid: out.invalid, results, record: out.record, portalStatus: statusAfter, portal },
+      json: { ok: out.ok, invalid: out.invalid, results, record: out.record, portalStatus: statusAfter, portal, testMode },
     };
   } catch (err) {
     return { status: 409, json: { ok: false, error: clean(err instanceof Error ? err.message : 'Batch failed.') } };

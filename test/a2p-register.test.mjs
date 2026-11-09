@@ -572,3 +572,23 @@ test('a noncompliant evaluation stops the batch before anything is submitted', a
   const submits = b.fetchImpl.calls.filter((c) => c.method === 'POST' && /^\/v1\/(CustomerProfiles|TrustProducts)\/BU[0-9a-f]+$/.test(c.path));
   assert.equal(submits.length, 0, 'nothing was submitted');
 });
+
+test('a dry run applies every real check, then sends nothing and saves nothing', async () => {
+  const redis = redisSpy();
+  const fetchImpl = twilio();
+  const run = (form) =>
+    runBatch({
+      mode: 'submit', form, slug: 'arthurs-plumbing', plan: 'growth', record: null, env: ENV, fetchImpl, dryRun: true,
+      persist: (patch, current) => writeRegistration({ slug: 'arthurs-plumbing', patch, current, redis }),
+    });
+
+  const refused = await run({ ...FORM, rep: { ...FORM.rep, phone: '(407) 555-0123' } });
+  assert.equal(refused.ok, false, 'a dry run still refuses what a real run would');
+  assert.deepEqual(refused.invalid, ['rep.phone']);
+
+  const passed = await run(FORM);
+  assert.equal(passed.ok, true);
+  assert.deepEqual(passed.results.map((r) => r.status), Array(10).fill('done'));
+  assert.equal(fetchImpl.calls.length, 0, 'Twilio was contacted');
+  assert.equal(redis.writes.length, 0, 'a record was written');
+});

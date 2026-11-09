@@ -714,3 +714,13 @@
 .moto-cardfield .moto-cardfield-row { display: grid; grid-template-columns: 1fr 1fr; padding: 0; }
 .moto-cardfield .moto-cardfield-row > div { padding: 12px 13px; }
 .moto-cardfield .moto-cardfield-row > div + div { border-left: 1px solid var(--rule); }
+.moto-box > .moto-linkbox { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+/* Close wizard: the Terms step's options and confirmation. */
+.terms-option { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 18px; border: 1px solid var(--rule); border-radius: 12px; background: #fffdf8; color: var(--fg); cursor: pointer; }
+.terms-option:hover { border-color: var(--accent); }
+.terms-option b { font-size: 17px; }
+.terms-option span { color: var(--fg-2); }
+.terms-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; align-content: start; }
+.terms-facts dt { color: var(--fg-3); }
+.terms-facts dd { margin: 0; }

@@ -128,6 +128,8 @@ interface RegisterModule {
   A2pStepRefused: new (message: string) => Error;
   batchSteps(mode: 'submit' | 'save', path: A2pPath): string[];
   runBatch(args: {
+    /** Run the real checks, then send nothing to Twilio and save nothing. */
+    dryRun?: boolean;
     mode: 'submit' | 'save';
     form: A2pBatchForm;
     slug: string;

@@ -39,6 +39,14 @@ export async function runPreflight(): Promise<GoLiveResult> {
     checks.push({ label: `${key} present`, ok: present(agency[key]) });
   }
 
+  // Read-only and unreadable: Stripe's API doesn't expose it, so this stays grey (null, never a
+  // pass) and the go-live wizard's step is where it gets done. Every payment link fails without it.
+  checks.push({
+    label: 'Stripe Terms of service URL set',
+    ok: null,
+    detail: "Stripe's API can't report this. Confirm it in Stripe under Settings, Public details.",
+  });
+
   // ── Clerk (agency) ─────────────────────────────────────────────────────────
   checks.push({
     label: 'Clerk secret key is live',

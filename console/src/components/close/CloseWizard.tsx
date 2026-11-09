@@ -46,7 +46,7 @@ interface Prices {
 interface TermsView {
   script: { version: string; hash: string; lines: string[] };
   termsHash: string;
-  totals: { today: number; recurring: number; period: Period };
+  totals: { today: number; recurring: number; period: Period; nextPaymentAt?: number };
 }
 
 const STEP_LABELS: Record<CloseStep, string> = {
@@ -491,6 +491,23 @@ function OrderStep({
 
 // ── Terms ───────────────────────────────────────────────────────────────────
 
+interface AgreementSummary {
+  method: 'read-aloud' | 'agreement-link';
+  acceptedAt: string;
+  signerName: string;
+  signerTitle: string;
+  businessName: string;
+  version: string;
+  emailedTo: string;
+}
+
+type TermsMode = 'options' | 'aloud' | 'link' | 'recorded' | 'confirm';
+
+/**
+ * Accepting the terms, one of two ways (mockup: https://claude.ai/artifact/TvSLZo2M3JV4qVT784wm5p):
+ * the script read aloud with a verbal yes, or a private link where the client reads the full
+ * agreement and agrees themselves. Both end on the same confirmation, with the signed copy.
+ */
 function TermsStep({
   order,
   terms,
@@ -502,23 +519,184 @@ function TermsStep({
   onAccepted: (order: OperatorOrder) => void;
   onContinue: () => void;
 }) {
-  const accepted = order.status !== 'draft';
-  const [read, setRead] = useState<boolean[]>(() => terms.script.lines.map(() => accepted));
-  const [agreed, setAgreed] = useState(accepted);
+  const [mode, setMode] = useState<TermsMode>(order.status !== 'draft' ? 'confirm' : 'options');
+  const [read, setRead] = useState<boolean[]>(() => terms.script.lines.map(() => false));
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [summary, setSummary] = useState<AgreementSummary | null>(null);
 
   async function accept() {
     setBusy(true);
     setError(null);
-    const { ok, data } = await post<{ order: OperatorOrder }>(`/api/sales/orders/${order.id}/accept-terms`, {
+    const { ok, data } = await post<{ order: OperatorOrder; agreement?: AgreementSummary | null }>(`/api/sales/orders/${order.id}/accept-terms`, {
       confirmed: true,
       scriptHash: terms.script.hash,
       termsHash: terms.termsHash,
     });
     setBusy(false);
     if (!ok || !data.order) return setError(data.error ?? 'Could not record the agreement.');
+    setSummary(data.agreement ?? null);
     onAccepted(data.order);
+    setMode('confirm');
+  }
+
+  async function openLink(fresh = false) {
+    setBusy(true);
+    setError(null);
+    const { ok, data } = await post<{ shortUrl: string; order?: OperatorOrder }>(`/api/sales/orders/${order.id}/agreement-link`, { fresh });
+    setBusy(false);
+    if (!ok) return setError(data.error ?? 'Could not create the agreement link.');
+    setShortUrl(data.shortUrl);
+    setCopied(false);
+  }
+
+  function showLink() {
+    setMode('link');
+    void openLink();
+  }
+
+  async function copy() {
+    if (!shortUrl) return;
+    await navigator.clipboard?.writeText(`https://${shortUrl}`).catch(() => {});
+    setCopied(true);
+  }
+
+  // While the link is out, watch for the client agreeing on their own device.
+  useEffect(() => {
+    if (mode !== 'link') return;
+    const t = setInterval(async () => {
+      const d = await fetch(`/api/sales/orders/${order.id}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+      const o = d?.order as OperatorOrder | undefined;
+      if (!o || o.status === 'draft') return;
+      clearInterval(t);
+      setSummary((d.agreement as AgreementSummary | null) ?? null);
+      onAccepted(o);
+      setMode('recorded');
+    }, 3000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, order.id]);
+
+  // Reopening a close whose terms are already accepted.
+  useEffect(() => {
+    if (mode !== 'confirm' || summary) return;
+    let cancelled = false;
+    fetch(`/api/sales/orders/${order.id}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d?.agreement) setSummary(d.agreement as AgreementSummary);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, summary, order.id]);
+
+  if (mode === 'options') {
+    return (
+      <Card>
+        <h2 className="text-[22px] font-bold text-fg">Terms review</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button type="button" className="terms-option" onClick={() => setMode('aloud')}>
+            <b>Read aloud</b>
+            <span>Summary read on the call. Verbal agreement.</span>
+          </button>
+          <button type="button" className="terms-option" onClick={showLink}>
+            <b>Agreement link</b>
+            <span>Full agreement by private link. Agreed online.</span>
+          </button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (mode === 'link') {
+    return (
+      <Card>
+        <h2 className="text-[22px] font-bold text-fg">Terms review</h2>
+        <div className="flex flex-col gap-1 rounded-xl border border-[var(--rule)] bg-[var(--panel)] p-4">
+          <div className="field-label">Agreement link</div>
+          <div className="break-all font-display text-[30px] font-bold leading-tight">{shortUrl ?? '…'}</div>
+          <div className="text-[13px] text-fg2">Private to this order · expires in 24 hours</div>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <button type="button" className="btn btn-primary" disabled={!shortUrl} onClick={copy}>{copied ? 'Copied' : 'Copy link'}</button>
+          <button type="button" className="btn" disabled={busy || !shortUrl} onClick={() => openLink(true)}>New link</button>
+        </div>
+        <div role="status" className="moto-status moto-status-wait">
+          <span className="moto-status-dot"><i /></span>
+          <div>
+            <div className="font-semibold">Waiting for agreement…</div>
+            <div className="text-[13px] text-fg2">Updates automatically.</div>
+          </div>
+        </div>
+        <ErrorLine text={error} />
+        <div>
+          <button type="button" className="btn moto-quiet" onClick={() => setMode('aloud')}>Switch to read aloud</button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (mode === 'recorded') {
+    return (
+      <Card>
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <span className="grid h-14 w-14 place-items-center rounded-full" style={{ background: 'var(--ok)' }} aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M5 12l5 5 9-10" /></svg>
+          </span>
+          <h2 className="font-display text-[34px] font-bold leading-none text-fg">Agreement recorded</h2>
+          <p className="m-0 text-fg2">Copy sent to {order.client.email}.</p>
+          <button type="button" className="btn btn-primary" onClick={() => setMode('confirm')}>Next</button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (mode === 'confirm') {
+    const pdf = `/api/sales/orders/${order.id}/agreement-pdf`;
+    const planName = order.plan.charAt(0).toUpperCase() + order.plan.slice(1);
+    const document = summary?.version.startsWith('addendum')
+      ? `Site Addendum ${summary.version.replace('addendum-', '')}, ${planName}`
+      : `Terms of Service ${summary?.version ?? ''}, ${planName}`;
+    const when = summary
+      ? `${new Date(summary.acceptedAt).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/New_York' })} ET`
+      : '';
+    return (
+      <Card>
+        <div className="rounded-[10px] border px-4 py-3.5" style={{ borderColor: 'var(--ok)', background: 'var(--ok-glow)' }}>
+          <span className="font-bold" style={{ color: 'var(--ok)' }}>✓ Terms accepted</span>
+        </div>
+        <div className="grid gap-5 md:grid-cols-2">
+          {summary ? (
+            <dl className="terms-facts">
+              <dt>Accepted by</dt><dd>{summary.signerName}, {summary.signerTitle}</dd>
+              <dt>Business</dt><dd>{summary.businessName}</dd>
+              <dt>Method</dt><dd>{summary.method === 'read-aloud' ? 'Read aloud' : 'Agreement link'}</dd>
+              <dt>Date</dt><dd>{when}</dd>
+              <dt>Document</dt><dd>{document}</dd>
+              <dt>Copy sent to</dt><dd>{summary.emailedTo}</dd>
+              <dt>Client record</dt><dd>Saved</dd>
+            </dl>
+          ) : (
+            <div className="text-fg2">…</div>
+          )}
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="field-label">Accepted terms</div>
+            <iframe title="Accepted terms" src={pdf} className="h-[300px] w-full rounded-[10px] border border-[var(--rule)] bg-white" />
+            <div>
+              <a className="btn" href={pdf} target="_blank" rel="noopener noreferrer">Open PDF</a>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button type="button" className="btn btn-primary" onClick={onContinue}>Continue</button>
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -538,7 +716,6 @@ function TermsStep({
                 type="checkbox"
                 className="mt-1 h-5 w-5 flex-none accent-[var(--accent)]"
                 checked={read[i]}
-                disabled={accepted}
                 onChange={() => setRead((r) => r.map((v, j) => (j === i ? !v : v)))}
               />
               <span className="text-base leading-normal">{line}</span>
@@ -548,23 +725,17 @@ function TermsStep({
       </ol>
 
       <label className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-[var(--rule-strong)] bg-[var(--panel)] px-4 py-3.5">
-        <input type="checkbox" className="h-[22px] w-[22px] flex-none accent-[var(--accent)]" checked={agreed} disabled={accepted} onChange={() => setAgreed((a) => !a)} />
+        <input type="checkbox" className="h-[22px] w-[22px] flex-none accent-[var(--accent)]" checked={agreed} onChange={() => setAgreed((a) => !a)} />
         <span className="text-base"><span className="font-bold">Client verbally agreed</span> to the terms above</span>
       </label>
 
       <ErrorLine text={error} />
-      {!accepted ? (
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" disabled={busy || !agreed || !read.every(Boolean)} onClick={accept}>
-            {busy ? 'Saving…' : 'Accept terms'}
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[10px] border px-4 py-3.5" style={{ borderColor: 'var(--ok)', background: 'var(--ok-glow)' }}>
-          <span><span className="font-bold" style={{ color: 'var(--ok)' }}>✓ Terms accepted.</span> A copy is on its way to {order.client.email}.</span>
-          <button type="button" className="btn btn-primary" onClick={onContinue}>Continue</button>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <button type="button" className="btn moto-quiet" onClick={showLink}>Switch to agreement link</button>
+        <button type="button" className="btn btn-primary" disabled={busy || !agreed || !read.every(Boolean)} onClick={accept}>
+          {busy ? 'Saving…' : 'Accept terms'}
+        </button>
+      </div>
     </Card>
   );
 }
@@ -642,6 +813,7 @@ function PaymentStep({
   }
 
   async function resend() {
+    if (!expired && !window.confirm('New link replaces the current one.')) return;
     setBusy(true);
     setError(null);
     const { ok, data } = await post<{ order: OperatorOrder; shortUrl: string }>(`/api/sales/orders/${order.id}/resend-link`);
@@ -669,9 +841,6 @@ function PaymentStep({
     setTab(next);
   }
 
-  const today = totals ? money(totals.today) : '';
-  const then = totals ? `${money(totals.recurring)}/${totals.period === 'annual' ? 'yr' : 'mo'}` : '';
-
   // The card path is a checkout of its own, with its own header (CardFlow).
   if (tab === 'card' && !waiting) {
     return (
@@ -683,59 +852,142 @@ function PaymentStep({
 
   return (
     <Card>
-      {totals && (
-        <div className="flex flex-wrap items-baseline gap-2.5">
-          <span className="font-display text-3xl font-bold leading-tight">{today}</span>
-          <span className="text-fg2">due today, then {then}</span>
-        </div>
-      )}
-
-      {!waiting && (
-        <>
-          <div role="tablist" className="flex flex-wrap gap-1.5">
-            <button type="button" role="tab" aria-selected={tab === 'link'} disabled={busy} onClick={() => switchTo('link')} className={`btn ${tab === 'link' ? 'border-2 border-fg' : ''}`}>Link</button>
-            <button type="button" role="tab" aria-selected={tab === 'card'} disabled={busy} onClick={() => switchTo('card')} className={`btn ${tab === 'card' ? 'border-2 border-fg' : ''}`}>Enter card</button>
-          </div>
-
-          {tab === 'link' && (
-            <div className="flex flex-col gap-3.5">
-              <div className="flex flex-col gap-2 rounded-xl border border-[var(--rule)] bg-[var(--panel)] p-4">
-                <div className="field-label">Payment link</div>
-                <div className="break-all font-display text-[34px] font-bold leading-tight">{shortUrl ?? (expired ? 'Link expired' : '…')}</div>
-                <div className="text-[13px] text-fg2">Secure checkout by Stripe · expires in 24 hours</div>
-              </div>
-              <div className="flex gap-2.5">
-                {expired ? (
-                  <button type="button" className="btn btn-primary" disabled={busy} onClick={resend}>New link</button>
-                ) : (
-                  <button type="button" className="btn btn-primary" disabled={!shortUrl} onClick={copy}>{copied ? 'Copied' : 'Copy link'}</button>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {waiting && (
-        <div className="flex flex-col gap-4 rounded-xl border p-5" style={{ borderColor: 'rgba(31,111,120,0.35)', background: 'rgba(31,111,120,0.06)' }}>
-          <div className="flex items-center gap-3">
-            <span className="h-3.5 w-3.5 animate-pulse rounded-full" style={{ background: 'var(--accent)', boxShadow: '0 0 0 6px rgba(31,111,120,0.18)' }} />
-            <div className="text-lg font-bold">Waiting for payment…</div>
-          </div>
-          <ol className="flex flex-col gap-2">
-            <li className="flex gap-2.5"><span className="w-[18px] font-bold" style={{ color: 'var(--ok)' }}>✓</span>Terms accepted</li>
-            <li className="flex gap-2.5"><span className="w-[18px] font-bold" style={{ color: 'var(--ok)' }}>✓</span>Payment link opened</li>
-            <li className="flex gap-2.5"><span className="w-[18px] font-bold" style={{ color: 'var(--accent)' }}>…</span>Payment</li>
-          </ol>
-          <div className="flex flex-wrap gap-2.5">
-            {shortUrl && <span className="codechip self-center">{shortUrl}</span>}
-            <button type="button" className="btn" disabled={busy} onClick={() => switchTo('card')}>Switch to card</button>
-            <button type="button" className="btn" disabled={busy} onClick={cancel}>Cancel</button>
-          </div>
-        </div>
-      )}
-      <ErrorLine text={error} />
+      <LinkCheckout
+        order={order}
+        totals={totals}
+        termsVersion={termsVersion}
+        shortUrl={shortUrl}
+        expired={expired}
+        waiting={waiting}
+        copied={copied}
+        busy={busy}
+        error={error}
+        onCopy={copy}
+        onOpened={() => setWaiting(true)}
+        onNewLink={resend}
+        onSwitchToCard={() => switchTo('card')}
+        onCancel={cancel}
+      />
     </Card>
+  );
+}
+
+/**
+ * The payment link, on the same checkout as the card path: the order summary on the left, and
+ * the link where the card field would be. While a link is live it can always be copied again,
+ * opened, or replaced; the old panel offered only Switch to card and Cancel, which read as stuck.
+ */
+function LinkCheckout({
+  order,
+  totals,
+  termsVersion,
+  shortUrl,
+  expired,
+  waiting,
+  copied,
+  busy,
+  error,
+  onCopy,
+  onOpened,
+  onNewLink,
+  onSwitchToCard,
+  onCancel,
+}: {
+  order: OperatorOrder;
+  totals: TermsView['totals'] | null;
+  termsVersion: string | null;
+  shortUrl: string | null;
+  expired: boolean;
+  waiting: boolean;
+  copied: boolean;
+  busy: boolean;
+  error: string | null;
+  onCopy: () => void;
+  onOpened: () => void;
+  onNewLink: () => void;
+  onSwitchToCard: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="moto-checkout -m-6">
+      {totals && (
+        <OrderSummary
+          order={order}
+          recurringCents={Math.round(totals.recurring * 100)}
+          amountCents={Math.round(totals.today * 100)}
+          period={totals.period}
+          nextPaymentAt={totals.nextPaymentAt ?? null}
+        />
+      )}
+      <div className="moto-payside">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Contact information</h3>
+          <div className="moto-box"><div><span className="moto-k">Email</span><span>{order.client.email}</span></div></div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Payment link</h3>
+          <div className="moto-box">
+            <div className="moto-linkbox">
+              <div className="break-all font-display text-[30px] font-bold leading-tight">{shortUrl ?? (expired ? 'Link expired' : '…')}</div>
+              <div className="text-[13px] text-fg3">Secure checkout by Stripe · expires in 24 hours</div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            {expired ? (
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={onNewLink}>New link</button>
+            ) : (
+              <>
+                <button type="button" className="btn btn-primary" disabled={!shortUrl} onClick={onCopy}>{copied ? 'Copied' : 'Copy link'}</button>
+                <a
+                  className={`btn ${shortUrl ? '' : 'pointer-events-none opacity-50'}`}
+                  href={shortUrl ? `https://${shortUrl}` : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onOpened}
+                >
+                  Open link
+                </a>
+                <button type="button" className="btn" disabled={busy || !shortUrl} onClick={onNewLink}>New link</button>
+              </>
+            )}
+          </div>
+        </div>
+        {waiting && !expired && (
+          <div role="status" className="moto-status moto-status-wait">
+            <span className="moto-status-dot"><i /></span>
+            <div>
+              <div className="font-semibold">Waiting for payment…</div>
+              <div className="text-[13px] text-fg2">Updates automatically.</div>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-semibold">Billing details</h3>
+          <div className="moto-box">
+            <div><span className="moto-k">Name</span><span>{order.client.legalName}</span></div>
+            <div><span className="moto-k">Address</span><span>{order.client.address}</span></div>
+          </div>
+        </div>
+        <div className="moto-check">
+          <span className="moto-cb" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4"><path d="M5 12l5 5 9-10" /></svg>
+          </span>
+          <span>
+            You agreed to the Juneau Digital Designs Terms of Service{termsVersion ? ` (${termsVersion})` : ''} by phone today. A copy
+            was emailed to you.
+          </span>
+        </div>
+        <div className="flex items-center justify-center gap-1.5 text-xs text-fg3">
+          <LockIcon size={12} />
+          Payments processed securely by Stripe
+        </div>
+        <ErrorLine text={error} />
+        <div className="flex flex-wrap justify-center gap-[18px]">
+          <button type="button" className="btn moto-quiet" disabled={busy} onClick={onSwitchToCard}>Switch to card</button>
+          <button type="button" className="btn moto-quiet" disabled={busy} onClick={onCancel}>Cancel order</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1128,6 +1380,80 @@ function LockIcon({ size }: { size: number }) {
   );
 }
 
+/** The order, as a hosted checkout lays it out. Both ways of paying show exactly this. */
+function OrderSummary({
+  order,
+  recurringCents,
+  amountCents,
+  period,
+  nextPaymentAt,
+}: {
+  order: OperatorOrder;
+  recurringCents: number;
+  amountCents: number;
+  period: Period;
+  nextPaymentAt: number | null;
+}) {
+  const unit = period === 'annual' ? 'year' : 'month';
+  const onboardingCents = amountCents - recurringCents;
+  const planName = order.plan.charAt(0).toUpperCase() + order.plan.slice(1);
+  const billed = period === 'annual' ? 'Billed yearly · 12 months for the price of 10' : 'Billed monthly';
+  return (
+    <div className="moto-summary">
+      <div className="flex items-center gap-2.5 font-semibold">
+        <span className="text-fg3" aria-hidden="true">←</span>
+        <span className="moto-mark" aria-hidden="true">J</span>
+        Juneau Digital Designs
+      </div>
+      <div>
+        <div className="font-medium text-fg3">Subscribe to {planName}</div>
+        <div className="mt-1 flex items-baseline gap-2 tabular-nums">
+          <b className="font-display text-[44px] font-bold leading-none">{cents(recurringCents)}</b>
+          <span className="text-sm leading-tight text-fg3">
+            per
+            <br />
+            {unit}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col tabular-nums">
+        <div className="moto-item">
+          <span className="moto-thumb" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 5h16v11H4zM9 20h6M12 16v4" /></svg>
+          </span>
+          <div>
+            <div className="font-semibold">{planName}</div>
+            <div className="text-[13px] text-fg3">{planIncludes(order)} · {billed}</div>
+          </div>
+          <div className="text-right font-semibold">{cents(recurringCents)}</div>
+        </div>
+        {onboardingCents > 0 && (
+          <div className="moto-item">
+            <span className="moto-thumb" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" /></svg>
+            </span>
+            <div>
+              <div className="font-semibold">Onboarding</div>
+              <div className="text-[13px] text-fg3">One-time fee</div>
+            </div>
+            <div className="text-right font-semibold">{cents(onboardingCents)}</div>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-2.5 border-t border-[var(--rule)] pt-3.5 tabular-nums">
+        <div className="flex justify-between gap-3 text-fg2"><span>Subtotal</span><span>{cents(amountCents)}</span></div>
+        <div className="flex justify-between gap-3 border-t border-[var(--rule)] pt-3 text-base font-bold">
+          <span>Total due today</span>
+          <span>{cents(amountCents)}</span>
+        </div>
+        <div className="text-[13px] text-fg3">
+          Then {cents(recurringCents)} per {unit}{nextPaymentAt != null ? `, starting ${longDate(nextPaymentAt)}` : ''}.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CardCheckout({
   order,
   preview,
@@ -1155,66 +1481,17 @@ function CardCheckout({
   onUseLink: () => void;
 }) {
   const card = preview.card;
-  const unit = preview.period === 'annual' ? 'year' : 'month';
-  const onboardingCents = preview.amountCents - preview.recurringCents;
-  const planName = order.plan.charAt(0).toUpperCase() + order.plan.slice(1);
-  const billed = preview.period === 'annual' ? 'Billed yearly · 12 months for the price of 10' : 'Billed monthly';
   const stripeDisagrees = preview.stripeAmountCents !== preview.amountCents;
 
   return (
     <div className="moto-checkout -m-6">
-      <div className="moto-summary">
-        <div className="flex items-center gap-2.5 font-semibold">
-          <span className="text-fg3" aria-hidden="true">←</span>
-          <span className="moto-mark" aria-hidden="true">J</span>
-          Juneau Digital Designs
-        </div>
-        <div>
-          <div className="font-medium text-fg3">Subscribe to {planName}</div>
-          <div className="mt-1 flex items-baseline gap-2 tabular-nums">
-            <b className="font-display text-[44px] font-bold leading-none">{cents(preview.recurringCents)}</b>
-            <span className="text-sm leading-tight text-fg3">
-              per
-              <br />
-              {unit}
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-col tabular-nums">
-          <div className="moto-item">
-            <span className="moto-thumb" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 5h16v11H4zM9 20h6M12 16v4" /></svg>
-            </span>
-            <div>
-              <div className="font-semibold">{planName}</div>
-              <div className="text-[13px] text-fg3">{planIncludes(order)} · {billed}</div>
-            </div>
-            <div className="text-right font-semibold">{cents(preview.recurringCents)}</div>
-          </div>
-          {onboardingCents > 0 && (
-            <div className="moto-item">
-              <span className="moto-thumb" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" /></svg>
-              </span>
-              <div>
-                <div className="font-semibold">Onboarding</div>
-                <div className="text-[13px] text-fg3">One-time fee</div>
-              </div>
-              <div className="text-right font-semibold">{cents(onboardingCents)}</div>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-2.5 border-t border-[var(--rule)] pt-3.5 tabular-nums">
-          <div className="flex justify-between gap-3 text-fg2"><span>Subtotal</span><span>{cents(preview.amountCents)}</span></div>
-          <div className="flex justify-between gap-3 border-t border-[var(--rule)] pt-3 text-base font-bold">
-            <span>Total due today</span>
-            <span>{cents(preview.amountCents)}</span>
-          </div>
-          <div className="text-[13px] text-fg3">
-            Then {cents(preview.recurringCents)} per {unit}, starting {longDate(preview.nextPaymentAt)}.
-          </div>
-        </div>
-      </div>
+      <OrderSummary
+        order={order}
+        recurringCents={preview.recurringCents}
+        amountCents={preview.amountCents}
+        period={preview.period}
+        nextPaymentAt={preview.nextPaymentAt}
+      />
 
       <div className="moto-payside">
         <div className="flex flex-col gap-2">

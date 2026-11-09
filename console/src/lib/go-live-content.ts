@@ -164,6 +164,16 @@ export function buildGoLive(): Phase[] {
           ],
         },
         {
+          id: 'stripe-tos-url',
+          title: 'Set the Terms of service URL in Stripe',
+          why: 'Payment links make the client tick the Terms of Service box on the Stripe page, and Stripe refuses to create the link at all when the account has no Terms of service URL. Without it, every payment link fails on a live call. Stripe does not expose this setting through its API, so it cannot be checked automatically.',
+          est: '~2 min',
+          blocks: [
+            { t: 'link', label: 'Stripe public details (live mode)', href: 'https://dashboard.stripe.com/settings/public' },
+            { t: 'copy', label: 'Terms of service URL', value: `${SITE_URL}/terms` },
+          ],
+        },
+        {
           id: 'stripe-prices',
           title: 'Create the live Stripe prices',
           why: 'Test price IDs do not work in live mode. This clones your test products/prices into live exactly (the monthly, annual and one-time onboarding price for every plan), and returns the nine live price IDs to paste into the env. Idempotent — a re-run reports the existing IDs rather than duplicating.',

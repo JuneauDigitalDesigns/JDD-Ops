@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { loadManageTarget } from '@/lib/manageSites';
 import { loadRegister, loadStore, type A2pIntakeRecord } from '@/lib/a2pChain';
 import { loadA2pEnv } from '@/lib/opsSecrets';
+import { a2pTestMode } from '@/lib/a2pFormRules';
 import { siteNumbers } from '@/lib/a2pServer';
 import { appendAudit } from '@/lib/audit';
 
@@ -58,6 +59,7 @@ export async function GET(req: Request) {
       numbers,
       masterServiceSid: (env.TWILIO_MESSAGING_SERVICE_SID ?? '').trim() || null,
       brandName: ctx.brandName,
+      testMode: a2pTestMode(env),
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not read the A2P record.' }, { status: 500 });
