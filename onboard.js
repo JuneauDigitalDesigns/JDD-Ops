@@ -52,7 +52,7 @@ import {
 } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
 import { FONT_DIR, FONT_LOADER, googleFontImports, writeSiteFonts } from './lib/site-fonts.js';
-import { uiPinToAdopt } from './lib/ui-pin.js';
+import { uiPinMove } from './lib/ui-pin.js';
 // toE164 comes from the package for the same reason vercelAppHost does: five copies had
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
@@ -893,12 +893,7 @@ function writeSelfHostedFonts(repoDir) {
  * recorded fixture client never needs, so the phase contract's recordings stay valid.
  */
 function refreshUiPin(repoDir) {
-  const pinIn = (dir) => {
-    const pkg = resolve(dir, 'package.json');
-    if (!existsSync(pkg)) return undefined;
-    return JSON.parse(readFileSync(pkg, 'utf8')).dependencies?.['@jdd/ui'];
-  };
-  const next = uiPinToAdopt(pinIn(repoDir), pinIn(resolve(SCRIPT_DIR, 'template')));
+  const next = uiPinMove(repoDir, resolve(SCRIPT_DIR, 'template'))?.to;
   if (!next) return;
   if (DRY_RUN) {
     dryLog(`would move @jdd/ui to ${next}`);

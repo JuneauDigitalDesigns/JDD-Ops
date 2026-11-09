@@ -552,8 +552,16 @@ Starter's response and form are unchanged.
 **The route and the form move together.** `writeApiRoutes` rewrites the route on every run, and a
 client repo's package.json isn't template-owned. So `refreshUiPin` (`lib/ui-pin.js`) moves the repo
 to the template's `@jdd/ui` tag in the same pass, forward only, before step 5's build. Without it, a
-callback site re-run with the new route on an older form has no box, and nobody is ever called. A
-console export over a stale repo is stopped by `verifyUiPins` instead.
+callback site re-run with the new route on an older form has no box, and nobody is ever called.
+
+The console export writes the same routes (`writeOnboardRoutes`) and takes the same rule
+(`uiPinMove`), but moves the pin **only on the operator's confirmation**. Re-export and Deploy list
+the whole update from `/api/build/export/plan` (pin, lockfile, refreshed `src/lib`, rewritten
+routes) behind an "Update shared libraries" box; the export refuses, before writing anything,
+unless the request names exactly that from → to. Then, after install and before the build, commit
+and push, `checkRepoFormRoutePairing` (`console/src/lib/sharedLibs.ts`) reads the **installed**
+`@jdd/ui` form and the repo's `/api/contact` and refuses any pair that disagrees on AI-call consent.
+`console/test/shared-lib-upgrade.test.mjs` holds both rules.
 
 **An unanswered callback is a lost lead (operator decision, 2026-11-03).** It must produce no
 after-call run and nothing in the client's portal. Both halves enforce it:

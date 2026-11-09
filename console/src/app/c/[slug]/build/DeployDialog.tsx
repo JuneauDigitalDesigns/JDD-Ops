@@ -13,6 +13,9 @@ import {
   buildCommitMessage, describeComposition, diffComposition, diffContent, resolveRevert,
   type CompositionChange, type ContentChange, type DeployDiff,
 } from '@/lib/deploy-diff';
+import {
+  DeployProgress, NextStep, SharedLibsPanel, upgradeConfirmation, useSharedLibPlan,
+} from './SharedLibs';
 
 /**
  * Ship studio changes to a client's LIVE site.
@@ -61,8 +64,11 @@ type Status =
   | { kind: 'diffing' }
   | { kind: 'ready'; payload: DiffPayload }
   | { kind: 'running'; steps: string[] }
-  | { kind: 'done'; steps: string[] }
-  | { kind: 'error'; message: string; detail?: string; steps: string[] };
+  | { kind: 'done'; steps: string[]; pushed: Pushed | null }
+  | { kind: 'error'; message: string; detail?: string; next?: string; steps: string[] };
+
+/** What the export route reports reached the remote. */
+type Pushed = { branch: string; sha: string | null; fullSha: string | null };
 
 /**
  * Paths the studio itself writes. Everything else in a deploy commit was authored by
@@ -238,6 +244,13 @@ export default function DeployDialog({
   /** Behind the remote means `git push` is rejected — refuse before anything is written. */
   const behindBlocked = (payload?.sync?.behind ?? 0) > 0;
 
+  // A repo behind the template's @jdd/ui: the update is listed and must be confirmed to deploy.
+  const libs = useSharedLibPlan(slug);
+  const [libsConfirmed, setLibsConfirmed] = useState(false);
+  useEffect(() => setLibsConfirmed(false), [libs.plan?.from, libs.plan?.to]);
+  const libsBlocked = Boolean(libs.plan) && !libsConfirmed;
+  const libsPending = libs.loading;
+
   const deploy = useCallback(
     async (commitMessage: string) => {
       setStatus({ kind: 'running', steps: [] });
@@ -256,6 +269,7 @@ export default function DeployDialog({
             content: effective,
             deploy: true,
             commitMessage,
+            uiUpgrade: upgradeConfirmation(libs.plan, libsConfirmed),
           }),
         });
       } catch {
@@ -313,14 +327,20 @@ export default function DeployDialog({
               steps.push(String(msg.message));
               setStatus({ kind: 'running', steps: [...steps] });
             } else if (msg.type === 'done') {
-              setStatus({ kind: 'done', steps: [...steps] });
+              const pushed = msg.pushed && typeof msg.pushed === 'object' ? (msg.pushed as Pushed) : null;
+              setStatus({ kind: 'done', steps: [...steps], pushed });
+              libs.reload();
             } else if (msg.type === 'error') {
               setStatus({
                 kind: 'error',
                 message: String(msg.message),
                 detail: msg.detail ? String(msg.detail) : undefined,
+                next: msg.next ? String(msg.next) : undefined,
                 steps: [...steps],
               });
+              if (msg.uiUpgrade && typeof msg.uiUpgrade === 'object') {
+                libs.setPlan(msg.uiUpgrade as NonNullable<typeof libs.plan>);
+              }
             }
           }
         }
@@ -341,7 +361,7 @@ export default function DeployDialog({
         });
       }
     },
-    [slug, exportEntries, vertical, effective],
+    [slug, exportEntries, composition, vertical, effective, libs, libsConfirmed],
   );
 
   return (
@@ -378,6 +398,17 @@ export default function DeployDialog({
               slug={slug}
               onRecheck={() => setRefreshKey((k) => k + 1)}
             />
+          )}
+
+          {status.kind === 'ready' && !status.payload.blocker && libs.plan && (
+            <div className="mt-5">
+              <SharedLibsPanel plan={libs.plan} confirmed={libsConfirmed} onConfirmedChange={setLibsConfirmed} />
+            </div>
+          )}
+          {status.kind === 'ready' && libs.error && (
+            <p className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--warn)' }}>
+              <Warning size={13} weight="fill" /> {libs.error}
+            </p>
           )}
 
           {status.kind === 'ready' && !status.payload.blocker && !behindBlocked && (
@@ -432,10 +463,14 @@ export default function DeployDialog({
               )}
               {status.kind === 'done' && (
                 <li className="mt-2 flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ok)' }}>
-                  <CheckCircle size={15} weight="fill" /> Pushed. Vercel is building the new version.
+                  <CheckCircle size={15} weight="fill" /> Pushed{status.pushed?.sha ? ` ${status.pushed.sha}` : ''} to
+                  origin/{status.pushed?.branch ?? '…'}.
                 </li>
               )}
             </ol>
+          )}
+          {status.kind === 'done' && status.pushed?.fullSha && (
+            <DeployProgress slug={slug} sha={status.pushed.fullSha} branch={status.pushed.branch} />
           )}
 
           {status.kind === 'error' && (
@@ -448,6 +483,7 @@ export default function DeployDialog({
                   {status.detail}
                 </pre>
               )}
+              <NextStep text={status.next} />
             </div>
           )}
         </div>
@@ -479,9 +515,11 @@ export default function DeployDialog({
           {status.kind === 'ready' && !status.payload.blocker && !behindBlocked && !liveDiff.clean && (
             <>
               <span className="text-2xs text-fg3">
-                {status.payload.firstDeploy
-                  ? 'First deploy — the whole site ships.'
-                  : summarise(status.payload, liveDiff)}
+                {libsBlocked
+                  ? 'Shared libraries · confirmation required'
+                  : status.payload.firstDeploy
+                    ? 'First deploy — the whole site ships.'
+                    : summarise(status.payload, liveDiff)}
               </span>
               <button type="button" onClick={onClose} className="btn btn-sm ml-auto">
                 Cancel
@@ -489,8 +527,14 @@ export default function DeployDialog({
               <button
                 type="button"
                 onClick={() => deploy(message)}
-                disabled={!message.trim()}
-                title={!message.trim() ? 'A commit message is required.' : undefined}
+                disabled={!message.trim() || libsBlocked || libsPending}
+                title={
+                  !message.trim()
+                    ? 'A commit message is required.'
+                    : libsBlocked
+                      ? 'Tick “Update shared libraries” first.'
+                      : undefined
+                }
                 className="btn btn-sm btn-primary"
               >
                 Deploy <ArrowRight size={13} weight="bold" />
@@ -500,7 +544,9 @@ export default function DeployDialog({
           {status.kind === 'ready' && !status.payload.blocker && !behindBlocked && liveDiff.clean && (
             <>
               <span className="text-2xs text-fg3">
-                Nothing to deploy — the live site already matches.
+                {libsBlocked
+                  ? 'Shared libraries · confirmation required'
+                  : 'Nothing to deploy — the live site already matches.'}
               </span>
               <button type="button" onClick={onClose} className="btn btn-sm ml-auto">
                 Close
@@ -511,7 +557,7 @@ export default function DeployDialog({
               <button
                 type="button"
                 onClick={() => deploy(message)}
-                disabled={!message.trim()}
+                disabled={!message.trim() || libsBlocked || libsPending}
                 className="btn btn-sm"
                 title="Re-run the export, commit and push even though nothing looks different"
               >
@@ -519,8 +565,19 @@ export default function DeployDialog({
               </button>
             </>
           )}
+          {status.kind === 'error' && (
+            // Back to the comparison, re-fetched: most refusals are fixed outside this dialog
+            // (a confirmation, a rebase, a provisioning run), and this is the way back in.
+            <button type="button" onClick={() => setRefreshKey((k) => k + 1)} className="btn btn-sm ml-auto">
+              <ArrowClockwise size={13} /> Re-check
+            </button>
+          )}
           {(status.kind === 'done' || status.kind === 'error') && (
-            <button type="button" onClick={onClose} className="btn btn-sm ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className={status.kind === 'error' ? 'btn btn-sm' : 'btn btn-sm ml-auto'}
+            >
               Close
             </button>
           )}

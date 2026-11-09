@@ -44,3 +44,44 @@ test('onboard.js moves the pin before its build, with the spec named explicitly'
   // npm does not re-resolve a github: dependency when only the tag moves in package.json.
   assert.match(src, /run\(`npm install "\$\{next\}"`/);
 });
+
+/**
+ * The console export moves a client repo's pin too, after the operator confirms it. It reads the
+ * same rule through uiPinMove rather than keeping its own copy, so the two can't disagree about
+ * which repos are behind.
+ */
+test('uiPinMove reads both package.json files and applies the one rule', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { uiPinMove } = await import('../lib/ui-pin.js');
+  const dir = mkdtempSync(resolve(tmpdir(), 'ui-pin-'));
+  const pkg = (sub, ui) => {
+    mkdirSync(resolve(dir, sub), { recursive: true });
+    writeFileSync(resolve(dir, sub, 'package.json'), JSON.stringify({ dependencies: ui ? { '@jdd/ui': ui } : {} }));
+  };
+  try {
+    pkg('template', spec('v1.4.0'));
+    pkg('repo', spec('v1.0.7'));
+    assert.deepEqual(uiPinMove(resolve(dir, 'repo'), resolve(dir, 'template')), { from: spec('v1.0.7'), to: spec('v1.4.0') });
+    pkg('repo', spec('v1.4.0'));
+    assert.equal(uiPinMove(resolve(dir, 'repo'), resolve(dir, 'template')), null);
+    assert.equal(uiPinMove(resolve(dir, 'missing'), resolve(dir, 'template')), null, 'no repo package.json');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('only a github:owner/repo#vX.Y.Z spec is installable on a command line', async () => {
+  const { isInstallableUiSpec } = await import('../lib/ui-pin.js');
+  assert.equal(isInstallableUiSpec(spec('v1.4.0')), true);
+  assert.equal(isInstallableUiSpec(spec('main')), false);
+  assert.equal(isInstallableUiSpec('github:a&calc/jdd-ui#v1.4.0'), false);
+  assert.equal(isInstallableUiSpec(`${spec('v1.4.0')} && calc`), false);
+  assert.equal(isInstallableUiSpec(undefined), false);
+});
+
+test('onboard.js takes its pin move from uiPinMove, the rule the console uses', () => {
+  const src = readFileSync(resolve(ROOT, 'onboard.js'), 'utf8');
+  assert.match(src, /import \{ uiPinMove \} from '\.\/lib\/ui-pin\.js';/);
+  assert.match(src, /const next = uiPinMove\(repoDir, resolve\(SCRIPT_DIR, 'template'\)\)\?\.to;/);
+});

@@ -10,6 +10,7 @@ import type { VerticalId } from '@/lib/verticals';
 import type { SiteContent } from '@/data/site';
 import { defaultSkin, supportsSkin } from '@/lib/skins';
 import { EASE } from '@/lib/motion';
+import { NextStep, SharedLibsPanel, upgradeConfirmation, useSharedLibPlan } from './SharedLibs';
 
 // Export + destination, lifted out of the old FinalizePanel. The Studio canvas owns
 // composition and editing; this owns only "ship it". It opens from the top bar's Launch
@@ -21,10 +22,10 @@ type Status =
   | { kind: 'idle' }
   | { kind: 'running'; steps: string[] }
   | { kind: 'done'; repoPath: string; components: string[]; steps: string[] }
-  | { kind: 'error'; message: string; detail?: string; steps: string[] };
+  | { kind: 'error'; message: string; detail?: string; next?: string; steps: string[] };
 
 export default function LaunchDialog({
-  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose,
+  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy,
 }: {
   categories: CategoryEntry[];
   selections: Selections;
@@ -37,6 +38,8 @@ export default function LaunchDialog({
   effective: SiteContent;
   lockedSlug?: string;
   onClose: () => void;
+  /** Opens the Deploy dialog for this client; offered once an export of an existing repo succeeds. */
+  onDeploy?: () => void;
 }) {
   const reduce = useReducedMotion();
   const [clients, setClients] = useState<ClientInfo[]>([]);
@@ -84,7 +87,15 @@ export default function LaunchDialog({
   const effectiveSlug = (lockedSlug ?? (mode === 'new' ? newSlug : selectedSlug)).trim();
   const slugHasRepo = clients.find((c) => c.slug === effectiveSlug)?.hasRepo ?? false;
   const busy = status.kind === 'running';
-  const canExport = exportEntries.length > 0 && effectiveSlug.length > 0 && !busy;
+
+  // A repo behind the template's @jdd/ui is offered the update; the export refuses it unconfirmed.
+  const libs = useSharedLibPlan(slugHasRepo ? effectiveSlug : null);
+  const [libsConfirmed, setLibsConfirmed] = useState(false);
+  useEffect(() => setLibsConfirmed(false), [libs.plan?.from, libs.plan?.to]);
+  const libsBlocked = Boolean(libs.plan) && !libsConfirmed;
+
+  const canExport =
+    exportEntries.length > 0 && effectiveSlug.length > 0 && !busy && !libs.loading && !libsBlocked;
 
   async function handleExport() {
     if (!canExport) return;
@@ -98,6 +109,7 @@ export default function LaunchDialog({
         body: JSON.stringify({
           slug: effectiveSlug,
           overwrite: slugHasRepo ? overwrite : false,
+          uiUpgrade: upgradeConfirmation(libs.plan, libsConfirmed),
           selections: exportEntries.map((e) => ({
             categoryId: e.categoryId, name: e.name, label: e.label, skin: e.exportSkin,
           })),
@@ -141,13 +153,21 @@ export default function LaunchDialog({
             components: (msg.components as string[]) ?? [],
             steps: [...steps],
           });
+          // The update is applied now; nothing is pending any more.
+          libs.reload();
         } else if (msg.type === 'error') {
           setStatus({
             kind: 'error',
             message: String(msg.message),
             detail: msg.detail ? String(msg.detail) : undefined,
+            next: msg.next ? String(msg.next) : undefined,
             steps: [...steps],
           });
+          // The server found an update the dialog didn't know about (the template moved, or the
+          // plan couldn't be read on open): show it so it can be confirmed.
+          if (msg.uiUpgrade && typeof msg.uiUpgrade === 'object') {
+            libs.setPlan(msg.uiUpgrade as NonNullable<typeof libs.plan>);
+          }
         }
       }
     }
@@ -234,10 +254,27 @@ export default function LaunchDialog({
             </div>
           )}
 
+          {slugHasRepo && libs.plan && (
+            <SharedLibsPanel
+              plan={libs.plan}
+              confirmed={libsConfirmed}
+              onConfirmedChange={setLibsConfirmed}
+              disabled={busy}
+            />
+          )}
+          {slugHasRepo && libs.error && (
+            <p className="flex items-center gap-2 text-xs" style={{ color: 'var(--warn)' }}>
+              <Warning size={14} weight="fill" /> {libs.error}
+            </p>
+          )}
+
           {slugHasRepo && (
             <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <input
-                type="checkbox" checked={overwrite} disabled={busy}
+                type="checkbox"
+                // A confirmed shared-library update always refreshes the template-owned files.
+                checked={overwrite || (Boolean(libs.plan) && libsConfirmed)}
+                disabled={busy || (Boolean(libs.plan) && libsConfirmed)}
                 onChange={(e) => setOverwrite(e.target.checked)} className="mt-1"
               />
               Overwrite the existing repo with a fresh template copy
@@ -268,6 +305,9 @@ export default function LaunchDialog({
                   {status.repoPath}
                 </code>
               </p>
+              {onDeploy && slugHasRepo && (
+                <p className="mt-1 text-xs">Built locally only. Nothing is committed or pushed until Deploy.</p>
+              )}
             </div>
           )}
 
@@ -279,6 +319,9 @@ export default function LaunchDialog({
               {status.detail && (
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-chromeMono text-xs">{status.detail}</pre>
               )}
+              <div className="mt-2">
+                <NextStep text={status.next} />
+              </div>
             </div>
           )}
         </div>
@@ -289,10 +332,19 @@ export default function LaunchDialog({
               ? `${composition.pages.length} page${composition.pages.length === 1 ? '' : 's'}`
               : `${bodyEntries.length} section${bodyEntries.length === 1 ? '' : 's'}${seoEntry ? ' + SEO' : ''}`}
           </span>
-          <button type="button" onClick={handleExport} disabled={!canExport} className="btn btn-primary">
-            {busy ? <CircleNotch size={17} className="animate-spin" /> : <Rocket size={17} />}
-            {busy ? 'Building…' : 'Export & build'}
-          </button>
+          {libsBlocked && !busy && (
+            <span className="ml-auto text-xs text-fg3">Shared libraries · confirmation required</span>
+          )}
+          {status.kind === 'done' && onDeploy && slugHasRepo ? (
+            <button type="button" onClick={onDeploy} className="btn btn-primary">
+              <Rocket size={17} /> Deploy
+            </button>
+          ) : (
+            <button type="button" onClick={handleExport} disabled={!canExport} className="btn btn-primary">
+              {busy ? <CircleNotch size={17} className="animate-spin" /> : <Rocket size={17} />}
+              {busy ? 'Building…' : 'Export & build'}
+            </button>
+          )}
         </footer>
       </motion.div>
     </div>

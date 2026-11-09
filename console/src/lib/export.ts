@@ -33,6 +33,7 @@ import {
   type UiPinResult,
 } from '@/lib/libExports';
 import { isValidSkin, supportsSkin } from '@/lib/skins';
+import { ONBOARD_OWNED, TEMPLATE_OWNED_FILES, TEMPLATE_OWNED_PREFIXES } from '@/lib/sharedLibs';
 import { VERTICAL_PRESETS } from '@/lib/verticals';
 
 const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
@@ -157,40 +158,9 @@ export function validateEntries(entries: Entry[]): Entry[] {
   return entries;
 }
 
-/**
- * Repo paths owned by onboard.js (written from jdd-ops/lib/site-routes/*), NOT by template/.
- *
- * template/ ships stubs of all three so it builds standalone, but the contact stub is a retired
- * architecture — it still branches on `LEAD_DELIVERY_MODE === 'webhook'` and posts to
- * MAKE_WEBHOOK_URL, which nothing sets any more. Copying it over a provisioned client swaps a
- * working Retell callback for a webhook that does not exist and leads vanish silently. That had
- * already happened to the reference client before this guard existed.
- */
-export const ONBOARD_OWNED = [
-  { asset: 'contact.route.ts', dest: 'src/app/api/contact/route.ts' },
-  { asset: 'voice.route.ts', dest: 'src/app/api/voice/route.ts' },
-  { asset: 'no-answer.route.ts', dest: 'src/app/api/voice/no-answer/route.ts' },
-] as const;
-
-/**
- * What the TEMPLATE owns once a repo exists — the shared libraries, styles and build config a
- * catalog component compiles against.
- *
- * Refreshing exactly these is the entire purpose of `overwrite`: verifyCatalogImports' staleRepo
- * branch tells the operator to "export again with overwrite enabled" precisely so src/lib catches
- * up with the console. Everything outside this list belongs to the client repo once it exists.
- */
-const TEMPLATE_OWNED_PREFIXES = ['src/lib/', 'src/styles/'];
-const TEMPLATE_OWNED_FILES = [
-  'next.config.js',
-  'postcss.config.js',
-  'tailwind.config.ts',
-  'tsconfig.json',
-  // Rewritten immediately afterwards by writeSiteContent/wirePage; listed so an existing repo
-  // still gets a clean base if either of those is ever skipped.
-  'src/data/site.ts',
-  'src/app/page.tsx',
-];
+// ONBOARD_OWNED and the template-owned lists live in sharedLibs.ts (fs-only, so tests can load
+// them), next to the shared-library update that reports on exactly these paths.
+export { ONBOARD_OWNED };
 
 /**
  * template-relative POSIX path for a source path handed to cpSync's filter.
@@ -933,6 +903,27 @@ export async function verifyUiLockFor(
     problems: results.flatMap((r) => r.problems),
     uncheckable: results.flatMap((r) => r.uncheckable),
   };
+}
+
+/**
+ * The same lockfile check, for the CLIENT repo, after a confirmed shared-library update.
+ *
+ * verifyUiLockFor checks the console and the template before an export because a client repo has
+ * no lock of its own until the export installs one. Once `npm install <spec>` has re-resolved a
+ * client's lock, that lock is the thing about to be committed and pushed, so it is checked too.
+ */
+export async function verifyRepoUiLockFor(
+  repoRoot: string,
+  slug: string,
+  lookup: (remote: string) => Promise<Record<string, string>> = lsRemoteTags,
+): Promise<LockResult> {
+  const repoDir = repoDirFor(repoRoot, slug);
+  return verifyUiLock({
+    pkgPath: resolve(repoDir, 'package.json'),
+    lockPath: resolve(repoDir, 'package-lock.json'),
+    tagCommits: await lookup(UI_REMOTE),
+    label: `clients/${slug}/repo`,
+  });
 }
 
 const UI_REMOTE = 'https://github.com/JuneauDigitalDesigns/jdd-ui.git';
