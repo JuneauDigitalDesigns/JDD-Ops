@@ -63,7 +63,9 @@ export type AuditAction =
   | 'a2p.intake'
   // Close on a call: the order action and its outcome, never a card, an email body or an EIN.
   | 'close.order'
-  | 'close.convert';
+  | 'close.convert'
+  // A call recording attached to an agreement: the order id only, never the file name.
+  | 'agreement.recording';
 
 export interface AuditEntry {
   /** ISO timestamp. */

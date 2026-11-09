@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * The order's write actions, each a one-to-one proxy of the agency route of the same name.
  * An allowlist, not a pass-through: this path can only reach the actions named here.
  */
-const ACTIONS = new Set(['accept-terms', 'agreement-link', 'payment', 'resend-link', 'resend-invite', 'cancel']);
+const ACTIONS = new Set(['accept-terms', 'agreement-link', 'recording-stopped', 'payment', 'resend-link', 'resend-invite', 'cancel']);
 
 export async function POST(req: Request, { params }: { params: { id: string; action: string } }) {
   if (!isLoopback(req)) return NextResponse.json({ error: 'Available on localhost only.' }, { status: 403 });
