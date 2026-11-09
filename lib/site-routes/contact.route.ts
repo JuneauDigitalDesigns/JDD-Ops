@@ -36,17 +36,27 @@ function toE164(raw: string): string | null {
 //   - No callback (Starter, web-only, Retell refused it, no dialable number) → recorded, and the
 //     owner is texted at once. A refused callback is a system failure, not a lost lead.
 //
+// A callback also needs the visitor's consent to an AI call (operator decision, 2026-11-09). The
+// form's box is the first gate; this route is the real one. It dials only with a consent it can
+// verify, and only after the proof is saved at the agency, because a placed callback is never
+// recorded as a lead and would otherwise take the proof with it. A callback site with no valid
+// consent, or nowhere to keep it, makes no call: the lead goes to the inbox and the owner is
+// texted, the same as a callback Retell refuses.
+//
 // Resend is gone entirely. It was the whole delivery mechanism for Starter and it failed open:
 // `RESEND_API_KEY` seeded empty on a fresh client and `syncVercelEnv` skips empty values, so the
 // key never reached Vercel and this route 502'd on every lead until someone noticed by hand.
 
-/** Record the lead in the client's portal. Returns true when it was stored. */
-async function recordLead(data: Record<string, unknown>, callbackPlaced: boolean): Promise<boolean> {
+/** Record the lead in the client's portal. Returns its id, or null when it wasn't stored. */
+async function recordLead(
+  data: Record<string, unknown>,
+  callbackPlaced: boolean,
+): Promise<{ leadId: string | null } | null> {
   const url = process.env.LEAD_INGEST_URL;
   const token = process.env.LEAD_INGEST_TOKEN;
   if (!url || !token) {
     console.error('[contact] LEAD_INGEST_URL/LEAD_INGEST_TOKEN not set — lead not recorded');
-    return false;
+    return null;
   }
   try {
     // The WHOLE body is forwarded, not a whitelist. That is what lets a new form field — or the
@@ -61,11 +71,143 @@ async function recordLead(data: Record<string, unknown>, callbackPlaced: boolean
     });
     if (!res.ok) {
       console.error('[contact] lead ingest failed:', res.status, (await res.text()).slice(0, 300));
+      return null;
+    }
+    const body = (await res.json().catch(() => null)) as { leadId?: unknown } | null;
+    return { leadId: typeof body?.leadId === 'string' ? body.leadId : null };
+  } catch (e) {
+    console.error('[contact] lead ingest threw:', e);
+    return null;
+  }
+}
+
+/**
+ * Add the visitor's message to a lead this route already recorded, after the AI call couldn't go
+ * out. It updates that lead rather than creating another, so the owner gets one lead and one text.
+ */
+async function saveFollowUpMessage(raw: unknown): Promise<NextResponse> {
+  const { leadId, message } = (raw && typeof raw === 'object' ? raw : {}) as {
+    leadId?: unknown;
+    message?: unknown;
+  };
+  const text = shortString(message, 2000);
+  if (typeof leadId !== 'string' || !/^[0-9a-f-]{36}$/i.test(leadId) || !text) {
+    return NextResponse.json({ ok: false, error: 'A message is required' }, { status: 400 });
+  }
+  try {
+    const res = await fetch(new URL('/api/ingest/lead/message', process.env.LEAD_INGEST_URL), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.LEAD_INGEST_TOKEN}`,
+      },
+      body: JSON.stringify({ leadId, message: text }),
+    });
+    if (res.ok) return NextResponse.json({ ok: true });
+    console.error('[contact] follow-up message not saved:', res.status);
+  } catch (e) {
+    console.error('[contact] saving the follow-up message threw:', e);
+  }
+  return NextResponse.json({ ok: false, error: 'Delivery failed' }, { status: 502 });
+}
+
+/**
+ * The wording each consent version showed, so a hash can be checked against the words.
+ *
+ * A standalone copy of LEAD_CALL_CONSENT_TEMPLATE in @jdd/ui: this file is written verbatim into
+ * client repos. Approved word for word by the operator on 2026-11-09. A new wording in @jdd/ui
+ * adds a row here; never edit one. console/test/contact-route-callback.test.mjs pins the words.
+ */
+const CALL_CONSENT_WORDING: Record<string, string> = {
+  'lead-call-consent-v1':
+    "I agree that {business} may call me back at the number I entered, about this request, using an automated system and an AI-generated voice. The call may be recorded. I don't have to agree in order to buy anything, and I can phone instead.",
+};
+
+const canonicalText = (text: string) => text.replace(/\s+/g, ' ').trim();
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const shortString = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+interface CallConsentProof {
+  textVersion: string;
+  textHash: string;
+  text: string;
+  businessName: string;
+  capturedAt: string;
+  pageUrl: string;
+}
+
+/**
+ * The visitor's consent to the AI callback, or null if it isn't one we can stand behind.
+ *
+ * The hash is re-derived from this site's own business name, so a form on an old build, one that
+ * showed other words, or a hand-written POST can't reach the dialer. A site with no business name
+ * fails here on purpose: the approved wording names the business.
+ */
+async function verifiedCallConsent(raw: unknown): Promise<CallConsentProof | null> {
+  if (!raw || typeof raw !== 'object') return null;
+  const c = raw as Record<string, unknown>;
+  const businessName = canonicalText(process.env.NEXT_PUBLIC_BRAND_NAME ?? '');
+  const textVersion = typeof c.textVersion === 'string' ? c.textVersion : '';
+  if (c.basis !== 'web-form-checkbox' || !businessName) return null;
+  if (!Object.hasOwn(CALL_CONSENT_WORDING, textVersion)) return null;
+
+  const text = canonicalText(CALL_CONSENT_WORDING[textVersion].replace('{business}', () => businessName));
+  const textHash = await sha256Hex(text);
+  if (c.textHash !== textHash) return null;
+
+  return {
+    textVersion,
+    textHash,
+    text,
+    businessName,
+    capturedAt: shortString(c.capturedAt, 40),
+    pageUrl: shortString(c.pageUrl, 500),
+  };
+}
+
+/**
+ * Save the proof at the agency. True only once it is stored.
+ *
+ * Its own endpoint, not the lead ingest: this record must exist for a callback that goes
+ * unanswered, and nothing about that callback may appear in the client's inbox.
+ */
+async function saveCallConsentProof(
+  req: Request,
+  proof: CallConsentProof,
+  phone: string,
+  name: unknown,
+): Promise<boolean> {
+  const token = process.env.LEAD_INGEST_TOKEN;
+  if (!process.env.LEAD_INGEST_URL || !token) {
+    console.error('[contact] LEAD_INGEST_URL/LEAD_INGEST_TOKEN not set — call consent not saved');
+    return false;
+  }
+  try {
+    const url = new URL('/api/ingest/call-consent', process.env.LEAD_INGEST_URL);
+    const forwarded = req.headers.get('x-forwarded-for');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        ...proof,
+        phone,
+        name: shortString(name, 200),
+        ip: forwarded ? forwarded.split(',')[0].trim() : req.headers.get('x-real-ip') || 'unknown',
+        userAgent: shortString(req.headers.get('user-agent'), 500) || 'unknown',
+      }),
+    });
+    if (!res.ok) {
+      console.error('[contact] call consent not saved:', res.status);
       return false;
     }
     return true;
   } catch (e) {
-    console.error('[contact] lead ingest threw:', e);
+    console.error('[contact] saving call consent threw:', e);
     return false;
   }
 }
@@ -155,6 +297,12 @@ async function placeCallback(toNumber: string, leadName: unknown): Promise<boole
 export async function POST(req: Request) {
   const data = await req.json().catch(() => ({}) as Record<string, unknown>);
 
+  // The second step of a callback site's form, only ever reached after a call that didn't go out.
+  const followUp = (data as { followUp?: unknown }).followUp;
+  if (followUp !== undefined && process.env.LEAD_CALLBACK === 'on') {
+    return saveFollowUpMessage(followUp);
+  }
+
   const phoneRaw = String((data as { phone?: unknown }).phone ?? '');
   const emailRaw = String((data as { email?: unknown }).email ?? '').trim();
   const toNumber = phoneRaw ? toE164(phoneRaw) : null;
@@ -172,7 +320,13 @@ export async function POST(req: Request) {
   // the added latency is one API round trip rather than the length of a conversation.
   let callbackPlaced = false;
   if (process.env.LEAD_CALLBACK === 'on' && toNumber) {
-    callbackPlaced = await placeCallback(toNumber, (data as { name?: unknown }).name);
+    const { name, callConsent } = data as { name?: unknown; callConsent?: unknown };
+    const proof = await verifiedCallConsent(callConsent);
+    if (!proof) {
+      console.warn('[contact] no valid call consent — not dialing, recording the lead instead');
+    } else if (await saveCallConsentProof(req, proof, toNumber, name)) {
+      callbackPlaced = await placeCallback(toNumber, name);
+    }
   }
 
   // A placed callback is NOT recorded here. Operator rule, 2026-11-03: an unanswered callback is
@@ -191,6 +345,12 @@ export async function POST(req: Request) {
   // Nothing happened at all: the form must say so and show the phone number as a fallback.
   if (!stored) {
     return NextResponse.json({ ok: false, error: 'Delivery failed' }, { status: 502 });
+  }
+
+  // A visitor on a callback site was told to expect a call that isn't coming. Saying so lets the
+  // form offer a message box instead. Starter's response stays exactly as it was.
+  if (process.env.LEAD_CALLBACK === 'on' && phoneRaw) {
+    return NextResponse.json({ ok: true, callback: 'unavailable', followUpId: stored.leadId });
   }
 
   return NextResponse.json({ ok: true });
