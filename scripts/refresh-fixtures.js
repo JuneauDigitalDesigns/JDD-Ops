@@ -156,6 +156,12 @@ async function main() {
   console.log('Make:');
   const bp = await getJson(`${MAKE_ZONE}/scenarios/${masterScenario}/blueprint`, mk, 'master blueprint');
   save('make/master-blueprint.json', scrubBlueprint(bp));
+  // Module metadata is scrubbed above because it can hold call data. The Airtable module's form
+  // description holds none, and it is what checkEditorShowsMappings reads.
+  {
+    const { expect, restore } = bp?.response?.blueprint?.flow?.find((m) => (m.module ?? '').startsWith('airtable'))?.metadata ?? {};
+    save('make/master-airtable-metadata.json', { expect, restore });
+  }
 
   const scen = await getJson(`${MAKE_ZONE}/scenarios/${masterScenario}`, mk, 'master scenario');
   save('make/scenario.json', scen);

@@ -13,6 +13,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -304,18 +305,32 @@ test('verify-agents runs the check on each agent from its own folder', () => {
 
 const intakeSite = { brand: { name: growth.business }, services: { items: [] } };
 
+/**
+ * The real SDK against a local server, through its own base-URL setting. Replacing global fetch is
+ * not enough: the SDK version in the lockfile keeps its own reference, so that stub let this test
+ * call the real API from CI (401 on the fake key) while passing on a machine with a newer SDK.
+ */
 async function withAnthropic(prompt, run) {
-  const real = globalThis.fetch;
-  const key = process.env.ANTHROPIC_API_KEY;
+  const server = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ id: 'msg', type: 'message', role: 'assistant', model: 'x', stop_reason: 'end_turn', content: [{ type: 'text', text: prompt }], usage: { input_tokens: 1, output_tokens: 1 } }));
+    });
+  });
+  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  const saved = { key: process.env.ANTHROPIC_API_KEY, url: process.env.ANTHROPIC_BASE_URL };
   process.env.ANTHROPIC_API_KEY = 'recorded';
-  globalThis.fetch = async () =>
-    Response.json({ id: 'msg', type: 'message', role: 'assistant', model: 'x', stop_reason: 'end_turn', content: [{ type: 'text', text: prompt }], usage: { input_tokens: 1, output_tokens: 1 } });
+  process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${server.address().port}`;
   try {
     return await run();
   } finally {
-    globalThis.fetch = real;
-    if (key === undefined) delete process.env.ANTHROPIC_API_KEY;
-    else process.env.ANTHROPIC_API_KEY = key;
+    server.closeAllConnections();
+    server.close();
+    if (saved.key === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved.key;
+    if (saved.url === undefined) delete process.env.ANTHROPIC_BASE_URL;
+    else process.env.ANTHROPIC_BASE_URL = saved.url;
   }
 }
 
