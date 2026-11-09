@@ -62,9 +62,15 @@ test('the exporter and the Studio preview put the same class on the same section
 });
 
 test('the reveal CSS is in the template and the console, guarded for support and reduced motion', () => {
-  const block = (css) => {
+  // Line endings normalised BEFORE searching: on a Windows checkout git writes these files with
+  // CRLF, and an end marker of '\n}\n' never matched there (the test passed in CI and failed on
+  // the operator's machine, 530/531, after #41).
+  const block = (raw) => {
+    const css = raw.replace(/\r\n/g, '\n');
     const start = css.indexOf('@keyframes rv-in');
-    return css.slice(start, css.indexOf('\n}\n', css.indexOf('@supports (animation-timeline: view())', start)) + 2).replace(/\r/g, '');
+    if (start < 0) return '';
+    const end = css.indexOf('\n}\n', css.indexOf('@supports (animation-timeline: view())', start));
+    return end < 0 ? '' : css.slice(start, end + 2);
   };
   const template = block(read(path.join(OPS, 'template/src/styles/globals.css')));
   const consoleCss = block(read(path.join(CONSOLE, 'src/app/globals.css')));
