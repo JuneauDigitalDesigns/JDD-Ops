@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'lawn-reviews',
@@ -64,7 +65,7 @@ export default function LawnReviews({ content = CONTENT }: { content?: SiteConte
                   {avatar ? (
                     <span
                       className="h-11 w-11 shrink-0 rounded-full bg-cover bg-center"
-                      style={{ backgroundImage: `url(${avatar})` }}
+                      style={{ backgroundImage: `url(${imageAt(avatar, 640)})` }}
                       role="img"
                       aria-label={t.a}
                     />

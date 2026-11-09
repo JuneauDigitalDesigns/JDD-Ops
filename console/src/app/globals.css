@@ -599,6 +599,20 @@
   .hero-rise, .hero-slide, .hero-bar { animation: none; }
 }
 
+/* Scroll reveal for sections that bring no motion of their own (console/src/lib/revealPolicy.ts
+   decides which; the exporter puts the .rv class on them). A CSS scroll-driven animation: no
+   JavaScript, nothing hidden at first paint. A browser without animation-timeline, or a visitor
+   who prefers reduced motion, just sees the section. Same 24px rise and fade as @jdd/ui's `reveal` preset, finished once the section's top is 240px into view (a fixed
+   distance, so a tall section isn't left half-faded while it is being read).
+   KEEP IN STEP: the same block is in template/src/styles/globals.css and the console's
+   src/app/globals.css (console/test/reveal-policy.test.mjs). */
+@keyframes rv-in { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .rv { animation: rv-in linear both; animation-timeline: view(); animation-range: entry 0px entry 240px; }
+  }
+}
+
 /* ── Make.com module replicas (/onboard → map the call log) ──────────────────
    Deliberately NOT themed to the console: these reproduce Make's own white UI so that what
    is on screen matches what the operator has open in the other tab. The colours live in the

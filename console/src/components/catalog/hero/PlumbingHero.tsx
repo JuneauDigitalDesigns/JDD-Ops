@@ -17,6 +17,7 @@ import { Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'plumbing-hero',
@@ -91,7 +92,7 @@ export default function PlumbingHero({ content = CONTENT }: { content?: SiteCont
         {slide && (
           <div
             className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${slide})` }}
+            style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }}
             role="img"
             aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} plumbing work`}
           />

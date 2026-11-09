@@ -616,6 +616,26 @@ pre-portal and wrong.
 (`lib/site-routes/*.ts`) and written into the repo on every run — it is not sourced
 from `template/` or the client repo.
 
+**A client's `layout.tsx` is the client's, but it must mount the site-wide pieces.** It is copied
+from the template once, when the repo is made, and never refreshed: it holds the client's own fonts,
+metadata and analytics. So `lib/site-layout.js` (`ensureSiteLayout`) adds `<SmoothScroll />` (Lenis)
+and `<StickyCallBar />` when missing, exactly as `template/src/app/layout.tsx` mounts them, and
+touches nothing else. onboard.js runs it in step 3b; the console export runs it on every export and
+refuses a layout it can't place them in. `_e2e_test_growth` went live without either (2026-11-09)
+because its layout predates `96dd76a`.
+
+**Image fields are a localized base, not a file.** The export pipeline writes `/img/<hash>` into
+`site.ts` and `<hash>-<width>.webp` into `public/img`. A catalog component never uses an image field
+raw: `imageAt(url, width)` (`src/lib/localImage.ts`, a byte-identical copy in `template/src/lib`) for
+a CSS background or a single `src`, `responsiveImage`/`responsivePicture` (@jdd/ui) for srcsets.
+`console/test/local-images.test.mjs` fails on a raw use, and the export refuses a build whose pages
+ask for a local image with no file behind it. The live hero 404ed on 2026-11-09 for want of this.
+
+**Below-the-fold sections animate in.** The bespoke vertical components carry no motion of their own,
+so the exporter marks each section that needs it (`console/src/lib/revealPolicy.ts`) and
+`template/src/styles/globals.css` runs a CSS scroll-driven reveal: no JavaScript, never hidden in a
+browser without support or under reduced motion.
+
 ## Never wire a client to a master resource
 
 A client must own its Airtable base and its own clone of the post-call Make scenario. Sharing

@@ -4,6 +4,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'recent-jobs-grid',
@@ -64,7 +65,7 @@ export default function RecentJobsGrid({
               <div className="relative min-h-[180px] flex-1 overflow-hidden sm:min-h-0">
                 {p.image?.url ? (
                   /* width/height only supply the intrinsic ratio so the box is reserved before the bytes land; CSS (object-cover, flex-fill) sets the rendered size. */
-                  <img src={p.image.url} alt={p.image.alt} loading="lazy" width={i === 0 ? 1600 : 1200} height={i === 0 ? 1000 : 900}
+                  <img src={imageAt(p.image.url, i === 0 ? 1536 : 1024)} alt={p.image.alt} loading="lazy" width={i === 0 ? 1600 : 1200} height={i === 0 ? 1000 : 900}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                   // Decision 30(b): the contract §3 hatch, not a branded gradient slab.

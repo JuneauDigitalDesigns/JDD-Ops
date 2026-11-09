@@ -11,6 +11,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, stillFor } from '@/lib/motion';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'work-spotlight',
@@ -62,7 +63,7 @@ export default function WorkSpotlight({
                   transition={{ duration: 0.35, ease: EASE }}
                 >
                   {current.image?.url ? (
-                    <img src={current.image.url} alt={current.image.alt} loading="lazy" width={1200} height={800}
+                    <img src={imageAt(current.image.url, 1536)} alt={current.image.alt} loading="lazy" width={1200} height={800}
                       className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">

@@ -10,6 +10,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'testimonials-grid',
@@ -85,7 +86,7 @@ export default function TestimonialsGrid({
                 </div>
                 <div className="mt-6 flex items-center gap-3">
                   {avatar ? (
-                    <img src={avatar} alt={t.a} loading="lazy" width={96} height={96}
+                    <img src={imageAt(avatar, 640)} alt={t.a} loading="lazy" width={96} height={96}
                       className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-accent/20" />
                   ) : (
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent ring-1 ring-accent/20">

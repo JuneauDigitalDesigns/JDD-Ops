@@ -53,6 +53,7 @@ import {
 import { createClerkClient } from '@clerk/backend';
 import { FONT_DIR, FONT_LOADER, googleFontImports, writeSiteFonts } from './lib/site-fonts.js';
 import { uiPinMove } from './lib/ui-pin.js';
+import { ensureSiteLayout, LAYOUT_FILE } from './lib/site-layout.js';
 // toE164 comes from the package for the same reason vercelAppHost does: five copies had
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
@@ -892,6 +893,25 @@ function writeSelfHostedFonts(repoDir) {
  * Like the fonts, no log() of its own. In a dry run it only speaks when a move is due, which a
  * recorded fixture client never needs, so the phase contract's recordings stay valid.
  */
+/**
+ * Step 3b, continued: the site-wide mounts every layout.tsx needs (lib/site-layout.js has the
+ * why). Like the fonts and the pin, no log() of its own; a dry run speaks only when one is due.
+ *
+ * Warns rather than failing the run on a layout it can't place them in: provisioning stopping
+ * halfway over smooth scrolling would cost more than the scrolling. The console export, which is
+ * where a site is deployed from, refuses that case instead.
+ */
+function ensureLayoutPieces(repoDir) {
+  const result = ensureSiteLayout(repoDir, { write: !DRY_RUN });
+  if (result.error) {
+    console.warn(`  ⚠ ${result.error} Add <SmoothScroll /> and <StickyCallBar /> as template/src/app/layout.tsx does.`);
+    return;
+  }
+  if (!result.added.length) return;
+  if (DRY_RUN) dryLog(`would mount ${result.added.join(' + ')} in ${LAYOUT_FILE}`);
+  else console.log(`  Mounted ${result.added.join(' + ')} in ${LAYOUT_FILE}`);
+}
+
 function refreshUiPin(repoDir) {
   const next = uiPinMove(repoDir, resolve(SCRIPT_DIR, 'template'))?.to;
   if (!next) return;
@@ -3300,6 +3320,7 @@ async function main() {
     installClientSchema(repoDir, site);
     writeApiRoutes(repoDir);
     writeSelfHostedFonts(repoDir);
+    ensureLayoutPieces(repoDir);
     refreshUiPin(repoDir);
     // The env lines are returned (and computed even in dry mode) so the correctness checks can
     // assert the tier matrix and the forward target without re-reading the file.

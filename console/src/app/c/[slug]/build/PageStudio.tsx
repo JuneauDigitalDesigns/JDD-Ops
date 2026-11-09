@@ -13,6 +13,7 @@ import type { StudioReverts } from './page-order';
 import type { CategoryEntry } from './categories';
 import type { PageInstance, SectionRef, SectionRhythm, SiteComposition } from '@/lib/pages';
 import { homeLegacyView, navLinksFor, styleKeyFor, rhythmClass } from '@/lib/pages';
+import { REVEAL_CLASS, revealsOnScroll } from '@/lib/revealPolicy';
 import { defaultSkin, supportsSkin, type SkinId } from '@/lib/skins';
 import { EditProvider } from '@/lib/editable';
 import { sectionVars } from '@/lib/palette';
@@ -168,6 +169,8 @@ export default function PageStudio({
           <SectionShell
             style={style}
             rhythm={ref.rhythm}
+            // The same reveal the export writes, so the preview scrolls the way the site will.
+            reveal={chromeSlot === null && revealsOnScroll(ref, i - 1)}
             isOpen={openKey === sKey}
             onOpen={() => setOpenKey(sKey)}
             onCloseRequest={() => setOpenKey((k) => (k === sKey ? null : k))}
@@ -377,10 +380,11 @@ const OPEN_DELAY_MS = 3000;
 const CLOSE_GRACE_MS = 1500;
 
 function SectionShell({
-  style, rhythm, isOpen, onOpen, onCloseRequest, panel, children,
+  style, rhythm, reveal = false, isOpen, onOpen, onCloseRequest, panel, children,
 }: {
   style: CSSProperties;
   rhythm?: SectionRhythm;
+  reveal?: boolean;
   isOpen: boolean;
   onOpen: () => void;
   onCloseRequest: () => void;
@@ -408,7 +412,7 @@ function SectionShell({
 
   return (
     <div className="relative" onPointerEnter={handleEnter} onPointerLeave={handleLeave}>
-      <div className={rhythmClass(rhythm)} style={style}>{children}</div>
+      <div className={[rhythmClass(rhythm), reveal ? REVEAL_CLASS : ''].filter(Boolean).join(' ') || undefined} style={style}>{children}</div>
       {isOpen && panel}
     </div>
   );

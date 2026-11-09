@@ -7,6 +7,7 @@
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'lawn-services',
@@ -52,7 +53,7 @@ export default function LawnServices({ content = CONTENT }: { content?: SiteCont
                   {photo && (
                     <div
                       className="absolute inset-0 bg-cover bg-center"
-                      style={{ backgroundImage: `url(${photo})` }}
+                      style={{ backgroundImage: `url(${imageAt(photo, 1024)})` }}
                       role="img"
                       aria-label={item.image?.alt ?? item.t}
                     />
