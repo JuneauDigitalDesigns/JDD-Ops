@@ -130,6 +130,24 @@ test('no component owns a lead form', () => {
   assert.deepEqual(bad.map((c) => c.rel), [], 'these should use <LeadForm> from @/lib/LeadForm');
 });
 
+test('every lead form takes its mode from the plan', () => {
+  // `mode` is how the plan reaches the form. A form left on the default (phone), or hard-coded to
+  // it, would show a Starter visitor the AI-call consent box for a call that site never makes.
+  const code = (src) => src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '');
+  const forms = ALL.filter((c) => /<LeadForm\b/.test(code(c.src)));
+  assert.ok(forms.length > 10, `expected the catalog's forms, found ${forms.length}`);
+  const bad = forms.filter((c) => {
+    const src = code(c.src);
+    // One prop list per form: from each tag to the next one, far enough to hold its props.
+    const everyFormPassesMode = src
+      .split(/(?=<LeadForm\b)/)
+      .slice(1)
+      .every((form) => /\bmode=\{mode\}/.test(form.slice(0, 400)));
+    return !everyFormPassesMode || !/selectedPlan\s*===\s*'starter'\s*\?\s*'email'\s*:\s*'phone'/.test(src);
+  });
+  assert.deepEqual(bad.map((c) => c.rel), []);
+});
+
 test('no placeholder-only inputs', () => {
   // A placeholder is not an accessible name: announced inconsistently, and gone on input.
   const bad = ALL.filter((c) => /<input[^>]*placeholder=/.test(c.src));

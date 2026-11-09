@@ -494,7 +494,8 @@ Things worth knowing:
 The final-CTA form POSTs to `/api/contact`. `LEAD_DELIVERY_MODE` is `portal` on every tier; the
 only tier difference here is `LEAD_CALLBACK`:
 
-1. **If `LEAD_CALLBACK=on`** (Growth/Enterprise), the route normalizes the phone to E.164 and calls
+1. **If `LEAD_CALLBACK=on`** (Growth/Enterprise) **and the visitor's consent to an AI call is valid
+   and saved** (see below), the route normalizes the phone to E.164 and calls
    `POST https://api.retellai.com/v2/create-phone-call` (Bearer `RETELL_API_KEY`, body
    `{ from_number: TWILIO_NUMBER, to_number, override_agent_id: RETELL_AGENT_ID,
    agent_override: { retell_llm: { begin_message: <outbound opening line> } },
@@ -502,11 +503,40 @@ only tier difference here is `LEAD_CALLBACK`:
    the approved recording disclosure and identity check.
 2. **If that callback was placed, the submission is NOT recorded.** The lead reaches the portal
    only through the completed call.
-3. **Otherwise** (Starter, web-only, a callback Retell refused, no dialable number), the whole
+3. **Otherwise** (Starter, web-only, a callback Retell refused, no valid call consent, no dialable number), the whole
    posted body goes to `LEAD_INGEST_URL` with the per-client bearer `LEAD_INGEST_TOKEN`, so fields
    like the form's `consent` object arrive with no further change here, and the owner is texted
    at once. The route returns 502 only when that write fails: nothing happened, so the form shows
    the phone number as a fallback.
+
+**A callback needs consent to an AI call (operator decision, 2026-11-09).** The FCC treats an AI
+voice as artificial under the TCPA, so a phone-mode `LeadForm` (`@jdd/ui` v1.4.0+, every form that
+isn't Starter or web-only) has a required, unticked box naming the business and the AI voice, and
+posts the tick as `callConsent`. `/api/contact` is the real gate:
+
+- It re-derives the hash from its own `NEXT_PUBLIC_BRAND_NAME` and its copy of the wording
+  (`CALL_CONSENT_WORDING`). No match, no call. A new wording in `@jdd/ui` adds a row there too, or
+  every callback stops.
+- It saves the proof at the agency (`/api/ingest/call-consent`, same token) **before** dialing:
+  `call:consent:log:{slug}:{phone}`, append-only, no expiry, never read by the portal. A placed
+  callback isn't recorded as a lead, so the proof can't travel with one.
+- No valid consent, or nowhere to save it: no call. The lead is recorded and the owner texted,
+  exactly like a callback Retell refuses.
+
+The wording is word for word as the operator approved it. A lawyer has not reviewed it. Don't
+reword it without sign-off.
+
+**When the call can't go out, the form offers a message box (operator decision, 2026-11-09).**
+The route answers `{ ok: true, callback: 'unavailable', followUpId: <leadId> }` on a callback site
+whose lead was recorded instead of called. The form then shows a box, and what the visitor types
+reaches `/api/ingest/lead/message`, which adds it to that lead: one enquiry, one owner text.
+Starter's response and form are unchanged.
+
+**The route and the form move together.** `writeApiRoutes` rewrites the route on every run, and a
+client repo's package.json isn't template-owned. So `refreshUiPin` (`lib/ui-pin.js`) moves the repo
+to the template's `@jdd/ui` tag in the same pass, forward only, before step 5's build. Without it, a
+callback site re-run with the new route on an older form has no box, and nobody is ever called. A
+console export over a stale repo is stopped by `verifyUiPins` instead.
 
 **An unanswered callback is a lost lead (operator decision, 2026-11-03).** It must produce no
 after-call run and nothing in the client's portal. Both halves enforce it:

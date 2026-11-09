@@ -52,6 +52,7 @@ import {
 } from './lib/vercel-sync.js';
 import { createClerkClient } from '@clerk/backend';
 import { FONT_DIR, FONT_LOADER, googleFontImports, writeSiteFonts } from './lib/site-fonts.js';
+import { uiPinToAdopt } from './lib/ui-pin.js';
 // toE164 comes from the package for the same reason vercelAppHost does: five copies had
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
@@ -881,6 +882,30 @@ function writeSelfHostedFonts(repoDir) {
     console.warn(`  ⚠ ${rel} imports next/font/google, so this site's builds still download from Google and can fail at random.`);
     console.warn(`    Vendor the family into template/src/lib/fonts/ (scripts/vendor-fonts.js) and load it with next/font/local.`);
   }
+}
+
+/**
+ * Step 3b, continued: bring the repo's @jdd/ui up to the template's (lib/ui-pin.js has the why).
+ * Step 5's build then proves the result compiles before anything is pushed.
+ *
+ * Like the fonts, no log() of its own. In a dry run it only speaks when a move is due, which a
+ * recorded fixture client never needs, so the phase contract's recordings stay valid.
+ */
+function refreshUiPin(repoDir) {
+  const pinIn = (dir) => {
+    const pkg = resolve(dir, 'package.json');
+    if (!existsSync(pkg)) return undefined;
+    return JSON.parse(readFileSync(pkg, 'utf8')).dependencies?.['@jdd/ui'];
+  };
+  const next = uiPinToAdopt(pinIn(repoDir), pinIn(resolve(SCRIPT_DIR, 'template')));
+  if (!next) return;
+  if (DRY_RUN) {
+    dryLog(`would move @jdd/ui to ${next}`);
+    return;
+  }
+  // Named explicitly: npm does not re-resolve a github: dependency when only the tag moves.
+  run(`npm install "${next}"`, { cwd: repoDir });
+  console.log(`  Moved @jdd/ui to ${next}`);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -3257,6 +3282,7 @@ async function main() {
     installClientSchema(repoDir, site);
     writeApiRoutes(repoDir);
     writeSelfHostedFonts(repoDir);
+    refreshUiPin(repoDir);
     // The env lines are returned (and computed even in dry mode) so the correctness checks can
     // assert the tier matrix and the forward target without re-reading the file.
     const { lines: envLines } = writeClientEnvLocal(clientDir, siteSlug, intake.plan, site, webOnly);
