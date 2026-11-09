@@ -39,6 +39,7 @@ import {
   checkAnalysisCoversBlueprint,
   checkSelectMappingsTotal,
   checkCallbackNumberColumn,
+  checkEditorShowsMappings,
   checkOwnerBriefViaAgency,
   checkConnectedCallsOnly,
 } from '../lib/onboard-checks.js';
@@ -139,6 +140,11 @@ async function main() {
   // Every singleSelect mapping must be unable to emit an invalid option — a bare analysis field
   // that comes back "" fails the whole row (2026-11-03). Checked on the master, before the patch
   // mutates it, against the master's own base: every clone inherits these expressions.
+  // What the master writes must be what its editor draws, or a hand edit can drop it (2026-11-09).
+  const editor = checkEditorShowsMappings({ blueprint, fieldMap: masterMap });
+  if (editor.ok) note(`  ✓ ${editor.detail}`);
+  else bad(editor.detail ?? 'could not read the module metadata');
+
   const callbackNumber = checkCallbackNumberColumn({ blueprint, fieldMap: masterMap });
   if (callbackNumber.ok) note(`  ✓ ${callbackNumber.detail}`);
   else bad(callbackNumber.detail);
