@@ -146,10 +146,13 @@ export default function PromptTuner({ ctx, site }: { ctx: ClientContext; site: S
         body: JSON.stringify({ slug: ctx.slug, site: site.slug, prompt, push }),
       });
       const body = (await res.json()) as {
-        ok?: boolean; error?: string; pushed?: boolean; pushError?: string; llmId?: string;
+        ok?: boolean; error?: string; pushed?: boolean; pushError?: string; llmId?: string; prompt?: string;
       };
       if (body.error) { setResult({ ok: false, text: body.error }); return; }
-      setSaved(prompt);
+      // What was written, which differs from what was typed if the AI statement line was restored.
+      const written = body.prompt ?? prompt;
+      setPrompt(written);
+      setSaved(written);
       if (push && body.pushed) {
         setResult({ ok: true, text: `Live — the agent is now answering with this prompt.` });
         setLive({ inSync: true, error: null });

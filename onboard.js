@@ -117,6 +117,7 @@ import {
   SPELLING_RULE,
   PROMPT_SECTIONS,
 } from './lib/voice-consent.js';
+import { applyStoredAiStatement } from './lib/ai-statement.js';
 import { CALL_LOG_FIELDS } from './lib/call-log-fields.js';
 // Which finished calls get logged and briefed: connected ones only (operator rule, 2026-11-03).
 import { CALL_OUTCOME_CASES, shouldLog } from './lib/call-outcomes.js';
@@ -1048,7 +1049,7 @@ async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate =
     const existing = readFileSync(promptFile, 'utf8');
     console.log(`  Reusing ${promptFile} (${existing.length.toLocaleString()} chars) — agent already exists, so not regenerating`);
     console.log(`  To change the live prompt: npm run update-prompt -- --slug ${basename(clientDir)}`);
-    return existing;
+    return carryAiStatement(existing, clientDir);
   }
 
   if (DRY_RUN) {
@@ -1116,7 +1117,29 @@ async function generateRetellPrompt(content, clientDir, siteSlug, { regenerate =
     fail(6, `${parity.detail}. Delete ${promptPath} and re-run to regenerate.`);
   }
   console.log(`  Review this before Checkpoint 2 — you will tune it on a test call`);
-  return prompt;
+  return carryAiStatement(prompt, clientDir);
+}
+
+/**
+ * Keep this client's AI statement choice through a prompt rewrite (lib/ai-statement.js). Applied
+ * after the generator's checks, because the generator never writes this line: a client who asked
+ * in writing keeps it through `regenerate-prompt`, a resume, and a replaced agent.
+ */
+function carryAiStatement(prompt, clientDir) {
+  let carried;
+  try {
+    carried = applyStoredAiStatement(prompt, clientDir);
+  } catch (err) {
+    fail(6, err.message);
+  }
+  if (carried.change) {
+    if (DRY_RUN) dryLog(`would write ${clientDir}/agent-prompt.txt with the AI statement ${carried.change}`);
+    else {
+      writeFileSync(resolve(clientDir, 'agent-prompt.txt'), carried.prompt, 'utf8');
+      console.log(`  AI statement ${carried.change}, per this client's stored choice`);
+    }
+  }
+  return carried.prompt;
 }
 
 // ───────────────────────────────────────────────────────────────────────────

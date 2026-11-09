@@ -3,8 +3,9 @@ import { loadReconcileProbes } from '@/lib/reconcileProbes';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadManageTarget } from '@/lib/manageSites';
-import { loadRetellApiKey } from '@/lib/opsSecrets';
+import { loadMasterLlmId, loadRetellApiKey } from '@/lib/opsSecrets';
 import { appendAudit } from '@/lib/audit';
+import { loadAiStatement } from '@/lib/aiStatement';
 import { ensureBaseline, recordPromptVersion } from '@/lib/promptVersions';
 
 /**
@@ -143,9 +144,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'This client declined the receptionist — no voice agent.' }, { status: 400 });
   }
 
-  const prompt = typeof body.prompt === 'string' ? body.prompt : '';
-  if (!prompt.trim()) {
+  const submitted = typeof body.prompt === 'string' ? body.prompt : '';
+  if (!submitted.trim()) {
     return NextResponse.json({ error: 'Prompt is empty — refusing to write.' }, { status: 400 });
+  }
+
+  // This client's stored AI statement choice decides whether its line is in what gets written, so
+  // an edit (or a restored older version) can't quietly drop what the client asked for in writing.
+  let prompt: string;
+  let aiStatementChange: string | null;
+  try {
+    const carried = (await loadAiStatement()).applyStoredAiStatement(submitted, resolved.dir);
+    prompt = carried.prompt;
+    aiStatementChange = carried.change;
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'AI statement setting unreadable.' }, { status: 409 });
   }
 
   // Disk first, always: a push that fails must still leave the edit recoverable.
@@ -184,15 +197,18 @@ export async function POST(req: Request) {
   // rather than appending a duplicate.
   recordPromptVersion({ slug: ctx.slug, siteSlug: resolved.site.slug, trigger: 'saved', content: prompt });
 
+  // `prompt` and `aiStatementChange` go back with every outcome, so the editor shows what was
+  // actually written rather than what was typed.
+  const saved = { ok: true, saved: true, prompt, aiStatementChange };
+
   if (!body.push) {
-    return NextResponse.json({ ok: true, saved: true, pushed: false, chars: prompt.length });
+    return NextResponse.json({ ...saved, pushed: false, chars: prompt.length });
   }
 
   const apiKey = loadRetellApiKey();
   if (!apiKey) {
     return NextResponse.json({
-      ok: true, // the disk write succeeded; only the push didn't happen
-      saved: true,
+      ...saved, // the disk write succeeded; only the push didn't happen
       pushed: false,
       pushError: 'RETELL_API_KEY is not set in jdd-ops/.env — saved to disk only.',
     });
@@ -201,8 +217,7 @@ export async function POST(req: Request) {
   const agentId = resolved.env.RETELL_AGENT_ID;
   if (!agentId) {
     return NextResponse.json({
-      ok: true,
-      saved: true,
+      ...saved,
       pushed: false,
       pushError: 'No RETELL_AGENT_ID on this site — nothing to push to.',
     });
@@ -216,7 +231,13 @@ export async function POST(req: Request) {
         slug: ctx.slug, siteSlug: resolved.site.slug, action: 'agent.prompt.push',
         ok: false, summary: llm.error,
       });
-      return NextResponse.json({ ok: true, saved: true, pushed: false, pushError: llm.error });
+      return NextResponse.json({ ...saved, pushed: false, pushError: llm.error });
+    }
+    // A client's prompt, and now a client's AI statement, must never land on the template.
+    if (llm.llmId === loadMasterLlmId()) {
+      const message = `This agent is bound to the MASTER Retell LLM (${llm.llmId}). Refusing: this would rewrite every client's template.`;
+      appendAudit({ slug: ctx.slug, siteSlug: resolved.site.slug, action: 'agent.prompt.push', ok: false, summary: message });
+      return NextResponse.json({ ...saved, pushed: false, pushError: message });
     }
 
     const res = await fetch(`${RETELL_API}/update-retell-llm/${llm.llmId}`, {
@@ -231,7 +252,7 @@ export async function POST(req: Request) {
         slug: ctx.slug, siteSlug: resolved.site.slug, action: 'agent.prompt.push',
         ok: false, summary: message,
       });
-      return NextResponse.json({ ok: true, saved: true, pushed: false, pushError: message });
+      return NextResponse.json({ ...saved, pushed: false, pushError: message });
     }
 
     recordPromptVersion({ slug: ctx.slug, siteSlug: resolved.site.slug, trigger: 'pushed', content: prompt });
@@ -243,13 +264,13 @@ export async function POST(req: Request) {
       summary: `Pushed prompt to Retell LLM ${llm.llmId}`,
       detail: { llmId: llm.llmId, agentId, chars: prompt.length },
     });
-    return NextResponse.json({ ok: true, saved: true, pushed: true, llmId: llm.llmId });
+    return NextResponse.json({ ...saved, pushed: true, llmId: llm.llmId });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Retell push failed.';
     appendAudit({
       slug: ctx.slug, siteSlug: resolved.site.slug, action: 'agent.prompt.push',
       ok: false, summary: message,
     });
-    return NextResponse.json({ ok: true, saved: true, pushed: false, pushError: message });
+    return NextResponse.json({ ...saved, pushed: false, pushError: message });
   }
 }

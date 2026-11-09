@@ -103,6 +103,17 @@ export function loadRetellApiKey(): string | null {
 }
 
 /**
+ * The id of the MASTER Retell LLM, the template every client's own LLM is cloned from.
+ *
+ * Read from jdd-ops/.env on purpose and never from process.env: the same key name in a client's
+ * .env.local is that client's own LLM, so anything that could reach the environment could make
+ * the master look like someone else's. Used only to refuse writes to it.
+ */
+export function loadMasterLlmId(): string | null {
+  return parseEnvFile(resolve(opsRoot(), '.env')).RETELL_LLM_ID ?? null;
+}
+
+/**
  * The org PAT, for pushing a client repo from the studio's Deploy button.
  *
  * Without it the push falls back to whatever the ambient credential helper offers, and on a

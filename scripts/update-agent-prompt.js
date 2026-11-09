@@ -43,11 +43,12 @@
  */
 
 import 'dotenv/config';
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
+import { applyStoredAiStatement } from '../lib/ai-statement.js';
 import { setRetellAgentConfig } from '../lib/repair-ops.js';
 import { checkPromptHasConsentAsk } from '../lib/onboard-checks.js';
 
@@ -127,8 +128,23 @@ async function main() {
   // --file wins, so a caller who passes an explicit path never silently gets a client's prompt.
   const promptPath = file ? resolve(file) : resolve('clients', slug, 'agent-prompt.txt');
   if (!existsSync(promptPath)) fail(`Prompt file not found: ${promptPath}`);
-  const prompt = readFileSync(promptPath, 'utf8').trim();
-  if (!prompt) fail(`Prompt file is empty: ${promptPath}`);
+  const fromDisk = readFileSync(promptPath, 'utf8').trim();
+  if (!fromDisk) fail(`Prompt file is empty: ${promptPath}`);
+
+  // The client's stored AI statement choice decides whether its line is in what gets pushed, not
+  // what the file happens to hold: a hand-edited or regenerated file must not lose it quietly.
+  // Keyed on the prompt's own folder, so an enterprise site pushed with --file is covered too.
+  let carried;
+  try {
+    carried = applyStoredAiStatement(fromDisk, dirname(promptPath));
+  } catch (err) {
+    fail(err.message);
+  }
+  const prompt = carried.prompt;
+  if (carried.change) {
+    writeFileSync(promptPath, prompt, 'utf8');
+    console.log(`AI statement ${carried.change} in ${promptPath}, per this client's stored choice (${carried.setting.enabled ? 'on' : 'off'}).`);
+  }
 
   const withConsent = plan.consent;
   const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };

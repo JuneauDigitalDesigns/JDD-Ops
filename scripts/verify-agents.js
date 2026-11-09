@@ -10,7 +10,8 @@
  * `checkLiveAgentSetup`: not on the master LLM, the recording disclosure as its opening line,
  * the approved consent ask in its prompt, an `sms_consent` field, the voicemail hang-up, and the
  * analysis fields exactly as a new client gets them. `checkPromptParity` then holds its prompt to
- * the rules a new client's prompt is generated under.
+ * the rules a new client's prompt is generated under, and `checkAiStatement` reports whether the
+ * client's AI statement is on and still intact.
  *
  * Found 2026-11-04: the consent work reached new clients only, and the growth fixture's agent ran
  * on the master LLM. Nothing reported either — this is the report. GETs only; changes nothing.
@@ -25,8 +26,9 @@ import { readdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { readEnvLocal } from '../onboard.js';
-import { checkLiveAgentSetup, checkPromptParity, formatCheckLines } from '../lib/onboard-checks.js';
+import { checkAiStatement, checkLiveAgentSetup, checkPromptParity, formatCheckLines } from '../lib/onboard-checks.js';
 import { recoverBusinessName } from '../lib/voice-consent.js';
+import { readAiStatementSetting } from '../lib/ai-statement.js';
 
 const apiKey = process.env.RETELL_API_KEY;
 const masterLlmId = process.env.RETELL_LLM_ID || null; // in the ROOT .env this is the master template
@@ -54,7 +56,7 @@ function agentDirs() {
     }
     for (const dir of dirs) {
       const id = readEnvLocal(dir).RETELL_AGENT_ID;
-      if (id) out.push({ label: dir.slice(root.length + 1).replace(/\\/g, '/'), agentId: id, leadCallback: readEnvLocal(dir).LEAD_CALLBACK });
+      if (id) out.push({ dir, label: dir.slice(root.length + 1).replace(/\\/g, '/'), agentId: id, leadCallback: readEnvLocal(dir).LEAD_CALLBACK });
     }
   }
   return out;
@@ -69,7 +71,7 @@ const getJson = async (url) => {
 let failed = 0;
 const dirs = agentDirs();
 if (!dirs.length) console.log('No client agents found.');
-for (const { label, agentId, leadCallback } of dirs) {
+for (const { dir, label, agentId, leadCallback } of dirs) {
   const agent = await getJson(`https://api.retellai.com/get-agent/${agentId}`);
   const llmId = agent?.response_engine?.llm_id;
   const llm = llmId ? await getJson(`https://api.retellai.com/get-retell-llm/${llmId}`) : null;
@@ -81,9 +83,15 @@ for (const { label, agentId, leadCallback } of dirs) {
     business: recoverBusinessName(llm?.begin_message),
     callbacks: leadCallback === 'on',
   });
-  if (c.ok !== true || parity.ok !== true) failed++;
+  // Whether this client's AI statement is on, and if so still in the prompt the agent answers with.
+  const aiStatement = checkAiStatement({
+    prompt: llm?.general_prompt,
+    setting: readAiStatementSetting(dir),
+    disclosedBusiness: recoverBusinessName(llm?.begin_message),
+  });
+  if (c.ok !== true || parity.ok !== true || aiStatement.ok !== true) failed++;
   console.log(`${label} (${agentId}, LLM ${llmId ?? '?'})`);
-  for (const line of formatCheckLines([c, parity])) console.log(`  ${line}`);
+  for (const line of formatCheckLines([c, parity, aiStatement])) console.log(`  ${line}`);
 }
 console.log(failed ? `\n✗ ${failed} of ${dirs.length} agent(s) need attention.` : `\n✓ All ${dirs.length} agent(s) carry the consent setup.`);
 process.exit(failed ? 1 : 0);
