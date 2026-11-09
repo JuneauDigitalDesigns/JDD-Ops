@@ -18,7 +18,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { checkLiveAgentSetup } from '../lib/onboard-checks.js';
-import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
+import { buildPostCallAnalysisData, inboundOpeningLine, SIGNED_RECORDING_SETTINGS, SIGNED_URL_EXPIRATION_MS, smsConsentAsk, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
 import { loadFixture } from './helpers/fixtures.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,7 +47,7 @@ test('the starter fixture as found: its own LLM, but no disclosure, no ask, no s
 /** What update-prompt + onboard.js produce for a client: built from the real wording functions. */
 function correct(business = 'Your HVAC Co.') {
   return {
-    agent: { agent_name: 'Master Agent', post_call_analysis_data: buildPostCallAnalysisData(business), voicemail_option: VOICEMAIL_OPTION },
+    agent: { agent_name: 'Master Agent', post_call_analysis_data: buildPostCallAnalysisData(business), voicemail_option: VOICEMAIL_OPTION, ...SIGNED_RECORDING_SETTINGS },
     llm: { llm_id: 'llm_client_own_000000000000', begin_message: inboundOpeningLine(business), general_prompt: `## CLOSING\nAsk exactly: "${smsConsentAsk(business)}"` },
   };
 }
@@ -68,6 +68,9 @@ test('each missing piece is caught on its own', () => {
     [(x) => { x.llm.general_prompt = 'One last thing — is it okay if Your HVAC Co. texts you at that number about this request? Message and data rates may apply, and you can reply STOP anytime. A yes or no is fine.'; }, /consent ask/],
     [(x) => { x.agent.post_call_analysis_data = x.agent.post_call_analysis_data.filter((f) => f.name !== 'sms_consent'); }, /sms_consent/],
     [(x) => { x.agent.voicemail_option = null; }, /voicemail/],
+    [(x) => { x.agent.opt_in_signed_url = false; }, /recording links never expire/],
+    // Signed, but on Retell's 24-hour default: a copied link would last a day.
+    [(x) => { delete x.agent.signed_url_expiration_ms; }, /24-hour default/],
     // Said aloud to a caller on 2026-11-04: "That's [spell the name letter by letter] at G as in golf…"
     [(x) => { x.llm.general_prompt += '\nThen say: "That\'s [spell the name letter by letter]."'; }, /square brackets/],
   ];
@@ -77,6 +80,22 @@ test('each missing piece is caught on its own', () => {
     const c = check(x);
     assert.equal(c.ok, false, `should fail: ${why}`);
     assert.match(c.detail, why);
+  }
+});
+
+test('both test agents as recorded on 2026-11-09 fail: their recording links never expire', () => {
+  // Retell reports the field as a real `false`, and no expiry at all.
+  const found = loadFixture('retell/agent-signed-url-2026-11-09.json');
+  for (const live of Object.values(found.agents)) {
+    assert.equal(live.opt_in_signed_url, false);
+    const x = correct();
+    delete x.agent.opt_in_signed_url;
+    delete x.agent.signed_url_expiration_ms;
+    Object.assign(x.agent, live);
+    const c = check(x);
+    assert.equal(c.ok, false);
+    assert.match(c.detail, /recording links never expire/);
+    assert.doesNotMatch(c.detail, /FAIL:/);
   }
 });
 
@@ -96,6 +115,8 @@ test("a new client's LLM and agent, exactly as onboard.js sends them, pass the l
   assert.equal(llm.begin_message, inboundOpeningLine(business));
   assert.equal(llm.start_speaker, 'agent');
   assert.equal(agent.response_engine.llm_id, llm.llm_id);
+  assert.equal(agent.opt_in_signed_url, true);
+  assert.equal(agent.signed_url_expiration_ms, SIGNED_URL_EXPIRATION_MS);
   const c = checkLiveAgentSetup({ agent, llm, masterLlmId: MASTER });
   assert.equal(c.ok, true, c.detail);
 });

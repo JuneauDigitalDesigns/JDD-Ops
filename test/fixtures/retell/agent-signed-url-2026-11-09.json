@@ -1,0 +1,11 @@
+{
+  "recorded": "2026-11-09, GET /get-agent on both _e2e_test_* agents, these fields only",
+  "agents": {
+    "_e2e_test_growth": {
+      "opt_in_signed_url": false
+    },
+    "_e2e_test_starter": {
+      "opt_in_signed_url": false
+    }
+  }
+}

@@ -112,6 +112,7 @@ import {
   inboundOpeningLine,
   smsConsentAsk,
   VOICEMAIL_OPTION,
+  SIGNED_RECORDING_SETTINGS,
   voiceConsentInstructions,
   callerDetailsInstructions,
   SPELLING_RULE,
@@ -1180,6 +1181,8 @@ export function clientAgentCreateBody({ businessName, llmId, voiceId }) {
     // Hang up on voicemail. An API-created agent has detection OFF unless this is set, and then
     // talks to the voicemail — see lib/voice-consent.js.
     voicemail_option: VOICEMAIL_OPTION,
+    // Recording and log links expire instead of opening for anyone, forever. See lib/voice-consent.js.
+    ...SIGNED_RECORDING_SETTINGS,
   };
 }
 

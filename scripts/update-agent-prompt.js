@@ -13,6 +13,7 @@
  *   ... --business "<Business Name>"                          # override the spoken business name
  *   ... --prompt-only                                         # prompt alone (+ the voicemail hang-up)
  *   ... --voicemail-only                                      # ONLY the voicemail hang-up; no prompt read
+ *   ... --signed-recordings-only                              # ONLY the signed recording links; no prompt read
  *
  * ── The voicemail hang-up does not wait on the prompt ───────────────────────
  *
@@ -22,6 +23,13 @@
  * an agent without it talks to an unanswered lead's voicemail (growth fixture, 2026-11-03, 48 s).
  * It used to ride inside the consent push, so every pre-consent client — exactly the agents that
  * lacked it — could not get it without first regenerating their prompt.
+ *
+ * ── Signed recording links go the same way ──────────────────────────────────
+ *
+ * `opt_in_signed_url` is pushed on its own right after the voicemail hang-up, for the same reason:
+ * it must not wait on a prompt regeneration. The portal has to be on the version that fetches a
+ * fresh link at play time before this reaches an agent, or the link Make stores goes dead and
+ * the owner's recording with it (lib/voice-consent.js). Calls already made are unaffected.
  *
  * ── Two objects, one command ────────────────────────────────────────────────
  *
@@ -47,7 +55,7 @@ import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
+import { buildPostCallAnalysisData, inboundOpeningLine, smsConsentAsk, SIGNED_RECORDING_SETTINGS, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
 import { applyStoredAiStatement } from '../lib/ai-statement.js';
 import { setRetellAgentConfig } from '../lib/repair-ops.js';
 import { checkPromptHasConsentAsk } from '../lib/onboard-checks.js';
@@ -59,7 +67,7 @@ function fail(msg, err) {
 }
 
 function parseArgs(argv) {
-  const args = { agentId: null, slug: null, file: null, business: null, promptOnly: false, voicemailOnly: false };
+  const args = { agentId: null, slug: null, file: null, business: null, promptOnly: false, voicemailOnly: false, signedRecordingsOnly: false };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--slug' && argv[i + 1]) {
       args.slug = argv[i + 1];
@@ -74,6 +82,8 @@ function parseArgs(argv) {
       args.promptOnly = true;
     } else if (argv[i] === '--voicemail-only') {
       args.voicemailOnly = true;
+    } else if (argv[i] === '--signed-recordings-only') {
+      args.signedRecordingsOnly = true;
     } else if (!args.agentId && !argv[i].startsWith('--')) {
       args.agentId = argv[i];
     }
@@ -93,16 +103,22 @@ function agentIdFromEnvLocal(slug) {
  * What a run will push, decided from the flags alone — exported so the test exercises the real
  * decision rather than a copy of it.
  *
- *   voicemail — client agents (`--slug`), always, and first. Not `--file`: that is JDD's own
- *               demo line, not a client callback agent.
- *   prompt    — unless `--voicemail-only`.
+ *   voicemail — client agents (`--slug`), first. Not `--file`: that is JDD's own demo line, not
+ *               a client callback agent. Not with `--signed-recordings-only`.
+ *   signedRecordings — client agents, next and on its own. Not with `--voicemail-only`.
+ *   prompt    — unless one of the `--…-only` flags.
  *   consent   — the prompt push plus the opening disclosure and analysis schema; a client
  *               agent, not `--prompt-only`.
  */
-export function planAgentUpdate({ slug, file, promptOnly = false, voicemailOnly = false }) {
+export function planAgentUpdate({ slug, file, promptOnly = false, voicemailOnly = false, signedRecordingsOnly = false }) {
   const client = Boolean(slug) && !file;
-  const prompt = !voicemailOnly;
-  return { voicemail: client, prompt, consent: client && prompt && !promptOnly };
+  const prompt = !voicemailOnly && !signedRecordingsOnly;
+  return {
+    voicemail: client && !signedRecordingsOnly,
+    signedRecordings: client && !voicemailOnly,
+    prompt,
+    consent: client && prompt && !promptOnly,
+  };
 }
 
 async function main() {
@@ -122,6 +138,11 @@ async function main() {
     const vm = await setRetellAgentConfig({ apiKey, agentId, patch: { voicemail_option: VOICEMAIL_OPTION } });
     if (!vm.ok) fail(`Agent ${agentId} voicemail_option not updated: ${vm.reason}`);
     console.log(`✓ Agent ${agentId} voicemail: ${JSON.stringify(vm.before?.voicemail_option ?? null)} → ${JSON.stringify(vm.after?.voicemail_option ?? null)}`);
+  }
+  if (plan.signedRecordings) {
+    const signed = await setRetellAgentConfig({ apiKey, agentId, patch: SIGNED_RECORDING_SETTINGS });
+    if (!signed.ok) fail(`Agent ${agentId} signed recording links not updated: ${signed.reason}`);
+    console.log(`✓ Agent ${agentId} signed recording links: ${JSON.stringify(signed.before)} → ${JSON.stringify(signed.after)}`);
   }
   if (!plan.prompt) return;
 

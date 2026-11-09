@@ -31,7 +31,7 @@ import {
   removeAiStatement,
 } from '../lib/ai-statement.js';
 import { checkAiStatement, checkLiveAgentSetup, checkPromptParity } from '../lib/onboard-checks.js';
-import { aiStatementSentence, buildPostCallAnalysisData, inboundOpeningLine, PROMPT_SECTIONS, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
+import { aiStatementSentence, buildPostCallAnalysisData, inboundOpeningLine, PROMPT_SECTIONS, SIGNED_RECORDING_SETTINGS, VOICEMAIL_OPTION } from '../lib/voice-consent.js';
 import { generateRetellPrompt } from '../onboard.js';
 import { loadFixture } from './helpers/fixtures.mjs';
 
@@ -101,7 +101,7 @@ test('an agent with the statement on still passes every fixed check', () => {
     assert.equal(parity.ok, true, `${name}: ${parity.detail}`);
     assert.deepEqual([...prompt.matchAll(/^##\s+(.+?)\s*$/gm)].map((m) => m[1]), PROMPT_SECTIONS, name);
     const llm = { llm_id: OWN, begin_message: inboundOpeningLine(x.business), general_prompt: prompt };
-    const agent = { post_call_analysis_data: buildPostCallAnalysisData(x.business), voicemail_option: VOICEMAIL_OPTION };
+    const agent = { post_call_analysis_data: buildPostCallAnalysisData(x.business), voicemail_option: VOICEMAIL_OPTION, ...SIGNED_RECORDING_SETTINGS };
     const live = checkLiveAgentSetup({ agent, llm, masterLlmId: MASTER });
     if (name === 'growth' || name === 'starter') assert.equal(live.ok, true, `${name}: ${live.detail}`);
   }
