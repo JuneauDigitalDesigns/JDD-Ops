@@ -8,6 +8,7 @@
 import { Star } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'detail-reviews',
@@ -65,7 +66,7 @@ export default function DetailReviews({ content = CONTENT }: { content?: SiteCon
               </blockquote>
               <figcaption className="mt-6 flex items-center gap-[13px] pt-5" style={{ borderTop: '1px solid rgba(255,255,255,0.09)' }}>
                 {avatars[i] ? (
-                  <span className="h-[42px] w-[42px] shrink-0 rounded-full bg-cover bg-center" style={{ backgroundImage: `url(${avatars[i]})` }} />
+                  <span className="h-[42px] w-[42px] shrink-0 rounded-full bg-cover bg-center" style={{ backgroundImage: `url(${imageAt(avatars[i], 640)})` }} />
                 ) : (
                   <span
                     className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full font-heading text-[16px] font-extrabold text-[#0D0E12]"

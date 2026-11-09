@@ -31,6 +31,8 @@ import {
   type SharedLibUpgrade,
 } from '@/lib/sharedLibs';
 import { loadUiPinRules } from '@/lib/uiPinRules';
+import { loadSiteLayout } from '@/lib/siteLayout';
+import { findMissingLocalImages } from '@/lib/imageRefs';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
 import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import type { SiteContent } from '@/data/site';
@@ -330,6 +332,24 @@ export async function POST(req: Request) {
           );
         }
 
+        // 1a1. The site-wide pieces layout.tsx must mount (smooth scrolling, the mobile call bar).
+        //      layout.tsx belongs to the client, so this only ADDS what is missing, the way
+        //      template/src/app/layout.tsx mounts it; see jdd-ops/lib/site-layout.js. Runs after
+        //      copyTemplate so the src/lib files it imports are already in place.
+        const layout = (await loadSiteLayout()).ensureSiteLayout(repoDirFor(repoRoot, slug));
+        if (layout.error) {
+          send({
+            type: 'error',
+            message: 'This site’s layout.tsx can’t be given smooth scrolling and the mobile call bar safely. Nothing was built or pushed.',
+            detail: `${layout.error}\n\nThe template mounts both after {children} in template/src/app/layout.tsx.`,
+            next: `Needs a developer: add <SmoothScroll /> and <StickyCallBar /> to clients/${slug}/repo/src/app/layout.tsx as the template does, then run this again.`,
+          });
+          return;
+        }
+        if (layout.added.length > 0) {
+          step(`Mounted ${layout.added.join(' and ')} in src/app/layout.tsx (the rest of the layout is unchanged).`);
+        }
+
         // 1a2. Union any new template dependencies in without dropping the client's own.
         const merged = mergePackageJson(repoRoot, slug);
         if (merged.added.length > 0) {
@@ -562,6 +582,25 @@ export async function POST(req: Request) {
           });
           return;
         }
+
+        // 5b. Every local image the built pages ask for must exist. A component that uses an
+        //     image field raw points at the pipeline's `/img/<hash>` base, which is not a file:
+        //     the build passes and the live page shows a 404 where the photograph should be.
+        const images = findMissingLocalImages(repoDir);
+        if (images.pagesFound === 0) {
+          step('Note: the build wrote no static pages, so local image addresses could not be checked.');
+        } else if (images.missing.length > 0) {
+          send({
+            type: 'error',
+            message: `The built site asks for ${images.missing.length} local image${images.missing.length === 1 ? '' : 's'} that ${images.missing.length === 1 ? 'doesn’t' : 'don’t'} exist. Nothing was committed or pushed.`,
+            detail:
+              images.missing.map((m) => `${m.ref}  (on ${m.pages.join(', ')})`).join('\n') +
+              '\n\nAn address ending in a bare hash is a component using an image field without imageAt() or responsiveImage().',
+            next: 'Needs a developer: route that component’s image through imageAt() (src/lib/localImage.ts), then run this again.',
+          });
+          return;
+        }
+        step(`Checked the built pages: every local image they use exists (${images.pagesFound} page${images.pagesFound === 1 ? '' : 's'}).`);
 
         // 6. Commit + push, so Vercel's GitHub integration redeploys the live site.
         //    Deliberately AFTER the build above: pushing something that doesn't compile

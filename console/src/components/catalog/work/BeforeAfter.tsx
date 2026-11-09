@@ -4,6 +4,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, viewportOnce, stillFor } from '@/lib/motion';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'before-after',
@@ -70,7 +71,7 @@ export default function BeforeAfter({
           >
             <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
               {featured.image?.url ? (
-                <img src={featured.image.url} alt={featured.image.alt} loading="lazy" width={1600} height={900}
+                <img src={imageAt(featured.image.url, 1536)} alt={featured.image.alt} loading="lazy" width={1600} height={900}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
               ) : (
                 <EmptyImage label="01" big />
@@ -102,7 +103,7 @@ export default function BeforeAfter({
                 >
                   <div className="relative w-24 shrink-0 overflow-hidden rounded-lg" style={{ aspectRatio: '4/3' }}>
                     {p.image?.url ? (
-                      <img src={p.image.url} alt={p.image.alt} loading="lazy" width={1200} height={900}
+                      <img src={imageAt(p.image.url, 1024)} alt={p.image.alt} loading="lazy" width={1200} height={900}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     ) : (
                       <EmptyImage label={String(i + 2).padStart(2, '0')} />

@@ -11,6 +11,7 @@ import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'work-masonry',
@@ -30,7 +31,7 @@ function Card({ i, p, s }: { i: number; p: SiteContent['work']['projects'][numbe
     <div className="w-[78vw] shrink-0 snap-start sm:w-[46vw] lg:w-[32vw]">
       <div className="relative overflow-hidden rounded-2xl" style={{ aspectRatio: '3/2' }}>
         {p.image?.url ? (
-          <img src={p.image.url} alt={p.image.alt} loading="lazy" width={1200} height={800} className="h-full w-full object-cover" />
+          <img src={imageAt(p.image.url, 1024)} alt={p.image.alt} loading="lazy" width={1200} height={800} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-bgSoft bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]">
             <span className="font-heading text-5xl font-black leading-none text-inkSoft/30">{String(i + 1).padStart(2, '0')}</span>

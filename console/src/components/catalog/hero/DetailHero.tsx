@@ -13,6 +13,7 @@
 import { Phone, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'detail-hero',
@@ -47,7 +48,7 @@ export default function DetailHero({ content = CONTENT }: { content?: SiteConten
       {slide && (
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${slide})`, filter: 'saturate(.82) contrast(1.06)' }}
+          style={{ backgroundImage: `url(${imageAt(slide, 1536)})`, filter: 'saturate(.82) contrast(1.06)' }}
           role="img"
           aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} detailed vehicle`}
         />

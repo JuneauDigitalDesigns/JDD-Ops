@@ -16,6 +16,7 @@ import {
 } from 'node:fs';
 import { routePath, styleKeyFor, rhythmClass, navHref, type SectionRhythm, type SiteComposition } from '@/lib/pages';
 import { reconcileRoutes } from '@/lib/composition-manifest';
+import { REVEAL_CLASS, revealsOnScroll } from '@/lib/revealPolicy';
 import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
@@ -579,9 +580,14 @@ export function wirePages(
 
     /** Emit one section element, wrapped in a sectionVars div only when it carries a style.
      *  Unstyled → a single 6-space-indented line, identical to the pre-styling output. */
-    const emit = (inner: string, ref: { id?: string; categoryId: string; name: string; rhythm?: SectionRhythm }): string[] => {
+    const emit = (
+      inner: string,
+      ref: { id?: string; categoryId: string; name: string; rhythm?: SectionRhythm },
+      reveal = false,
+    ): string[] => {
       const k = styledKeyOf(ref);
-      const rc = rhythmClass(ref.rhythm);
+      // The scroll reveal rides on the same wrapper as rhythm/style (see revealPolicy.ts).
+      const rc = [rhythmClass(ref.rhythm), reveal ? REVEAL_CLASS : ''].filter(Boolean).join(' ');
       // Byte-identical to the pre-rhythm output when a ref carries neither a style nor a rhythm.
       if (!k && !rc) return [`      ${inner}`];
       const cls = rc ? ` className="${rc}"` : '';
@@ -605,14 +611,14 @@ export function wirePages(
         comp.chrome.nav,
       ),
     );
-    for (const ref of page.sections) {
+    page.sections.forEach((ref, i) => {
       if (ref.categoryId === 'pageHeader') {
         const rk = JSON.stringify(page.route);
         lines.push(...emit(`<${ref.name} data={CONTENT.subpages?.[${rk}]?.header ?? ${fallbackHeaderLiteral(page.label)}} />`, ref));
       } else {
-        lines.push(...emit(`<${ref.name}${skinAttr(ref)} />`, ref));
+        lines.push(...emit(`<${ref.name}${skinAttr(ref)} />`, ref, revealsOnScroll(ref, i)));
       }
-    }
+    });
     lines.push(
       ...emit(`<${comp.chrome.footer.name}${skinAttr(comp.chrome.footer)} />`, comp.chrome.footer),
       `      {/* @studio:body:end */}`,

@@ -17,6 +17,7 @@ import { CheckCircle } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'roofing-final-cta',
@@ -49,7 +50,7 @@ export default function RoofingFinalCta({ content = CONTENT }: { content?: SiteC
   return (
     <section className="relative isolate overflow-hidden bg-[#17110F] py-20">
       {slide && (
-        <div className="absolute inset-0 bg-cover bg-[center_35%]" style={{ backgroundImage: `url(${slide})` }} aria-hidden="true" />
+        <div className="absolute inset-0 bg-cover bg-[center_35%]" style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }} aria-hidden="true" />
       )}
       <div
         className="absolute inset-0"

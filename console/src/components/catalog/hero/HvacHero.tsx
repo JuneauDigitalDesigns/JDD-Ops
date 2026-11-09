@@ -13,6 +13,7 @@
 import { PhoneCall, Check, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'hvac-hero',
@@ -52,7 +53,7 @@ export default function HvacHero({ content = CONTENT }: { content?: SiteContent 
       {slide && (
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${slide})` }}
+          style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }}
           role="img"
           aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} technician`}
         />
