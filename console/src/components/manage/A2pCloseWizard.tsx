@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle, Circle, SpinnerGap, XCircle } from '@phosphor-icons/react';
 import type { A2pBatchStepResult, A2pEnums, A2pPath, A2pRegistrationRecord } from '@/lib/a2pChain';
+import { toE164 } from '@jdd/schema';
+import { formWebsite } from '@/lib/a2pFormRules';
 
 /**
  * The sales-call close's SMS step — `<A2pRegistrationPanel variant="close-wizard" />`.
@@ -41,6 +43,13 @@ interface Props {
 }
 
 type Item = 'pending' | 'running' | 'done' | 'failed';
+
+/**
+ * The order keeps the phone as the operator typed it, and the registration checks want E.164: on
+ * 2026-11-08 a prefilled "(407) 555-0142" came back as "Check: Mobile" on a form nobody had
+ * touched. Anything unreadable is left alone, for the check to name.
+ */
+const formPhone = (raw: string | null | undefined): string => toE164(raw) ?? (raw ?? '');
 
 const FILED = new Set(['pending-review', 'in-review', 'twilio-approved']);
 
@@ -81,17 +90,19 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
     lastName: prefill.repLastName ?? '',
     jobPosition: '',
     email: prefill.repEmail ?? '',
-    phone: prefill.repPhone ?? '',
+    phone: formPhone(prefill.repPhone),
   });
   const [address, setAddress] = useState({ street: '', city: '', region: '', postalCode: '', country: 'US' });
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>(['pending', 'pending', 'pending']);
+  const [testMode, setTestMode] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/manage/a2p?slug=${encodeURIComponent(slug)}`, { cache: 'no-store' });
-    const body = (await res.json()) as { plan?: string; record?: A2pRegistrationRecord | null };
+    const body = (await res.json()) as { plan?: string; record?: A2pRegistrationRecord | null; testMode?: boolean };
+    setTestMode(Boolean(body.testMode));
     setPlan(body.plan ?? null);
     setRecord(body.record ?? null);
     if (body.record?.registrationPath) setPath(body.record.registrationPath);
@@ -116,6 +127,8 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
     setError(null);
     setItems((prev) => prev.map((i) => (i === 'done' ? i : 'pending')) as Item[]);
     if (!addLater) setItems((prev) => [prev[0] === 'done' ? 'done' : 'running', prev[1], prev[2]]);
+    // Test mode saves nothing, so re-reading the record afterwards would undo the ticks.
+    let keepTicks = false;
     try {
       const res = await fetch(`/api/manage/a2p/batch?slug=${encodeURIComponent(slug)}`, {
         method: 'POST',
@@ -129,9 +142,9 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
             legalBusinessName,
             businessType,
             businessIndustry,
-            websiteUrl,
+            websiteUrl: formWebsite(websiteUrl),
             ein: addLater ? undefined : ein,
-            rep: path === 'standard' ? rep : { ...rep, jobPosition: undefined },
+            rep: { ...rep, phone: formPhone(rep.phone), ...(path === 'standard' ? {} : { jobPosition: undefined }) },
             address,
           },
         }),
@@ -141,7 +154,9 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
         invalid?: string[];
         error?: string;
         results?: A2pBatchStepResult[];
+        testMode?: boolean;
       };
+      keepTicks = Boolean(body.testMode && body.ok);
       const results = body.results ?? [];
       onResult?.({ ok: Boolean(body.ok), results });
       if (body.invalid?.length) {
@@ -163,7 +178,7 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
       setEin('');
       setTyped('');
       setBusy(false);
-      await load();
+      if (!keepTicks) await load();
     }
   }
 
@@ -190,6 +205,11 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
 
   return (
     <div className="space-y-6">
+      {testMode && (
+        <div role="status" className="rounded-[10px] border px-3.5 py-2.5 text-sm font-semibold" style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }}>
+          Test mode: nothing is sent to Twilio or saved.
+        </div>
+      )}
       <Section title="Registration type">
         <div className="flex flex-wrap gap-2">
           <Chip on={path === 'standard'} disabled={pathLocked} onClick={() => setPath('standard')}>Business with an EIN</Chip>
@@ -198,7 +218,7 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
       </Section>
 
       {path === 'standard' && needsEin && (
-        <Section title="EIN available now?">
+        <Section title="EIN and website available now?">
           <div className="flex flex-wrap gap-2">
             <Chip on={einNow} onClick={() => setEinNow(true)}>Yes</Chip>
             <Chip on={!einNow} onClick={() => setEinNow(false)}>Add later</Chip>
@@ -213,7 +233,7 @@ export default function A2pCloseWizard({ slug, enums, prefill = {}, vertical, on
             <>
               <Select label="Business type" value={businessType} onChange={setBusinessType} options={enums.businessTypes} />
               <Select label="Industry" value={businessIndustry} onChange={setIndustry} options={enums.industries} />
-              <Input label="Website" value={websiteUrl} onChange={setWebsite} />
+              {!addLater && <Input label="Website" value={websiteUrl} onChange={setWebsite} />}
               {needsEin && einNow && <Input label="EIN" value={ein} onChange={setEin} placeholder="12-3456789" secret />}
             </>
           )}

@@ -243,6 +243,7 @@ export function loadA2pEnv(): Record<string, string | undefined> {
     'A2P_OPS_EMAIL',
     'A2P_INBOUND_URL',
     'A2P_STATUS_CALLBACK',
+    'A2P_TEST_MODE',
   ];
   return Object.fromEntries(keys.map((key) => [key, process.env[key] ?? ops[key]]));
 }

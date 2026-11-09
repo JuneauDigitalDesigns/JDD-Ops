@@ -66,12 +66,41 @@ test('with phone orders on, the card is typed in the checkout; without, the Dash
 });
 
 test('the whole order is on screen before Subscribe', () => {
+  const summary = section('function OrderSummary', 'function CardCheckout');
+  for (const shown of ['Subtotal', 'Total due today', 'per {unit}', 'starting']) {
+    assert.ok(summary.includes(shown), `the summary shows "${shown}"`);
+  }
   const checkout = section('function CardCheckout', 'function CardPaid');
   const button = checkout.indexOf("'Subscribe'");
-  for (const shown of ['Total due today', 'Then {cents(preview.recurringCents)} per {unit}, starting', 'Billing details', 'Terms of Service']) {
+  for (const shown of ['<OrderSummary', 'Billing details', 'Terms of Service']) {
     const at = checkout.indexOf(shown);
     assert.ok(at > 0 && at < button, `"${shown}" comes before the Subscribe button`);
   }
+});
+
+// ── The payment link ────────────────────────────────────────────────────────
+//
+// Xander, 2026-11-08: the link view should look just like the card view, with a payment link
+// where the card field is. And from the test run: once a link was copied, the panel offered only
+// Switch to card and Cancel. No way to copy it again, open it or replace it, and Cancel didn't say
+// it cancels the whole order. New link only appeared after the link expired.
+
+test('the link view is the same checkout as the card view', () => {
+  const link = section('function LinkCheckout', 'interface ChargePreview');
+  assert.match(link, /<OrderSummary/);
+  assert.match(link, /moto-checkout/);
+  assert.match(link, /Billing details/);
+});
+
+test('a live link can be copied again, opened, or replaced', () => {
+  const link = section('function LinkCheckout', 'interface ChargePreview');
+  const live = link.slice(link.indexOf('{expired ? ('), link.indexOf('{waiting && !expired'));
+  const afterExpiredBranch = live.slice(live.indexOf(') : ('));
+  for (const action of ['Copy link', 'Open link', 'New link']) {
+    assert.ok(afterExpiredBranch.includes(action), `${action} is offered while the link is live`);
+  }
+  assert.match(link, /Cancel order/);
+  assert.match(wizard, /New link replaces the current one\./);
 });
 
 // ── Before the payment step ─────────────────────────────────────────────────
