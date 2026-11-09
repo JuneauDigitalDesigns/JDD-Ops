@@ -27,6 +27,7 @@ import {
   inboundOpeningLine,
   PROMPT_SECTIONS,
   recoverBusinessName,
+  SIGNED_RECORDING_SETTINGS,
   VOICEMAIL_OPTION,
 } from '../lib/voice-consent.js';
 import { loadFixture } from './helpers/fixtures.mjs';
@@ -110,7 +111,7 @@ test('an agent whose analysis wording lags a new client is flagged, not passed',
     f.name === 'callback_number' ? { ...f, description: 'If none was spoken, use the number they called from.' } : f,
   );
   const llm = { llm_id: 'llm_client_own_000000000000', begin_message: inboundOpeningLine(business), general_prompt: growth.prompt };
-  const agent = { post_call_analysis_data: fields, voicemail_option: VOICEMAIL_OPTION };
+  const agent = { post_call_analysis_data: fields, voicemail_option: VOICEMAIL_OPTION, ...SIGNED_RECORDING_SETTINGS };
   const c = checkLiveAgentSetup({ agent, llm, masterLlmId: 'llm_master' });
   assert.equal(c.ok, false);
   assert.match(c.detail, /callback_number differ/);
