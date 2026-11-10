@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 const CONSOLE = fileURLToPath(new URL('..', import.meta.url));
 const ROOT = join(CONSOLE, '..');
-const DASH = /[–—]/;
+// The characters, and their HTML entities: JSX renders &mdash; as an em-dash, and two Lawn lines
+// carried one that the character-only check missed (found 2026-11-10).
+const DASH = /[–—]|&(mdash|ndash|#8212|#8211|#x2014|#x2013);/i;
 
 /** Source with comments removed: block comments (incl. JSX {/* *\/}) and line comments that are
  *  not part of a URL ("https://"). Strings keep their text. */
@@ -64,6 +66,10 @@ for (const [label, files] of Object.entries(GROUPS)) {
     assert.deepEqual(hits, [], `dashes found:\n${hits.join('\n')}`);
   });
 }
+
+test('entity dashes count as dashes', () => {
+  assert.ok(DASH.test('a flat quote &mdash; usually') && DASH.test('1&ndash;2') && !DASH.test('a-b'));
+});
 
 test('stripComments keeps strings and URLs, drops comments', () => {
   const src = "const a = 'x — y'; // note — here\r\n/* block — */ const u = 'https://e.com';\r\n{/* jsx — */}";

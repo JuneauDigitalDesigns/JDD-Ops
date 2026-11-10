@@ -43,7 +43,19 @@ const CLAIMS: Array<{ claim: string; re: RegExp; support?: RegExp }> = [
   { claim: 'family-owned', re: /\bfamily[- ](owned|run)\b/i },
   { claim: 'years in business', re: /\b(since (19|20)\d\d|\d+\+? years? (of experience|in business))\b/i, support: /\b(19|20)\d\d\b|\byears?\b/i },
   { claim: 'rating', re: /\b[45]\.\d ?(★|stars?)|\b\d+\+? (five-star |5-star )?reviews\b/i, support: /\brating\b|\breviews?\b|★/i },
+  // Added with the fixed-template scan (Xander 2026-11-10, wording file section C: "Reword all to
+  // promise nothing"): the promises his examples make.
+  { claim: 'response time', re: /\b(in|within|under) (minutes|an hour|\d+ (minutes?|mins?|hours?))\b|\bright away\b|\bcalls? you back (in|within)\b|\balready nearby\b/i, support: /\bminutes?\b|\bhours?\b|\bsame[- ]day\b|\bright away\b/i },
+  { claim: 'travel', re: /\bwe travel\b|\bwe come to you\b|\bwe(?:'|’)?ll come to you\b/i, support: /\btravel\b|\bmobile\b|\bcome to (you|the customer)\b|\bradius\b/i },
+  { claim: 'no fee', re: /\bno (mobile|trip|call-?out|travel|service|diagnostic) (fee|charge)s?\b/i },
+  { claim: 'flat price', re: /\bflat[- ](quote|rate|price|fee)s?\b/i },
 ];
+
+/** The claims a piece of text makes, by name (the CLAIMS above). Used by the fixed-template scan
+ *  (test/fixed-claims.test.mjs) on text no client fact can ever support. */
+export function claimsIn(text: string): string[] {
+  return CLAIMS.filter(({ re }) => re.test(text)).map(({ claim }) => claim);
+}
 
 export interface CopyRisk { path: string; text: string }
 export interface ClaimRisk { path: string; claim: string; text: string }
