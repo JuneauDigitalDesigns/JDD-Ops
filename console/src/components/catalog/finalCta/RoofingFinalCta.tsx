@@ -22,13 +22,14 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
 import { imageAt } from '@/lib/localImage';
+import { serviceBySlug, serviceMessage } from '@/lib/serviceLinks';
 
 export const meta = {
   id: 'roofing-final-cta',
   category: 'finalCta',
   label: 'Roofing / Photo-band final CTA',
-  consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.headlineEmphasis', 'finalCta.sub', 'finalCta.frictionReducers', 'images.hero.slides'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
+  consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.headlineEmphasis', 'finalCta.sub', 'finalCta.frictionReducers', 'images.hero.slides', 'services.items'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -46,13 +47,24 @@ function CtaHeadline({ text, emphasis }: { text: string; emphasis: string | null
   );
 }
 
-export default function RoofingFinalCta({ content = CONTENT }: { content?: SiteContent }) {
+export default function RoofingFinalCta({
+  content = CONTENT,
+  serviceSlug,
+}: {
+  content?: SiteContent;
+  /** On a service page (wirePages and the Studio pass it): the form opens with "Service: {service}"
+   *  in its message box, the page's only form (Xander 2026-11-10). */
+  serviceSlug?: string;
+}) {
   const { finalCta, images, _meta } = content;
+  const service = serviceBySlug(content, serviceSlug);
   const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
   const slide = images.hero?.slides?.[1]?.url ?? images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
 
   return (
-    <section className="relative isolate overflow-hidden bg-inkPanel py-16 text-onInk lg:py-24">
+    // id="cta": the service page's "Ask for a quote" button (and the vertical's own "#cta" nav and
+    // footer links) scroll here; until 2026-11-10 this section had no id, so those went nowhere.
+    <section id="cta" className="relative isolate overflow-hidden bg-inkPanel py-16 text-onInk lg:py-24">
       {slide && (
         <div className="absolute inset-0 bg-cover bg-[center_35%]" style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }} aria-hidden="true" />
       )}
@@ -85,6 +97,7 @@ export default function RoofingFinalCta({ content = CONTENT }: { content?: SiteC
           layout="row"
           className="mt-[34px] max-w-[780px]"
           submitLabel="Book my free inspection"
+          {...(service ? { withMessage: true, initialMessage: serviceMessage(service) } : {})}
         />
 
         {finalCta.frictionReducers.length > 0 && (
