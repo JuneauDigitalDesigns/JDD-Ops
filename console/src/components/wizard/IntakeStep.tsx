@@ -4,15 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BUILT_IN_VERTICALS } from '@jdd/schema';
 import type { CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
-import { VERTICALS, type VerticalId } from '@/lib/verticals';
+import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, parseVerdictKey, type Section, type VerdictKey } from '@/lib/copy-schema';
 import { buildReviewGroups, reviewKeys, type ReviewPage } from '@/lib/copy-review-groups';
 import { labelFor } from '@/lib/section-labels';
-import { missingFields as getMissingFields } from '@/lib/flags';
 import { resolveBrief } from '@/lib/copy-brief/resolve';
-import { intakeFactPaths } from '@/lib/copy-brief/attention';
+import { sourceOf, isSupplied, type SourceContext } from '@/lib/intake-sources';
+import { intakeTodo, attentionByStep, servicePageHint, realReviews, BUSINESS_GROUPS } from '@/lib/intake-todo';
+import { SERVICE_GATE } from '@/lib/service-gate';
+import { copyRisks } from '@/lib/copyRisks';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
-import { migrateStepId } from '@/lib/intake-steps';
+import { migrateStepId, landingStepId } from '@/lib/intake-steps';
 import IntakeShell from './brief/IntakeShell';
 import type { SectionVerdict } from './CopyWireframe';
 
@@ -52,6 +54,7 @@ export default function IntakeStep({
   copyModel,
   onCopyModelChange,
   pages,
+  edits,
 }: {
   stage: IntakeStageId;
   onStageChange: (s: IntakeStageId) => void;
@@ -73,8 +76,9 @@ export default function IntakeStep({
   /** The site's non-home pages (from the live composition) — drives the per-page review groups
    *  and, with them, the gate. Empty for a single-page site. */
   pages: ReviewPage[];
+  /** The operator's edits by path: an edited value's source is Console (lib/intake-sources.ts). */
+  edits: Record<string, unknown>;
 }) {
-  const missing = getMissingFields(effective._meta);
 
   // Only the six built-in verticals are visible client-side today — a custom/overridden
   // vertical (console/.state/verticals.json, resolved server-side by
@@ -101,19 +105,19 @@ export default function IntakeStep({
     [verticalDef, effective, imported, brief, tickedSections],
   );
 
-  /** Which fact paths the client's own intake supplied, for the Client intake step's source
-   *  chips. Computed once here rather than per-field inside the editor. */
-  const intakePaths = useMemo(() => intakeFactPaths(imported), [imported]);
+  /** Where each value came from: the form, the close, the console, or nowhere yet. */
+  const sources = useMemo<SourceContext>(
+    () => ({ effective, imported, preset: presetFor(vertical), edits }),
+    [effective, imported, vertical, edits],
+  );
 
   /**
-   * Resolve a legacy persisted position to a real step id, once on mount.
-   *
-   * Bundles saved before this rebuild hold 'brief' | 'prompt' | 'review'. The migration lives
-   * here rather than in BuildWizard because BuildWizard has no reason to know the step
-   * registry, and duplicating the sequence in two files is how the two drift apart.
+   * Where the Intake opens, once per mount: Still to do if the intake has run (Approve stamped
+   * `brief.lastRunAt`), else the saved step with legacy ids migrated (lib/intake-steps.ts). Here
+   * rather than in BuildWizard because BuildWizard has no reason to know the step registry.
    */
   useEffect(() => {
-    const resolved = migrateStepId(stage);
+    const resolved = landingStepId(stage, brief.lastRunAt);
     if (resolved !== stage) onStageChange(resolved);
     // Mount only — a later `stage` is always a real id written by the shell.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,6 +198,37 @@ export default function IntakeStep({
     return VERTICALS.find((v) => v.id === industry || v.label.toLowerCase() === industry)?.id ?? null;
   }, [imported]);
 
+  // Still to do, the rail's counts and the summary's figures: one list, so they never disagree.
+  const todo = useMemo(
+    () => intakeTodo(SERVICE_GATE, { ...sources, unreviewed: unreviewed.map(unreviewedLabel) }),
+    [sources, unreviewed, unreviewedLabel],
+  );
+  // SEO plan D2 (Xander, 2026-11-10): preset sample copy and claims the facts don't support,
+  // warned about loudly on Still to do. client-seo's detector; a warning, never a block.
+  const risks = useMemo(() => copyRisks(effective, presetFor(vertical)), [effective, vertical]);
+  const counts = useMemo(() => {
+    const by = attentionByStep(todo);
+    const total = Object.values(by).reduce((a, b) => a + b, 0);
+    return { ...by, todo: total } as Record<string, number>;
+  }, [todo]);
+  const stats = useMemo(() => {
+    const fields = BUSINESS_GROUPS.flatMap((g) => g.fields);
+    const facts = fields.filter((f) => isSupplied(sourceOf(sources, f.path))).length;
+    const services = effective.services?.items ?? [];
+    const own = services.filter((_, i) => servicePageHint(SERVICE_GATE, effective, i).page).length;
+    const reviews = realReviews(effective).length;
+    return [
+      { value: `${facts} / ${fields.length}`, label: 'Business facts' },
+      { value: `${own} / ${services.length}`, label: 'Services with their own page' },
+      { value: String(reviews), label: reviews ? 'Real reviews' : 'Real reviews · section hidden' },
+      generated
+        ? (unreviewed.length
+          ? { value: String(unreviewed.length), label: 'Sections to review' }
+          : { value: 'All', label: 'Sections reviewed', ok: true })
+        : { value: '—', label: 'No copy generated yet' },
+    ];
+  }, [sources, effective, generated, unreviewed.length]);
+
   return (
     <IntakeShell
       activeId={migrateStepId(stage)}
@@ -201,9 +236,12 @@ export default function IntakeStep({
       blocks={blocks}
       content={effective}
       setField={setField}
-      missingFields={missing}
       onUpdate={onBriefChange}
-      intakePaths={intakePaths}
+      sources={sources}
+      todo={todo}
+      counts={counts}
+      stats={stats}
+      risks={risks}
       vertical={vertical}
       onVerticalChange={onVerticalChange}
       clientPickedVertical={clientPickedVertical}

@@ -75,12 +75,14 @@ export default function RecentJobsGrid({
                 )}
               </div>
               <div className="p-5">
-                <span className="text-xs font-medium uppercase tracking-wider text-accent"><E p={`work.projects.${i}.scope`}>{p.scope}</E></span>
+                {p.scope && (
+                  <span className="text-xs font-medium uppercase tracking-wider text-accent"><E p={`work.projects.${i}.scope`}>{p.scope}</E></span>
+                )}
                 <div className="mt-1 flex items-start justify-between gap-2">
                   <h3 className={`font-heading text-sm font-bold ${s.heading}`}><E p={`work.projects.${i}.t`}>{p.t}</E></h3>
                   {p.yr && <span className={`shrink-0 text-xs ${s.body}`}><E p={`work.projects.${i}.yr`}>{p.yr}</E></span>}
                 </div>
-                <p className={`mt-1 text-xs ${s.body}`}><E p={`work.projects.${i}.loc`}>{p.loc}</E></p>
+                {p.loc && <p className={`mt-1 text-xs ${s.body}`}><E p={`work.projects.${i}.loc`}>{p.loc}</E></p>}
               </div>
             </motion.article>
           ))}
