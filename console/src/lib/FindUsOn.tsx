@@ -1,11 +1,11 @@
 // "Find us on": the client's own profiles in the footer (SEO plan D11, the heading approved word
 // for word by Xander 2026-11-10). Google Business Profile first. Plain links with rel="me noopener"
 // and never nofollow: Google's own advice for a business's own profiles. Hidden when the client
-// has none. The same list is the structured data's sameAs (lib/profileLinks.ts).
+// has none. The same list (lib/serviceLinks.ts profileLinks) is the structured data's sameAs.
 //
 // BYTE-IDENTICAL in console/src/lib and template/src/lib (test/profile-links.test.mjs). Colour and
 // type come from the footer that mounts it (text-current); pass className to space or tint it.
-import { profileLinks } from '@/lib/profileLinks';
+import { profileLinks } from '@/lib/serviceLinks';
 
 export default function FindUsOn({ content, className = '' }: { content: unknown; className?: string }) {
   const links = profileLinks(content);

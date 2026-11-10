@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { PhoneCall, Envelope, MapPin, InstagramLogo, FacebookLogo } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import FindUsOn from '@/lib/FindUsOn';
-import { siteAddress } from '@/lib/profileLinks';
+import { displayAddress } from '@/lib/serviceLinks';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
@@ -96,7 +96,7 @@ export default function FooterColumns({
               {brand.address && (
                 <div className={`flex items-start gap-2 py-2 ${s.body}`}>
                   <MapPin size={17} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-                  <E p="brand.address">{siteAddress(content)}</E>
+                  <E p="brand.address">{displayAddress(content)}</E>
                 </div>
               )}
             </div>
