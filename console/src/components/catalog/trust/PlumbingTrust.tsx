@@ -38,7 +38,7 @@ export default function PlumbingTrust({ content = CONTENT }: { content?: SiteCon
           24/7
         </div>
         <p className="mx-auto mt-[18px] max-w-[52ch] text-[17px] leading-[1.65] text-inkSoft">
-          Not on the list? Call — we&apos;ll tell you straight whether we can get to you.
+          Not on the list? Call. We&apos;ll tell you straight whether we can get to you.
         </p>
         <div className="mt-[34px] grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-[10px]">
           {towns.map((town, i) => (

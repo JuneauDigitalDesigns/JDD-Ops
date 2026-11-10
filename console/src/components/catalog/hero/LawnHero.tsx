@@ -45,7 +45,7 @@ export const meta = {
 } as const;
 
 const FREQUENCIES = [
-  { key: 'weekly', label: 'Weekly', sub: 'Mar–Oct' },
+  { key: 'weekly', label: 'Weekly', sub: 'Mar to Oct' },
   { key: 'biweekly', label: 'Bi-weekly', sub: 'Year-round' },
   { key: 'onetime', label: 'One-time', sub: 'Cleanup' },
 ] as const;
@@ -208,7 +208,7 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
             <h2 className="font-heading text-[20px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink sm:text-[22px]">
               <E p="hero.formLabel">{formLabel}</E>
             </h2>
-            <p className="mt-1.5 text-[14px] text-inkSoft">We&rsquo;ll call with a flat quote &mdash; usually same day.</p>
+            <p className="mt-1.5 text-[14px] text-inkSoft">We&rsquo;ll call with a flat quote. Usually same day.</p>
             <span
               className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12.5px] font-bold text-accent"
               style={{ background: 'color-mix(in srgb, var(--accent) 12%, var(--bg))' }}

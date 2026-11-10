@@ -144,14 +144,14 @@ export const CONTENT: SiteContent = {
       { q: "How often should I service my HVAC system?", a: "We recommend a tune-up twice a year, once before heating season and once before cooling season. Regular maintenance extends equipment life and keeps your warranty valid." },
       { q: "What's the difference between R-410A and R-32 refrigerant?", a: "R-32 is the newer, more eco-friendly refrigerant with a lower global warming potential. New systems use R-32; if you have an older R-410A system we'll walk you through your options." },
       { q: "When should I repair vs. replace my system?", a: "If the repair cost exceeds 50% of a new system's cost, or your equipment is over 15 years old, replacement usually makes more financial sense. We'll give you an honest recommendation either way." },
-      { q: "How can I improve my home's energy efficiency?", a: "Regular filter changes (every 1–3 months), sealing duct leaks, adding a programmable thermostat, and annual tune-ups are the highest-impact steps. We offer a free energy audit with any service call." },
+      { q: "How can I improve my home's energy efficiency?", a: "Regular filter changes (every 1 to 3 months), sealing duct leaks, adding a programmable thermostat, and annual tune-ups are the highest-impact steps. We offer a free energy audit with any service call." },
       { q: "Do you offer maintenance plans?", a: "Yes, our plan covers two tune-ups per year, priority scheduling, discounts on parts and labor, and a no-breakdown guarantee for covered components." },
     ],
   },
 
   finalCta: {
     eyebrow:          "Get started",
-    headline:         "Comfort restored — the same day you call.",
+    headline:         "Comfort restored the same day you call.",
     headlineEmphasis: "the same day you call.",
     sub:              "Book online or call now, a real person answers and we will get a technician scheduled, often the same day.",
     cta:              "Book a free estimate",

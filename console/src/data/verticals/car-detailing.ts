@@ -92,7 +92,7 @@ export const CONTENT: SiteContent = {
     items: [
       { n: "01", t: "Interior Detailing",    d: "Deep clean of all interior surfaces, vacuuming, steam cleaning, leather conditioning, and odor elimination.", tag: "Interior" },
       { n: "02", t: "Exterior Hand Wash",    d: "Two-bucket hand wash, decontamination, and finishing wax. Safer and more thorough than any automatic wash.", tag: "Exterior" },
-      { n: "03", t: "Ceramic Coating",       d: "Professional-grade ceramic coating that protects your paint for 2–5 years and makes washing effortless.", tag: "Protection" },
+      { n: "03", t: "Ceramic Coating",       d: "Professional-grade ceramic coating that protects your paint for 2 to 5 years and makes washing effortless.", tag: "Protection" },
       { n: "04", t: "Paint Correction",      d: "Single- and multi-stage machine polishing to remove swirl marks, scratches, and oxidation from the clear coat.", tag: "Correction" },
       { n: "05", t: "Engine Bay Detailing",  d: "Safe and thorough engine bay cleaning and dressing for a professional under-hood appearance.", tag: "Engine Bay" },
       { n: "06", t: "Mobile Service",        d: "We bring our full detail suite to your driveway or office. Same quality, maximum convenience.", tag: "Mobile" },
@@ -122,10 +122,10 @@ export const CONTENT: SiteContent = {
     title:   "Frequently Asked Questions",
     sub:     "Everything you need to know before booking.",
     items: [
-      { q: "How long does a full detail take?", a: "A full interior and exterior detail typically takes 3–5 hours depending on vehicle size and condition. Paint correction and ceramic coating packages can take one to two full days. We'll give you a time estimate when you book." },
+      { q: "How long does a full detail take?", a: "A full interior and exterior detail typically takes 3 to 5 hours depending on vehicle size and condition. Paint correction and ceramic coating packages can take one to two full days. We'll give you a time estimate when you book." },
       { q: "What's the difference between mobile and shop service?", a: "Mobile service brings our full equipment to your location, same products, same quality. Shop service is better for paint correction and coatings, which require controlled lighting and a covered workspace. Both options are offered." },
-      { q: "How long does ceramic coating last?", a: "Our professional-grade ceramic coatings are rated for 2–5 years depending on the product tier and how well the car is maintained. With proper washing technique and annual maintenance, top-tier coatings can last even longer." },
-      { q: "How often should I have my car detailed?", a: "Interior details every 3–6 months; exterior details every 1–3 months depending on driving conditions. Regular washing between sessions extends the life of your detail significantly. Our ceramic coating clients typically do a full detail once a year." },
+      { q: "How long does ceramic coating last?", a: "Our professional-grade ceramic coatings are rated for 2 to 5 years depending on the product tier and how well the car is maintained. With proper washing technique and annual maintenance, top-tier coatings can last even longer." },
+      { q: "How often should I have my car detailed?", a: "Interior details every 3 to 6 months; exterior details every 1 to 3 months depending on driving conditions. Regular washing between sessions extends the life of your detail significantly. Our ceramic coating clients typically do a full detail once a year." },
       { q: "Can you remove pet hair and odors from the interior?", a: "Yes, pet hair removal and odor elimination are specialties of ours. We use a combination of specialized vacuums, steam treatment, enzymatic cleaners, and ozone treatment for persistent odors. Results are typically excellent." },
     ],
   },

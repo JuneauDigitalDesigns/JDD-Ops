@@ -96,7 +96,7 @@ export default function DetailFinalCta({
           <h3 className="font-heading text-[21px] font-extrabold tracking-[-0.02em] text-onInk">
             <E p="finalCta.cta">{finalCta.cta}</E>
           </h3>
-          <p className="mt-1.5 text-[13.5px] leading-[1.5] text-onInkSoft">Tell us what&apos;s going on — we&apos;ll call you right back.</p>
+          <p className="mt-1.5 text-[13.5px] leading-[1.5] text-onInkSoft">Tell us what&apos;s going on. We&apos;ll call you right back.</p>
           <LeadForm
             mode={mode}
             surface="dark"

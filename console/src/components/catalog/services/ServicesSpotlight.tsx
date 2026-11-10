@@ -92,7 +92,7 @@ export default function ServicesSpotlight({
             {/* Active detail caption — flat dark plate (no gradient tell). */}
             <div className="absolute inset-x-0 bottom-0 z-[2] bg-[rgba(8,14,22,0.74)] p-5">
               <p className="font-heading text-[13px] font-bold tracking-[0.12em] text-[color:var(--accent-200)]">
-                {String(active + 1).padStart(2, '0')} — {cur.t.toUpperCase()}
+                {String(active + 1).padStart(2, '0')} · {cur.t.toUpperCase()}
               </p>
               <p className="mt-1.5 max-w-[46ch] text-[14px] leading-relaxed text-onInkSoft">
                 <E p={`services.items.${active}.d`}>{cur.d}</E>

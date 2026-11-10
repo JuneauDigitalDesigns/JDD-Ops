@@ -50,7 +50,7 @@ export default function RoofingTrust({ content = CONTENT }: { content?: SiteCont
             </h2>
           </div>
           <p className="max-w-[52ch] text-[17px] leading-[1.65] text-inkSoft">
-            Outside the list? Call anyway — we travel for full replacements and commercial work.
+            Outside the list? Call anyway. We travel for full replacements and commercial work.
           </p>
         </div>
 
