@@ -94,7 +94,7 @@ export default function LawnFinalCta({ content = CONTENT }: { content?: SiteCont
           <h3 className="font-heading text-[22px] font-extrabold tracking-[-0.02em] text-ink">
             <E p="finalCta.cta">{finalCta.cta}</E>
           </h3>
-          <p className="mt-1.5 text-[14px] text-inkSoft">We&rsquo;ll call with a flat quote &mdash; usually same day.</p>
+          <p className="mt-1.5 text-[14px] text-inkSoft">We&rsquo;ll call with a flat quote. Usually same day.</p>
           <LeadForm
             mode={mode}
             surface="light"

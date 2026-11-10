@@ -11,8 +11,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Phone, EnvelopeSimple, MapPin } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import FindUsOn from '@/lib/FindUsOn';
-import { siteAddress } from '@/lib/profileLinks';
 import { E } from '@/lib/editable';
 
 export const meta = {
@@ -50,7 +48,6 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
               </span>
             </a>
             <p className="mt-4 max-w-[34ch] text-[14.5px] leading-[1.6]"><E p="footer.blurb">{footer.blurb}</E></p>
-            <FindUsOn content={content} />
             {badges.length > 0 && (
               <div className="mt-[18px] flex flex-wrap gap-2">
                 {badges.map((b, i) => (
@@ -83,7 +80,7 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
               <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
             </a>
             <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
-              <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.address">{siteAddress(content)}</E>
+              <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.address">{brand.address}</E>
             </span>
           </div>
         </div>
