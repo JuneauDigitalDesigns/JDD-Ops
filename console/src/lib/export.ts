@@ -17,6 +17,7 @@ import {
 import { routePath, styleKeyFor, rhythmClass, navHref, type SectionRhythm, type SiteComposition } from '@/lib/pages';
 import { reconcileRoutes } from '@/lib/composition-manifest';
 import { REVEAL_CLASS, revealsOnScroll } from '@/lib/revealPolicy';
+import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
 import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
@@ -83,13 +84,17 @@ export const CATALOG: Record<string, readonly string[]> = {
   nav:          ['NavMinimal', 'NavEmergencyBar', 'HvacNav', 'RoofingNav', 'LawnNav', 'PlumbingNav', 'DetailNav'],
   // v2.2: the lightweight header that opens a non-home page. Reads its copy from
   // SiteContent.subpages[route].header, not a global CONTENT import.
-  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader', 'LawnPageHeader', 'PlumbingPageHeader', 'DetailPageHeader'],
+  pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader', 'LawnPageHeader', 'PlumbingPageHeader', 'DetailPageHeader',
+                 // Per-service pages (service-page-spec.md, Xander 2026-11-10): one header per vertical.
+                 'HvacServiceHeader', 'DetailServiceHeader', 'LawnServiceHeader', 'PlumbingServiceHeader', 'RoofingServiceHeader'],
   hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap', 'HvacHero', 'RoofingHero', 'LawnHero', 'PlumbingHero', 'DetailHero'],
   trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust', 'LawnTrust', 'PlumbingTrust', 'DetailTrust'],
   // New section category (decision 18). Reads about.pillars; no new schema field.
   differentiators: ['DifferentiatorsIndex', 'DifferentiatorsPanels', 'DifferentiatorsRail'],
   about:        ['AboutFeature', 'AboutStory', 'AboutSticky', 'HvacAbout', 'RoofingAbout', 'LawnAbout', 'PlumbingAbout', 'DetailAbout'],
-  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight', 'HvacServices', 'RoofingServices', 'LawnServices', 'PlumbingServices', 'DetailServices'],
+  services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight', 'HvacServices', 'RoofingServices', 'LawnServices', 'PlumbingServices', 'DetailServices',
+                 // The body of a per-service page, blocks 4–12, one per vertical.
+                 'HvacServiceDetail', 'DetailServiceDetail', 'LawnServiceDetail', 'PlumbingServiceDetail', 'RoofingServiceDetail'],
   // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.
   work:         ['RecentJobsGrid', 'BeforeAfter', 'WorkSpotlight', 'WorkMasonry'],
   // New section category (decision 18). Reads about.stats; StatsBand is the one count-up.
@@ -615,12 +620,19 @@ export function wirePages(
         comp.chrome.nav,
       ),
     );
+    // A per-service page (/services/<slug>): its service sections get the slug, so they render
+    // that one service and its final CTA opens with "Service: {service}" (service-page-spec.md).
+    const serviceSlug = page.pageType === 'service' ? page.route.slice('services/'.length) : null;
+    const slugAttr = (ref: { name: string }) =>
+      serviceSlug && SERVICE_PAGE_SECTIONS.has(ref.name) ? ` serviceSlug=${JSON.stringify(serviceSlug)}` : '';
     page.sections.forEach((ref, i) => {
-      if (ref.categoryId === 'pageHeader') {
+      if (ref.categoryId === 'pageHeader' && slugAttr(ref)) {
+        lines.push(...emit(`<${ref.name}${slugAttr(ref)} />`, ref));
+      } else if (ref.categoryId === 'pageHeader') {
         const rk = JSON.stringify(page.route);
         lines.push(...emit(`<${ref.name} data={CONTENT.subpages?.[${rk}]?.header ?? ${fallbackHeaderLiteral(page.label)}} />`, ref));
       } else {
-        lines.push(...emit(`<${ref.name}${skinAttr(ref)} />`, ref, revealsOnScroll(ref, i)));
+        lines.push(...emit(`<${ref.name}${skinAttr(ref)}${slugAttr(ref)} />`, ref, revealsOnScroll(ref, i)));
       }
     });
     lines.push(

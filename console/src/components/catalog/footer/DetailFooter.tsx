@@ -6,21 +6,35 @@
 // badge chips, muted uppercase column heads, links that brighten on hover, accent contact icons.
 // Reads brand.* + footer.* + extensions.trustBadges.
 //
+// Service pages pass (Xander 2026-11-10, as HvacFooter): "Find us on" lists the client's own
+// profiles (Google first, rel="me", hidden when none); a service-area business never shows its
+// street (displayAddress); opening hours show from extensions.hours when present.
+//
 // Every colour is a palette token (ink-panel, on-ink, on-ink-soft, rule-ink, accent); the mark
 // is the accent pulled toward black and the badge border is the accent at 30%.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Phone, EnvelopeSimple, MapPin } from '@phosphor-icons/react';
+import {
+  Phone, EnvelopeSimple, MapPin, Clock,
+  GoogleLogo, FacebookLogo, InstagramLogo, Star, SealCheck, HouseLine, Storefront, GlobeSimple,
+} from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
-import FindUsOn from '@/lib/FindUsOn';
-import { siteAddress } from '@/lib/profileLinks';
 import { E } from '@/lib/editable';
+import { displayAddress, profileLinks, type ProfileKind } from '@/lib/serviceLinks';
+
+/** D11 heading, approved word for word by Xander on 2026-11-10. */
+const FIND_US_ON = 'Find us on';
+const PROFILE_ICON: Record<ProfileKind, Icon> = {
+  google: GoogleLogo, facebook: FacebookLogo, yelp: Star, bbb: SealCheck, angi: HouseLine,
+  nextdoor: Storefront, instagram: InstagramLogo, other: GlobeSimple,
+};
 
 export const meta = {
   id: 'detail-footer',
   category: 'footer',
   label: 'Car Detailing / Footer',
-  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'brand.license', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable'],
+  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'brand.license', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges', 'extensions.profiles', 'extensions.serviceAreaBusiness', 'extensions.hours'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -30,6 +44,12 @@ const GOLD_MARK = 'linear-gradient(145deg, var(--accent), color-mix(in srgb, var
 export default function DetailFooter({ content = CONTENT }: { content?: SiteContent }) {
   const { footer, brand, extensions } = content;
   const badges = extensions.trustBadges ?? [];
+  // "Find us on" (D11): the client's own profiles, Google first; hidden when there are none.
+  // rel="me" ties the profile to the site; no nofollow on the business's own profiles.
+  const profiles = profileLinks(content);
+  // A service-area business never shows its street (Google Business Profile rule).
+  const address = displayAddress(content);
+  const hours = Object.entries(extensions.hours ?? {}).filter(([d, h]) => d.trim() && h?.trim());
   const col = 'block py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk';
   const head = 'mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-[color:color-mix(in_srgb,var(--on-ink-soft)_80%,transparent)]';
 
@@ -50,7 +70,6 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
               </span>
             </a>
             <p className="mt-4 max-w-[34ch] text-[14.5px] leading-[1.6]"><E p="footer.blurb">{footer.blurb}</E></p>
-            <FindUsOn content={content} />
             {badges.length > 0 && (
               <div className="mt-[18px] flex flex-wrap gap-2">
                 {badges.map((b, i) => (
@@ -61,6 +80,29 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
                     <E p={`extensions.trustBadges.${i}`}>{b}</E>
                   </span>
                 ))}
+              </div>
+            )}
+            {profiles.length > 0 && (
+              <div className="mt-6">
+                <h4 className={head.replace('mb-3.5', 'mb-3')}>{FIND_US_ON}</h4>
+                <ul className="flex flex-wrap gap-2">
+                  {profiles.map((pr) => {
+                    const Ic = PROFILE_ICON[pr.kind];
+                    return (
+                      <li key={pr.path}>
+                        <a
+                          href={pr.url}
+                          rel="me noopener"
+                          target="_blank"
+                          className="flex items-center gap-2 rounded-[8px] border border-ruleInk px-3 py-1.5 text-[13px] font-semibold text-onInkSoft transition-colors hover:border-[color:color-mix(in_srgb,var(--accent)_45%,transparent)] hover:text-onInk"
+                        >
+                          <Ic size={15} weight="fill" className="text-accent" aria-hidden="true" />
+                          {pr.label}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
           </div>
@@ -82,9 +124,25 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
             <a href={`mailto:${brand.email}`} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft transition-colors [overflow-wrap:anywhere] hover:text-onInk">
               <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
             </a>
-            <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
-              <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.address">{siteAddress(content)}</E>
-            </span>
+            {address && (
+              <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
+                <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                {address === brand.address ? <E p="brand.address">{brand.address}</E> : address}
+              </span>
+            )}
+            {hours.length > 0 && (
+              <div className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
+                <Clock size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  {hours.map(([d, h]) => (
+                    <div key={d} className="contents">
+                      <dt className="text-onInk">{d}</dt>
+                      <dd><E p={`extensions.hours.${d}`}>{h}</E></dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
           </div>
         </div>
 

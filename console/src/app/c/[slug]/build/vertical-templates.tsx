@@ -291,14 +291,73 @@ export type VerticalTemplate = {
   label: string;
   /** Builds a fresh 4-page composition with minted section ids. */
   build: () => SiteComposition;
+  /** The sections of one per-service page (/services/<slug>, service-page-spec.md §3), in order:
+   *  the service header, the service body, and the vertical's own final CTA (which wirePages and
+   *  the Studio give the same serviceSlug, so its form opens prefilled). Absent until a vertical's
+   *  service page is built. */
+  serviceSections?: () => SectionRef[];
 };
 
+/** One per-service page for a vertical: route `services/<slug>`, nav-hidden (linked from the
+ *  Services menu, the cards and the footer instead), labelled with the service's own name. Null
+ *  when the vertical has no service page yet. */
+export function verticalServicePage(vertical: VerticalId, slug: string, label: string): PageInstance | null {
+  const sections = verticalTemplateFor(vertical)?.serviceSections?.();
+  if (!sections) return null;
+  return { route: `services/${slug}`, pageType: 'service', label, templateId: `${vertical}:service`, navVisible: false, sections };
+}
+
+/**
+ * Bring a composition's service pages in line with a chosen list (client-seo's gate decides the
+ * list: pickServicePages in lib/servicePages.ts). Pure. A service page already present keeps its
+ * PageInstance as it is (section ids, so per-section styles, and any operator rename); a new one is
+ * built from the composition's own vertical; one no longer chosen is removed. Service pages sit
+ * after every other page, in the list's order. A composition that isn't a vertical template, or
+ * whose vertical has no service page yet, comes back unchanged.
+ */
+export function syncServicePages(comp: SiteComposition, chosen: { slug: string; label: string }[]): SiteComposition {
+  const vertical = templateIdFor(comp);
+  if (!vertical || !verticalTemplateFor(vertical)?.serviceSections) return comp;
+  const existing = new Map(comp.pages.filter((p) => p.pageType === 'service').map((p) => [p.route, p]));
+  const service = chosen
+    .map(({ slug, label }) => existing.get(`services/${slug}`) ?? verticalServicePage(vertical, slug, label))
+    .filter((p): p is PageInstance => p !== null);
+  return { ...comp, pages: [...comp.pages.filter((p) => p.pageType !== 'service'), ...service] };
+}
+
+/** The slugs of a composition's service pages, in order: what the export writes into
+ *  `content.servicePages` and the Studio injects into its preview, so components link only to
+ *  pages that exist. */
+export function servicePageSlugs(comp: SiteComposition): string[] {
+  return comp.pages.filter((p) => p.pageType === 'service').map((p) => p.route.replace(/^services\//, ''));
+}
+
 export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> = {
-  hvac: { label: 'HVAC — Standard', build: hvacTemplate },
-  roofing: { label: 'Roofing — Standard', build: roofingTemplate },
-  'lawn-care': { label: 'Lawn Care — Standard', build: lawnTemplate },
-  plumbing: { label: 'Plumbing — Standard', build: plumbingTemplate },
-  'car-detailing': { label: 'Car Detailing — Standard', build: detailTemplate },
+  hvac: {
+    label: 'HVAC — Standard',
+    build: hvacTemplate,
+    serviceSections: () => [S('pageHeader', 'HvacServiceHeader'), S('services', 'HvacServiceDetail'), S('finalCta', 'HvacFinalCta')],
+  },
+  roofing: {
+    label: 'Roofing — Standard',
+    build: roofingTemplate,
+    serviceSections: () => [S('pageHeader', 'RoofingServiceHeader'), S('services', 'RoofingServiceDetail'), S('finalCta', 'RoofingFinalCta')],
+  },
+  'lawn-care': {
+    label: 'Lawn Care — Standard',
+    build: lawnTemplate,
+    serviceSections: () => [S('pageHeader', 'LawnServiceHeader'), S('services', 'LawnServiceDetail'), S('finalCta', 'LawnFinalCta')],
+  },
+  plumbing: {
+    label: 'Plumbing — Standard',
+    build: plumbingTemplate,
+    serviceSections: () => [S('pageHeader', 'PlumbingServiceHeader'), S('services', 'PlumbingServiceDetail'), S('finalCta', 'PlumbingFinalCta')],
+  },
+  'car-detailing': {
+    label: 'Car Detailing — Standard',
+    build: detailTemplate,
+    serviceSections: () => [S('pageHeader', 'DetailServiceHeader'), S('services', 'DetailServiceDetail'), S('finalCta', 'DetailFinalCta')],
+  },
 };
 
 /** The template for a vertical, or null when none is built yet. */
