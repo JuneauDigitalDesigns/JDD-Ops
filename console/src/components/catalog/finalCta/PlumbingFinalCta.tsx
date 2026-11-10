@@ -14,6 +14,7 @@ import { CheckCircle } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
+import { serviceBySlug, serviceMessage } from '@/lib/serviceLinks';
 
 /** Headline with an optional emphasis phrase in the editable accent2, matching `.pl-cta h2 .em`. */
 function CtaHeadline({ text, emphasis }: { text: string; emphasis: string | null }) {
@@ -34,17 +35,28 @@ export const meta = {
   category: 'finalCta',
   label: 'Plumbing / Accent-band final CTA',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.headlineEmphasis', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
 
-export default function PlumbingFinalCta({ content = CONTENT }: { content?: SiteContent }) {
+export default function PlumbingFinalCta({
+  content = CONTENT,
+  serviceSlug,
+}: {
+  content?: SiteContent;
+  /** On a service page (wirePages and the Studio pass it): the form opens with "Service: {service}"
+   *  in its message box, the page's only form (Xander 2026-11-10). */
+  serviceSlug?: string;
+}) {
   const { finalCta, _meta } = content;
+  const service = serviceBySlug(content, serviceSlug);
   const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
+    // id="cta": the target of the service page's "Ask for a quote" (PlumbingServiceDetail), as on HvacFinalCta.
     <section
+      id="cta"
       className="relative isolate overflow-hidden py-16 text-onInk lg:py-24"
       style={{
         background:
@@ -89,7 +101,13 @@ export default function PlumbingFinalCta({ content = CONTENT }: { content?: Site
             <E p="finalCta.cta">{finalCta.cta}</E>
           </h3>
           <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&apos;s going on — we&apos;ll call you right back.</p>
-          <LeadForm mode={mode} surface="light" className="mt-3.5" submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>} />
+          <LeadForm
+            mode={mode}
+            surface="light"
+            className="mt-3.5"
+            submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+            {...(service ? { withMessage: true, initialMessage: serviceMessage(service) } : {})}
+          />
         </div>
       </div>
     </section>
