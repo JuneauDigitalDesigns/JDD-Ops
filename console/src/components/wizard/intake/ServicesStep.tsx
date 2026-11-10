@@ -182,6 +182,16 @@ function ServicePanel({
             className={`${INPUT} h-7 w-28`}
           />
         </label>
+        <label className="flex items-center gap-1.5 text-2xs text-uiFg3">
+          Takes
+          <input
+            value={item.duration ?? ''}
+            placeholder="Not given"
+            maxLength={40}
+            onChange={(e) => setField(`${base}.duration`, e.target.value.trim() ? e.target.value : null)}
+            className={`${INPUT} h-7 w-28`}
+          />
+        </label>
         {hint.page
           ? <Tag tone="teal" title="Qualifies for its own page">Own page · /services/{slug}</Tag>
           : <Tag tone="warn" title={hint.text}>Section only · {hint.short} short</Tag>}
