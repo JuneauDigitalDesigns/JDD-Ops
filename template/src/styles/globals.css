@@ -72,9 +72,12 @@ h1, h2, h3, h4, h5, h6 {
    review stars and a "taking calls" dot are not brand colours and no Studio slot moves them.
    Brand-tinted shadows read --ink so a section or brand palette recolours them. */
 :root { --star: #F6B54A; --live: #49D18B; }
-.shadow-brand-1 { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent); }
-.shadow-brand-2 { box-shadow: 0 2px 6px color-mix(in srgb, var(--ink) 8%, transparent), 0 14px 30px -12px color-mix(in srgb, var(--ink) 24%, transparent); }
-.shadow-brand-3 { box-shadow: 0 4px 10px color-mix(in srgb, var(--ink) 9%, transparent), 0 26px 50px -16px color-mix(in srgb, var(--ink) 32%, transparent); }
+/* In @layer utilities so Tailwind builds their variants: `hover:shadow-brand-3` works. */
+@layer utilities {
+  .shadow-brand-1 { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent); }
+  .shadow-brand-2 { box-shadow: 0 2px 6px color-mix(in srgb, var(--ink) 8%, transparent), 0 14px 30px -12px color-mix(in srgb, var(--ink) 24%, transparent); }
+  .shadow-brand-3 { box-shadow: 0 4px 10px color-mix(in srgb, var(--ink) 9%, transparent), 0 26px 50px -16px color-mix(in srgb, var(--ink) 32%, transparent); }
+}
 .hover-lift { transition: transform .25s cubic-bezier(.16, 1, .3, 1), box-shadow .25s cubic-bezier(.16, 1, .3, 1); }
 .hover-lift:hover { transform: translateY(-4px); }
 /* Children of a card grid inside a revealed section arrive one after another: the same

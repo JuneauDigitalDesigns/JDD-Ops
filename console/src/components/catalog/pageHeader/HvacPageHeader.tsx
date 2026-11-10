@@ -41,14 +41,14 @@ export default function HvacPageHeader({
       className="relative isolate overflow-hidden bg-inkPanel text-onInk"
       style={{
         background:
-          'radial-gradient(900px 300px at 80% 0%, color-mix(in srgb, var(--accent-2-strong) 14%, transparent), transparent 60%),' +
+          'radial-gradient(900px 300px at 80% 0%, color-mix(in srgb, color-mix(in srgb, var(--accent-2) 45%, var(--on-ink)) 14%, transparent), transparent 60%),' +
           'var(--ink-panel)',
       }}
     >
       <div className={`mx-auto grid max-w-[1120px] items-center gap-8 px-5 py-12 sm:px-6 lg:py-[72px] ${photo ? 'lg:grid-cols-[1.1fr_0.9fr] lg:gap-12' : ''}`}>
         <div>
           {data.eyebrow ? (
-            <p className="flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-[color:var(--accent-2-strong)]">
+            <p className="flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,var(--accent-2)_45%,var(--on-ink))]">
               <span className="accent-bar !h-[3px] !w-7" aria-hidden="true" />
               {field('eyebrow', data.eyebrow)}
             </p>

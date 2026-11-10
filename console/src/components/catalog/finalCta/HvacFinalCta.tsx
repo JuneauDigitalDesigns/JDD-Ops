@@ -52,14 +52,14 @@ export default function HvacFinalCta({ content = CONTENT }: { content?: SiteCont
       className="relative isolate overflow-hidden bg-inkPanel py-16 text-onInk lg:py-[104px]"
       style={{
         background:
-          'radial-gradient(1100px 380px at 85% -10%, color-mix(in srgb, var(--accent-2-strong) 14%, transparent), transparent 60%),' +
+          'radial-gradient(1100px 380px at 85% -10%, color-mix(in srgb, color-mix(in srgb, var(--accent-2) 45%, var(--on-ink)) 14%, transparent), transparent 60%),' +
           'linear-gradient(180deg, var(--ink-panel-2), var(--ink-panel))',
       }}
     >
       <div className="mx-auto grid max-w-[1120px] items-center gap-10 px-5 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
         <div>
           {finalCta.eyebrow && (
-            <div className="flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-[color:var(--accent-2-strong)]">
+            <div className="flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,var(--accent-2)_45%,var(--on-ink))]">
               <span className="accent-bar !h-[3px] !w-7" aria-hidden="true" />
               <E p="finalCta.eyebrow">{finalCta.eyebrow}</E>
             </div>
