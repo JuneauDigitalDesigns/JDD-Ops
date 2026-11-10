@@ -31,7 +31,7 @@ export function ProseBlockEditor({ block, onUpdate, variant = 'page' }: { block:
       <OverrideTextarea
         value={part.text}
         onChange={(v) => onUpdate((b) => setBlockOverride(b, block.id, 'full', v === part.defaultText ? undefined : v))}
-        rows={block.id === 'guardrails' ? 3 : 8}
+        rows={block.id === 'guardrails' ? 3 : 20}
         placeholder={block.id === 'guardrails' ? 'e.g. no medical claims, no pricing promises…' : undefined}
       />
     </div>
