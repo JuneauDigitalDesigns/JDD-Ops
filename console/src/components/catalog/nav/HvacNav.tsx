@@ -68,7 +68,7 @@ export default function HvacNav({
             className="accent-bar !h-9 !w-9 shrink-0 !rounded-[10px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
             aria-hidden="true"
           />
-          <span className="min-w-0 truncate font-heading text-[18px] font-semibold leading-none tracking-[-0.01em] text-ink md:text-[22px]">
+          <span className="min-w-0 font-heading text-[18px] font-semibold leading-none tracking-[-0.01em] text-ink md:text-[22px]">
             <E p="brand.name">{brand.name}</E>
             {brand.tagline && (
               <small className="mt-0.5 hidden font-sans text-[11px] font-medium tracking-[0.04em] text-inkSoft md:block">
