@@ -39,7 +39,7 @@ function Card({ i, p, s }: { i: number; p: SiteContent['work']['projects'][numbe
         )}
       </div>
       <p className={`mt-3 font-heading text-sm font-semibold ${s.heading}`}><E p={`work.projects.${i}.t`}>{p.t}</E></p>
-      <p className={`mt-0.5 text-xs ${s.body}`}>{[p.loc, p.yr].filter(Boolean).join(' · ')}</p>
+      {(p.loc || p.yr) && <p className={`mt-0.5 text-xs ${s.body}`}>{[p.loc, p.yr].filter(Boolean).join(' · ')}</p>}
     </div>
   );
 }

@@ -74,9 +74,9 @@ export default function WorkSpotlight({
               </AnimatePresence>
             </div>
             <div className="mt-4">
-              <span className={`text-xs font-medium uppercase tracking-wider ${s.body}`}>{current.scope}</span>
+              {current.scope && <span className={`text-xs font-medium uppercase tracking-wider ${s.body}`}>{current.scope}</span>}
               <h3 className={`mt-1 font-heading text-xl font-semibold tracking-[-0.01em] ${s.heading}`}>{current.t}</h3>
-              <p className={`mt-1 text-sm ${s.body}`}>{[current.loc, current.yr].filter(Boolean).join(' · ')}</p>
+              {(current.loc || current.yr) && <p className={`mt-1 text-sm ${s.body}`}>{[current.loc, current.yr].filter(Boolean).join(' · ')}</p>}
               {current.caption && <p className={`mt-2 max-w-prose text-sm ${s.body}`}>{current.caption}</p>}
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function WorkSpotlight({
                   style={on ? { borderColor: 'var(--ink)' } : undefined}
                 >
                   <span className="block font-heading text-sm font-semibold"><E p={`work.projects.${i}.t`}>{p.t}</E></span>
-                  <span className={`mt-0.5 block text-xs ${on ? s.body : ''}`}>{[p.loc, p.yr].filter(Boolean).join(' · ')}</span>
+                  {(p.loc || p.yr) && <span className={`mt-0.5 block text-xs ${on ? s.body : ''}`}>{[p.loc, p.yr].filter(Boolean).join(' · ')}</span>}
                 </button>
               );
             })}

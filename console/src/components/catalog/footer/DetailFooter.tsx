@@ -50,6 +50,9 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
   // A service-area business never shows its street (Google Business Profile rule).
   const address = displayAddress(content);
   const hours = Object.entries(extensions.hours ?? {}).filter(([d, h]) => d.trim() && h?.trim());
+  // The common shape is { all: "Mon to Fri 8am to 5pm" }: "all" is a key, not a label, so it isn't shown.
+  const isAllDays = (d: string) => /^all$/i.test(d.trim());
+  // The common shape is { all: "Mon to Fri 8am to 5pm" }: "all" is a key, not a label, so it isn't shown.
   const col = 'block py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk';
   const head = 'mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-[color:color-mix(in_srgb,var(--on-ink-soft)_80%,transparent)]';
 
@@ -136,8 +139,8 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                   {hours.map(([d, h]) => (
                     <div key={d} className="contents">
-                      <dt className="text-onInk">{d}</dt>
-                      <dd><E p={`extensions.hours.${d}`}>{h}</E></dd>
+                      {!isAllDays(d) && <dt className="text-onInk">{d}</dt>}
+                      <dd className={isAllDays(d) ? 'col-span-2' : undefined}><E p={`extensions.hours.${d}`}>{h}</E></dd>
                     </div>
                   ))}
                 </dl>

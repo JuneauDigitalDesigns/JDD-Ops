@@ -1,22 +1,13 @@
 'use client';
 
 /**
- * The Intake, as eight steps in four phases.
+ * The Intake: eleven steps, each a board that fills the window with no page scroll
+ * (redesign approved 2026-11-10; lib/intake-steps.ts declares the sequence).
  *
- * Replaces BriefBlockShell, and with it two whole rows of chrome. The screen used to carry a
- * Brief/Prompt/Review pill row, a pinned "from the client's intake" card, AND a row of one
- * pill per block — three navigation tiers plus a context card, roughly 275px of furniture
- * before any actual work appeared. This owns all of it in one stepper row.
- *
- * What makes that possible is that the Intake is now ONE sequence rather than a tier of
- * stages each containing steps. Prompt and Review are steps 7 and 8, not a separate mode —
- * see lib/intake-steps.ts, which declares the whole sequence and is the only place the
- * grouping lives.
- *
- * Navigation is fully free: every phase and every dot is always clickable. The one hard gate
- * in the Intake is Approve, which the Review step owns.
+ * One rail of named steps on top, the board, and Back / Next at the bottom. Navigation is free:
+ * every step is always reachable. The one hard gate is Approve, on Still to do.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import type { CopyBrief } from '@jdd/schema';
@@ -25,43 +16,56 @@ import type { SetField } from '@/components/fields';
 import type { LinesBlock, ResolvedBlock } from '@/lib/copy-brief/types';
 import type { Section, VerdictKey } from '@/lib/copy-schema';
 import type { ReviewPage } from '@/lib/copy-review-groups';
-import { intakeAttention } from '@/lib/copy-brief/attention';
+import type { SourceContext } from '@/lib/intake-sources';
+import type { TodoItem } from '@/lib/intake-todo';
+import type { CopyRisks } from '@/lib/copyRisks';
+import type { RiskTarget } from '@/lib/intake-risks';
 import { INTAKE_STEPS, stepIndex, type IntakeStepDef } from '@/lib/intake-steps';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import type { VerticalId } from '@/lib/verticals';
-import PhaseStepper, { toStepperSteps } from './PhaseStepper';
 import BlockGroupPane from './BlockGroupPane';
-import ClientIntakeStep from './ClientIntakeStep';
-import ReviewStep from './ReviewStep';
 import PromptStage from '../prompt/PromptStage';
 import type { SectionVerdict } from '../CopyWireframe';
+import StepRail from '../intake/StepRail';
+import BusinessStep from '../intake/BusinessStep';
+import ServicesStep from '../intake/ServicesStep';
+import AreaStep from '../intake/AreaStep';
+import ReviewsStep from '../intake/ReviewsStep';
+import WordsStep from '../intake/WordsStep';
+import ReviewBoard from '../intake/ReviewBoard';
+import TodoStep from '../intake/TodoStep';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
+/** Column widths for the block steps, so each fits its contents side by side. */
+const BLOCK_WIDTHS: Record<string, string> = {
+  voice: 'minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr)',
+  positioning: 'minmax(0,1fr) minmax(0,1fr)',
+  structure: 'minmax(260px,.7fr) minmax(0,1.6fr) minmax(0,1fr)',
+};
+
 export default function IntakeShell({
   activeId, onSelect,
-  blocks, content, setField, missingFields, onUpdate, intakePaths,
+  blocks, content, setField, onUpdate, sources,
   vertical, onVerticalChange, clientPickedVertical, onReplaceContent,
   brief, verticalDef, imported, tickedSections, copyModel, onCopyModelChange,
   onGenerated, onClearGenerated, hasGenerated,
   verdictFor, pages, unreviewed, gateReason, onApprove,
+  todo, counts, stats, risks,
 }: {
   activeId: string;
   onSelect: (id: string) => void;
 
-  // Brief inputs
   blocks: ResolvedBlock[];
   content: SiteContent;
   setField: SetField;
-  missingFields: string[];
   onUpdate: Update;
-  intakePaths: Set<string>;
+  sources: SourceContext;
   vertical: VerticalId;
   onVerticalChange: (v: VerticalId) => void;
   clientPickedVertical: VerticalId | null;
   onReplaceContent: (site: SiteContent) => void;
 
-  // Prompt step
   brief: CopyBrief;
   verticalDef: import('@jdd/schema').VerticalDef;
   imported: SiteContent | null;
@@ -72,60 +76,51 @@ export default function IntakeShell({
   onClearGenerated: () => void;
   hasGenerated: boolean;
 
-  // Review step
   verdictFor: (key: VerdictKey) => SectionVerdict;
   pages: ReviewPage[];
   unreviewed: Set<VerdictKey>;
   gateReason?: string;
   onApprove: () => void;
+
+  todo: TodoItem[];
+  counts: Record<string, number>;
+  stats: Array<{ value: string; label: string; ok?: boolean }>;
+  /** client-seo's copyRisks over the effective content: the Still to do warning (SEO plan D2). */
+  risks: CopyRisks;
 }) {
   const reduce = useReducedMotion();
   const [dir, setDir] = useState(1);
+  /** Where a Still to do jump points inside the step it opens. */
+  const [focus, setFocus] = useState<{ path?: string; service?: number; section?: string; route?: string; n: number }>({ n: 0 });
 
   const index = stepIndex(activeId);
   const step: IntakeStepDef = INTAKE_STEPS[index];
 
-  /** Only the Client intake step carries a count — see copy-brief/attention.ts for why no
-   *  other step has an honest one. */
-  const attentionFor = useCallback(
-    (s: IntakeStepDef) => (s.kind === 'intake' ? intakeAttention(content) : 0),
-    [content],
-  );
-  const stepperSteps = useMemo(
-    () => toStepperSteps(INTAKE_STEPS, attentionFor),
-    [attentionFor],
-  );
+  const select = useCallback((id: string) => {
+    setDir(stepIndex(id) > index ? 1 : -1);
+    onSelect(id);
+  }, [index, onSelect]);
 
-  const go = useCallback(
-    (nextIndex: number) => {
-      if (nextIndex < 0 || nextIndex > INTAKE_STEPS.length - 1) return;
-      setDir(nextIndex > index ? 1 : -1);
-      onSelect(INTAKE_STEPS[nextIndex].id);
-    },
-    [index, onSelect],
-  );
+  const jump = useCallback((it: TodoItem) => {
+    const target = it.step === 'review' ? 'review' : it.step;
+    setFocus((f) => ({ path: it.path, service: it.serviceIndex, n: f.n + 1 }));
+    select(target);
+  }, [select]);
 
-  const handleSelect = useCallback(
-    (id: string) => {
-      setDir(stepIndex(id) > index ? 1 : -1);
-      onSelect(id);
-    },
-    [index, onSelect],
-  );
+  const riskJump = useCallback((t: RiskTarget) => {
+    setFocus((f) => ({ service: t.serviceIndex, section: t.section, route: t.route, n: f.n + 1 }));
+    select(t.step);
+  }, [select]);
 
   const prev = index > 0 ? INTAKE_STEPS[index - 1] : null;
   const next = index < INTAKE_STEPS.length - 1 ? INTAKE_STEPS[index + 1] : null;
-  // `brief.blocks.facts` is a settings key now, not a block — the Client intake step's toggle
-  // writes it and compile-brief.ts reads it. Absent means included, matching resolve.ts.
   const factsEnabled = brief.blocks.facts?.enabled !== false;
-  // Narrowed via a type guard rather than cast: the Client intake step reads this block's
-  // `lines`, and resolveBrief is free to stop producing it.
   const clientWords = blocks.find((b): b is LinesBlock => b.kind === 'lines');
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-uiCardRule px-6 py-2.5">
-        <PhaseStepper steps={stepperSteps} activeId={activeId} onSelect={handleSelect} />
+      <div className="shrink-0 border-b border-uiCardRule bg-uiBg px-6 py-1.5">
+        <StepRail steps={INTAKE_STEPS} activeId={activeId} counts={counts} onSelect={select} />
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -140,10 +135,48 @@ export default function IntakeShell({
             transition={stepTransition(reduce)}
             className="absolute inset-0 flex flex-col"
           >
-            {/* The Prompt step manages its own two-pane scrolling, so it gets the bare box;
-                every other step scrolls inside the shell's padded body. */}
-            {step.kind === 'prompt' ? (
-              <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {step.kind === 'business' && (
+                <BusinessStep
+                  key={focus.n}
+                  content={content}
+                  sources={sources}
+                  setField={setField}
+                  clientWords={clientWords}
+                  factsEnabled={factsEnabled}
+                  onUpdate={onUpdate}
+                  vertical={vertical}
+                  clientPickedVertical={clientPickedVertical}
+                  onVerticalChange={onVerticalChange}
+                  onReplaceContent={onReplaceContent}
+                  focusPath={focus.path}
+                />
+              )}
+              {step.kind === 'services' && (
+                <ServicesStep content={content} setField={setField} focusService={focus.service} />
+              )}
+              {step.kind === 'area' && <AreaStep content={content} sources={sources} setField={setField} />}
+              {step.kind === 'reviews' && <ReviewsStep content={content} sources={sources} setField={setField} />}
+              {step.kind === 'words' && step.blockIds && (
+                <WordsStep blockIds={step.blockIds} blocks={blocks} content={content} setField={setField} onUpdate={onUpdate} />
+              )}
+              {step.kind === 'blocks' && step.blockIds && (
+                <div className="flex h-full min-h-0 flex-col gap-3.5 px-6 py-4">
+                  <h2 className="shrink-0 font-display text-[28px] font-bold leading-none text-uiInk">{step.label}</h2>
+                  <div className="min-h-0 flex-1">
+                    <BlockGroupPane
+                      blockIds={step.blockIds}
+                      blocks={blocks}
+                      content={content}
+                      setField={setField}
+                      onUpdate={onUpdate}
+                      columns
+                      widths={BLOCK_WIDTHS[step.id]}
+                    />
+                  </div>
+                </div>
+              )}
+              {step.kind === 'prompt' && (
                 <PromptStage
                   vertical={vertical}
                   verticalDef={verticalDef}
@@ -159,70 +192,48 @@ export default function IntakeShell({
                   onClearGenerated={onClearGenerated}
                   hasGenerated={hasGenerated}
                 />
-              </div>
-            ) : (
-              <div className="no-scrollbar min-w-0 flex-1 overflow-y-auto">
-                <div className={step.kind === 'review' ? 'px-6 py-6' : 'step-body max-w-3xl'}>
-                  {step.kind === 'intake' && (
-                    <ClientIntakeStep
-                      content={content}
-                      setField={setField}
-                      missingFields={missingFields}
-                      intakePaths={intakePaths}
-                      clientWords={clientWords}
-                      factsEnabled={factsEnabled}
-                      onUpdate={onUpdate}
-                      vertical={vertical}
-                      clientPickedVertical={clientPickedVertical}
-                      onVerticalChange={onVerticalChange}
-                      onReplaceContent={onReplaceContent}
-                    />
-                  )}
+              )}
+              {step.kind === 'review' && (
+                <ReviewBoard
+                  content={content}
+                  setField={setField}
+                  verdictFor={verdictFor}
+                  pages={pages}
+                  unreviewed={unreviewed}
+                  hasGenerated={hasGenerated}
+                  focusSection={focus.section}
+                  focusRoute={focus.route}
+                  focusKey={focus.n}
+                />
+              )}
+              {step.kind === 'todo' && (
+                <TodoStep
+                  items={todo}
+                  lastRunAt={brief.lastRunAt}
+                  stats={stats}
+                  onJump={jump}
+                  blocked={unreviewed.size > 0}
+                  gateReason={gateReason}
+                  onApprove={onApprove}
+                  onRerun={() => select('prompt')}
+                  risks={risks}
+                  onRiskJump={riskJump}
+                />
+              )}
+            </div>
 
-                  {step.kind === 'blocks' && step.blockIds && (
-                    <BlockGroupPane
-                      blockIds={step.blockIds}
-                      blocks={blocks}
-                      content={content}
-                      setField={setField}
-                      onUpdate={onUpdate}
-                    />
-                  )}
-
-                  {step.kind === 'review' && (
-                    <ReviewStep
-                      content={content}
-                      setField={setField}
-                      verdictFor={verdictFor}
-                      pages={pages}
-                      unreviewed={unreviewed}
-                      hasGenerated={hasGenerated}
-                      gateReason={gateReason}
-                      onApprove={onApprove}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-uiCardRule px-6 py-2.5">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-uiCardRule bg-uiBg px-6 py-2">
               {prev ? (
-                <button type="button" onClick={() => go(index - 1)} className="btn btn-sm">
+                <button type="button" onClick={() => select(prev.id)} className="btn btn-sm">
                   <ArrowLeft size={14} /> {prev.label}
                 </button>
-              ) : (
-                <span />
-              )}
-              <span className="font-chromeMono text-2xs text-uiFg3">
-                {index + 1} of {INTAKE_STEPS.length}
-              </span>
+              ) : <span />}
+              <span className="font-chromeMono text-2xs text-uiFg3">{index + 1} of {INTAKE_STEPS.length}</span>
               {next ? (
-                <button type="button" onClick={() => go(index + 1)} className="btn btn-sm btn-primary">
+                <button type="button" onClick={() => select(next.id)} className="btn btn-sm btn-primary">
                   {next.label} <ArrowRight size={14} />
                 </button>
-              ) : (
-                <span />
-              )}
+              ) : <span />}
             </div>
           </motion.div>
         </AnimatePresence>
