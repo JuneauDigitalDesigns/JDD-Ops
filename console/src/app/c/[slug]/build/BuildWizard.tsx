@@ -24,7 +24,7 @@ import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import PageStudio from './PageStudio';
 import { defaultCompositionFor } from './page-templates';
-import { applyVerticalTemplate } from './vertical-templates';
+import { applyVerticalTemplate, servicePageSlugs } from './vertical-templates';
 import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import { landingStepId } from '@/lib/intake-steps';
@@ -275,9 +275,16 @@ export default function BuildWizard({
   // renders. The export route runs the same transform on the server, so what's previewed
   // here is what ships — except `includeWork`, whose fabricated sample projects are
   // preview-only and are never serialized into a client repo.
+  //
+  // `servicePages` is routing, not copy: the slugs of the composition's per-service pages, which
+  // the export writes the same way (beside `nav`). The Services menu, the cards, related services
+  // and the footer link only to these, so the preview never links to a page that won't ship.
   const previewContent = useMemo(
-    () => fillImagePlaceholders(effective, vertical, { includeWork: true }).content,
-    [effective, vertical],
+    () => ({
+      ...fillImagePlaceholders(effective, vertical, { includeWork: true }).content,
+      servicePages: servicePageSlugs(siteComposition),
+    }) as SiteContent,
+    [effective, vertical, siteComposition],
   );
   const categories = useMemo(() => buildCategories(previewContent), [previewContent]);
 

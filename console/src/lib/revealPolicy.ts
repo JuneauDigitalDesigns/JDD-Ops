@@ -30,6 +30,11 @@ export const SELF_ANIMATED: ReadonlySet<string> = new Set([
   'FinalCtaSimple',
   'FinalCtaSplit',
   'HeroOverlap',
+  // A per-service page's body: each of its blocks carries its own `rv`, since one reveal on the
+  // whole page-tall body would leave it half-faded while it is read.
+  'HvacServiceDetail',
+  'PlumbingServiceDetail',
+  'RoofingServiceDetail',
   'NavMinimal',
   'RecentJobsGrid',
   'ServicesAccordion',
