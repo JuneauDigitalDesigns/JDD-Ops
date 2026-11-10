@@ -10,8 +10,9 @@
  *   plus:  at least one more fact (the other core list, a starting price, brands, this service's
  *          own towns, or a real review / job photo / customer question tagged to it)
  *
- * A service that misses stays a card on /services (`/services#<slug>`): no page, no sitemap
- * entry, no dead link. Nothing here generates copy, and nothing is ever padded to pass.
+ * A service that misses stays a plain card with no link anywhere (Xander 2026-11-10): no page,
+ * no sitemap entry, not in related links, the footer or the Services menu. Nothing here generates
+ * copy, and nothing is ever padded to pass.
  *
  * The ONE implementation: the export, the Studio's page wiring and intake-wizard's "this service
  * needs N more facts" hint all import it, the way onboard-checks.js serves both the suite and
