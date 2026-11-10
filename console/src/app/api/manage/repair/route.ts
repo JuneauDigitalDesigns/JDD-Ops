@@ -10,6 +10,7 @@ import {
 } from '@/lib/opsSecrets';
 import { resolveLiveUrl } from '@/lib/manageSites';
 import { appendAudit } from '@/lib/audit';
+import { addHostnamesToSiteWidget } from '@/lib/turnstilePool';
 import { recordUndo, type UndoKind } from '@/lib/undo';
 import { applyEnvUpdates } from '@/lib/envFile';
 import { siteDirFor } from '@/lib/clients';
@@ -69,7 +70,8 @@ export type RepairAction =
   | 'profile.forwardPhone'
   | 'airtable.callLog'
   | 'airtable.siteColumn'
-  | 'airtable.columns';
+  | 'airtable.columns'
+  | 'turnstile.hostnames';
 
 interface Body {
   slug?: string;
@@ -117,6 +119,8 @@ export async function POST(req: Request) {
       case 'airtable.siteColumn':
       case 'airtable.columns':
         return await repairAirtable(ops, ctx, site, action);
+      case 'turnstile.hostnames':
+        return await repairTurnstileHostnames(ctx.slug, site);
       default:
         return NextResponse.json({ error: `Unknown action "${action}"` }, { status: 400 });
     }
@@ -424,4 +428,44 @@ async function activateMakeScenario(
     summary: `Reactivated Make scenario ${scenarioId}`,
     result,
   });
+}
+
+/**
+ * Put every host the site serves on the Turnstile widget its lead form renders, so the human check
+ * runs there again. Additive only, and no undo: taking a hostname back off would switch the check
+ * off on a live domain. It never moves the site to another widget (that changes the site key and
+ * needs a rebuild); when the widget has no room it says to re-run onboarding.
+ */
+async function repairTurnstileHostnames(slug: string, site: SiteInfo) {
+  if (!loadVercelCredentials()) {
+    return NextResponse.json({ error: "No VERCEL_TOKEN, so the site's domains can't be listed." }, { status: 400 });
+  }
+  const vercel = await loadVercelSync();
+  const domains = await vercel.listProjectDomains(site.slug);
+  if (!domains.ok) {
+    return NextResponse.json({ error: `Vercel did not list this site's domains: ${domains.reason ?? 'no reason given'}.` }, { status: 502 });
+  }
+  const result = await addHostnamesToSiteWidget({
+    slug,
+    siteSlug: site.slug,
+    siteKey: site.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '',
+    hostnames: domains.domains.map((d) => d.name),
+  });
+  if (!result.ok) {
+    appendAudit({ slug, siteSlug: site.slug, action: 'turnstile.hostnames', ok: false, summary: 'Turnstile hostnames not added', detail: { reason: result.error } });
+    return NextResponse.json({ error: result.error }, { status: 409 });
+  }
+  if (result.added.length === 0) {
+    appendAudit({ slug, siteSlug: site.slug, action: 'turnstile.hostnames', ok: true, summary: 'Turnstile hostnames already correct' });
+    return NextResponse.json({ ok: true, changed: false, message: 'Already correct.' });
+  }
+  appendAudit({
+    slug,
+    siteSlug: site.slug,
+    action: 'turnstile.hostnames',
+    ok: true,
+    summary: `Added ${result.added.join(', ')} to the site's Turnstile widget`,
+    detail: { hostnames: result.added, siteKey: result.siteKey },
+  });
+  return NextResponse.json({ ok: true, changed: true });
 }

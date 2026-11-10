@@ -50,6 +50,8 @@ const OLD_FORM = read(path.join(PAIRING, 'LeadForm.v1.0.7.tsx.txt'));
 /** The last form and route from before the human check (2026-11-09). */
 const PRE_CHECK_FORM = read(path.join(PAIRING, 'LeadForm.v1.4.0.tsx.txt'));
 const PRE_ADMIT_ROUTE = read(path.join(PAIRING, 'contact.route.pre-admit.ts.txt'));
+/** The route from before the form could say its widget couldn't run (2026-11-09). */
+const PRE_WIDGET_ERROR_ROUTE = read(path.join(PAIRING, 'contact.route.pre-widget-error.ts.txt'));
 
 function write(file, text) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -208,6 +210,18 @@ test('a form with the human check beside a route that never verifies it is refus
   const r = checkFormRoutePairing({ consentTextSrc: CURRENT_CONSENT_TEXT, leadFormSrc: CURRENT_FORM, routeSrc: PRE_ADMIT_ROUTE });
   assert.equal(r.ok, false);
   assert.match(r.reason, /look protected and not be/);
+});
+
+test("a form that reports a widget error beside a route that ignores it is refused: those leads would be lost", () => {
+  const form = CURRENT_FORM.includes('turnstileStatus') ? CURRENT_FORM : `${CURRENT_FORM}
+// turnstileStatus: 'error'`;
+  const r = checkFormRoutePairing({ consentTextSrc: CURRENT_CONSENT_TEXT, leadFormSrc: form, routeSrc: PRE_WIDGET_ERROR_ROUTE, installedLabel: 'v1.6.0' });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /widget couldn.t run/);
+});
+
+test('the installed form reports a widget that could not run', () => {
+  assert.match(CURRENT_FORM, /turnstileStatus/, 'console/package.json must pin @jdd/ui v1.6.0 or later');
 });
 
 test('the installed form is the one with the human check', () => {

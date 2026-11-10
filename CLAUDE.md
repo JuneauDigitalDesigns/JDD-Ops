@@ -550,10 +550,23 @@ verifies it (the token's hostname must be the host the form posted to), applies 
 limits and claims the AI callback, then returns a single-use admission that `call-consent` and
 `lead` require. The route never dials on its own say-so.
 
-- Keys: one widget for all client sites. Its public key is the master `CLIENT_TURNSTILE_SITE_KEY`,
-  written into each `.env.local` as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Its secret lives only on the
-  agency, as `LEAD_FORM_TURNSTILE_SECRET_KEY` (`TURNSTILE_SECRET_KEY` there is the agency's own
-  quote-form widget). No key: no widget, leads still arrive, no AI callback.
+- Keys: a **pool** of widgets (`lib/turnstile-pool.js`, operator decision 2026-11-09), because a
+  free widget holds 10 hostnames. Pool widgets are named "JDD client lead forms", "… 2", "… 3";
+  nothing else on the Cloudflare account is touched, and `vercel.app` itself is never added.
+  onboard.js step 9 puts the site's vercel.app host and every Vercel-listed domain on a widget
+  with room (creating one when all are full) and writes its public key to `.env.local` as
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. A new widget's secret goes straight to the agency's KV
+  (`portal:gate:v1:widget-secret:{siteKey}`) and is never printed. The first, hand-made widget's
+  secret is the agency env `LEAD_FORM_TURNSTILE_SECRET_KEY` (`TURNSTILE_SECRET_KEY` there is the
+  agency's own quote-form widget). Needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; without
+  them the key stays `CLIENT_TURNSTILE_SITE_KEY` and nothing is checked.
+- **A host missing from the site's widget can't run the check** (Cloudflare error 110200). The form
+  (v1.6.0+) then posts `turnstileStatus: 'error'` and the agency keeps the lead with no AI call, and
+  emails JDD once a day naming the site and host ("never lose a lead"). So `/manage`'s domain attach
+  adds the host to the widget first and attaches nothing if it can't, and the
+  `turnstile.missingHostnames` finding names any missing host with an "Add" button. The console
+  only ever adds to the site's own widget; moving a site to another widget changes its key and is
+  onboard.js's job.
 - Limits, all at the agency (`lead-gate.ts`, `lead-admit.ts`, env-tunable): one AI call per number
   per site per 24 h (kept even if Retell refuses, so a resubmit never re-dials), two per number
   across sites, 100 per site a day; repeats from one phone/email within 24 h merge into one lead

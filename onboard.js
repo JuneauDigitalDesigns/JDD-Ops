@@ -65,7 +65,14 @@ import {
   accountStoreConfigured,
   getAccountRecord,
   registerLeadIngestToken,
+  storeTurnstileWidgetSecret,
 } from './lib/account-store.js';
+import {
+  describeTurnstilePlan,
+  ensureSiteOnPool,
+  missingTurnstileHostnames,
+  siteHostnames,
+} from './lib/turnstile-pool.js';
 import {
   ensureClientRecord,
   clientRecordsConfigured,
@@ -2355,9 +2362,54 @@ function commitAndPush(repoDir, brandName) {
 // Step 9: Sync env to Vercel
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * Step 9, first: put this site's hostnames on a Turnstile widget with room (lib/turnstile-pool.js
+ * has the why), and record the widget's public key as NEXT_PUBLIC_TURNSTILE_SITE_KEY so the env
+ * sync below carries it and the rebuild bakes it in.
+ *
+ * Without CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID nothing is checked and the key stays what
+ * .env.local says (CLIENT_TURNSTILE_SITE_KEY on a first run). Any failure is a warning, never a
+ * stop: a site whose host isn't on its widget still records every lead, it just places no AI call.
+ * Deliberately no log() of its own: it is part of step 9 (see the phase contract).
+ */
+async function assignTurnstileWidget(siteSlug, clientDir) {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const say = DRY_RUN ? dryLog : (m) => console.log(`  ${m}`);
+  if (!token || !accountId) {
+    say(`Turnstile hostnames not checked: CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in jdd-ops/.env`);
+    return;
+  }
+  try {
+    const current = readEnvLocal(clientDir).NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
+    const domains = await listProjectDomains(siteSlug);
+    const wanted = siteHostnames({
+      vercelHost: vercelAppHost(siteSlug),
+      domains: domains.ok ? domains.domains.map((d) => d.name) : [],
+    });
+    const { plan, siteKey, widgets } = await ensureSiteOnPool({
+      accountId,
+      token,
+      wanted,
+      currentSiteKey: current,
+      storeSecret: storeTurnstileWidgetSecret,
+      dryRun: DRY_RUN,
+    });
+    if (current) {
+      const now = missingTurnstileHostnames({ widgets, siteKey: current, wanted });
+      if (!now.ok) say(`Turnstile: ${now.missing.join(', ')} not on this site's widget today, so the human check can't run there`);
+    }
+    say(`Turnstile: ${DRY_RUN ? 'would ' : ''}${describeTurnstilePlan(plan)}`);
+    if (!DRY_RUN && siteKey && siteKey !== current) patchEnvLocal(clientDir, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY', siteKey);
+  } catch (err) {
+    console.warn(`  ⚠ Turnstile hostnames not updated: ${err.message}. Leads still arrive; AI callbacks are held where the check can't run.`);
+  }
+}
+
 async function syncVercelEnv(siteSlug, content, clientDir, plan) {
   const projectName = sanitizeProjectName(siteSlug);
   log(9, `Sync env to Vercel project "${projectName}"`);
+  await assignTurnstileWidget(siteSlug, clientDir);
   if (DRY_RUN) {
     if (projectName !== siteSlug) {
       dryLog(`project name sanitized: "${siteSlug}" → "${projectName}" (GitHub repo keeps "${siteSlug}")`);

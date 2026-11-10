@@ -1,12 +1,13 @@
 import 'server-only';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { sortFindings, type Finding, type ReconcileResult } from '@jdd/schema';
+import { sortFindings, vercelAppHost, type Finding, type ReconcileResult } from '@jdd/schema';
 import type { PortalAccount } from '@jdd/schema';
 import type { ClientContext, SiteInfo } from './types';
 import { siteDirFor } from './clients';
 import { loadVercelSync } from './vercelSync';
 import {
+  loadCloudflareCredentials,
   loadVercelCredentials,
   loadRetellApiKey,
   loadMakeApiKey,
@@ -436,6 +437,73 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
             }),
           );
         }
+      }
+    }
+
+    // ── The lead form's human check: every host on the site's Turnstile widget ──
+    // A host the widget doesn't list makes Cloudflare refuse to render it there, so leads from
+    // it arrive unchecked and no AI call is placed for them. Every tier has a lead form.
+    const siteKey = site.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      findings.push(
+        f({
+          id: 'turnstile.noSiteKey',
+          severity: 'amber',
+          area: 'leads',
+          siteSlug,
+          title: 'Lead form has no human check',
+          detail:
+            'This site has no NEXT_PUBLIC_TURNSTILE_SITE_KEY, so its lead form renders no Turnstile check. Leads still ' +
+            'arrive, but no AI call is placed for any of them. Re-run onboarding for this client to assign a widget.',
+        }),
+      );
+    } else {
+      const cf = loadCloudflareCredentials();
+      const ts = await probes.probeTurnstileHostnames({
+        token: cf?.token ?? null,
+        accountId: cf?.accountId ?? null,
+        siteKey,
+        vercelHost: vercelAppHost(siteSlug),
+        domains: domains?.ok ? domains.domains.map((d) => d.name) : [],
+      });
+      if (!ts.checked) {
+        if (!quiet) {
+          findings.push(
+            unknownFinding(
+              'turnstile.unchecked',
+              'leads',
+              siteSlug,
+              'Turnstile hostnames not checked',
+              'No CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID in jdd-ops/.env, or Cloudflare could not be read.',
+            ),
+          );
+        }
+      } else if (ts.missing?.length) {
+        const names = ts.missing.join(', ');
+        findings.push(
+          f({
+            id: 'turnstile.missingHostnames',
+            severity: 'red',
+            area: 'leads',
+            siteSlug,
+            title: ts.siteKeyKnown ? `${names} not on the lead form's Turnstile widget` : "The lead form's Turnstile widget is gone",
+            detail: ts.siteKeyKnown
+              ? `Cloudflare won't show the human check on ${names}, so leads from there arrive unchecked and no AI call ` +
+                'is placed for them. Adding the hostname to the widget fixes it at once; nothing is rebuilt.'
+              : `The site key this site renders (${siteKey}) isn't any of the pool's widgets, so the human check runs ` +
+                'nowhere: leads arrive, no AI call is placed. Re-run onboarding for this client to assign one.',
+            actual: names,
+            ...(ts.siteKeyKnown
+              ? {
+                  fix: {
+                    route: '/api/manage/repair',
+                    body: { slug: a.ctx.slug, siteSlug, action: 'turnstile.hostnames' },
+                    label: `Add ${names}`,
+                  },
+                }
+              : {}),
+          }),
+        );
       }
     }
   } else if (!a.vercel && shouldBeLive && !quiet) {

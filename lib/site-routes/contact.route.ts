@@ -72,7 +72,20 @@ function clientIp(req: Request): string | null {
 
 /** The form's own fields for the human check. Never forwarded with the lead. */
 const HONEYPOT_FIELD = 'jdd_hp';
-const NOT_FORWARDED = new Set(['turnstileToken', HONEYPOT_FIELD, 'admissionId', 'callbackPlaced']);
+const NOT_FORWARDED = new Set(['turnstileToken', 'turnstileStatus', HONEYPOT_FIELD, 'admissionId', 'callbackPlaced']);
+
+/**
+ * What the agency should make of a submission with no token. "off": this site has no key, so the
+ * form rendered no widget. "widget-error": the form (@jdd/ui v1.6.0+) says its widget couldn't run,
+ * most often because this host isn't on the site's widget. Either way the agency keeps the lead and
+ * places no call (operator decision, 2026-11-09: never lose a lead). A token always wins: then the
+ * check runs.
+ */
+function humanCheckFor(turnstileToken: unknown, turnstileStatus: unknown): 'on' | 'off' | 'widget-error' {
+  if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim()) return 'off';
+  if (!shortString(turnstileToken, 2048) && turnstileStatus === 'error') return 'widget-error';
+  return 'on';
+}
 
 type Admission =
   | { kind: 'admitted'; admissionId: string; callback: boolean }
@@ -85,7 +98,7 @@ type Admission =
  */
 async function admitSubmission(
   req: Request,
-  input: { turnstileToken: unknown; phone: string | null; email: string; wantsCallback: boolean },
+  input: { turnstileToken: unknown; turnstileStatus: unknown; phone: string | null; email: string; wantsCallback: boolean },
 ): Promise<Admission> {
   const token = process.env.LEAD_INGEST_TOKEN;
   if (!process.env.LEAD_INGEST_URL || !token) {
@@ -106,9 +119,9 @@ async function admitSubmission(
         // production deployment's first ask moves this site over to admissions at the agency.
         host: req.headers.get('x-forwarded-host') || req.headers.get('host'),
         deployment: process.env.VERCEL_ENV ?? null,
-        // Without a site key the form renders no widget, so there is no token to expect. The
-        // agency then records the lead and places no call, until the key is set.
-        humanCheck: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ? 'on' : 'off',
+        humanCheck: humanCheckFor(input.turnstileToken, input.turnstileStatus),
+        // Which widget the form rendered: client sites share a pool, each with its own secret.
+        siteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null,
       }),
       signal: AbortSignal.timeout(4000),
     });
@@ -437,6 +450,7 @@ export async function POST(req: Request) {
 
   const admission = await admitSubmission(req, {
     turnstileToken: data.turnstileToken,
+    turnstileStatus: data.turnstileStatus,
     phone: toNumber,
     email: emailRaw,
     wantsCallback: Boolean(proof),
