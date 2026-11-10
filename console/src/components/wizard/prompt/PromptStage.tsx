@@ -45,14 +45,11 @@ export default function PromptStage({
   }, [verticalDef, base, imported, brief, tickedSections, blocks]);
 
   return (
-    <div className="flex h-full min-h-0">
-      <div className="no-scrollbar min-w-0 flex-[2] overflow-y-auto">
-        <div className="step-body max-w-3xl">
-          <PromptPlainView system={prompt.system} user={prompt.user} />
-        </div>
-      </div>
-      <div className="w-[300px] shrink-0">
-        <RunControls
+    // The prompt takes the full width and reads sideways; the run box floats over its bottom-right
+    // corner, just above the intake's Back / Next bar.
+    <div className="relative h-full min-h-0">
+      <PromptPlainView system={prompt.system} user={prompt.user} />
+      <RunControls
           vertical={vertical}
           base={base}
           imported={imported}
@@ -65,7 +62,6 @@ export default function PromptStage({
           onClearGenerated={onClearGenerated}
           hasGenerated={hasGenerated}
         />
-      </div>
     </div>
   );
 }

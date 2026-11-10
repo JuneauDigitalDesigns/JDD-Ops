@@ -1,14 +1,22 @@
 'use client';
 
+/**
+ * The Prompt step's run box (Xander, 2026-11-10, the approved "Prompt v2" mockup). It used to be a
+ * 300px sidebar; now it is a small box floating in the bottom-right corner, just above the intake's
+ * Back / Next bar, that steps through: the sections to write a group at a time (a switch beside
+ * each name), the model and its estimated cost, and a summary over the Generate button.
+ * The steps and their headers are lib/run-steps.ts.
+ */
 import { useEffect, useRef, useState } from 'react';
-import { CircleNotch, Check, X, Warning, Sparkle } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, CircleNotch, Check, X, Warning, Sparkle } from '@phosphor-icons/react';
 import type { CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
-import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import type { Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
 import { relativeTime } from '@/lib/relativeTime';
-import { MODEL_OPTIONS, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
+import { MODEL_OPTIONS, modelOption } from '@/lib/model-pricing';
+import { RUN_STEPS, runSummary, switchSection, generateLabel } from '@/lib/run-steps';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
@@ -39,7 +47,7 @@ export default function RunControls({
   onClearGenerated: () => void;
   hasGenerated: boolean;
 }) {
-  const sectionOptions = ALL_SECTIONS.filter((s) => s !== 'brand');
+  const [stepAt, setStepAt] = useState(0);
   const [statuses, setStatuses] = useState<Record<string, SectionStatus>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [run, setRun] = useState<RunState>({ kind: 'idle' });
@@ -49,8 +57,7 @@ export default function RunControls({
 
   const ticked = new Set(tickedSections);
   const toggle = (s: Section) =>
-    onBriefChange((b) => setTickedSections(b, ticked.has(s) ? tickedSections.filter((x) => x !== s) : [...tickedSections, s]));
-  const allTicked = sectionOptions.every((s) => ticked.has(s));
+    onBriefChange((b) => setTickedSections(b, switchSection(tickedSections, s, !ticked.has(s))));
 
   // Debounced token/cost estimate whenever the run inputs change.
   useEffect(() => {
@@ -154,119 +161,162 @@ export default function RunControls({
   }
 
   const busy = run.kind === 'running';
+  const step = RUN_STEPS[stepAt];
+  const summary = runSummary(tickedSections);
+  const cost = estimating ? 'estimating…' : estimate ? `~$${estimate.estCostUsd.toFixed(2)}` : '—';
+  const failures = Object.entries(errors);
 
   return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto border-l border-uiCardRule p-5">
-      <div>
-        <div className="mb-1 flex items-center justify-between">
-          <p className="kicker">Sections to write</p>
-          <button
-            type="button"
-            onClick={() => onBriefChange((b) => setTickedSections(b, allTicked ? [] : sectionOptions))}
-            disabled={busy}
-            className="mono text-2xs text-uiInkSoft hover:text-uiInk"
-          >
-            {allTicked ? 'None' : 'All'}
-          </button>
-        </div>
-        <p className="mb-2 text-2xs leading-relaxed text-uiInkSoft">
-          Only what&apos;s ticked is written. Unticking a section leaves whatever is already there
-          untouched — it is not cleared.
-        </p>
-        <div className="overflow-hidden rounded-lg border border-uiCardRule">
-          {sectionOptions.map((s, i) => {
-            const status = statuses[s] ?? 'idle';
-            return (
-              <div key={s} className={`flex items-center gap-2 px-3 py-1.5 ${i > 0 ? 'border-t border-uiCardRule' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={ticked.has(s)}
-                  onChange={() => toggle(s)}
-                  disabled={busy}
-                  className="shrink-0 cursor-pointer"
-                />
-                <span className="min-w-0 flex-1 truncate text-sm text-uiFg2">{labelFor(s)}</span>
-                <StatusIcon status={status} />
-              </div>
-            );
-          })}
-        </div>
-        {run.kind !== 'idle' && Object.keys(errors).length > 0 && (
-          <div className="mt-2 space-y-1">
-            {Object.entries(errors).map(([s, msg]) => (
-              <p key={s} className="text-2xs text-danger">{labelFor(s as Section)}: {msg}</p>
+    <div
+      data-testid="run-box"
+      className="absolute bottom-3.5 right-6 z-10 flex h-[316px] w-[340px] flex-col overflow-hidden rounded-[14px] border border-ruleStrong bg-panel shadow-overlay"
+    >
+      <div className="flex shrink-0 items-center gap-2 border-b border-uiCardRule px-2.5 pb-2 pt-2.5">
+        <button
+          type="button"
+          aria-label="Previous"
+          onClick={() => setStepAt((i) => Math.max(0, i - 1))}
+          disabled={stepAt === 0}
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-uiCardRule bg-uiBg text-uiInk disabled:opacity-30"
+        >
+          <ArrowLeft size={14} />
+        </button>
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+          <p className="truncate font-display text-[19px] font-bold leading-none text-uiInk">{step.label}</p>
+          <div className="flex gap-1" aria-hidden>
+            {RUN_STEPS.map((s, i) => (
+              <i key={s.label} className={`block h-[3px] w-3.5 rounded-sm ${i === stepAt ? 'bg-uiAccent' : 'bg-uiCardRule'}`} />
             ))}
           </div>
-        )}
-      </div>
-
-      <div>
-        <p className="kicker mb-2">Model</p>
-        <select
-          value={model}
-          onChange={(e) => onModelChange(e.target.value)}
-          disabled={busy}
-          className="w-full rounded-md border border-uiCardRule bg-uiBg px-2 py-1.5 text-sm text-uiFg2 outline-none focus:border-uiAccent"
+        </div>
+        <button
+          type="button"
+          aria-label="Next"
+          onClick={() => setStepAt((i) => Math.min(RUN_STEPS.length - 1, i + 1))}
+          disabled={stepAt === RUN_STEPS.length - 1}
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-uiCardRule bg-uiBg text-uiInk disabled:opacity-30"
         >
-          {MODEL_OPTIONS.map((m) => (
-            <option key={m.id} value={m.id}>{m.label}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <p className="kicker mb-2">Estimated cost</p>
-        {estimating ? (
-          <p className="mono text-xs text-uiInkSoft">estimating…</p>
-        ) : estimate ? (
-          <>
-            <p className="font-display text-lg font-semibold tracking-tightish text-uiInk">
-              ~${estimate.estCostUsd.toFixed(2)}
-            </p>
-            <p className="mono mt-0.5 text-2xs text-uiFg2">
-              ~{estimate.estInputTokens.toLocaleString()} in / ~{estimate.estOutputTokens.toLocaleString()} out
-            </p>
-          </>
-        ) : (
-          <p className="mono text-xs text-uiInkSoft">tick a section to estimate</p>
-        )}
-        <p className="mt-1 text-2xs text-uiInkSoft">Input is exact; output is a working guess until a run reports real usage.</p>
-      </div>
-
-      <button
-        type="button"
-        onClick={generate}
-        disabled={busy || tickedSections.length === 0}
-        className="btn btn-primary mt-auto w-full justify-center"
-      >
-        {busy ? <CircleNotch size={15} className="animate-spin" /> : <Sparkle size={15} weight="fill" />}
-        {busy ? 'Generating…' : `${hasGenerated ? 'Regenerate' : 'Generate'} ${tickedSections.length} section${tickedSections.length === 1 ? '' : 's'}`}
-      </button>
-
-      {/* `lastRunAt` is stamped on approve, not on generate (see IntakeStep's approve()), so
-          this reads "last approved" rather than "last generated" — labelled accordingly rather
-          than mislabelled as a run timestamp. */}
-      {brief.lastRunAt && !busy && (
-        <p className="mono text-2xs text-uiInkSoft">
-          Last approved {relativeTime(brief.lastRunAt)}
-        </p>
-      )}
-
-      {run.kind === 'done' && (
-        <p className="flex items-center gap-1.5 text-sm text-ok">
-          <Check size={15} weight="bold" /> Copy applied — review it on the next stage.
-        </p>
-      )}
-      {run.kind === 'error' && (
-        <p className="flex items-center gap-1.5 text-sm text-danger">
-          <Warning size={15} /> {run.message}
-        </p>
-      )}
-      {hasGenerated && !busy && (
-        <button type="button" onClick={onClearGenerated} className="mono text-2xs text-uiInkSoft hover:text-uiInk">
-          Revert generated copy
+          <ArrowRight size={14} />
         </button>
-      )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col px-3.5 pb-3 pt-1.5">
+        {step.kind === 'sections' && step.sections.map((s) => {
+          const on = ticked.has(s);
+          return (
+            <div key={s} className="flex h-11 items-center gap-2.5 border-b border-uiCardRule last:border-b-0">
+              <span className={`text-sm ${on ? 'font-semibold text-uiInk' : 'text-uiFg3'}`}>{labelFor(s)}</span>
+              <StatusIcon status={statuses[s] ?? 'idle'} />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={on}
+                aria-label={labelFor(s)}
+                onClick={() => toggle(s)}
+                disabled={busy}
+                className="relative ml-auto inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors disabled:opacity-50"
+                style={{ background: on ? 'var(--ui-accent)' : 'var(--ui-rule-strong)' }}
+              >
+                <span
+                  className="inline-block h-4 w-4 rounded-full bg-panel transition-transform"
+                  style={{ transform: on ? 'translateX(19px)' : 'translateX(3px)' }}
+                />
+              </button>
+            </div>
+          );
+        })}
+
+        {step.kind === 'model' && (
+          <>
+            <div role="radiogroup" aria-label="Model">
+              {MODEL_OPTIONS.map((m) => (
+                <label key={m.id} className={`flex h-9 cursor-pointer items-center gap-2.5 text-sm ${m.id === model ? 'font-semibold text-uiInk' : 'text-uiFg2'}`}>
+                  <input
+                    type="radio"
+                    name="copy-model"
+                    value={m.id}
+                    checked={m.id === model}
+                    onChange={() => onModelChange(m.id)}
+                    disabled={busy}
+                    className="accent-[var(--ui-accent)]"
+                  />
+                  {m.label}
+                </label>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-t border-uiCardRule pt-2.5">
+              <p className="kicker w-full">Estimated cost</p>
+              <p className="font-display text-[26px] font-bold leading-none text-uiInk">{cost}</p>
+              {estimate && !estimating && (
+                <p className="mono text-2xs text-uiFg3">
+                  ~{estimate.estInputTokens.toLocaleString()} in / ~{estimate.estOutputTokens.toLocaleString()} out
+                </p>
+              )}
+            </div>
+            <button type="button" onClick={() => setStepAt(RUN_STEPS.length - 1)} className="btn btn-sm mt-auto self-end">
+              Next: Summary <ArrowRight size={14} />
+            </button>
+          </>
+        )}
+
+        {step.kind === 'summary' && (
+          <>
+            <dl className="flex flex-col gap-1.5 pt-1.5 text-[13px] text-uiFg2">
+              <SummaryLine term="Sections" value={`${summary.on} of ${summary.of}`} />
+              {summary.off.length > 0 && <SummaryLine term="Off" value={summary.off.join(', ')} />}
+              <SummaryLine term="Model" value={modelOption(model).label} />
+              <SummaryLine term="Estimated cost" value={cost} />
+            </dl>
+            <div className="mt-2 flex min-h-0 flex-col gap-1 overflow-hidden">
+              {run.kind === 'done' && (
+                <p className="flex items-center gap-1.5 text-xs text-ok">
+                  <Check size={14} weight="bold" /> Copy applied — review it on the next stage.
+                </p>
+              )}
+              {run.kind === 'error' && (
+                <p className="flex items-center gap-1.5 text-xs text-danger">
+                  <Warning size={14} className="shrink-0" /> <span className="truncate">{run.message}</span>
+                </p>
+              )}
+              {run.kind !== 'idle' && failures.map(([s, msg]) => (
+                <p key={s} className="truncate text-2xs text-danger">{labelFor(s as Section)}: {msg}</p>
+              ))}
+              {/* `lastRunAt` is stamped on approve, not on generate, so this reads "last
+                  approved" rather than "last generated". */}
+              {!busy && (brief.lastRunAt || hasGenerated) && (
+                <div className="flex items-center justify-between gap-2">
+                  {brief.lastRunAt ? (
+                    <p className="mono text-2xs text-uiInkSoft">Last approved {relativeTime(brief.lastRunAt)}</p>
+                  ) : <span />}
+                  {hasGenerated && (
+                    <button type="button" onClick={onClearGenerated} className="mono text-2xs text-uiInkSoft hover:text-uiInk">
+                      Revert generated copy
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={generate}
+              disabled={busy || tickedSections.length === 0}
+              className="btn btn-primary mt-auto h-[42px] w-full shrink-0 justify-center"
+            >
+              {busy ? <CircleNotch size={15} className="animate-spin" /> : <Sparkle size={15} weight="fill" />}
+              {busy ? 'Generating…' : generateLabel(tickedSections.length, hasGenerated)}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryLine({ term, value }: { term: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="shrink-0">{term}</dt>
+      <dd className="min-w-0 truncate text-right font-semibold text-uiInk" title={value}>{value}</dd>
     </div>
   );
 }
