@@ -5,20 +5,37 @@
 // the emphasis colour, squared uppercase trust-badge chips, and the license line. Client link
 // columns from footer.cols; derived Contact column.
 //
+// Service pages (Xander 2026-11-10): "Find us on" lists the client's own profiles as squared
+// chips under the badges (Google first, hidden when there are none); the address is the one the
+// site may show (no street for a service-area business); opening hours from extensions.hours sit
+// under it when the client gave them.
+//
 // Colours are palette tokens: ground ink-panel, text on-ink / on-ink-soft (the off-palette
 // blue-grey tagline is gone), heads var(--accent-2) (the editable accent2 slot that replaced the
 // hardcoded amber), hairlines rule-ink.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Phone, EnvelopeSimple, MapPin } from '@phosphor-icons/react';
+import {
+  Phone, EnvelopeSimple, MapPin, Clock,
+  GoogleLogo, FacebookLogo, InstagramLogo, Star, SealCheck, HouseLine, Storefront, GlobeSimple,
+} from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { displayAddress, profileLinks, type ProfileKind } from '@/lib/serviceLinks';
+
+/** D11 heading. Pending Xander's word-for-word approval: one constant to change. */
+const FIND_US_ON = 'Find us on';
+const PROFILE_ICON: Record<ProfileKind, Icon> = {
+  google: GoogleLogo, facebook: FacebookLogo, yelp: Star, bbb: SealCheck, angi: HouseLine,
+  nextdoor: Storefront, instagram: InstagramLogo, other: GlobeSimple,
+};
 
 export const meta = {
   id: 'roofing-footer',
   category: 'footer',
   label: 'Roofing / Footer',
-  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable'],
+  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges', 'extensions.profiles', 'extensions.serviceAreaBusiness', 'extensions.hours'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true,
 } as const;
@@ -26,6 +43,12 @@ export const meta = {
 export default function RoofingFooter({ content = CONTENT }: { content?: SiteContent }) {
   const { footer, brand, extensions } = content;
   const badges = extensions.trustBadges ?? [];
+  // "Find us on" (D11): the client's own profiles, Google first; hidden when there are none.
+  // rel="me" ties the profile to the site; no nofollow on the business's own profiles.
+  const profiles = profileLinks(content);
+  // A service-area business never shows its street (Google Business Profile rule).
+  const address = displayAddress(content);
+  const hours = Object.entries(extensions.hours ?? {}).filter(([d, h]) => d.trim() && h?.trim());
   const col = 'block py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk';
   const head = 'mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-[color:var(--accent-2)]';
 
@@ -52,6 +75,29 @@ export default function RoofingFooter({ content = CONTENT }: { content?: SiteCon
                 ))}
               </div>
             )}
+            {profiles.length > 0 && (
+              <div className="mt-6">
+                <h4 className={head}>{FIND_US_ON}</h4>
+                <ul className="flex flex-wrap gap-2">
+                  {profiles.map((pr) => {
+                    const Ic = PROFILE_ICON[pr.kind];
+                    return (
+                      <li key={pr.path}>
+                        <a
+                          href={pr.url}
+                          rel="me noopener"
+                          target="_blank"
+                          className="flex items-center gap-2 rounded-[4px] border border-ruleInk px-3 py-1.5 text-[13px] font-semibold text-onInkSoft transition-colors hover:border-accent hover:text-onInk"
+                        >
+                          <Ic size={15} weight="fill" className="text-accent" aria-hidden="true" />
+                          {pr.label}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Client link columns */}
@@ -73,9 +119,25 @@ export default function RoofingFooter({ content = CONTENT }: { content?: SiteCon
             <a href={`mailto:${brand.email}`} className="flex items-start gap-[9px] break-all py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk">
               <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
             </a>
-            <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
-              <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.address">{brand.address}</E>
-            </span>
+            {address && (
+              <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
+                <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                {address === brand.address ? <E p="brand.address">{brand.address}</E> : address}
+              </span>
+            )}
+            {hours.length > 0 && (
+              <div className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
+                <Clock size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  {hours.map(([d, h]) => (
+                    <div key={d} className="contents">
+                      <dt className="font-semibold text-onInk">{d}</dt>
+                      <dd><E p={`extensions.hours.${d}`}>{h}</E></dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
           </div>
         </div>
 
