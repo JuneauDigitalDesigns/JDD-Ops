@@ -19,6 +19,7 @@
 import { useState } from 'react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 import { imageAt } from '@/lib/localImage';
 
 export const meta = {
@@ -26,8 +27,8 @@ export const meta = {
   category: 'hero',
   label: 'Lawn / Plan-picker hero',
   consumes: [
-    'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'extensions.reviewBadge',
-    'services.items', 'images.hero.slides',
+    'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta',
+    'extensions.reviewBadge', 'services.items', 'images.hero.slides',
   ],
   sharedDeps: ['@/lib/editable'],
   signature: false,
@@ -54,8 +55,14 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 }
 
 export default function LawnHero({ content = CONTENT }: { content?: SiteContent }) {
-  const { hero, extensions, services, images } = content;
+  const { hero, extensions, services, images, _meta } = content;
   const [selected, setSelected] = useState<(typeof FREQUENCIES)[number]['key']>('weekly');
+  // The hero lead form (operator decision 2026-11-09): the shared <LeadForm> beside the picker.
+  // The picked plan travels with the submission as the editable message, the same contract
+  // LawnContact honours from ?frequency=. An empty hero.formLabel switches the card off.
+  const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const formLabel = hero.formLabel?.trim();
+  const plan = FREQUENCIES.find((f) => f.key === selected) ?? FREQUENCIES[0];
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
   const review = extensions.reviewBadge;
   // items[0], not a find() over all items: the <E> edit path below has to name a FIXED index,
@@ -84,7 +91,7 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
         }}
       />
 
-      <div className="relative mx-auto w-full max-w-[1140px] px-6 py-[92px]">
+      <div className={`relative mx-auto grid w-full max-w-[1140px] items-center gap-10 px-6 py-[92px] ${formLabel ? 'lg:grid-cols-[1.05fr_0.95fr]' : ''}`}>
         <div className="max-w-[620px] text-[#fff]">
           {review && (
             <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(232,179,58,0.42)] bg-[rgba(232,179,58,0.18)] px-[15px] py-[7px] text-[13px] font-bold text-[#E8B33A]">
@@ -144,6 +151,27 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
             </div>
           </div>
         </div>
+
+        {formLabel && (
+          <div className="relative z-[1] w-full rounded-[26px] bg-bg p-6 text-ink shadow-[0_30px_60px_-24px_rgba(14,38,20,0.6)] sm:p-[30px] lg:max-w-[460px] lg:justify-self-end">
+            <h2 className="font-heading text-[21px] font-extrabold tracking-[-0.02em] text-ink">
+              <E p="hero.formLabel">{formLabel}</E>
+            </h2>
+            <p className="mt-1.5 text-[13.5px] text-inkSoft">We&rsquo;ll call with a flat quote &mdash; usually same day.</p>
+            <span className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 text-[12.5px] font-bold text-accent" style={{ background: '#E2EDDB' }}>
+              Plan: {plan.label}
+            </span>
+            <LeadForm
+              key={selected}
+              mode={mode}
+              withMessage
+              initialMessage={`Mowing frequency: ${plan.label} (${plan.sub})`}
+              surface="light"
+              className="mt-3.5"
+              submitLabel={<E p="hero.cta">{hero.cta}</E>}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

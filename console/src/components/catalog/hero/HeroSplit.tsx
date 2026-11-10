@@ -24,6 +24,7 @@ import { PhoneCall, CheckCircle, Star, ArrowRight } from '@phosphor-icons/react'
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, useEditing } from '@/lib/editable';
 import { responsiveImage, responsivePicture } from '@/lib/img';
+import { LeadForm } from '@/lib/LeadForm';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
@@ -32,11 +33,11 @@ export const meta = {
   label: 'Hero / Image-led split',
   consumes: [
     'hero.eyebrow', 'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.badge',
-    'hero.cta', 'hero.secondaryCta', 'hero.frictionReducers', 'hero.heroBullets',
+    'hero.cta', 'hero.secondaryCta', 'hero.formLabel', 'hero.frictionReducers', 'hero.heroBullets',
     'brand.phoneHref', 'brand.phone', 'brand.short', 'brand.name',
     'images.hero.slides', 'extensions.reviewBadge',
   ],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/LeadForm'],
   skins: ['default', 'inverted'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'asymmetric-split',
@@ -69,8 +70,12 @@ export default function HeroSplit({
 }) {
   const s = skinClasses(skin);
   const editing = useEditing();
-  const { hero, brand, images, extensions } = content;
+  const { hero, brand, images, extensions, _meta } = content;
   const slide = images.hero.slides?.[0];
+  // The hero lead form (operator decision 2026-11-09): the shared <LeadForm>, same props as the
+  // final CTA, in a light card beside the copy. An empty hero.formLabel switches it off.
+  const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const formLabel = hero.formLabel?.trim();
   // The hero is the LCP image and the one slot the export pipeline emits AVIF for (decision 44).
   // Non-null only after export localizes the slot to /img/<hash>; in the console preview (an origin
   // URL) webpSrcSet is undefined and the responsiveImage fallback below renders instead.
@@ -128,7 +133,7 @@ export default function HeroSplit({
           the most-cited AI tell). Paired with the headline's text-shadow for legibility. */}
       <div className="absolute inset-0 -z-10 bg-[rgba(9,14,22,0.56)]" />
 
-      <div className="mx-auto flex min-h-[560px] max-w-6xl items-center px-5 pb-16 pt-24 sm:px-6 lg:min-h-[620px] lg:pb-20 lg:pt-28">
+      <div className={`mx-auto grid min-h-[560px] max-w-6xl items-center gap-10 px-5 pb-16 pt-24 sm:px-6 lg:min-h-[620px] lg:pb-20 lg:pt-28 ${formLabel ? 'lg:grid-cols-[1.05fr_0.95fr] lg:gap-14' : ''}`}>
         <div className="max-w-[640px] text-onInk">
           {review && (
             /* Not LCP — staggers in. */
@@ -191,6 +196,20 @@ export default function HeroSplit({
             </ul>
           )}
         </div>
+
+        {formLabel && (
+          <div className="hero-rise relative z-[1] w-full rounded-2xl border border-rule bg-bg p-6 text-ink lg:max-w-[460px] lg:justify-self-end lg:p-7" style={{ animationDelay: '0.3s', boxShadow: tileShadow }}>
+            <h2 className="font-heading text-[21px] font-bold leading-snug text-ink">
+              <E p="hero.formLabel">{formLabel}</E>
+            </h2>
+            <LeadForm
+              mode={mode}
+              surface="light"
+              className="mt-4"
+              submitLabel={<E p="hero.cta">{hero.cta}</E>}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Stat tiles (hero.heroBullets, lifted out of the old flat accent band) ── */}

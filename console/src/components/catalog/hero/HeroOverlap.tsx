@@ -5,6 +5,7 @@ import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
 import { E, useEditing } from '@/lib/editable';
 import { responsiveImage, responsivePicture } from '@/lib/img';
+import { LeadForm } from '@/lib/LeadForm';
 
 export const meta = {
   id: 'hero-overlap',
@@ -12,10 +13,10 @@ export const meta = {
   label: 'Hero / Full-bleed overlap',
   consumes: [
     'hero.eyebrow', 'hero.headline', 'hero.headlineEmphasis', 'hero.sub',
-    'hero.badge', 'hero.cta', 'hero.frictionReducers',
+    'hero.badge', 'hero.cta', 'hero.formLabel', 'hero.frictionReducers',
     'brand.phoneHref', 'brand.phone', 'images.hero.slides',
   ],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/LeadForm'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'full-bleed-overlay',
   /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
@@ -40,8 +41,12 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 export default function HeroOverlap({ content = CONTENT }: { content?: SiteContent }) {
   const reduce = useReducedMotion() ?? false;
   const editing = useEditing();
-  const { hero, brand, images } = content;
+  const { hero, brand, images, _meta } = content;
   const slide = images.hero.slides?.[0];
+  // The hero lead form (operator decision 2026-11-09): the shared <LeadForm> inside the solid
+  // card, under the CTAs, so the overlap card becomes the lead card. Empty hero.formLabel = off.
+  const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const formLabel = hero.formLabel?.trim();
   // Full-bleed hero = the LCP image and the only AVIF slot (decision 44). Localized only after
   // export; in the preview the responsiveImage fallback renders (origin URL, no typed source).
   const heroPic = slide?.url ? responsivePicture(slide.url, { avif: true }) : null;
@@ -144,6 +149,20 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
                   <E p={`hero.frictionReducers.${i}`}>{s}</E>
                 </span>
               ))}
+            </div>
+          )}
+
+          {formLabel && (
+            <div className="mt-7 border-t border-rule pt-6">
+              <h2 className="font-heading text-[20px] font-bold leading-snug text-ink">
+                <E p="hero.formLabel">{formLabel}</E>
+              </h2>
+              <LeadForm
+                mode={mode}
+                surface="light"
+                className="mt-3.5"
+                submitLabel={<E p="hero.cta">{hero.cta}</E>}
+              />
             </div>
           )}
         </motion.div>

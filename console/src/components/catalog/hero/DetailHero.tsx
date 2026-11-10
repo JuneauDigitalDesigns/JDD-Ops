@@ -13,14 +13,15 @@
 import { Phone, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { LeadForm } from '@/lib/LeadForm';
 import { imageAt } from '@/lib/localImage';
 
 export const meta = {
   id: 'detail-hero',
   category: 'hero',
   label: 'Car Detailing / Centred vignette hero',
-  consumes: ['hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.frictionReducers', 'brand.phone', 'brand.phoneHref', 'images.hero.slides'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable'],
+  consumes: ['hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.cta', 'hero.formLabel', 'hero.frictionReducers', 'brand.phone', 'brand.phoneHref', 'images.hero.slides'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -40,8 +41,13 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 }
 
 export default function DetailHero({ content = CONTENT }: { content?: SiteContent }) {
-  const { hero, brand, images } = content;
+  const { hero, brand, images, _meta } = content;
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
+  // The hero lead form (operator decision 2026-11-09): the shared <LeadForm>, same props as the
+  // final CTA, in a wide row-layout card under the reducers so the centred composition holds.
+  // An empty hero.formLabel switches it off for a site.
+  const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
+  const formLabel = hero.formLabel?.trim();
 
   return (
     <header className="relative isolate flex min-h-[680px] items-center overflow-hidden text-center" style={{ background: '#08090C' }}>
@@ -98,6 +104,24 @@ export default function DetailHero({ content = CONTENT }: { content?: SiteConten
                 <E p={`hero.frictionReducers.${i}`}>{f}</E>
               </span>
             ))}
+          </div>
+        )}
+
+        {formLabel && (
+          <div
+            className="relative z-[1] mx-auto mt-9 max-w-[820px] rounded-[12px] border border-rule p-5 text-left sm:p-6"
+            style={{ background: 'color-mix(in srgb, var(--ink-panel-2, #1B1E26) 85%, transparent)', backdropFilter: 'blur(10px)' }}
+          >
+            <h2 className="font-heading text-[19px] font-extrabold tracking-[-0.016em] text-[#fff]">
+              <E p="hero.formLabel">{formLabel}</E>
+            </h2>
+            <LeadForm
+              mode={mode}
+              surface="dark"
+              layout="row"
+              className="mt-3.5"
+              submitLabel={<E p="hero.cta">{hero.cta}</E>}
+            />
           </div>
         )}
       </div>
