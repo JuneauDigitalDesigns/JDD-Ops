@@ -343,7 +343,11 @@ export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> =
     build: roofingTemplate,
     serviceSections: () => [S('pageHeader', 'RoofingServiceHeader'), S('services', 'RoofingServiceDetail'), S('finalCta', 'RoofingFinalCta')],
   },
-  'lawn-care': { label: 'Lawn Care — Standard', build: lawnTemplate },
+  'lawn-care': {
+    label: 'Lawn Care — Standard',
+    build: lawnTemplate,
+    serviceSections: () => [S('pageHeader', 'LawnServiceHeader'), S('services', 'LawnServiceDetail'), S('finalCta', 'LawnFinalCta')],
+  },
   plumbing: {
     label: 'Plumbing — Standard',
     build: plumbingTemplate,
