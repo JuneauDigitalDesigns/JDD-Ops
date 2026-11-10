@@ -29,7 +29,9 @@ test('the self-animated list is exactly the components that bring their own moti
     for (const f of readdirSync(path.join(CATALOG, cat.name))) {
       if (!f.endsWith('.tsx')) continue;
       const src = read(path.join(CATALOG, cat.name, f));
-      if (/from 'framer-motion'|from '@\/lib\/motion'/.test(src)) scanned.push(f.replace(/\.tsx$/, ''));
+      // Its own motion: framer-motion / @jdd/ui presets, or its own scroll reveal on each block
+      // (a per-service page body: one reveal on the whole page-tall body would half-fade it).
+      if (/from 'framer-motion'|from '@\/lib\/motion'|className="rv /.test(src)) scanned.push(f.replace(/\.tsx$/, ''));
     }
   }
   assert.deepEqual([...SELF_ANIMATED].sort(), scanned.sort());
@@ -55,7 +57,8 @@ test('a component with its own entrance is not revealed twice, and the first sec
 
 test('the exporter and the Studio preview put the same class on the same sections', () => {
   const exporter = read(path.join(CONSOLE, 'src/lib/export.ts'));
-  assert.match(exporter, /lines\.push\(\.\.\.emit\(`<\$\{ref\.name\}\$\{skinAttr\(ref\)\} \/>`, ref, revealsOnScroll\(ref, i\)\)\);/);
+  // `slugAttr` adds serviceSlug to a per-service page's own sections; it never touches the reveal.
+  assert.match(exporter, /lines\.push\(\.\.\.emit\(`<\$\{ref\.name\}\$\{skinAttr\(ref\)\}\$\{slugAttr\(ref\)\} \/>`, ref, revealsOnScroll\(ref, i\)\)\);/);
   assert.match(exporter, /reveal \? REVEAL_CLASS : ''/);
   const studio = read(path.join(CONSOLE, 'src/app/c/[slug]/build/PageStudio.tsx'));
   assert.match(studio, /reveal=\{chromeSlot === null && revealsOnScroll\(ref, i - 1\)\}/);
