@@ -94,3 +94,14 @@ test('serviceSlug: never empty, never "near me", never a city stuffed in by the 
 test('an invalid stored slug is ignored rather than published', () => {
   assert.equal(serviceSlug({ t: 'AC Repair', slug: 'AC Repair!' }, []), 'ac-repair');
 });
+
+test('primaryCity: the address locality, then the first service area town, then nothing', async () => {
+  const { primaryCity } = await import('../src/lib/servicePages.ts');
+  const c = (address, serviceArea = []) => ({ brand: { address }, extensions: { serviceArea } });
+  assert.equal(primaryCity(c('123 Main St, Clermont, FL 34711')), 'Clermont');
+  // A service-area business hides the street on the site but still stores the full address.
+  assert.equal(primaryCity(c('Clermont, FL 34711')), 'Clermont');
+  assert.equal(primaryCity(c('', ['Groveland', 'Minneola'])), 'Groveland');
+  assert.equal(primaryCity(c('123 Main St', ['Groveland'])), 'Groveland', 'a street alone is not a city');
+  assert.equal(primaryCity(c('')), '');
+});

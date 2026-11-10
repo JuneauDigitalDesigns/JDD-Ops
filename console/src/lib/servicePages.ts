@@ -122,3 +122,22 @@ export function pickServicePages(content: unknown, slotsLeft: number): number[] 
     .sort((a, b) => b.count - a.count || a.i - b.i);
   return ranked.slice(0, Math.max(0, slotsLeft)).map((r) => r.i).sort((a, b) => a - b);
 }
+
+const STATE_ZIP = /^[a-z]{2}(\s+\d{5}(-\d{4})?)?$/i;
+
+/**
+ * The one city a site names in service-page H1s ("{t} in {city}"), titles and intro sentences,
+ * so the three never disagree. The locality of `brand.address` ("123 Main St, Clermont, FL
+ * 34711" or, for a service-area business, "Clermont, FL 34711"), else the first service-area
+ * town, else '' (the H1 is then the bare service name). Never guessed: a lone street is no city.
+ */
+export function primaryCity(content: unknown): string {
+  const c = obj(content);
+  const parts = str(obj(c.brand).address).split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1];
+    const locality = STATE_ZIP.test(last) ? parts[parts.length - 2] : last;
+    if (locality && !/\d/.test(locality)) return locality;
+  }
+  return filled(obj(c.extensions).serviceArea)[0] ?? '';
+}
