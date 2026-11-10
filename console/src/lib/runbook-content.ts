@@ -4,6 +4,7 @@
 
 import { ENV_FIELDS } from './envFields';
 import type { ClientContext, OpsConfig, Plan, SiteInfo } from './types';
+import { gbpPhase } from '@/lib/runbook-gbp';
 
 /**
  * The default ring window, in seconds, read from the copy the console bundle already pins.
@@ -453,6 +454,7 @@ export function buildRunbook(ctx: ClientContext, config: OpsConfig = {}): Phase[
   phases.push(provisionPhase(ctx, config));
   if (!ctx.isWebOnly) phases.push(callLoggingSetupPhase(ctx));
   phases.push(analyticsPhase(ctx));
+  phases.push(gbpPhase(ctx));
   // ── Review (verify + reference) ──
   phases.push(siteReviewPhase(ctx));
   if (!ctx.isWebOnly) {
