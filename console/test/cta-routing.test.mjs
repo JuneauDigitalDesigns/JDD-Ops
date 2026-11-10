@@ -50,6 +50,14 @@ function anchors(src) {
 
 const ALLOWED_LITERAL_NON_CONVERSION = new Set(['/']); // logo links, etc.
 
+/** A per-service page's own header and body (Xander 2026-11-10, service-page-spec.md) carry
+ *  navigation, not sales buttons: the breadcrumb's "Services" (it must match the BreadcrumbList
+ *  structured data), the "Pricing"/"Questions" jump links, and "Ask for a quote", which jumps to
+ *  the page's one form in its final CTA (#cta). Scoped to those files and those hrefs only. */
+const SERVICE_PAGE_FILE = /^(Roofing|Plumbing|Detail)Service(Header|Detail)\.tsx$/;
+const SERVICE_PAGE_NAV = new Set(['/services', '#pricing', '#questions', '#cta']);
+const isServicePageNav = (base, href) => SERVICE_PAGE_FILE.test(base) && SERVICE_PAGE_NAV.has(href);
+
 test('every <a> in the Roofing*/Plumbing*/Detail* catalog has an href (no dead CTA links)', () => {
   const bad = [];
   for (const file of verticalFiles()) {
@@ -71,6 +79,7 @@ test('every literal non-phone, non-mailto Roofing*/Plumbing*/Detail* CTA href is
       if (a.href.startsWith('tel:') || a.href.startsWith('mailto:')) continue;
       if (ALLOWED_LITERAL_NON_CONVERSION.has(a.href)) continue;
       if (base === D16_EXCEPTION.file && a.href === D16_EXCEPTION.href) continue;
+      if (isServicePageNav(base, a.href)) continue;
       if (a.href !== '/contact') bad.push(`${base}: href="${a.href}"`);
     }
   }
@@ -83,6 +92,9 @@ test('DetailHero carries the D16 "See packages" -> /services exception, and nowh
   for (const file of verticalFiles()) {
     const src = readFileSync(file, 'utf8');
     const base = path.basename(file);
+    // A service page's breadcrumb links to /services as navigation (see SERVICE_PAGE_NAV), not as
+    // a CTA; D16 is about a sales-area button, so those files are out of its scope.
+    if (SERVICE_PAGE_FILE.test(base)) continue;
     const hasServicesHref = anchors(src).some((a) => a.href === '/services');
     if (base === D16_EXCEPTION.file) {
       assert.ok(hasServicesHref, `${base} should carry the D16 /services exception but does not`);
