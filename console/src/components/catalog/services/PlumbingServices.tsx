@@ -1,9 +1,13 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// PlumbingServices — rounded cards with a circular icon badge, mirrored 1:1 (#plumbing .svc-grid
-// / .svc-card). Each card floats its category tag as a pill in the top-right corner rather than
-// pinning it to the card's bottom border like Hvac/RoofingServices — this vertical's one
-// services-layout deviation. Content schema-driven. Fixed design, no skin.
+// PlumbingServices — rounded cards with a circular icon badge, premium pass (2026-11-09, approved
+// mockup). A centred section head (accent eyebrow on a short accent-bar → display heading → lede)
+// over the three-up grid. Each card still floats its category tag as a pill in the top-right
+// corner rather than pinning it to the card's bottom border like Hvac/RoofingServices — this
+// vertical's one services-layout deviation. The badge sits on accent2's soft tint and fills with
+// the accent on hover while the card lifts; cards arrive in a scroll stagger. Icons come from
+// serviceIcon(icon, tag) as before. Content schema-driven.
+// Every colour is a palette token. Fixed design, no skin.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
@@ -25,40 +29,38 @@ export default function PlumbingServices({ content = CONTENT }: { content?: Site
   if (!items.length) return null;
 
   return (
-    <section className="bg-bg py-[88px]">
-      <div className="mx-auto max-w-[1160px] px-6">
+    <section className="bg-bg py-16 lg:py-[92px]">
+      <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
         <div className="mx-auto max-w-[56ch] text-center">
           {services.eyebrow && (
-            <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-accent">
+            <div className="flex items-center justify-center gap-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-accent">
+              <span className="accent-bar !h-[3px] !w-7" aria-hidden="true" />
               <E p="services.eyebrow">{services.eyebrow}</E>
             </div>
           )}
-          <h2 className="mt-3 font-heading text-[40px] font-extrabold leading-[1.02] tracking-[-0.02em] text-ink">
+          <h2 className="mt-4 font-heading text-[34px] font-extrabold leading-[1.04] tracking-[-0.02em] text-ink lg:text-[46px]">
             <E p="services.title">{services.title}</E>
           </h2>
-          <p className="mx-auto mt-3.5 max-w-[56ch] text-[16px] leading-[1.6] text-inkSoft">
+          <p className="mx-auto mt-3.5 max-w-[52ch] text-[17px] leading-[1.65] text-inkSoft">
             <E p="services.sub">{services.sub}</E>
           </p>
         </div>
 
-        <div className="mt-11 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rv-stagger mt-8 grid gap-4 sm:grid-cols-2 lg:mt-11 lg:grid-cols-3 lg:gap-[22px]">
           {items.map((item, i) => (
             <div
               key={item.n ?? i}
-              className="relative flex flex-col rounded-[20px] border border-rule bg-bg p-7 shadow-[0_2px_4px_rgba(16,33,46,0.04)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_14px_34px_-12px_rgba(16,33,46,0.26)]"
+              className="group hover-lift shadow-brand-1 relative flex flex-col rounded-[20px] border border-rule bg-bg p-6 hover:shadow-[0_4px_10px_rgba(16,33,46,0.09),0_26px_50px_-16px_rgba(16,33,46,0.3)] lg:p-7"
             >
               {item.tag && (
-                <span className="absolute right-[22px] top-[22px] rounded-full bg-bgSoft px-[11px] py-[6px] text-[11px] font-bold uppercase tracking-[0.09em] text-accent">
+                <span className="absolute right-[22px] top-[22px] rounded-full bg-bgSoft px-[11px] py-[6px] text-[11px] font-bold uppercase leading-none tracking-[0.09em] text-accent">
                   <E p={`services.items.${i}.tag`}>{item.tag}</E>
                 </span>
               )}
-              <span
-                className="mb-[18px] grid h-[54px] w-[54px] place-items-center rounded-full text-accent"
-                style={{ background: '#DBE9F2' }}
-              >
+              <span className="mb-[18px] grid h-14 w-14 place-items-center rounded-full bg-[color:var(--accent-2-soft)] text-accent transition-[background-color,color,transform] duration-300 group-hover:scale-[1.06] group-hover:bg-accent group-hover:text-accentFg">
                 <Ico p={`services.items.${i}.icon`} icon={serviceIcon(item.icon, item.tag)} size={24} />
               </span>
-              <h3 className="pr-[10px] font-heading text-[20.5px] font-extrabold tracking-[-0.018em] text-ink">
+              <h3 className="pr-[10px] font-heading text-[21px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink">
                 <E p={`services.items.${i}.t`}>{item.t}</E>
               </h3>
               {item.d?.trim() && (
