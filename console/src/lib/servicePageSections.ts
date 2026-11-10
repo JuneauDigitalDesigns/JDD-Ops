@@ -5,4 +5,5 @@
 export const SERVICE_PAGE_SECTIONS: ReadonlySet<string> = new Set([
   'HvacServiceHeader', 'HvacServiceDetail', 'HvacFinalCta',
   'DetailServiceHeader', 'DetailServiceDetail', 'DetailFinalCta',
+  'RoofingServiceHeader', 'RoofingServiceDetail', 'RoofingFinalCta',
 ]);

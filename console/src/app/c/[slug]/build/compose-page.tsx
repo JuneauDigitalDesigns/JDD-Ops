@@ -22,6 +22,9 @@ import HvacFinalCta from '@/components/catalog/finalCta/HvacFinalCta';
 import DetailServiceHeader from '@/components/catalog/pageHeader/DetailServiceHeader';
 import DetailServiceDetail from '@/components/catalog/services/DetailServiceDetail';
 import DetailFinalCta from '@/components/catalog/finalCta/DetailFinalCta';
+import RoofingServiceHeader from '@/components/catalog/pageHeader/RoofingServiceHeader';
+import RoofingServiceDetail from '@/components/catalog/services/RoofingServiceDetail';
+import RoofingFinalCta from '@/components/catalog/finalCta/RoofingFinalCta';
 import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
 import type { CategoryEntry } from './categories';
 import { navHref, type PageInstance, type SectionRef, type SiteComposition } from '@/lib/pages';
@@ -37,6 +40,9 @@ const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: st
   DetailServiceHeader: (p) => <DetailServiceHeader {...p} />,
   DetailServiceDetail: (p) => <DetailServiceDetail {...p} />,
   DetailFinalCta: (p) => <DetailFinalCta {...p} />,
+  RoofingServiceHeader: (p) => <RoofingServiceHeader {...p} />,
+  RoofingServiceDetail: (p) => <RoofingServiceDetail {...p} />,
+  RoofingFinalCta: (p) => <RoofingFinalCta {...p} />,
 };
 
 /** A neutral header used when a subpage has no generated header copy yet. */
