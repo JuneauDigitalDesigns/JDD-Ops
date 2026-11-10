@@ -14,18 +14,23 @@
 // sun gold (eyebrow, emphasis, ✓ icons, ribbon) = the editable accent2 slot, with the ribbon's
 // label on --accent-2-fg so it stays readable whatever accent2 a client picks. Literal rgba()
 // values left are shadow alphas only. Fixed design, no skin.
+//
+// On a service page (Xander 2026-11-10) wirePages passes `serviceSlug`: the form opens with
+// "Service: {service}" in its message box. The band is id="cta" so the service page's "Ask for a
+// quote" button lands on it.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CheckCircle } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
+import { serviceBySlug, serviceMessage } from '@/lib/serviceLinks';
 
 export const meta = {
   id: 'lawn-final-cta',
   category: 'finalCta',
   label: 'Lawn / Offer-ribbon final CTA',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.headlineEmphasis', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers', 'extensions.offerBadge'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -43,13 +48,23 @@ function CtaHeadline({ text, emphasis }: { text: string; emphasis: string | null
   );
 }
 
-export default function LawnFinalCta({ content = CONTENT }: { content?: SiteContent }) {
+export default function LawnFinalCta({
+  content = CONTENT,
+  serviceSlug,
+}: {
+  content?: SiteContent;
+  /** On a service page (wirePages and the Studio pass it): the form opens with "Service: {service}"
+   *  in its message box, the page's only form (Xander 2026-11-10). */
+  serviceSlug?: string;
+}) {
   const { finalCta, extensions, _meta } = content;
+  const service = serviceBySlug(content, serviceSlug);
   const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
   const offerBadge = extensions.offerBadge?.trim();
 
   return (
     <section
+      id="cta"
       className="relative isolate overflow-hidden bg-inkPanel py-16 text-onInk lg:py-24"
       style={{
         background:
@@ -100,6 +115,7 @@ export default function LawnFinalCta({ content = CONTENT }: { content?: SiteCont
             surface="light"
             className="mt-3.5"
             submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+            {...(service ? { withMessage: true, initialMessage: serviceMessage(service) } : {})}
           />
         </div>
       </div>
