@@ -1,9 +1,15 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// PlumbingNav — "dispatch problem" nav, mirrored 1:1 (design: home-mockups.html #plumbing .nav).
-// Sticky white/blur bar like Hvac/RoofingNav, but every control is PILL geometry (999px) —
-// this vertical's signature shape, carried through buttons, chips and the aggregate. CTA reads
-// "Get a plumber" per the mockup, not a generic "Book a visit". Fixed design, no skin.
+// PlumbingNav — "dispatch problem" nav, premium pass (2026-11-09, approved mockup).
+// Sticky blurred bar: the round accent-bar mark (pill geometry stays this vertical's signature)
+// + brand name/tagline, route links from content.nav with an accent underline that grows from
+// the left, the phone in the display face, and the pill "Get a plumber" CTA to /contact.
+//
+// Every colour is a palette token: the mark reads --accent-bar, the bar reads bg/rule, so the
+// Studio's brand pane and the per-section overrides reach all of it. On a phone the number
+// becomes an icon button and the CTA a compact nowrap pill, so nothing overflows at 375px. The
+// mockup's decorative burger is left out: it opens nothing, and at 375px it cost the brand name
+// the room it needs.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
@@ -30,18 +36,20 @@ export default function PlumbingNav({
   const { brand, nav } = content;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-rule bg-[rgba(255,255,255,0.93)] backdrop-blur-md">
-      <div className="mx-auto flex h-[76px] max-w-[1160px] items-center gap-7 px-6">
-        <a href="/" className="flex items-center gap-[11px]">
+    <nav
+      className="sticky top-0 z-50 border-b border-rule backdrop-blur-md"
+      style={{ background: 'color-mix(in srgb, var(--bg) 92%, transparent)' }}
+    >
+      <div className="mx-auto flex h-[64px] max-w-[1120px] items-center gap-2.5 px-5 sm:gap-7 sm:px-6 md:h-[74px]">
+        <a href="/" className="flex min-w-0 items-center gap-2.5 md:gap-[11px]">
           <span
-            className="grid h-9 w-9 place-items-center rounded-full text-[#fff] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-            style={{ background: 'linear-gradient(145deg,#2E8AC6,#1E6FA8)' }}
+            className="accent-bar !h-8 !w-8 shrink-0 !rounded-full md:!h-9 md:!w-9 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
             aria-hidden="true"
           />
-          <span className="font-heading text-[22px] font-extrabold leading-none tracking-[-0.018em] text-ink">
+          <span className="min-w-0 lg:whitespace-nowrap font-heading text-[17px] font-extrabold leading-[1.05] tracking-[-0.02em] text-ink sm:text-[19px] md:text-[22px] md:leading-none">
             <E p="brand.name">{brand.name}</E>
             {brand.tagline && (
-              <small className="mt-0.5 block font-sans text-[11px] font-medium tracking-[0.04em] text-inkSoft">
+              <small className="mt-1 hidden font-sans text-[11px] font-medium tracking-[0.04em] text-inkSoft md:block">
                 <E p="brand.tagline">{brand.tagline}</E>
               </small>
             )}
@@ -54,21 +62,33 @@ export default function PlumbingNav({
               key={item.href + i}
               href={item.href}
               aria-current={currentPath && item.href === currentPath ? 'page' : undefined}
-              className="rounded-full px-[13px] py-2 text-[14.5px] font-semibold text-inkSoft transition-colors hover:bg-bgSoft hover:text-ink aria-[current=page]:text-accent"
+              className="group relative px-[13px] py-2 text-[14.5px] font-semibold text-inkSoft transition-colors hover:text-ink aria-[current=page]:text-ink"
             >
               <E p={`nav.${i}.label`}>{item.label}</E>
+              <span
+                className="absolute bottom-1 left-[13px] right-[13px] h-0.5 origin-left scale-x-0 bg-accent transition-transform duration-300 group-hover:scale-x-100 group-aria-[current=page]:scale-x-100"
+                aria-hidden="true"
+              />
             </a>
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-[18px]">
-          <a href={brand.phoneHref} className="hidden items-center gap-2 font-heading text-[19px] font-extrabold text-ink sm:flex">
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-[18px]">
+          <a href={brand.phoneHref} className="hidden items-center gap-2 font-heading text-[19px] font-extrabold tracking-[-0.01em] text-ink md:flex">
             <Phone size={18} weight="fill" className="text-accent" aria-hidden="true" />
             <E p="brand.phone">{brand.phone}</E>
           </a>
           <a
+            href={brand.phoneHref}
+            aria-label={`Call ${brand.phone}`}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-rule text-accent md:hidden"
+          >
+            <Phone size={18} weight="fill" aria-hidden="true" />
+          </a>
+          <a
             href="/contact"
-            className="inline-flex items-center rounded-full bg-accent px-[22px] py-[13px] text-[15px] font-bold text-accentFg shadow-[0_10px_22px_-8px_rgba(30,111,168,0.55)] transition-transform hover:-translate-y-0.5"
+            className="inline-flex items-center whitespace-nowrap rounded-full bg-accent px-[14px] py-[11px] text-[13.5px] font-bold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98] md:px-[22px] md:py-[13px] md:text-[15px]"
+            style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 50%, transparent)' }}
           >
             Get a plumber
           </a>

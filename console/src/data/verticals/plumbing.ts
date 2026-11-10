@@ -18,7 +18,9 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#1E6FA8",
-      accent2:  "#1E3A5F",
+      // accent2 = the emphasis colour (headline emphasis, CTA eyebrow on dark, tints), editable in
+      // the Studio. Light blue, from the 2026-11-09 approved premium mockup.
+      accent2:  "#6FC4F5",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",
