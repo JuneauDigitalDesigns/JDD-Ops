@@ -19,6 +19,9 @@ import HvacNav from '@/components/catalog/nav/HvacNav';
 import HvacServiceHeader from '@/components/catalog/pageHeader/HvacServiceHeader';
 import HvacServiceDetail from '@/components/catalog/services/HvacServiceDetail';
 import HvacFinalCta from '@/components/catalog/finalCta/HvacFinalCta';
+import PlumbingServiceHeader from '@/components/catalog/pageHeader/PlumbingServiceHeader';
+import PlumbingServiceDetail from '@/components/catalog/services/PlumbingServiceDetail';
+import PlumbingFinalCta from '@/components/catalog/finalCta/PlumbingFinalCta';
 import RoofingServiceHeader from '@/components/catalog/pageHeader/RoofingServiceHeader';
 import RoofingServiceDetail from '@/components/catalog/services/RoofingServiceDetail';
 import RoofingFinalCta from '@/components/catalog/finalCta/RoofingFinalCta';
@@ -34,6 +37,9 @@ const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: st
   HvacServiceHeader: (p) => <HvacServiceHeader {...p} />,
   HvacServiceDetail: (p) => <HvacServiceDetail {...p} />,
   HvacFinalCta: (p) => <HvacFinalCta {...p} />,
+  PlumbingServiceHeader: (p) => <PlumbingServiceHeader {...p} />,
+  PlumbingServiceDetail: (p) => <PlumbingServiceDetail {...p} />,
+  PlumbingFinalCta: (p) => <PlumbingFinalCta {...p} />,
   RoofingServiceHeader: (p) => <RoofingServiceHeader {...p} />,
   RoofingServiceDetail: (p) => <RoofingServiceDetail {...p} />,
   RoofingFinalCta: (p) => <RoofingFinalCta {...p} />,

@@ -4,5 +4,6 @@
 // component that doesn't declare the prop never receives it. No imports: tests load it directly.
 export const SERVICE_PAGE_SECTIONS: ReadonlySet<string> = new Set([
   'HvacServiceHeader', 'HvacServiceDetail', 'HvacFinalCta',
+  'PlumbingServiceHeader', 'PlumbingServiceDetail', 'PlumbingFinalCta',
   'RoofingServiceHeader', 'RoofingServiceDetail', 'RoofingFinalCta',
 ]);
