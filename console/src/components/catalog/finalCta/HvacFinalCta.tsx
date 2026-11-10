@@ -13,6 +13,7 @@ import { CheckCircle, ShieldCheck } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
+import { serviceBySlug, serviceMessage } from '@/lib/serviceLinks';
 
 /** Headline with an optional accent emphasis phrase, matching `.cta-grid h2 .em`. */
 function CtaHeadline({ text, emphasis }: { text: string; emphasis: string | null }) {
@@ -33,13 +34,22 @@ export const meta = {
   category: 'finalCta',
   label: 'HVAC / Final CTA',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers', 'extensions.trustBadges'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
 
-export default function HvacFinalCta({ content = CONTENT }: { content?: SiteContent }) {
+export default function HvacFinalCta({
+  content = CONTENT,
+  serviceSlug,
+}: {
+  content?: SiteContent;
+  /** On a service page (wirePages and the Studio pass it): the form opens with "Service: {service}"
+   *  in its message box, the page's only form (Xander 2026-11-10). */
+  serviceSlug?: string;
+}) {
   const { finalCta, extensions, _meta } = content;
+  const service = serviceBySlug(content, serviceSlug);
   // Lead mode follows the plan, same as the hero/<LeadForm> pattern: starter captures by email,
   // growth/enterprise by phone callback. The provisioned /api/contact route honors the matching
   // LEAD_DELIVERY_MODE, so the posted field (email vs phone) lines up with delivery.
@@ -93,6 +103,7 @@ export default function HvacFinalCta({ content = CONTENT }: { content?: SiteCont
             surface="light"
             className="mt-3.5"
             submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+            {...(service ? { withMessage: true, initialMessage: serviceMessage(service) } : {})}
           />
           {badges.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-x-3.5 gap-y-1.5 border-t border-rule pt-3.5">

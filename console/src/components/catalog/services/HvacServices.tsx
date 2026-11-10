@@ -10,26 +10,33 @@
 // The eyebrow is back (operator decision 2026-11-09: one steel eyebrow on every section head).
 // Photos route through imageAt() so the export pipeline's localized base resolves to a file.
 // Every colour is a palette token: steel = --accent-2 and its ramp, tag = accent.
+//
+// Service pages (Xander 2026-11-10): a service with its own page is a link to it, with "Details"
+// and an arrow in the footer row; a section-only service is a plain card, linked from nowhere.
+// Every card carries id="<slug>". Edit paths use the ORIGINAL services.items index, so a blank
+// item ahead of a filled one can't send an edit to the wrong service.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
+import { ArrowRight } from '@phosphor-icons/react';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { imageAt } from '@/lib/localImage';
+import { serviceRefs } from '@/lib/serviceLinks';
 
 export const meta = {
   id: 'hvac-services',
   category: 'services',
   label: 'HVAC / Standard services grid',
-  consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/localImage'],
+  consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items', 'servicePages'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/localImage', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
 
 export default function HvacServices({ content = CONTENT }: { content?: SiteContent }) {
   const { services } = content;
-  const items = services.items.filter((it) => it.t?.trim());
-  if (!items.length) return null;
+  const refs = serviceRefs(content);
+  if (!refs.length) return null;
 
   return (
     <section id="services" className="bg-bg py-16 lg:py-24">
@@ -50,8 +57,11 @@ export default function HvacServices({ content = CONTENT }: { content?: SiteCont
         </div>
 
         <div className="rv-stagger mt-8 grid gap-4 sm:grid-cols-2 lg:mt-11 lg:grid-cols-3 lg:gap-[22px]">
-          {items.map((item, i) => {
+          {refs.map((ref) => {
+            const i = ref.index;
+            const item = services.items[i];
             const photo = item.image?.url;
+            const Card = ref.href ? 'a' : 'div';
             const tile = (
               <span
                 className={`grid h-[56px] w-[56px] place-items-center rounded-[14px] text-[color:var(--accent-2)] transition-colors duration-300 group-hover:bg-[color:var(--accent-2)] group-hover:text-[color:var(--accent-2-fg)] ${
@@ -65,8 +75,10 @@ export default function HvacServices({ content = CONTENT }: { content?: SiteCont
               </span>
             );
             return (
-              <div
-                key={item.n ?? i}
+              <Card
+                key={ref.slug}
+                id={ref.slug}
+                {...(ref.href ? { href: ref.href } : {})}
                 className="group hover-lift shadow-brand-1 flex flex-col overflow-hidden rounded-[16px] border border-rule bg-bg hover:shadow-brand-3"
               >
                 {photo && (
@@ -95,10 +107,16 @@ export default function HvacServices({ content = CONTENT }: { content?: SiteCont
                     <div className="mt-auto flex items-center gap-2 border-t border-rule pt-[18px] text-[13px] font-bold uppercase tracking-[0.04em] text-accent">
                       <span className="h-0.5 w-[18px] rounded-sm bg-accent" aria-hidden="true" />
                       <E p={`services.items.${i}.tag`}>{item.tag}</E>
+                      {ref.href && (
+                        <span className="ml-auto flex items-center gap-1.5 text-[14px] normal-case tracking-normal text-[color:var(--accent-2)]">
+                          Details
+                          <ArrowRight size={16} weight="bold" aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-[3px]" />
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
