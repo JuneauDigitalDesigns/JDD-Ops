@@ -85,7 +85,7 @@ export const CATALOG: Record<string, readonly string[]> = {
   // SiteContent.subpages[route].header, not a global CONTENT import.
   pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader', 'LawnPageHeader', 'PlumbingPageHeader', 'DetailPageHeader',
                  // Per-service pages (service-page-spec.md, Xander 2026-11-10): one header per vertical.
-                 'HvacServiceHeader'],
+                 'HvacServiceHeader', 'DetailServiceHeader'],
   hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap', 'HvacHero', 'RoofingHero', 'LawnHero', 'PlumbingHero', 'DetailHero'],
   trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust', 'LawnTrust', 'PlumbingTrust', 'DetailTrust'],
   // New section category (decision 18). Reads about.pillars; no new schema field.
@@ -93,7 +93,7 @@ export const CATALOG: Record<string, readonly string[]> = {
   about:        ['AboutFeature', 'AboutStory', 'AboutSticky', 'HvacAbout', 'RoofingAbout', 'LawnAbout', 'PlumbingAbout', 'DetailAbout'],
   services:     ['ServicesGrid', 'ServicesAccordion', 'ServicesPanel', 'ServicesShowcase', 'ServicesSpotlight', 'HvacServices', 'RoofingServices', 'LawnServices', 'PlumbingServices', 'DetailServices',
                  // The body of a per-service page, blocks 4–12, one per vertical.
-                 'HvacServiceDetail'],
+                 'HvacServiceDetail', 'DetailServiceDetail'],
   // Reframed from portfolio to recent jobs: a trades client has jobs nearby, not a portfolio.
   work:         ['RecentJobsGrid', 'BeforeAfter', 'WorkSpotlight', 'WorkMasonry'],
   // New section category (decision 18). Reads about.stats; StatsBand is the one count-up.

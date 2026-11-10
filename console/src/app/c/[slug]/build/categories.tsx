@@ -65,6 +65,8 @@ import HvacPageHeader, { meta as hvacPageHeaderMeta } from '@/components/catalog
 // service page has, so compose-page.tsx renders them on those pages; here they render nothing.
 import HvacServiceHeader, { meta as hvacServiceHeaderMeta } from '@/components/catalog/pageHeader/HvacServiceHeader';
 import HvacServiceDetail, { meta as hvacServiceDetailMeta } from '@/components/catalog/services/HvacServiceDetail';
+import DetailServiceHeader, { meta as detailServiceHeaderMeta } from '@/components/catalog/pageHeader/DetailServiceHeader';
+import DetailServiceDetail, { meta as detailServiceDetailMeta } from '@/components/catalog/services/DetailServiceDetail';
 import HvacAbout, { meta as hvacAboutMeta } from '@/components/catalog/about/HvacAbout';
 import HvacContact, { meta as hvacContactMeta } from '@/components/catalog/contact/HvacContact';
 // Bespoke Roofing vertical-template components (vertical-templates-v1 Phase 5). Same contract
@@ -201,6 +203,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'PageHeaderMinimal',  id: pageHeaderMinimalMeta.id,  label: pageHeaderMinimalMeta.label,  skins: skinsFor('PageHeaderMinimal'),  render: () => <PageHeaderMinimal data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'HvacPageHeader', id: hvacPageHeaderMeta.id, label: hvacPageHeaderMeta.label, skins: skinsFor('HvacPageHeader'), render: () => <HvacPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'HvacServiceHeader', id: hvacServiceHeaderMeta.id, label: hvacServiceHeaderMeta.label, skins: skinsFor('HvacServiceHeader'), render: () => <HvacServiceHeader content={effective} /> },
+        { name: 'DetailServiceHeader', id: detailServiceHeaderMeta.id, label: detailServiceHeaderMeta.label, skins: skinsFor('DetailServiceHeader'), render: () => <DetailServiceHeader content={effective} /> },
         { name: 'RoofingPageHeader', id: roofingPageHeaderMeta.id, label: roofingPageHeaderMeta.label, skins: skinsFor('RoofingPageHeader'), render: () => <RoofingPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'LawnPageHeader', id: lawnPageHeaderMeta.id, label: lawnPageHeaderMeta.label, skins: skinsFor('LawnPageHeader'), render: () => <LawnPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'PlumbingPageHeader', id: plumbingPageHeaderMeta.id, label: plumbingPageHeaderMeta.label, skins: skinsFor('PlumbingPageHeader'), render: () => <PlumbingPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
@@ -274,6 +277,7 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'ServicesSpotlight', id: servicesSpotlightMeta.id, label: servicesSpotlightMeta.label, skins: skinsFor('ServicesSpotlight'), render: (skin) => <ServicesSpotlight content={effective} skin={skin} /> },
         { name: 'HvacServices',      id: hvacServicesMeta.id,      label: hvacServicesMeta.label,      skins: skinsFor('HvacServices'),      render: () => <HvacServices content={effective} /> },
         { name: 'HvacServiceDetail', id: hvacServiceDetailMeta.id, label: hvacServiceDetailMeta.label, skins: skinsFor('HvacServiceDetail'), render: () => <HvacServiceDetail content={effective} /> },
+        { name: 'DetailServiceDetail', id: detailServiceDetailMeta.id, label: detailServiceDetailMeta.label, skins: skinsFor('DetailServiceDetail'), render: () => <DetailServiceDetail content={effective} /> },
         { name: 'RoofingServices',   id: roofingServicesMeta.id,   label: roofingServicesMeta.label,   skins: skinsFor('RoofingServices'),   render: () => <RoofingServices content={effective} /> },
         { name: 'LawnServices',      id: lawnServicesMeta.id,      label: lawnServicesMeta.label,      skins: skinsFor('LawnServices'),      render: () => <LawnServices content={effective} /> },
         { name: 'PlumbingServices',  id: plumbingServicesMeta.id,  label: plumbingServicesMeta.label,  skins: skinsFor('PlumbingServices'),  render: () => <PlumbingServices content={effective} /> },

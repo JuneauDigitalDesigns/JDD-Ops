@@ -19,6 +19,9 @@ import HvacNav from '@/components/catalog/nav/HvacNav';
 import HvacServiceHeader from '@/components/catalog/pageHeader/HvacServiceHeader';
 import HvacServiceDetail from '@/components/catalog/services/HvacServiceDetail';
 import HvacFinalCta from '@/components/catalog/finalCta/HvacFinalCta';
+import DetailServiceHeader from '@/components/catalog/pageHeader/DetailServiceHeader';
+import DetailServiceDetail from '@/components/catalog/services/DetailServiceDetail';
+import DetailFinalCta from '@/components/catalog/finalCta/DetailFinalCta';
 import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
 import type { CategoryEntry } from './categories';
 import { navHref, type PageInstance, type SectionRef, type SiteComposition } from '@/lib/pages';
@@ -31,6 +34,9 @@ const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: st
   HvacServiceHeader: (p) => <HvacServiceHeader {...p} />,
   HvacServiceDetail: (p) => <HvacServiceDetail {...p} />,
   HvacFinalCta: (p) => <HvacFinalCta {...p} />,
+  DetailServiceHeader: (p) => <DetailServiceHeader {...p} />,
+  DetailServiceDetail: (p) => <DetailServiceDetail {...p} />,
+  DetailFinalCta: (p) => <DetailFinalCta {...p} />,
 };
 
 /** A neutral header used when a subpage has no generated header copy yet. */
