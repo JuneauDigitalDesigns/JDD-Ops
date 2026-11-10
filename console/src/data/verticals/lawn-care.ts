@@ -18,7 +18,9 @@ export const CONTENT: SiteContent = {
     // `accent` / `accentFg` are this vertical's own and are not touched here.
     palette: {
       accent:   "#2F7A33",
-      accent2:  "#2E4636",
+      // accent2 = the emphasis colour (headline emphasis, review pill, CTA eyebrow and offer ribbon
+      // on dark), editable in the Studio. Sun gold, from the 2026-11-09 approved premium mockup.
+      accent2:  "#E8B33A",
       accentFg: "#FFFFFF",
       bg:       "#FAF7F2",
       bgSoft:   "#F1EBE2",

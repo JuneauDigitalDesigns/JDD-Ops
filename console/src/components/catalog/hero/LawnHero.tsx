@@ -1,20 +1,29 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// LawnHero — "seasonal / organic / airy" hero, mirrored 1:1 (design: home-mockups.html #lawn
-// .hero / .picker). A warm forest-tinted scrim under a full-bleed photo, with a plan PICKER
-// (weekly/bi-weekly/one-time) replacing every other vertical's urgency line — the only hero in
-// the set that quotes a price. Real client-side state (useState), not static chrome: the
-// visitor's selection changes which option is highlighted and which frequency the "See my
-// price" link carries through to the contact form (D8).
+// LawnHero — "seasonal / organic / airy" hero, premium pass (2026-11-09, approved mockup).
+// A full-bleed photo under a forest colour-wash and a forest scrim (heavy left, light right on
+// desktop; climbing from the bottom on a phone), copy on the left with the plan PICKER
+// (weekly/bi-weekly/one-time) — the only hero in the set that quotes a price — and the lead form
+// card on the right. Real client-side state (useState), not static chrome: the visitor's
+// selection changes which option is highlighted, which frequency the "See my price" link carries
+// through to the contact form (D8), and the plan the hero form submits.
 //
 // "See my price" routes to /contact?frequency=<selection> — a WHITELISTED set of known values,
-// never the raw param echoed. The contact page (LawnContact's caller, the composed page) maps
-// that param to a fixed string and seeds <LeadForm initialMessage>, so the field stays fully
-// editable and nothing user-controlled reaches an owner email unvalidated.
+// never the raw param echoed. The contact page maps that param to a fixed string and seeds
+// <LeadForm initialMessage>, so the field stays fully editable and nothing user-controlled
+// reaches an owner email unvalidated.
 //
 // The price anchor reads services.items[0]?.priceFrom (the primary/weekly service) rather than
 // inventing a standalone hero price field — absent → the price line is simply omitted (D5).
-// Content stays schema-driven. Fixed design, no skin.
+//
+// THE LEAD FORM (operator decision 2026-11-09: every hero carries one): the shared <LeadForm>,
+// titled hero.formLabel (empty = no card), with the picked plan as its editable message. On a
+// phone the card follows the picker. LCP: the H1 and sub never animate; the review pill and picker
+// take the pure-CSS hero-rise fade; the form card does not, so it is usable the moment it is seen.
+//
+// Colours are palette tokens: forest panels = ink-panel-2, light text = on-ink / on-ink-soft,
+// the sun-gold emphasis and review pill = the editable accent2 slot (--accent-2), green tints =
+// accent mixed into bg. Literal rgba() values left are shadow alphas only. Fixed design, no skin.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { CONTENT, type SiteContent } from '@/data/site';
@@ -30,7 +39,7 @@ export const meta = {
     'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta',
     'extensions.reviewBadge', 'services.items', 'images.hero.slides',
   ],
-  sharedDeps: ['@/lib/editable'],
+  sharedDeps: ['@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -41,6 +50,7 @@ const FREQUENCIES = [
   { key: 'onetime', label: 'One-time', sub: 'Cleanup' },
 ] as const;
 
+/** Headline with the emphasised phrase in the editable accent2 slot (sun gold in the mockup). */
 function Headline({ text, emphasis }: { text: string; emphasis: string | null }) {
   if (!emphasis) return <>{text}</>;
   const i = text.indexOf(emphasis);
@@ -48,7 +58,7 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
   return (
     <>
       {text.slice(0, i)}
-      <span className="text-[#E8B33A]">{emphasis}</span>
+      <span className="text-[color:var(--accent-2)]">{emphasis}</span>
       {text.slice(i + emphasis.length)}
     </>
   );
@@ -72,7 +82,7 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
   const priceFrom = services.items[0]?.priceFrom;
 
   return (
-    <section className="relative isolate flex min-h-[620px] items-center overflow-hidden bg-[#1E4028]">
+    <section className="relative isolate flex items-center overflow-hidden bg-inkPanel2 text-onInk lg:min-h-[660px]">
       {slide && (
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -81,70 +91,109 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
           aria-label={images.hero?.slides?.[0]?.alt ?? `${content.brand.name} lawn`}
         />
       )}
+      {/* Forest wash: one grade for any client photo (colour blend of the forest panel). */}
+      <div className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />
+      {/* Scrim: on a phone it climbs from the bottom; on desktop heavy over the copy, light over the photo. */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 lg:hidden"
         aria-hidden="true"
         style={{
           background:
-            'linear-gradient(95deg,rgba(14,38,20,.88) 0%,rgba(14,38,20,.58) 46%,rgba(14,38,20,.14) 100%),' +
-            'linear-gradient(180deg,rgba(14,38,20,.1),rgba(14,38,20,.45))',
+            'linear-gradient(180deg, color-mix(in srgb, var(--ink-panel-2) 62%, transparent), color-mix(in srgb, var(--ink-panel-2) 92%, transparent) 60%)',
+        }}
+      />
+      <div
+        className="absolute inset-0 hidden lg:block"
+        aria-hidden="true"
+        style={{
+          background:
+            'linear-gradient(95deg, color-mix(in srgb, var(--ink-panel-2) 90%, transparent) 0%, color-mix(in srgb, var(--ink-panel-2) 62%, transparent) 46%, color-mix(in srgb, var(--ink-panel-2) 14%, transparent) 100%),' +
+            'linear-gradient(180deg, color-mix(in srgb, var(--ink-panel-2) 10%, transparent), color-mix(in srgb, var(--ink-panel-2) 50%, transparent))',
         }}
       />
 
-      <div className={`relative mx-auto grid w-full max-w-[1140px] items-center gap-10 px-6 py-[92px] ${formLabel ? 'lg:grid-cols-[1.05fr_0.95fr]' : ''}`}>
-        <div className="max-w-[620px] text-[#fff]">
+      <div
+        className={`relative mx-auto grid w-full max-w-[1120px] items-center gap-8 px-5 pb-12 pt-14 sm:px-6 lg:gap-12 lg:py-[88px] ${
+          formLabel ? 'lg:grid-cols-[1.05fr_0.95fr]' : ''
+        }`}
+      >
+        <div className="min-w-0 max-w-[620px]">
           {review && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(232,179,58,0.42)] bg-[rgba(232,179,58,0.18)] px-[15px] py-[7px] text-[13px] font-bold text-[#E8B33A]">
+            <span
+              className="hero-rise inline-flex items-center gap-2 rounded-full border px-[15px] py-[7px] text-[13px] font-bold text-[color:var(--accent-2)]"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-2) 42%, transparent)',
+                background: 'color-mix(in srgb, var(--accent-2) 18%, transparent)',
+              }}
+            >
               ★ {review.rating} from {review.count}+ neighbours
             </span>
           )}
 
-          <h1 className="mt-[18px] font-heading text-[clamp(40px,5.2vw,60px)] font-extrabold leading-[1.04] text-[#fff]">
+          <h1 className="mt-5 font-heading text-[42px] font-extrabold leading-none tracking-[-0.02em] text-onInk sm:text-[clamp(44px,5.6vw,68px)]">
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-4 max-w-[46ch] text-[18.5px] leading-[1.62] text-[#D3E0D2]">
+          <p className="mt-[18px] max-w-[46ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18.5px]">
             <E p="hero.sub">{hero.sub}</E>
           </p>
 
-          {/* The plan picker — lawn care's signature hero device (D8). Real state, not chrome. */}
-          <div className="mt-7 max-w-[520px] rounded-[20px] border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-[18px] backdrop-blur-md">
-            <div className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#B9CDBA]">How often?</div>
+          {/* The plan picker — lawn care's signature hero device (D8). Real state, not chrome.
+              Full 18px inner padding on every edge: nothing inside touches the panel's border. */}
+          <div
+            className="hero-rise mt-7 max-w-[520px] rounded-[22px] border p-[18px] backdrop-blur-md"
+            style={{
+              animationDelay: '.08s',
+              borderColor: 'color-mix(in srgb, var(--on-ink) 20%, transparent)',
+              background: 'color-mix(in srgb, var(--on-ink) 10%, transparent)',
+            }}
+          >
+            <div className="text-[12px] font-bold uppercase tracking-[0.13em] text-onInkSoft">How often?</div>
             <div className="mt-[11px] grid grid-cols-3 gap-2">
-              {FREQUENCIES.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setSelected(f.key)}
-                  aria-pressed={selected === f.key}
-                  className={`rounded-[13px] border-[1.5px] px-2 py-3 text-center text-[14px] font-bold transition-colors ${
-                    selected === f.key
-                      ? 'border-[#fff] bg-[#fff] text-[#1E4028]'
-                      : 'border-[rgba(255,255,255,0.22)] text-[#E3EDE2]'
-                  }`}
-                >
-                  {f.label}
-                  <small
-                    className="mt-[3px] block text-[11.5px] font-semibold"
-                    style={{ color: selected === f.key ? '#5B6F62' : '#B9CDBA' }}
+              {FREQUENCIES.map((f) => {
+                const on = selected === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setSelected(f.key)}
+                    aria-pressed={on}
+                    className={`min-w-0 rounded-[13px] border-[1.5px] px-2 py-3 text-center text-[14px] font-bold leading-[1.2] transition-colors ${
+                      on ? 'border-onInk bg-onInk text-inkPanel2' : 'text-onInk'
+                    }`}
+                    style={on ? undefined : { borderColor: 'color-mix(in srgb, var(--on-ink) 22%, transparent)' }}
                   >
-                    {f.sub}
-                  </small>
-                </button>
-              ))}
+                    {f.label}
+                    <small
+                      className="mt-[3px] block text-[11.5px] font-semibold leading-none"
+                      style={{
+                        color: on
+                          ? 'color-mix(in srgb, var(--ink-panel-2) 60%, var(--on-ink))'
+                          : 'var(--on-ink-soft)',
+                      }}
+                    >
+                      {f.sub}
+                    </small>
+                  </button>
+                );
+              })}
             </div>
-            <div className="mt-[15px] flex items-center justify-between gap-3.5 border-t border-[rgba(255,255,255,0.18)] pt-[14px]">
+            <div
+              className="mt-[15px] flex items-center justify-between gap-3.5 border-t pt-[14px]"
+              style={{ borderColor: 'color-mix(in srgb, var(--on-ink) 18%, transparent)' }}
+            >
               {priceFrom ? (
-                <div className="font-heading text-[17px] font-extrabold tracking-[-0.015em] text-[#fff]">
+                <div className="font-heading text-[17px] font-extrabold leading-none tracking-[-0.015em] text-onInk">
                   <E p="services.items.0.priceFrom">{priceFrom}</E>{' '}
-                  <small className="font-semibold text-[12.5px] text-[#B9CDBA]">/ visit</small>
+                  <small className="font-sans text-[12.5px] font-semibold text-onInkSoft">/ visit</small>
                 </div>
               ) : (
                 <span />
               )}
               <a
                 href={`/contact?frequency=${selected}`}
-                className="inline-flex items-center rounded-[14px] bg-accent px-[18px] py-[11px] text-[14.5px] font-extrabold text-accentFg shadow-[0_10px_22px_-9px_rgba(47,122,51,0.5)]"
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[14px] bg-accent px-[18px] py-[11px] text-[14.5px] font-bold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98]"
+                style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
               >
                 See my price →
               </a>
@@ -153,12 +202,17 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
         </div>
 
         {formLabel && (
-          <div className="relative z-[1] w-full rounded-[26px] bg-bg p-6 text-ink shadow-[0_30px_60px_-24px_rgba(14,38,20,0.6)] sm:p-[30px] lg:max-w-[460px] lg:justify-self-end">
-            <h2 className="font-heading text-[21px] font-extrabold tracking-[-0.02em] text-ink">
+          <div
+            className="shadow-brand-3 relative z-[1] w-full rounded-[22px] bg-bg p-6 text-ink sm:p-7 lg:max-w-[460px] lg:justify-self-end"
+          >
+            <h2 className="font-heading text-[20px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink sm:text-[22px]">
               <E p="hero.formLabel">{formLabel}</E>
             </h2>
-            <p className="mt-1.5 text-[13.5px] text-inkSoft">We&rsquo;ll call with a flat quote &mdash; usually same day.</p>
-            <span className="mt-3 inline-flex items-center rounded-full px-3 py-1.5 text-[12.5px] font-bold text-accent" style={{ background: '#E2EDDB' }}>
+            <p className="mt-1.5 text-[14px] text-inkSoft">We&rsquo;ll call with a flat quote &mdash; usually same day.</p>
+            <span
+              className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12.5px] font-bold text-accent"
+              style={{ background: 'color-mix(in srgb, var(--accent) 12%, var(--bg))' }}
+            >
               Plan: {plan.label}
             </span>
             <LeadForm
