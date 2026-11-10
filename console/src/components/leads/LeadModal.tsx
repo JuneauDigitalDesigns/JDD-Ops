@@ -7,11 +7,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CalendarPlus, CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
+import { BookOpen, CalendarPlus, CaretDown, CaretUp, Copy, EnvelopeSimple, Phone, X } from '@phosphor-icons/react';
 import { LEAD_SOURCE_SHORT } from '@/lib/lead-meta';
 import type { DemoCall, PlanInterest, QueuedLead } from '@/lib/leadTypes';
 import { absoluteTime, relativeTime } from '@/lib/relativeTime';
 import { SOURCE_ICON } from './LeadCard';
+import SalesTool from './SalesTool';
 
 const PLAN_LABEL: Record<string, string> = {
   starter: 'Starter',
@@ -127,6 +128,12 @@ function EditField({
   );
 }
 
+/**
+ * Below this width the modal and the sales tool don't fit side by side (790 + 16 + 480, plus the
+ * gutters), so the tool lays itself over the modal's right side instead.
+ */
+const SIDE_BY_SIDE_MIN_PX = 1180;
+
 /** Three pill buttons for plan interest. Clicking the active pill clears it. */
 function PlanPills({
   value, onChange,
@@ -156,7 +163,7 @@ function PlanPills({
 }
 
 export default function LeadModal({
-  lead, call, siteUrl, onClose, onPatch, onDelete, onOpenScript, onAddToCalendar, startEditing,
+  lead, call, siteUrl, onClose, onPatch, onDelete, onAddToCalendar, startEditing,
 }: {
   lead: QueuedLead;
   call: DemoCall | null;
@@ -164,8 +171,6 @@ export default function LeadModal({
   onClose: () => void;
   onPatch: (patch: ModalPatch) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  /** Opens the call script over this lead. The overlay is owned by LeadsView. */
-  onOpenScript: () => void;
   /** Navigate to /calendar with this lead's details prefilled. Board owns navigation. */
   onAddToCalendar: () => void;
   /** Set by the board when this lead was just created by hand, so typing can start immediately. */
@@ -180,6 +185,9 @@ export default function LeadModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeBlocked, setCloseBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** The sales tool, open beside this lead. Its own tab and search state live inside it. */
+  const [toolOpen, setToolOpen] = useState(false);
+  const [toolOverlay, setToolOverlay] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const notesDirtyRef = useRef(false);
 
@@ -196,8 +204,8 @@ export default function LeadModal({
     setCloseBlocked(false);
   }, [lead.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The call script writes `lead.notes` while this modal stays mounted underneath it. Pick that
-  // up, but never over the top of an edit made here.
+  // `lead.notes` can change while this modal is open (a refresh, another tab). Pick that up, but
+  // never over the top of an edit made here.
   //
   // "Edited here" is judged against the value this box was last synced FROM, not against
   // `lead.notes`: by the time this effect runs `lead.notes` is already the new value, so
@@ -238,6 +246,14 @@ export default function LeadModal({
 
   useEffect(() => { resizeNotes(); }, [notes]);
 
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${SIDE_BY_SIDE_MIN_PX - 1}px)`);
+    const sync = () => setToolOverlay(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   async function copyPhone() {
     try {
       await navigator.clipboard.writeText(lead.phone);
@@ -273,11 +289,20 @@ export default function LeadModal({
         onClick={tryClose}
       />
 
+      {/* The modal and the sales tool share one row. The row itself lets clicks through to the
+          backdrop, so clicking beside the panels still closes the lead. */}
+      <div
+        className={`pointer-events-none relative flex w-full justify-center gap-4 ${
+          toolOpen ? `h-[86vh]${toolOverlay ? ' max-w-[840px]' : ''}` : ''
+        }`}
+      >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`${lead.businessName} — lead`}
-        className="panel relative flex max-h-[86vh] w-full max-w-[840px] flex-col overflow-hidden"
+        className={`panel pointer-events-auto relative flex max-h-[86vh] w-full flex-col overflow-hidden ${
+          toolOpen && !toolOverlay ? 'h-full min-w-0 max-w-[790px] flex-1' : 'max-w-[840px]'
+        }${toolOpen && toolOverlay ? ' h-full' : ''}`}
       >
         {/* ── Header ── */}
         <div className="flex items-start gap-3 border-b border-rule px-5 py-4">
@@ -392,8 +417,14 @@ export default function LeadModal({
                     Close on call
                   </Link>
                 )}
-                <button type="button" onClick={onOpenScript} className="btn btn-sm btn-accent">
-                  <Phone size={13} /> Call script
+                <button
+                  type="button"
+                  onClick={() => setToolOpen((o) => !o)}
+                  aria-pressed={toolOpen}
+                  className="btn btn-sm btn-accent"
+                  style={toolOpen ? { background: 'var(--accent-glow)' } : undefined}
+                >
+                  <BookOpen size={13} /> Sales tool
                 </button>
                 <button
                   type="button"
@@ -634,6 +665,17 @@ export default function LeadModal({
             </button>
           </div>
         )}
+      </div>
+
+      {toolOpen && (
+        <SalesTool
+          planInterest={lead.planInterest}
+          onSetPlan={(p) => run({ planInterest: p })}
+          onAddToCalendar={onAddToCalendar}
+          onClose={() => setToolOpen(false)}
+          overlay={toolOverlay}
+        />
+      )}
       </div>
     </div>
   );
