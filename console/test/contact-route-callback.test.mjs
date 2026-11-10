@@ -26,15 +26,20 @@ const { POST } = await import('../../lib/site-routes/contact.route.ts');
 
 const INGEST = 'https://www.juneaudigitaldesigns.com/api/ingest/lead';
 const CONSENT_LOG = 'https://www.juneaudigitaldesigns.com/api/ingest/call-consent';
+const ADMIT = 'https://www.juneaudigitaldesigns.com/api/ingest/admit';
 const TOKEN = 'a'.repeat(64);
 let calls;
 let retellStatus;
 let consentLogStatus;
+/** The agency's human check. Default: passed, callback allowed whenever the route asks for one. */
+let admitAnswer;
 const order = [];
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
-  calls = { retell: [], ingest: [], consent: [] };
+  calls = { retell: [], ingest: [], consent: [], admit: [] };
+  admitAnswer = (body, n) =>
+    Response.json({ ok: true, admissionId: `adm_${n}`, callback: body.wantsCallback ? 'allowed' : 'held', verification: 'passed' });
   retellStatus = 201;
   consentLogStatus = 200;
   order.length = 0;
@@ -52,6 +57,12 @@ beforeEach(() => {
       order.push('retell');
       calls.retell.push(JSON.parse(init.body));
       return new Response('{}', { status: retellStatus });
+    }
+    if (url === ADMIT) {
+      order.push('admit');
+      const body = JSON.parse(init.body);
+      calls.admit.push({ body, auth: init.headers.authorization });
+      return admitAnswer(body, calls.admit.length);
     }
     if (url === CONSENT_LOG) {
       order.push('consent');
@@ -275,7 +286,7 @@ test('the proof is saved before the call, and survives an unanswered one', async
     { 'x-forwarded-for': '203.0.113.9, 10.0.0.1', 'user-agent': 'TestBrowser/1.0' },
   );
 
-  assert.deepEqual(order, ['consent', 'retell'], 'no proof may be written after a call is made');
+  assert.deepEqual(order, ['admit', 'consent', 'retell'], 'no proof may be written after a call is made');
   assert.equal(calls.ingest.length, 0, 'the proof is not a lead');
   assert.equal(calls.consent[0].auth, `Bearer ${TOKEN}`, "authenticated with this site's own token");
   assert.deepEqual(calls.consent[0].body, {
@@ -286,6 +297,7 @@ test('the proof is saved before the call, and survives an unanswered one', async
     capturedAt: '2026-11-09T15:00:00.000Z',
     pageUrl: 'https://acme.example/contact',
     phone: '+12073181838',
+    admissionId: 'adm_1',
     name: 'Santa Juno',
     ip: '203.0.113.9',
     userAgent: 'TestBrowser/1.0',
@@ -300,4 +312,122 @@ test('no proof saved means no call: the lead goes to the inbox instead', async (
   assert.equal(calls.ingest.length, 1);
   assert.equal(calls.ingest[0].callbackPlaced, false);
   assert.equal(res.status, 200);
+});
+
+/* ── the human check (operator decision, 2026-11-09) ───────────────────────────
+ * Every submission asks the agency's /api/ingest/admit first. The agency verifies the Turnstile
+ * token and claims the AI call; this route only obeys. What shipped before: no check at all, so a
+ * script could make this route dial any number, as often as it liked.
+ */
+
+const nothingHappened = () => {
+  assert.equal(calls.retell.length, 0, 'no call');
+  assert.equal(calls.consent.length, 0, 'no consent saved');
+  assert.equal(calls.ingest.length, 0, 'no lead');
+};
+
+for (const [status, error] of [[403, 'not-verified'], [429, 'too-many']]) {
+  test(`refused by the agency (${error}): the form is told why, and nothing is called or recorded`, async () => {
+    process.env.LEAD_CALLBACK = 'on';
+    admitAnswer = () => Response.json({ error }, { status });
+    const res = await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent(), turnstileToken: 'tok' });
+    assert.equal(res.status, status);
+    assert.deepEqual(await res.json(), { ok: false, error }, 'the error code the form maps to the approved words');
+    nothingHappened();
+  });
+}
+
+test('the token goes to the agency with the visitor, and is never stored with the lead', async () => {
+  process.env.LEAD_CALLBACK = 'off';
+  process.env.VERCEL_ENV = 'production';
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0x4AAAAAAAsitekey';
+  await submit(
+    { name: 'Dana', phone: '(407) 555-0188', turnstileToken: 'tok-123' },
+    { 'x-forwarded-for': '203.0.113.9, 10.0.0.1', 'x-forwarded-host': 'www.acme.example' },
+  );
+  delete process.env.VERCEL_ENV;
+  delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  assert.equal(calls.admit[0].auth, `Bearer ${TOKEN}`);
+  assert.deepEqual(calls.admit[0].body, {
+    turnstileToken: 'tok-123',
+    ip: '203.0.113.9',
+    phone: '+14075550188',
+    email: null,
+    wantsCallback: false,
+    host: 'www.acme.example',
+    deployment: 'production',
+    humanCheck: 'on',
+  });
+  assert.equal(calls.ingest.length, 1);
+  assert.equal(calls.ingest[0].turnstileToken, undefined);
+  assert.equal(calls.ingest[0].admissionId, 'adm_1', 'the lead carries its admission instead');
+});
+
+test('a site with no site key tells the agency so, rather than sending no token', async () => {
+  process.env.LEAD_CALLBACK = 'off';
+  await submit({ name: 'Dana', email: 'dana@example.com' });
+  assert.equal(calls.admit[0].body.humanCheck, 'off');
+});
+
+test('a callback is asked for only with a consent the route can verify', async () => {
+  process.env.LEAD_CALLBACK = 'on';
+  await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent({ textHash: 'f'.repeat(64) }) });
+  assert.equal(calls.admit[0].body.wantsCallback, false);
+  assert.equal(calls.retell.length, 0);
+});
+
+test('the agency holds the call (this number was called today): no call, the lead is recorded', async () => {
+  process.env.LEAD_CALLBACK = 'on';
+  admitAnswer = () => Response.json({ ok: true, admissionId: 'adm_held', callback: 'held', verification: 'passed' });
+  const res = await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent() });
+  assert.equal(calls.retell.length, 0, 'the route never dials on its own say-so');
+  assert.equal(calls.consent.length, 0);
+  assert.equal(calls.ingest[0].admissionId, 'adm_held');
+  assert.deepEqual(await res.json(), { ok: true, callback: 'unavailable', followUpId: 'lead_1' });
+});
+
+for (const [label, answer] of [
+  ['unreachable', () => { throw new TypeError('fetch failed'); }],
+  ['down', () => new Response('bad gateway', { status: 502 })],
+  ['answering something unexpected', () => Response.json({ ok: true })],
+]) {
+  test(`agency ${label}: no call, and the lead is still offered to the inbox`, async () => {
+    process.env.LEAD_CALLBACK = 'on';
+    admitAnswer = answer;
+    const res = await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent() });
+    assert.equal(calls.retell.length, 0, 'a call nobody counted is a call not made');
+    assert.equal(calls.ingest.length, 1);
+    assert.equal(calls.ingest[0].admissionId, undefined);
+    assert.equal(res.status, 200);
+  });
+}
+
+test('a filled honeypot is answered like a success, and nothing at all happens', async () => {
+  process.env.LEAD_CALLBACK = 'on';
+  const res = await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent(), jdd_hp: 'http://spam.example' });
+  assert.deepEqual(await res.json(), { ok: true });
+  assert.equal(calls.admit.length, 0);
+  nothingHappened();
+});
+
+test("a post from another site's page is refused before anything is asked", async () => {
+  process.env.LEAD_CALLBACK = 'on';
+  const res = await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent() }, { 'sec-fetch-site': 'cross-site' });
+  assert.equal(res.status, 403);
+  assert.equal(calls.admit.length, 0);
+  nothingHappened();
+});
+
+test('a same-origin post from the site itself goes through', async () => {
+  process.env.LEAD_CALLBACK = 'off';
+  const res = await submit({ name: 'Dana', email: 'dana@example.com' }, { 'sec-fetch-site': 'same-origin' });
+  assert.equal(res.status, 200);
+  assert.equal(calls.ingest.length, 1);
+});
+
+test('an oversized body is refused unread', async () => {
+  process.env.LEAD_CALLBACK = 'off';
+  const res = await submit({ name: 'Dana', email: 'dana@example.com', message: 'x'.repeat(20_000) });
+  assert.equal(res.status, 413);
+  assert.equal(calls.admit.length, 0);
 });

@@ -270,3 +270,25 @@ test('the existing ingest token survives a re-run, once', () => {
   assert.equal(env.LEAD_INGEST_TOKEN, token, 'the registered token must be kept, not re-minted');
   assert.equal(lines.filter((l) => String(l).startsWith('LEAD_INGEST_TOKEN=')).length, 1);
 });
+
+// ─── the lead form's human check (2026-11-09) ─────────────────────────────────
+// Every tier's form gets the same Turnstile widget, so every tier gets the public key. The
+// master name differs on purpose: NEXT_PUBLIC_TURNSTILE_SITE_KEY in the agency's own env is the
+// agency's quote-form widget, not the client-sites one.
+
+test('every tier, web-only included, gets the client-sites Turnstile key', () => {
+  for (const [plan, webOnly] of [['starter', true], ['starter', false], ['growth', false], ['enterprise', false]]) {
+    const { env } = build({ plan, webOnly, env: { CLIENT_TURNSTILE_SITE_KEY: '0x4AAAAAAAclients' } });
+    assert.equal(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY, '0x4AAAAAAAclients', `${plan}${webOnly ? ' web-only' : ''}`);
+  }
+});
+
+test("the agency's own site key is never taken for a client's", () => {
+  const { env } = build({ plan: 'growth', env: { NEXT_PUBLIC_TURNSTILE_SITE_KEY: '0x4AAAAAAAagency' } });
+  assert.equal(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY, '');
+});
+
+test('a key set by hand on a client is kept on re-run', () => {
+  const { env } = build({ plan: 'growth', prev: { NEXT_PUBLIC_TURNSTILE_SITE_KEY: '0x4AAAAAAAhand' }, env: { CLIENT_TURNSTILE_SITE_KEY: '0x4AAAAAAAclients' } });
+  assert.equal(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY, '0x4AAAAAAAhand');
+});

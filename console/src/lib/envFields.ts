@@ -156,6 +156,15 @@ export const ENV_FIELDS: EnvField[] = [
     plans: ALL,
     placeholder: 'https://www.juneaudigitaldesigns.com/api/ingest/lead',
   },
+  {
+    key: 'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+    group: 'leads',
+    label: 'Lead form human check (Turnstile site key)',
+    help: 'The public key of the client-sites Cloudflare Turnstile widget. Empty: the form has no human check, leads still arrive, and the AI never calls back. Its secret lives only on the agency.',
+    kind: 'text',
+    plans: ALL,
+    placeholder: '0x4AAAAAAA…',
+  },
 ];
 
 /** Sentinel the API sends in place of a secret, and ignores if it comes back unchanged. */
@@ -171,6 +180,9 @@ const SECRET_KEY_RE = /(_KEY|_TOKEN|_SECRET|_PASSWORD|AUTH)$/;
  * key for the reveal-on-click affordance. See that route for why.
  */
 export function isSecretKey(key: string): boolean {
+  // NEXT_PUBLIC_* is inlined into every visitor's browser bundle, so it can't be a secret, and
+  // masking one (the Turnstile site key ends in _KEY) would only hide what the page shows anyone.
+  if (key.startsWith('NEXT_PUBLIC_')) return false;
   return SECRET_KEY_RE.test(key);
 }
 

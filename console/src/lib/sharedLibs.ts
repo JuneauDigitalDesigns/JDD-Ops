@@ -324,6 +324,29 @@ export function checkFormRoutePairing(input: {
       reason: `The consent wording for "${form.version}" differs between the lead form from ${installed} and src/app/api/contact/route.ts, so the route would reject every consent.`,
     };
   }
+
+  // The human check (2026-11-09). The form produces a Turnstile token (@jdd/ui v1.5.0+) and the
+  // route has the agency verify it (`/api/ingest/admit`). Either one without the other fails,
+  // and neither failure shows: an old form beside the new route sends no token, so once the site
+  // has its key every lead is refused; a new form beside an old route looks protected and isn't.
+  const formSendsToken = /\bturnstileToken\b/.test(input.leadFormSrc ?? '');
+  const routeAdmits = /\/api\/ingest\/admit\b/.test(input.routeSrc);
+  if (routeAdmits && !formSendsToken) {
+    return {
+      ok: false,
+      reason:
+        `The lead form from ${installed} has no human check, but src/app/api/contact/route.ts has the agency verify one. ` +
+        'Once this site has its Turnstile key, every lead would be refused. Update @jdd/ui to v1.5.0 or later.',
+    };
+  }
+  if (formSendsToken && !routeAdmits) {
+    return {
+      ok: false,
+      reason:
+        `The lead form from ${installed} sends a human-check token, but src/app/api/contact/route.ts never has it verified, ` +
+        'so the form would look protected and not be. The current route is jdd-ops/lib/site-routes/contact.route.ts.',
+    };
+  }
   return { ok: true, version: form.version };
 }
 
