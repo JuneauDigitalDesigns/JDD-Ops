@@ -12,6 +12,7 @@ import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { sourceOf, isSupplied, type SourceContext } from '@/lib/intake-sources';
 import { intakeTodo, attentionByStep, servicePageHint, realReviews, BUSINESS_GROUPS } from '@/lib/intake-todo';
 import { SERVICE_GATE } from '@/lib/service-gate';
+import { copyRisks } from '@/lib/copyRisks';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
 import { migrateStepId, landingStepId } from '@/lib/intake-steps';
 import IntakeShell from './brief/IntakeShell';
@@ -202,6 +203,9 @@ export default function IntakeStep({
     () => intakeTodo(SERVICE_GATE, { ...sources, unreviewed: unreviewed.map(unreviewedLabel) }),
     [sources, unreviewed, unreviewedLabel],
   );
+  // SEO plan D2 (Xander, 2026-11-10): preset sample copy and claims the facts don't support,
+  // warned about loudly on Still to do. client-seo's detector; a warning, never a block.
+  const risks = useMemo(() => copyRisks(effective, presetFor(vertical)), [effective, vertical]);
   const counts = useMemo(() => {
     const by = attentionByStep(todo);
     const total = Object.values(by).reduce((a, b) => a + b, 0);
@@ -237,6 +241,7 @@ export default function IntakeStep({
       todo={todo}
       counts={counts}
       stats={stats}
+      risks={risks}
       vertical={vertical}
       onVerticalChange={onVerticalChange}
       clientPickedVertical={clientPickedVertical}

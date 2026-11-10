@@ -18,7 +18,7 @@ import { SectionReviewCard, type SectionVerdict } from '../CopyWireframe';
 import { Card, StatusMark, Tag } from './ui';
 
 export default function ReviewBoard({
-  content, setField, verdictFor, pages, unreviewed, hasGenerated,
+  content, setField, verdictFor, pages, unreviewed, hasGenerated, focusSection, focusRoute, focusKey,
 }: {
   content: SiteContent;
   setField: (path: string, value: unknown) => void;
@@ -26,6 +26,10 @@ export default function ReviewBoard({
   pages: ReviewPage[];
   unreviewed: Set<VerdictKey>;
   hasGenerated: boolean;
+  /** A section Still to do jumped to (a copy risk): open it. `focusKey` re-applies a repeat jump. */
+  focusSection?: string;
+  focusRoute?: string;
+  focusKey?: number;
 }) {
   const groups = useMemo(() => buildReviewGroups(pages), [pages]);
   const flat = useMemo(
@@ -35,9 +39,20 @@ export default function ReviewBoard({
   const [gi, setGi] = useState(0);
   const [key, setKey] = useState<VerdictKey | null>(null);
 
+  // A jump from Still to do wins: open that section (a subpage header by its route).
+  useEffect(() => {
+    if (!focusSection) return;
+    const hit = flat.find((f) => f.section === focusSection && (focusRoute ? f.route === focusRoute : !f.route))
+      ?? flat.find((f) => f.section === focusSection);
+    if (hit) { setKey(hit.key); setGi(hit.gi); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSection, focusRoute, focusKey]);
+
   // Open on the first section still to review, else the first section.
   useEffect(() => {
     if (key && flat.some((f) => f.key === key)) return;
+    // A jump set the key in this same commit; this default must not overwrite it.
+    if (focusSection && flat.some((f) => f.section === focusSection)) return;
     const first = flat.find((f) => unreviewed.has(f.key)) ?? flat[0];
     if (first) { setKey(first.key); setGi(first.gi); }
   }, [flat, unreviewed, key]);

@@ -18,6 +18,8 @@ import type { Section, VerdictKey } from '@/lib/copy-schema';
 import type { ReviewPage } from '@/lib/copy-review-groups';
 import type { SourceContext } from '@/lib/intake-sources';
 import type { TodoItem } from '@/lib/intake-todo';
+import type { CopyRisks } from '@/lib/copyRisks';
+import type { RiskTarget } from '@/lib/intake-risks';
 import { INTAKE_STEPS, stepIndex, type IntakeStepDef } from '@/lib/intake-steps';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import type { VerticalId } from '@/lib/verticals';
@@ -49,7 +51,7 @@ export default function IntakeShell({
   brief, verticalDef, imported, tickedSections, copyModel, onCopyModelChange,
   onGenerated, onClearGenerated, hasGenerated,
   verdictFor, pages, unreviewed, gateReason, onApprove,
-  todo, counts, stats,
+  todo, counts, stats, risks,
 }: {
   activeId: string;
   onSelect: (id: string) => void;
@@ -83,11 +85,13 @@ export default function IntakeShell({
   todo: TodoItem[];
   counts: Record<string, number>;
   stats: Array<{ value: string; label: string; ok?: boolean }>;
+  /** client-seo's copyRisks over the effective content: the Still to do warning (SEO plan D2). */
+  risks: CopyRisks;
 }) {
   const reduce = useReducedMotion();
   const [dir, setDir] = useState(1);
   /** Where a Still to do jump points inside the step it opens. */
-  const [focus, setFocus] = useState<{ path?: string; service?: number; n: number }>({ n: 0 });
+  const [focus, setFocus] = useState<{ path?: string; service?: number; section?: string; route?: string; n: number }>({ n: 0 });
 
   const index = stepIndex(activeId);
   const step: IntakeStepDef = INTAKE_STEPS[index];
@@ -101,6 +105,11 @@ export default function IntakeShell({
     const target = it.step === 'review' ? 'review' : it.step;
     setFocus((f) => ({ path: it.path, service: it.serviceIndex, n: f.n + 1 }));
     select(target);
+  }, [select]);
+
+  const riskJump = useCallback((t: RiskTarget) => {
+    setFocus((f) => ({ service: t.serviceIndex, section: t.section, route: t.route, n: f.n + 1 }));
+    select(t.step);
   }, [select]);
 
   const prev = index > 0 ? INTAKE_STEPS[index - 1] : null;
@@ -192,6 +201,9 @@ export default function IntakeShell({
                   pages={pages}
                   unreviewed={unreviewed}
                   hasGenerated={hasGenerated}
+                  focusSection={focus.section}
+                  focusRoute={focus.route}
+                  focusKey={focus.n}
                 />
               )}
               {step.kind === 'todo' && (
@@ -204,6 +216,8 @@ export default function IntakeShell({
                   gateReason={gateReason}
                   onApprove={onApprove}
                   onRerun={() => select('prompt')}
+                  risks={risks}
+                  onRiskJump={riskJump}
                 />
               )}
             </div>
