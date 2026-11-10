@@ -24,7 +24,8 @@ import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import PageStudio from './PageStudio';
 import { defaultCompositionFor } from './page-templates';
-import { applyVerticalTemplate, servicePageSlugs } from './vertical-templates';
+import { applyVerticalTemplate, servicePageSlugs, syncServicePages } from './vertical-templates';
+import { chosenServicePages } from './service-page-sync';
 import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import NavSlot from '@/components/NavSlot';
@@ -321,6 +322,17 @@ export default function BuildWizard({
       return enforcePins(arrayMove(next, from, to));
     });
   }, [selections]);
+
+  // Service pages follow the gate (service-page-spec.md §1): a service gets a page once its facts
+  // earn one, and loses it when they no longer do. syncServicePages keeps an existing page as it
+  // is (section ids, styles, renames) and is a no-op for a vertical without a service page yet.
+  // Compared by route so the effect settles after one update. Never before hydration, or the
+  // empty first render would strip a saved composition's pages.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    const next = syncServicePages(siteComposition, chosenServicePages(effective, siteComposition));
+    if (servicePageSlugs(next).join('|') !== servicePageSlugs(siteComposition).join('|')) setSiteComposition(next);
+  }, [effective, siteComposition]);
 
   // Persist the per-client bundle on any change — but never before hydration has run, or
   // the first commit's empty state would clobber what's in storage. See `hydrated`.

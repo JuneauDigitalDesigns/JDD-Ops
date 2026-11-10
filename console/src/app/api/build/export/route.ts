@@ -34,6 +34,8 @@ import { loadUiPinRules } from '@/lib/uiPinRules';
 import { loadSiteLayout } from '@/lib/siteLayout';
 import { findMissingLocalImages } from '@/lib/imageRefs';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
+import { servicePageSlugs } from '@/app/c/[slug]/build/vertical-templates';
+import { withStoredSlugs } from '@/app/c/[slug]/build/service-page-sync';
 import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import type { SiteContent } from '@/data/site';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
@@ -218,6 +220,12 @@ export async function POST(req: Request) {
         // Services, …), not the single-page anchor links. Generated routing, not client copy.
         if (composition && content) {
           content.nav = navLinksFor(composition);
+          // Routing too (service-page-spec.md §8): the slugs of the composition's service pages.
+          // The Services menu, the cards, related services and the footer link only to these, so
+          // a site never links a page that doesn't exist. Each paged service's slug is stored once
+          // (§2), so renaming the service later keeps its published URL.
+          content.servicePages = servicePageSlugs(composition);
+          content.services = withStoredSlugs(content, content.servicePages).services;
 
           // The rest of the site chrome carries single-page anchors too. On a multi-page site a
           // footer `#services`/`#about`/… link scrolls to nothing from every page that doesn't
