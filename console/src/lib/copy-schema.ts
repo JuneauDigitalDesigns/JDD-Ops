@@ -71,6 +71,17 @@ export interface CopyResult {
       seoDescription: string;
     }[];
   };
+  /** Per-service page body copy (service-page-spec.md §3, §4): one item per service that earns
+   *  its own page (lib/servicePages.ts), keyed by slug, merged into services.items[i].page. Only
+   *  requested when at least one service qualifies. */
+  servicePages?: {
+    items: {
+      slug: string;
+      intro: string;
+      expect: string[];
+      faq: { q: string; a: string }[];
+    }[];
+  };
 }
 
 export type Section = keyof CopyResult;
@@ -95,7 +106,7 @@ export function parseVerdictKey(k: VerdictKey): { route?: string; section: Secti
 
 export const ALL_SECTIONS: Section[] = [
   'brand', 'announcement', 'trust', 'hero', 'about', 'services',
-  'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo', 'subpages',
+  'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo', 'subpages', 'servicePages',
 ];
 
 const str = { type: 'string' } as const;
@@ -155,6 +166,15 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
       items: arr(obj(
         { route: str, eyebrow: str, title: str, sub: str, ctaLabel: str, ctaHref: str, seoTitle: str, seoDescription: str },
         ['route', 'eyebrow', 'title', 'sub', 'seoTitle', 'seoDescription'],
+      )),
+    },
+    ['items'],
+  ),
+  servicePages: obj(
+    {
+      items: arr(obj(
+        { slug: str, intro: str, expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
+        ['slug', 'intro', 'expect', 'faq'],
       )),
     },
     ['items'],

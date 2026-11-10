@@ -1,6 +1,7 @@
 'use client';
 import { PhoneCall, Envelope, InstagramLogo, FacebookLogo } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
+import FindUsOn from '@/lib/FindUsOn';
 import { E } from '@/lib/editable';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
@@ -39,6 +40,7 @@ export default function FooterMinimal({
         {/* Top row: blurb + social */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className={`text-sm ${s.body}`}><E p="footer.blurb">{footer.blurb}</E></p>
+          <FindUsOn content={content} />
           {footer.social.length > 0 && (
             <div className="flex items-center gap-3">
               {footer.social.map((soc, si) => {

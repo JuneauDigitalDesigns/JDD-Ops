@@ -78,14 +78,24 @@ export default function BeforeAfter({
               )}
             </div>
             <div className="p-7">
-              <span className="text-xs font-semibold uppercase tracking-wider text-accent"><E p="work.projects.0.scope">{featured.scope}</E></span>
+              {/* A photo-only job (service-page-spec §4) has t / caption / image and nothing else:
+                  every other field omits itself (D5) rather than print a label over nothing. */}
+              {featured.scope && (
+                <span className="text-xs font-semibold uppercase tracking-wider text-accent"><E p="work.projects.0.scope">{featured.scope}</E></span>
+              )}
               <h3 className={`mt-1 font-heading text-xl font-bold ${s.heading}`}><E p="work.projects.0.t">{featured.t}</E></h3>
               <p className={`mt-2 leading-relaxed ${s.body}`}><E p="work.projects.0.caption">{featured.caption}</E></p>
-              <div className="mt-4 flex gap-6 text-sm">
-                <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Location</span><p className={`mt-0.5 ${s.heading}`}><E p="work.projects.0.loc">{featured.loc}</E></p></div>
-                <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Size</span><p className={`mt-0.5 ${s.heading}`}><E p="work.projects.0.size">{featured.size}</E></p></div>
-                {featured.yr && <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Year</span><p className={`mt-0.5 ${s.heading}`}><E p="work.projects.0.yr">{featured.yr}</E></p></div>}
-              </div>
+              {(featured.loc || featured.size || featured.yr) && (
+                <div className="mt-4 flex gap-6 text-sm">
+                  {featured.loc && (
+                    <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Location</span><p className={`mt-0.5 ${s.heading}`}><E p="work.projects.0.loc">{featured.loc}</E></p></div>
+                  )}
+                  {featured.size && (
+                    <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Size</span><p className={`mt-0.5 ${s.heading}`}><E p="work.projects.0.size">{featured.size}</E></p></div>
+                  )}
+                  {featured.yr && <div><span className="text-xs font-semibold uppercase tracking-wider text-accent">Year</span><p className={`mt-0.5 ${s.heading}`}><E p="work.projects.0.yr">{featured.yr}</E></p></div>}
+                </div>
+              )}
             </div>
           </motion.article>
 
@@ -110,11 +120,17 @@ export default function BeforeAfter({
                     )}
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-medium text-accent"><E p={`work.projects.${i + 1}.scope`}>{p.scope}</E></span>
+                    {p.scope && (
+                      <span className="text-xs font-medium text-accent"><E p={`work.projects.${i + 1}.scope`}>{p.scope}</E></span>
+                    )}
                     <h3 className={`mt-0.5 font-heading text-sm font-bold leading-snug ${s.heading}`}><E p={`work.projects.${i + 1}.t`}>{p.t}</E></h3>
-                    <p className={`mt-1 text-xs ${s.body}`}>
-                      <E p={`work.projects.${i + 1}.loc`}>{p.loc}</E>{p.yr ? <> · <E p={`work.projects.${i + 1}.yr`}>{p.yr}</E></> : ''}
-                    </p>
+                    {(p.loc || p.yr) && (
+                      <p className={`mt-1 text-xs ${s.body}`}>
+                        {p.loc && <E p={`work.projects.${i + 1}.loc`}>{p.loc}</E>}
+                        {p.loc && p.yr ? ' · ' : ''}
+                        {p.yr && <E p={`work.projects.${i + 1}.yr`}>{p.yr}</E>}
+                      </p>
+                    )}
                   </div>
                 </motion.article>
               ))}

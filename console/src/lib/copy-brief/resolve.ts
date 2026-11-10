@@ -10,7 +10,7 @@ import type { SiteContent } from '@/data/site';
 import { getPath } from '@/lib/merge';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
-import { countsFor, sectionInstructionLine, subpagesInstruction } from './compile';
+import { countsFor, sectionInstructionLine, servicePageIndices, servicePagesInstruction, subpagesInstruction } from './compile';
 import type {
   BriefContext,
   ChipGroup,
@@ -215,12 +215,19 @@ function resolveSections(ctx: BriefContext): SectionsBlock {
   const subpages = ctx.subpages ?? [];
   // `subpages` is only a real section on a multi-page build — a single-page build never offers
   // or generates it, so drop it from the section list when there are no subpages.
-  const sectionIds = ALL_SECTIONS.filter((s) => s !== 'brand' && (s !== 'subpages' || subpages.length > 0));
+  // `servicePages` likewise exists only when at least one service earns its own page
+  // (lib/servicePages.ts); otherwise there is nothing to write and nowhere to show it.
+  const hasServicePages = servicePageIndices(ctx.effective).length > 0;
+  const sectionIds = ALL_SECTIONS.filter((s) =>
+    s !== 'brand' && (s !== 'subpages' || subpages.length > 0) && (s !== 'servicePages' || hasServicePages));
   const ticked = new Set(ctx.tickedSections);
   const entries: SectionEntry[] = sectionIds.map((section) => {
-    // The subpages instruction needs the routes, which sectionInstructionLine has no access to.
+    // The subpages and servicePages instructions need the routes or the services, which
+    // sectionInstructionLine has no access to.
     const defaultText = section === 'subpages'
       ? subpagesInstruction(subpages)
+      : section === 'servicePages'
+      ? servicePagesInstruction(ctx.effective)
       : sectionInstructionLine(section, {
           pillars: counts.pillars, services: counts.services,
           faq: counts.faq, heroBullets: counts.heroBullets,

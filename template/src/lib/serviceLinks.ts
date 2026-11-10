@@ -176,23 +176,42 @@ export function servicePhoto(content: unknown, s: ServiceRef): { url: string; al
 /** The closing form's prefilled message on a service page (Xander 2026-11-10). */
 export const serviceMessage = (s: ServiceRef) => `Service: ${s.t}`;
 
-/** Profile links for the footer's "Find us on" block (D11): Google first, then the rest in order. */
+/** Profile links for the footer's "Find us on" block (D11): Google first, then the rest in order.
+ *  THE one list: every footer's block and the structured data's sameAs (console lib/pageSeo.ts)
+ *  read it, so the site never links a profile it doesn't tell Google about, or the reverse.
+ *  Only real profiles: https, a host that matches the kind (a typo or a mislabelled link is left
+ *  out, not published under the wrong name), never a Google search page, no duplicates. */
 export const PROFILE_ORDER = ['google', 'facebook', 'yelp', 'bbb', 'angi', 'nextdoor', 'instagram', 'other'] as const;
 export type ProfileKind = (typeof PROFILE_ORDER)[number];
+const PROFILE_HOSTS: Record<Exclude<ProfileKind, 'other'>, RegExp> = {
+  google: /(^|\.)(google\.[a-z.]+|goo\.gl|g\.page)$/i,
+  facebook: /(^|\.)(facebook\.com|fb\.com)$/i,
+  yelp: /(^|\.)yelp\.[a-z.]+$/i,
+  bbb: /(^|\.)bbb\.org$/i,
+  angi: /(^|\.)(angi\.com|angieslist\.com|homeadvisor\.com)$/i,
+  nextdoor: /(^|\.)nextdoor\.com$/i,
+  instagram: /(^|\.)instagram\.com$/i,
+};
 export function profileLinks(content: unknown): { kind: ProfileKind; url: string; label: string; path: string }[] {
   const LABEL: Record<ProfileKind, string> = {
     google: 'Google', facebook: 'Facebook', yelp: 'Yelp', bbb: 'BBB', angi: 'Angi', nextdoor: 'Nextdoor', instagram: 'Instagram', other: '',
   };
+  const seen = new Set<string>();
   return arr(obj(obj(content).extensions).profiles)
     .map((raw, i) => {
       const x = obj(raw);
       const kind = (PROFILE_ORDER as readonly string[]).includes(str(x.kind)) ? (str(x.kind) as ProfileKind) : 'other';
       const url = str(x.url);
       let host = '';
-      try { host = new URL(url).hostname.replace(/^www\./, ''); } catch { /* not a URL */ }
-      return { kind, url, label: str(x.label) || LABEL[kind] || host, path: `extensions.profiles.${i}`, ok: /^https:\/\//.test(url) };
+      let path = '';
+      try { const u = new URL(url); host = u.hostname.toLowerCase(); path = u.pathname; } catch { /* not a URL */ }
+      const ok =
+        /^https:\/\//i.test(url) && host !== '' &&
+        (kind === 'other' || PROFILE_HOSTS[kind].test(host)) &&
+        !(/(^|\.)google\.[a-z.]+$/i.test(host) && path.startsWith('/search'));
+      return { kind, url, label: str(x.label) || LABEL[kind] || host.replace(/^www\./, ''), path: `extensions.profiles.${i}`, ok };
     })
-    .filter((p) => p.ok && p.label)
+    .filter((p) => p.ok && p.label && !seen.has(p.url) && Boolean(seen.add(p.url)))
     .sort((a, b) => PROFILE_ORDER.indexOf(a.kind) - PROFILE_ORDER.indexOf(b.kind))
     .map(({ ok: _ok, ...p }) => p);
 }

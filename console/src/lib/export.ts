@@ -37,6 +37,7 @@ import {
 import { isValidSkin, supportsSkin } from '@/lib/skins';
 import { ONBOARD_OWNED, TEMPLATE_OWNED_FILES, TEMPLATE_OWNED_PREFIXES } from '@/lib/sharedLibs';
 import { VERTICAL_PRESETS } from '@/lib/verticals';
+import { seoPagesSource, type PageSeo } from '@/lib/pageSeo';
 
 const EXCLUDE = new Set(['node_modules', '.next', '.git', 'out']);
 
@@ -568,19 +569,20 @@ export function wirePages(
     if (!isHomePage) lines.push(`import type { Metadata } from 'next';`);
     if (needsContent) lines.push(`import { CONTENT } from '@/data/site';`);
     if (pageHasStyled) lines.push(`import { sectionVars } from '@/lib/palette';`);
+    // SEO plan D7/D9/D10: every page's title, description, canonical, OG and own JSON-LD come from
+    // src/data/seo-pages.ts, written by writePageSeo on the same export (lib/pageSeo.ts).
+    if (!isHomePage) lines.push(`import { pageMetadata } from '@/lib/pageMetadata';`);
+    lines.push(`import PageJsonLd from '@/lib/PageJsonLd';`);
     lines.push(...importLines, '');
 
     if (isHomePage) {
+      // Kept as the SEO component's re-export: the Studio's read-back recovers chrome.seo from
+      // this line, and the component's generateMetadata is pageMetadata('').
       lines.push(`export { generateMetadata } from '@/components/catalog/seo/${comp.chrome.seo.name}';`, '');
     } else {
-      const rk = JSON.stringify(page.route);
-      lines.push(
-        `export const metadata: Metadata = {`,
-        `  title: CONTENT.subpages?.[${rk}]?.seo?.title ?? CONTENT.brand.name,`,
-        `  description: CONTENT.subpages?.[${rk}]?.seo?.description ?? CONTENT.brand.tagline,`,
-        `};`,
-        '',
-      );
+      // Used to read CONTENT.subpages[route].seo with no canonical, so every subpage inherited
+      // home's canonical from the layout and told Google it was a copy of home.
+      lines.push(`export const metadata: Metadata = pageMetadata(${JSON.stringify(page.route)});`, '');
     }
 
     /** Emit one section element, wrapped in a sectionVars div only when it carries a style.
@@ -608,6 +610,8 @@ export function wirePages(
       `export default function Page() {`,
       `  return (`,
       `    <main className="font-sans text-ink">`,
+      // Outside the body markers, so the Studio's read-back never sees it as a section.
+      `      <PageJsonLd route={${JSON.stringify(page.route)}} />`,
       `      {/* @studio:body:start */}`,
       ...emit(
         VERTICAL_NAVS.has(comp.chrome.nav.name)
@@ -691,6 +695,22 @@ export function writeSiteContent(repoRoot: string, slug: string, content: SiteCo
     `${SITE_TYPES_SOURCE}\nexport const CONTENT: SiteContent = ${JSON.stringify(stripped, null, 2)};\n`;
   const dest = resolve(repoDirFor(repoRoot, slug), 'src', 'data', 'site.ts');
   writeFileSync(dest, output, 'utf8');
+}
+
+/**
+ * Write the client repo's per-page SEO (SEO plan D7, D9, D10): src/data/seo-pages.ts with every
+ * page's title, description, canonical, OG image and own JSON-LD plus the business node, all
+ * computed by lib/pageSeo.ts; and src/app/sitemap.ts, copied from the template on EVERY export,
+ * because app/ files are not template-owned and an existing repo would otherwise keep its
+ * home-only sitemap for good. The readers (lib/pageMetadata.ts, lib/PageJsonLd.tsx,
+ * lib/structuredData.ts) arrive with the src/lib refresh.
+ */
+export function writePageSeo(repoRoot: string, slug: string, pages: Record<string, PageSeo>, business: Record<string, unknown> | null): void {
+  const repoDir = repoDirFor(repoRoot, slug);
+  mkdirSync(resolve(repoDir, 'src', 'data'), { recursive: true });
+  writeFileSync(resolve(repoDir, 'src', 'data', 'seo-pages.ts'), seoPagesSource(pages, business), 'utf8');
+  mkdirSync(resolve(repoDir, 'src', 'app'), { recursive: true });
+  copyFileSync(resolve(repoRoot, 'template', 'src', 'app', 'sitemap.ts'), resolve(repoDir, 'src', 'app', 'sitemap.ts'));
 }
 
 /**
