@@ -49,7 +49,7 @@ export default function HvacServiceArea({ content = CONTENT }: { content?: SiteC
             Where we work
           </h2>
           <p className="mt-4 max-w-[52ch] text-[17px] leading-[1.65] text-inkSoft">
-            Not on the list? Call and ask — we travel for bigger jobs across the region.
+            Not on the list? Call and ask. We travel for bigger jobs across the region.
           </p>
           <a href={brand.phoneHref} className="mt-4 inline-flex items-center gap-2 font-heading text-[21px] font-semibold text-accent">
             <E p="brand.phone">{brand.phone}</E>

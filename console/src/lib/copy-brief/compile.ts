@@ -16,24 +16,24 @@ import type { SiteContent } from '@/data/site';
 import { VERTICALS, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 
-const HOME_SERVICE_SYSTEM = `You are the JDD Brand Copywriter — a senior conversion copywriter for local home-service businesses.
+const HOME_SERVICE_SYSTEM = `You are the JDD Brand Copywriter, a senior conversion copywriter for local home-service businesses.
 
 Write real, specific, benefit-led marketing copy grounded in the business facts and the industry vertical you are given. Rules:
 - Specific over vague; benefits over features; active voice; plain language a homeowner uses.
 - Ground every claim in the provided facts. Never invent licenses, awards, prices, phone numbers, addresses, or named companies.
-- Only include a business name, phone, email, address, or license/credential when it appears in the provided website notes or operator details — otherwise omit those fields entirely.
+- Only include a business name, phone, email, address, or license/credential when it appears in the provided website notes or operator details; otherwise omit those fields entirely.
 - No placeholder text and no clichés (e.g. "top-notch", "one-stop shop", "we go the extra mile", "unmatched quality", "your satisfaction is our priority").
 - Match the exact section counts you are asked for.
 - SEO: title <= 60 chars (include the business name and city when known), description <= 155 chars.
 
 Return ONLY a JSON object that conforms to the provided output schema. No prose, no markdown, no code fences.`;
 
-const HEALTH_SYSTEM = `You are the JDD Brand Copywriter — a senior conversion copywriter for local health & wellness practices.
+const HEALTH_SYSTEM = `You are the JDD Brand Copywriter, a senior conversion copywriter for local health & wellness practices.
 
 Write warm, reassuring, benefit-led marketing copy grounded in the business facts you are given. Rules:
 - Patient/client-centered and welcoming; plain, calm language; active voice.
 - Ground every claim in the provided facts. Never invent licenses, credentials, awards, prices, phone numbers, addresses, or named companies.
-- Only include a business name, phone, email, address, or license/credential when it appears in the provided website notes or operator details — otherwise omit those fields entirely.
+- Only include a business name, phone, email, address, or license/credential when it appears in the provided website notes or operator details; otherwise omit those fields entirely.
 - HEALTH GUARDRAILS: make NO medical claims and NO promises of specific health outcomes or results. Do not imply diagnosis, cure, or treatment of any condition. Do not reference insurance coverage, pricing, or reimbursement. Avoid absolute or superlative health promises (e.g. "cure", "guaranteed results", "pain-free", "best care"). Keep everything supportive and non-committal about outcomes.
 - No placeholder text and no clichés (e.g. "top-notch", "world-class", "we go the extra mile", "your satisfaction is our priority").
 - Match the exact section counts you are asked for.
@@ -67,20 +67,25 @@ export interface SectionCounts {
  */
 export function sectionInstructionLine(section: Section, counts: SectionCounts): string | null {
   switch (section) {
+    // ── Per-section lines (SEO plan, 2026-11-10). Rewritten for D1 (answer first, facts only),
+    // D5/D6 (no em- or en-dash, ranges as "to"), D7 (title patterns) and D8 (the city in the home
+    // headline). Wording sent to Xander for word-for-word approval with the PR; don't reword
+    // without sign-off. The facts-only contact rule and exact counts the old role carried live
+    // here now, next to the fields they govern.
     case 'brand':
-      return '- brand.tagline: short, memorable. Populate brand name/phone/email/address/license ONLY when grounded (see rules); otherwise omit them.';
+      return '- brand.tagline: short, memorable. Write the brand name, phone, email, address and license only when they appear in the facts or the website notes; otherwise leave them out.';
     case 'announcement':
-      return '- announcement.text: one short promotional/seasonal line (or a general welcome if nothing specific is known).';
+      return '- announcement.text: one short promotional or seasonal line taken from the facts, or a general welcome if the facts give none.';
     case 'trust':
-      return '- trust: a short label, plus logos[] ONLY for real certifications/affiliations found in the notes or details — omit logos if none are grounded.';
+      return '- trust: a short label, plus logos[] ONLY for real certifications or affiliations found in the notes or details. Leave logos out if none are grounded.';
     case 'hero':
-      return `- hero: eyebrow (2–4 words), headline (6–10 words, the single strongest promise on the site), headlineEmphasis (the ONE number, time indicator, or bold differentiator WITHIN the headline that earns gold/accent treatment — must be a verbatim substring of headline, e.g. "24/7" or "same day"; pick the word or phrase that would make someone stop scrolling; omit only if the headline has no single standout hook), sub (ONE sentence, ≤ 25 words), cta (action + outcome, ≤ 4 words), secondaryCta, formLabel, trust (one credibility sentence, grounded in the facts), badge (≤ 3 words), frictionReducers (exactly ${counts.heroFriction} bullets, ≤ 5 words each, each removing a different objection), heroBullets (exactly ${counts.heroBullets} of {value = a short number or figure, label = what it measures}).`;
+      return `- hero: eyebrow (2 to 4 words), headline (6 to 10 words: the single strongest promise on the site, naming the trade and the city from the facts; leave the city out only when the facts give none), headlineEmphasis (the ONE word or phrase WITHIN the headline that earns the accent colour; it must be a verbatim substring of the headline and must be supported by the facts; omit it if no phrase stands out), sub (ONE sentence, at most 25 words, answering what the business does and where), cta (action + outcome, at most 4 words), secondaryCta, formLabel, trust (one credibility sentence, grounded in the facts), badge (at most 3 words, from the facts, or omit it), frictionReducers (exactly ${counts.heroFriction} bullets, at most 5 words each, each removing a different objection, each true according to the facts), heroBullets (up to ${counts.heroBullets} of {value = a number or figure stated in the facts, label = what it measures}; return an empty list when the facts state no figures).`;
     case 'about':
-      // Deliberately says nothing about stats (PLAN D4) — they are not in the output schema
+      // Deliberately says nothing about stats (PLAN D4): they are not in the output schema
       // at all, so there is nothing to instruct the model about.
-      return `- about: eyebrow, title, body (2–3 sentences), exactly ${counts.pillars} pillars {t = short title, d = one sentence}. Also write story: 3–4 paragraphs of real company background for the dedicated About page. Ground every sentence in the facts — do NOT invent founding dates, family history, employee counts, awards, or milestones that are not given to you. If the facts are thin, write shorter paragraphs about the work itself rather than filling space with invented history.`;
+      return `- about: eyebrow, title, body (2 to 3 sentences, the plain answer to "who are you and where do you work" first), exactly ${counts.pillars} pillars {t = short title, d = one sentence}. Also write story: 3 to 4 paragraphs of real company background for the dedicated About page. Ground every sentence in the facts. Do NOT invent founding dates, family history, employee counts, awards, or milestones that are not given to you. If the facts are thin, write shorter paragraphs about the work itself rather than filling space with invented history.`;
     case 'services':
-      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d ≤ 120 chars stating what the CUSTOMER gets (an outcome, not a list of features or equipment), tag = short category, detail = 2–3 sentence expansion shown when the card opens on the Services page}. Each item's d must be distinct — no two services may share a description shape or opening phrase.`;
+      return `- services: eyebrow, title, sub, and exactly ${counts.services} items {t = service name, d at most 120 chars stating what the CUSTOMER gets (an outcome, not a list of features or equipment), tag = short category, detail = 2 to 3 sentence expansion shown when the card opens on the Services page}. Each item's d must be distinct: no two services may share a description shape or opening phrase.`;
     case 'work':
       return '- work: eyebrow, title, sub; include projects ONLY if real projects/case studies are grounded in the notes.';
     case 'testimonials':
@@ -89,13 +94,13 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
       // shipped three invented five-star quotes.
       return "- testimonials: eyebrow and title only, the heading of the reviews section. Never write review quotes, reviewer names or star ratings: reviews are real customers' words that the client supplies, and the section stays hidden until they do.";
     case 'faq':
-      return `- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs. Write the questions a real customer asks before buying, phrased the way they would phrase them. Answer each in ≤ 2 sentences, grounded strictly in the facts — if a question cannot be answered from the facts, ask a different question rather than speculating. Never state a price, a warranty length, or a response time that is not given to you.`;
+      return `- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs. When the facts include the customer's own questions, use those first, as they were asked. Otherwise write the questions a real customer asks before buying, phrased the way they would phrase them. Answer each in at most 2 sentences, the plain answer first, grounded strictly in the facts. If a question cannot be answered from the facts, ask a different question rather than speculating. Never state a price, a warranty length, or a response time that is not given to you.`;
     case 'finalCta':
-      return `- finalCta: eyebrow, headline, headlineEmphasis (a verbatim substring of the finalCta headline to render in gold accent — the phrase that captures the key offer, e.g. "same day" or "at no cost"; omit if no phrase clearly stands out), sub, cta, secondary (short "or call…" style line), frictionReducers (exactly ${counts.ctaFriction} short bullets).`;
+      return `- finalCta: eyebrow, headline, headlineEmphasis (a verbatim substring of the finalCta headline to render in the accent colour: the phrase that captures the key offer, supported by the facts; omit it if no phrase clearly stands out), sub, cta, secondary (short "or call" style line), frictionReducers (exactly ${counts.ctaFriction} short bullets, each true according to the facts).`;
     case 'footer':
-      return '- footer.blurb: a 1–2 sentence company blurb.';
+      return '- footer.blurb: a 1 to 2 sentence company blurb saying what the business does and where.';
     case 'seo':
-      return '- seo: title (≤ 60 chars; lead with what the business DOES, then the business name, then the city when known — never just the business name), description (≤ 155 chars; one sentence naming the service and the area served, ending in a reason to click).';
+      return '- seo: title in the form "{trade} in {city} | {business name}", where {trade} names what the business does in 2 to 4 words and {city} is the city from the facts (drop " in {city}" when the facts give no city), at most 60 chars; description (at most 155 chars; one sentence naming the service and the area served, ending in a reason to act).';
     default:
       return null;
   }
@@ -110,7 +115,7 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
 export function subpagesInstruction(subpages: { route: string; pageType: string; label: string }[]): string {
   if (!subpages.length) return '';
   const routes = subpages.map((p) => p.route).join(', ');
-  return `- subpages: exactly one item per route (${routes}), each { route, eyebrow, title, sub, ctaLabel + ctaHref (optional), seoTitle ≤ 60 chars, seoDescription ≤ 155 chars }. Every page's header and SEO must be DISTINCT and specific to that page — never a copy of the hero or of another page. About introduces the company; Services frames the offering; Contact invites the visitor to get in touch.`;
+  return `- subpages: exactly one item per route (${routes}), each { route, eyebrow, title, sub, ctaLabel + ctaHref (optional), seoTitle at most 60 chars, seoDescription at most 155 chars }. Every page's header and SEO must be DISTINCT and specific to that page, never a copy of the hero or of another page. About introduces the company; Services frames the offering; Contact invites the visitor to get in touch. seoTitle forms: Services "{trade} Services in {city} | {business name}", About "About {business name} | {trade} in {city}", Contact "Contact {business name} | {city} {trade}", a service page "{service} in {city} | {business name}"; drop the city parts when the facts give no city.`;
 }
 
 /** Build the SectionCounts a base SiteContent implies — shared by buildCopyUserMessage and
@@ -167,7 +172,7 @@ export function buildCopyUserMessage(
     `Business facts (from the client's onboarding intake / preset):`,
     JSON.stringify(facts, null, 2),
     websiteNotes && websiteNotes.trim()
-      ? `Content scanned from the business's own website — treat this as ground truth for facts (name, contact, services, reviews) and rewrite/organize it into the copy:\n${websiteNotes.trim()}`
+      ? `Content scanned from the business's own website. Treat this as ground truth for facts (name, contact, services, reviews) and rewrite/organize it into the copy:\n${websiteNotes.trim()}`
       : '',
     // Attributed to the CLIENT, not the operator.
     //
@@ -177,9 +182,9 @@ export function buildCopyUserMessage(
     // a suggestion, whereas the owner's own account of their business is the most
     // authoritative positioning input available. The "invent no facts" clause stays.
     details && details.trim()
-      ? `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone — follow it closely, but invent no facts beyond it:\n${details.trim()}`
+      ? `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone: follow it closely, but invent no facts beyond it:\n${details.trim()}`
       : '',
-    `Existing structure to respect — keep these exact counts:`,
+    `Existing structure to respect. Keep these exact counts:`,
     JSON.stringify({ ...counts, reference }, null, 2),
     `Write brand copy for ONLY these sections:`,
     lines.join('\n'),

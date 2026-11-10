@@ -45,7 +45,7 @@ export default function LawnTrust({ content = CONTENT }: { content?: SiteContent
             Neighbourhoods we mow every week.
           </h2>
           <p className="mt-3.5 max-w-[52ch] text-[17px] leading-[1.65] text-inkSoft">
-            We route by neighbourhood, so your crew is already nearby — that's how the same day
+            We route by neighbourhood, so your crew is already nearby. That's how the same day
             every week actually holds.
           </p>
           <a href={brand.phoneHref} className="mt-[18px] inline-flex items-center gap-2 font-heading text-[17px] font-extrabold text-accent">

@@ -125,7 +125,7 @@ export const CONTENT: SiteContent = {
     sub:     "Everything you need to know before booking.",
     items: [
       { q: "How often should my lawn be mowed?", a: "During the growing season, most lawns benefit from weekly mowing. We adjust cut height and frequency based on grass type and growth rate, and we can switch to bi-weekly service during slow-growth periods." },
-      { q: "Are your products safe for kids and pets?", a: "Yes. We use EPA-registered, low-toxicity products and follow labeled re-entry intervals. We'll always let you know when you can safely return to treated areas, typically 1–2 hours after application dries." },
+      { q: "Are your products safe for kids and pets?", a: "Yes. We use EPA-registered, low-toxicity products and follow labeled re-entry intervals. We'll always let you know when you can safely return to treated areas, typically 1 to 2 hours after application dries." },
       { q: "When is the best time to aerate?", a: "For cool-season grasses (fescue, bluegrass, rye): fall is ideal. For warm-season grasses (Bermuda, zoysia, St. Augustine): late spring to early summer. Aerating at the right time maximizes recovery and benefit." },
       { q: "What does a weed control program include?", a: "Our program includes a pre-emergent application in early spring to prevent crabgrass and other annuals, followed by post-emergent treatments throughout the season to knock out any weeds that do appear." },
       { q: "Can you over-seed a thin or patchy lawn?", a: "Absolutely. We pair aeration with over-seeding for the best germination results. Fall is the ideal time for cool-season grasses. We select seed varieties appropriate for your specific sun/shade conditions." },

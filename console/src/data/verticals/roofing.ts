@@ -124,7 +124,7 @@ export const CONTENT: SiteContent = {
     title:   "Frequently Asked Questions",
     sub:     "Everything you need to know before booking.",
     items: [
-      { q: "How long does a roof typically last?", a: "Asphalt shingles last 20–30 years depending on the product grade and climate. Premium shingles with proper ventilation can last 30–50 years. We'll tell you honestly where your roof stands during the inspection." },
+      { q: "How long does a roof typically last?", a: "Asphalt shingles last 20 to 30 years depending on the product grade and climate. Premium shingles with proper ventilation can last 30 to 50 years. We'll tell you honestly where your roof stands during the inspection." },
       { q: "Does insurance cover roof replacement?", a: "If the damage is from a covered peril (storm, hail, wind), homeowners insurance typically covers replacement minus your deductible. We work with adjusters regularly and can help document your claim." },
       { q: "How do I know if I have storm damage?", a: "Common signs include missing or curling shingles, granule loss in gutters, dents on flashing and gutters, and interior water stains. Our free inspection will identify all damage with photo documentation." },
       { q: "What warranty do you offer?", a: "We offer a 30-year workmanship warranty on all installations plus the manufacturer's materials warranty (up to lifetime on premium shingles). Both warranties are transferable if you sell the home." },

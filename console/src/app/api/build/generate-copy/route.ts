@@ -7,6 +7,7 @@ import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { chunkSections } from '@/lib/copy-brief/chunking';
 import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
+import { guardDashes, dashRewriteMessage } from '@/lib/copy-brief/dash-guard';
 import { isValidModelId, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 
 export const runtime = 'nodejs';
@@ -102,19 +103,37 @@ export async function POST(req: Request) {
         for (const s of chunk) send({ type: 'section', section: s, status: 'writing' });
         try {
           const { system, user } = compileBriefPrompt(ctx, blocks, chunk);
-          const res = await client.messages.create({
-            model: modelId,
-            max_tokens: 4000,
-            system,
-            output_config: { format: { type: 'json_schema', schema: buildCopySchema(chunk, false) } },
-            messages: [{ role: 'user', content: user }],
-          });
-          if (res.stop_reason === 'refusal') throw new Error(REFUSAL);
-          const tb = res.content.find((b) => b.type === 'text');
-          if (!tb || tb.type !== 'text') throw new Error('No copy returned.');
-          const result = JSON.parse(tb.text) as Partial<CopyResult>;
+          const schema = buildCopySchema(chunk, false);
+          const ask = async (messages: Anthropic.MessageParam[]) => {
+            const res = await client.messages.create({
+              model: modelId,
+              max_tokens: 4000,
+              system,
+              output_config: { format: { type: 'json_schema', schema } },
+              messages,
+            });
+            if (res.stop_reason === 'refusal') throw new Error(REFUSAL);
+            const tb = res.content.find((b) => b.type === 'text');
+            if (!tb || tb.type !== 'text') throw new Error('No copy returned.');
+            send({ type: 'usage', model: modelId, input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens });
+            return tb.text;
+          };
+          const firstText = await ask([{ role: 'user', content: user }]);
+          // SEO plan D5 layer 2: a field with an em- or en-dash goes back to the model once, by
+          // name. If one survives the rewrite the whole chunk is rejected as needing review; the
+          // guard never edits the text itself (lib/copy-brief/dash-guard.ts).
+          const guarded = await guardDashes(JSON.parse(firstText) as Partial<CopyResult>, async (paths) =>
+            JSON.parse(await ask([
+              { role: 'user', content: user },
+              { role: 'assistant', content: firstText },
+              { role: 'user', content: dashRewriteMessage(paths) },
+            ])) as Partial<CopyResult>,
+          );
+          if (guarded.stillDashed.length) {
+            throw new Error(`Needs review: still contains an em-dash or en-dash after one rewrite (${guarded.stillDashed.join(', ')}).`);
+          }
+          const result = guarded.result;
           for (const s of chunk) send({ type: 'section', section: s, status: 'done' });
-          send({ type: 'usage', model: modelId, input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens });
           return { chunk, result };
         } catch (e) {
           const message =

@@ -38,8 +38,8 @@ export const meta = {
  *  so lead-form-prefill.test.mjs can assert the mapping directly, without rendering through
  *  next/navigation's router context (useSearchParams needs one; this plain object doesn't). */
 export const FREQUENCY_MESSAGES: Record<string, string> = {
-  weekly: 'Weekly mowing — quarter-acre',
-  biweekly: 'Bi-weekly mowing — quarter-acre',
+  weekly: 'Weekly mowing, quarter-acre',
+  biweekly: 'Bi-weekly mowing, quarter-acre',
   onetime: 'One-time cleanup',
 };
 

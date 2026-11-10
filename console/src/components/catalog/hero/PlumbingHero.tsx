@@ -134,7 +134,7 @@ export default function PlumbingHero({ content = CONTENT }: { content?: SiteCont
           }}
         >
           <div className="font-heading text-[20px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink">What&apos;s going on?</div>
-          <p className="mt-1.5 text-[13.5px] leading-[1.5] text-inkSoft">Tell us the problem — a real person calls you back in minutes.</p>
+          <p className="mt-1.5 text-[13.5px] leading-[1.5] text-inkSoft">Tell us the problem. A real person calls you back in minutes.</p>
           <LeadForm mode={mode} surface="light" className="mt-3.5" submitLabel="Get a callback now" />
           <a href={brand.phoneHref} className="mt-3 flex items-center justify-center gap-1.5 text-[13.5px] font-semibold text-inkSoft transition-colors hover:text-ink">
             <Phone size={14} weight="fill" className="text-accent" aria-hidden="true" />
