@@ -19,6 +19,9 @@ import HvacNav from '@/components/catalog/nav/HvacNav';
 import HvacServiceHeader from '@/components/catalog/pageHeader/HvacServiceHeader';
 import HvacServiceDetail from '@/components/catalog/services/HvacServiceDetail';
 import HvacFinalCta from '@/components/catalog/finalCta/HvacFinalCta';
+import LawnServiceHeader from '@/components/catalog/pageHeader/LawnServiceHeader';
+import LawnServiceDetail from '@/components/catalog/services/LawnServiceDetail';
+import LawnFinalCta from '@/components/catalog/finalCta/LawnFinalCta';
 import PlumbingServiceHeader from '@/components/catalog/pageHeader/PlumbingServiceHeader';
 import PlumbingServiceDetail from '@/components/catalog/services/PlumbingServiceDetail';
 import PlumbingFinalCta from '@/components/catalog/finalCta/PlumbingFinalCta';
@@ -37,6 +40,9 @@ const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: st
   HvacServiceHeader: (p) => <HvacServiceHeader {...p} />,
   HvacServiceDetail: (p) => <HvacServiceDetail {...p} />,
   HvacFinalCta: (p) => <HvacFinalCta {...p} />,
+  LawnServiceHeader: (p) => <LawnServiceHeader {...p} />,
+  LawnServiceDetail: (p) => <LawnServiceDetail {...p} />,
+  LawnFinalCta: (p) => <LawnFinalCta {...p} />,
   PlumbingServiceHeader: (p) => <PlumbingServiceHeader {...p} />,
   PlumbingServiceDetail: (p) => <PlumbingServiceDetail {...p} />,
   PlumbingFinalCta: (p) => <PlumbingFinalCta {...p} />,
