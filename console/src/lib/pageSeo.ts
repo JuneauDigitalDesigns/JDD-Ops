@@ -15,6 +15,7 @@
  */
 import { imageAt } from '@/lib/localImage';
 import { primaryCity, serviceSlugs } from '@/lib/servicePages';
+import { profileLinks } from '@/lib/profileLinks';
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {});
@@ -190,7 +191,8 @@ export function businessNode(content: unknown, vertical: string | null): Json {
     foundingDate: str(brand.established) || undefined,
     address: postalAddress(str(brand.address), sab),
     areaServed: places(ext.serviceArea),
-    sameAs: arr(ext.profiles).map(obj).map((p) => str(p.url)).filter((u) => /^https:\/\//i.test(u)),
+    // Exactly the footer's "Find us on" list (lib/profileLinks.ts), so the two always agree.
+    sameAs: profileLinks(content).map((l) => l.url),
     openingHoursSpecification: openingHours(obj(ext.hours)),
     // NO aggregateRating / review (D10): Google makes a business's reviews of itself ineligible
     // for review snippets. The visible review badge stays.
