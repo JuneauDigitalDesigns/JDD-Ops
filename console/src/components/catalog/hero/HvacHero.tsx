@@ -165,7 +165,7 @@ export default function HvacHero({ content = CONTENT }: { content?: SiteContent 
             <h2 className="font-heading text-[20px] font-semibold leading-[1.15] text-ink sm:text-[22px]">
               <E p="hero.formLabel">{formLabel}</E>
             </h2>
-            <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&rsquo;s going on — we&rsquo;ll call you right back.</p>
+            <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&rsquo;s going on. We&rsquo;ll call you right back.</p>
             <LeadForm
               mode={mode}
               surface="light"

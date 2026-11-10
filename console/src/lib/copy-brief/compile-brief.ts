@@ -50,11 +50,11 @@ import type {
 const RETURN_ONLY_JSON = [
   'Return ONLY a single valid JSON object. No prose before or after it, no markdown, no code fences, no comments, no trailing commas.',
   'Every key you emit must be one the output schema names. Unknown keys are discarded on import without warning, so an invented key is silently lost work.',
-  'Write every field you are asked for. A field you omit falls back to generic placeholder copy from the industry preset — which ships to the client looking like real output. Omitting is worse than brief.',
+  'Write every field you are asked for. A field you omit falls back to generic placeholder copy from the industry preset, which ships to the client looking like real output. Omitting is worse than brief.',
   'Write ONLY the sections you are instructed to write. Do not emit keys for sections not requested in this run; they are being handled separately and your version would overwrite theirs.',
 ].join(' ');
 
-const MULTI_PAGE_RULES = 'This is a MULTI-PAGE website, not a single landing page. Copy for one page must never duplicate another page\'s wording — each page stands on its own. The About page carries the detailed company story; the Services page carries per-service detail; every non-home page has a distinct header and its own SEO title and description.';
+const MULTI_PAGE_RULES = 'This is a MULTI-PAGE website, not a single landing page. Copy for one page must never duplicate another page\'s wording; each page stands on its own. The About page carries the detailed company story; the Services page carries per-service detail; every non-home page has a distinct header and its own SEO title and description.';
 
 /** One paragraph of the compiled prompt, tagged with the block that produced it.
  *  `blockId` is null for the handful of lines that aren't sourced from any block (the
@@ -158,7 +158,7 @@ function websiteSegment(blocks: ResolvedBlock[]): PromptSegment | null {
   if (!website.enabled || !website.notes.text.trim()) return null;
   return {
     blockId: 'website', label: website.label,
-    text: `Content scanned from the business's own website — treat this as ground truth for facts (name, contact, services, reviews) and rewrite/organize it into the copy:\n${website.notes.text.trim()}`,
+    text: `Content scanned from the business's own website. Treat this as ground truth for facts (name, contact, services, reviews) and rewrite/organize it into the copy:\n${website.notes.text.trim()}`,
   };
 }
 
@@ -168,7 +168,7 @@ function clientWordsSegment(blocks: ResolvedBlock[]): PromptSegment | null {
   const joined = clientWords.lines.map((l) => `${l.label}: ${l.text}`).join('\n');
   return {
     blockId: 'clientWords', label: clientWords.label,
-    text: `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone — follow it closely, but invent no facts beyond it:\n${joined}`,
+    text: `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone: follow it closely, but invent no facts beyond it:\n${joined}`,
   };
 }
 
@@ -195,7 +195,7 @@ function voiceSynthesisSegment(blocks: ResolvedBlock[]): PromptSegment | null {
     label: 'Voice synthesis',
     text: [
       'How to combine the two inputs above: the positioning lines state how this business wants to be PERCEIVED; the owner\'s own words are the only evidence of how they actually TALK.',
-      'Write in their voice, not in the positioning\'s voice. Carry through their specific vocabulary, their level of formality, and any term they use for their own work or their customers — if they say "folks" do not write "clients", if they name a process or a product line, use their name for it.',
+      'Write in their voice, not in the positioning\'s voice. Carry through their specific vocabulary, their level of formality, and any term they use for their own work or their customers: if they say "folks" do not write "clients", if they name a process or a product line, use their name for it.',
       'Do not quote them verbatim and do not repeat their phrasing back as a headline; you are matching a register, not transcribing. Where their words and the positioning conflict, their words win.',
     ].join(' '),
   };
@@ -239,7 +239,7 @@ function structureSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSeg
   };
   return {
     blockId: 'structure', label: structure.label,
-    text: `Existing structure to respect — keep these exact counts:\n${JSON.stringify(ref, null, 2)}`,
+    text: `Existing structure to respect. Keep these exact counts:\n${JSON.stringify(ref, null, 2)}`,
   };
 }
 

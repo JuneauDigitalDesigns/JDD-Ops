@@ -87,7 +87,7 @@ export default function HvacFinalCta({ content = CONTENT }: { content?: SiteCont
           <h3 className="font-heading text-[22px] font-semibold text-ink">
             <E p="finalCta.cta">{finalCta.cta}</E>
           </h3>
-          <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&rsquo;s going on — we&rsquo;ll call you right back.</p>
+          <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&rsquo;s going on. We&rsquo;ll call you right back.</p>
           <LeadForm
             mode={mode}
             surface="light"

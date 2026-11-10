@@ -36,8 +36,8 @@ const objLit = /FREQUENCY_MESSAGES: Record<string, string> = (\{[\s\S]*?\n\});/.
 const FREQUENCY_MESSAGES = eval(`(${objLit})`);
 
 test('known frequency keys map to their exact prefill text', () => {
-  assert.equal(FREQUENCY_MESSAGES.weekly, 'Weekly mowing — quarter-acre');
-  assert.equal(FREQUENCY_MESSAGES.biweekly, 'Bi-weekly mowing — quarter-acre');
+  assert.equal(FREQUENCY_MESSAGES.weekly, 'Weekly mowing, quarter-acre');
+  assert.equal(FREQUENCY_MESSAGES.biweekly, 'Bi-weekly mowing, quarter-acre');
   assert.equal(FREQUENCY_MESSAGES.onetime, 'One-time cleanup');
 });
 
@@ -53,9 +53,9 @@ test('an unmapped or missing key yields undefined, never the raw param echoed', 
 
 test('LeadForm.initialMessage seeds the textarea and the field stays editable', () => {
   const seeded = renderToStaticMarkup(
-    createElement(LeadForm, { withMessage: true, initialMessage: 'Weekly mowing — quarter-acre', submitLabel: 'Go' }),
+    createElement(LeadForm, { withMessage: true, initialMessage: 'Weekly mowing, quarter-acre', submitLabel: 'Go' }),
   );
-  assert.ok(seeded.includes('Weekly mowing — quarter-acre'), 'seeded value missing from rendered textarea');
+  assert.ok(seeded.includes('Weekly mowing, quarter-acre'), 'seeded value missing from rendered textarea');
   assert.ok(!seeded.includes('readonly'), 'textarea must stay editable, not readOnly');
   assert.ok(seeded.includes('<textarea'), 'withMessage must render a textarea');
 });

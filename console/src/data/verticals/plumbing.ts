@@ -126,7 +126,7 @@ export const CONTENT: SiteContent = {
     items: [
       { q: "Can you really come the same day?", a: "In most cases, yes. We keep vans stocked and dispatchers available during business hours. For true emergencies, burst pipes, no hot water, we're available 24/7 and treat those as priority dispatches." },
       { q: "How do you find a leak without tearing up walls?", a: "We use pressure testing, acoustic leak detection, and thermal imaging to pinpoint leaks non-invasively. In most cases, we can locate the leak precisely before opening any wall, minimizing repair work." },
-      { q: "How long does a water heater last?", a: "Tank water heaters typically last 8–12 years; tankless models last 15–20 years with proper maintenance. If yours is over 10 years old or you're seeing rust or inconsistent temperatures, it may be time to replace it." },
+      { q: "How long does a water heater last?", a: "Tank water heaters typically last 8 to 12 years; tankless models last 15 to 20 years with proper maintenance. If yours is over 10 years old or you're seeing rust or inconsistent temperatures, it may be time to replace it." },
       { q: "Do you charge extra for emergency calls?", a: "Our after-hours rate is listed on our website and communicated before we dispatch, no surprise fees. For genuine emergencies, we believe getting help fast is more important than debating pricing at 2am." },
       { q: "Should I attempt plumbing repairs myself?", a: "Minor things like replacing a toilet flapper or a supply line are manageable DIY tasks. Anything involving drain lines, water main shut-offs, or pipe connections is best left to a licensed plumber, mistakes can cause serious water damage." },
     ],

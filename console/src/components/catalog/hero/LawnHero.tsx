@@ -45,7 +45,7 @@ export const meta = {
 } as const;
 
 const FREQUENCIES = [
-  { key: 'weekly', label: 'Weekly', sub: 'Mar–Oct' },
+  { key: 'weekly', label: 'Weekly', sub: 'Mar to Oct' },
   { key: 'biweekly', label: 'Bi-weekly', sub: 'Year-round' },
   { key: 'onetime', label: 'One-time', sub: 'Cleanup' },
 ] as const;

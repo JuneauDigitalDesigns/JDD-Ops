@@ -88,7 +88,7 @@ export default function PlumbingFinalCta({ content = CONTENT }: { content?: Site
           <h3 className="font-heading text-[22px] font-extrabold tracking-[-0.02em] text-ink">
             <E p="finalCta.cta">{finalCta.cta}</E>
           </h3>
-          <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&apos;s going on — we&apos;ll call you right back.</p>
+          <p className="mt-1.5 text-[14px] text-inkSoft">Tell us what&apos;s going on. We&apos;ll call you right back.</p>
           <LeadForm mode={mode} surface="light" className="mt-3.5" submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>} />
         </div>
       </div>
