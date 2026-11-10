@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CONTENT } from '@/data/site';
+import { pageMetadata } from '@/lib/pageMetadata';
 
 export const meta = {
   id: 'seo-default',
@@ -16,25 +16,10 @@ export const meta = {
 } as const;
 
 export function generateMetadata(): Metadata {
-  const { seo, brand } = CONTENT;
-  return {
-    title: seo.title,
-    description: seo.description,
-    alternates: { canonical: seo.canonical },
-    robots: { index: true, follow: true },
-    openGraph: {
-      title: seo.title,
-      description: seo.description,
-      url: seo.canonical,
-      siteName: brand.name,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: seo.title,
-      description: seo.description,
-    },
-  };
+  // Home's metadata, computed at export with every other page's (lib/pageSeo.ts writes
+  // src/data/seo-pages.ts), so one rule sets every title, description and canonical (SEO plan
+  // D7, D9). Falls back to CONTENT.seo before an export has written seo-pages.ts.
+  return pageMetadata('');
 }
 
 // No default export by design.

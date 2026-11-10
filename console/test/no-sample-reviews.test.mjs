@@ -63,13 +63,15 @@ test('content with no testimonials passes through untouched', () => {
 
 test('the export strips sample reviews before it writes site.ts, on every branch', () => {
   // Both writeSiteContent calls (Studio content, direct vertical-preset call) go through it.
+  // Each branch builds `shipped` through the strip (and, since the SEO check, scores it), then
+  // writes exactly that object: two writeSiteContent calls and the copySiteData seed branch.
   const s = src('app/api/build/export/route.ts');
   const writes = s.match(/writeSiteContent\(/g) ?? [];
-  const guarded = s.match(/writeSiteContent\([\s\S]{0,200}?withoutSampleReviews\(/g) ?? [];
+  const built = s.match(/const shipped = withoutSampleReviews\(/g) ?? [];
   assert.ok(writes.length >= 2, 'expected the two writeSiteContent calls');
-  assert.equal(guarded.length, writes.length, 'a writeSiteContent call skips the sample-review strip');
-  // The third branch seeds from the default CONTENT through copySiteData's transform.
-  assert.match(s, /copySiteData\([^;]*withoutSampleReviews\(/, 'the copySiteData branch skips the sample-review strip');
+  assert.equal(built.length, 3, 'every branch must build its content through withoutSampleReviews');
+  assert.equal((s.match(/writeSiteContent\(repoRoot, slug, shipped\)/g) ?? []).length, writes.length, 'a writeSiteContent call writes something other than the stripped content');
+  assert.match(s, /copySiteData\(repoRoot, slug, \(\) => shipped\)/, 'the copySiteData branch skips the sample-review strip');
 });
 
 test("the Studio's effective content drops sample reviews, so the preview matches the export", () => {

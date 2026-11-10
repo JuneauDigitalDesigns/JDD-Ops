@@ -66,13 +66,13 @@ function walkStrings(v: unknown, path: string, out: Array<[string, string]>): vo
   }
 }
 
-function getPath(o: unknown, path: string): unknown {
+export function getPath(o: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((cur, seg) => (cur == null ? undefined : (cur as Json)[seg]), o);
 }
 
 /** Everything the client told us, as one searchable text: brand facts, extensions, the brief's
  *  own words, stats, and the per-service facts. Never the generated copy itself. */
-function factsText(content: unknown): string {
+export function factsText(content: unknown): string {
   const c = obj(content);
   const brand = obj(c.brand);
   const meta = obj(c._meta);
@@ -115,4 +115,13 @@ export function copyRisks(content: unknown, preset: unknown): CopyRisks {
     }
   }
   return { presetCopy, unsupportedClaims };
+}
+
+/** Every visible copy string, as [path, text], under the same roots and skips copyRisks scans.
+ *  scorePage scans exactly these, so the two checks can never disagree about what is "copy". */
+export function visibleCopy(content: unknown): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  const c = obj(content);
+  for (const root of COPY_ROOTS) walkStrings(c[root], root, out);
+  return out;
 }

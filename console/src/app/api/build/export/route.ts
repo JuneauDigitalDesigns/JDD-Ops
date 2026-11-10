@@ -7,6 +7,7 @@ import {
   readRepoSiteContent,
   writeOnboardRoutes,
   writeSiteContent,
+  writePageSeo,
   isValidSlug,
   placeComponents,
   repoDirFor,
@@ -35,7 +36,9 @@ import { loadSiteLayout } from '@/lib/siteLayout';
 import { findMissingLocalImages } from '@/lib/imageRefs';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
 import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
-import type { SiteContent } from '@/data/site';
+import { CONTENT as SEED_CONTENT, type SiteContent } from '@/data/site';
+import { buildPageSeo, businessNode, type PageSeo, type SeoPageRef } from '@/lib/pageSeo';
+import { scoreSite } from '@/lib/scorePage';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import { materializeImages } from '@/lib/image-pipeline';
 import { presetFor, type VerticalId } from '@/lib/verticals';
@@ -316,6 +319,32 @@ export async function POST(req: Request) {
           return cleaned;
         };
 
+        /** SEO plan D13: score the content this export is about to ship, and refuse on any hard
+         *  failure (dashes, numbers that aren't in the client's facts, duplicate titles, a wrong
+         *  canonical, "near me", a service page that doesn't earn its page). Findings are reported,
+         *  never refused, and preset copy and unsupported claims stay warnings (D2). On a pass it
+         *  keeps the per-page SEO for writePageSeo, so the scored titles are the shipped titles. */
+        const seoPages: SeoPageRef[] = composition
+          ? composition.pages.map((p) => ({ route: p.route, pageType: p.pageType, label: p.label, sections: p.sections }))
+          : [{ route: '', pageType: 'home', label: 'Home', sections: entries.map((e) => ({ categoryId: e.categoryId })) }];
+        let shippedSeo: { pages: Record<string, PageSeo>; business: Record<string, unknown> } | null = null;
+        const passesSeo = (c: SiteContent): boolean => {
+          const pages = buildPageSeo(c, seoPages, vertical);
+          const score = scoreSite(c, seoPages, pages, { preset: vertical ? presetFor(vertical) : {} });
+          if (score.soft.length) step(`SEO check: ${score.soft.length} finding(s) to look at, none blocking. First: ${score.soft[0]}`);
+          if (!score.ok) {
+            send({
+              type: 'error',
+              message: `This export would ship ${score.hard.length} SEO problem(s) that block a release. Nothing was committed or pushed.`,
+              detail: score.hard.join('\n'),
+              next: 'Fix each field listed in the Studio (or regenerate that section), then export again.',
+            });
+            return false;
+          }
+          shippedSeo = { pages, business: businessNode(c, vertical) };
+          return true;
+        };
+
         // 1. Copy (or reuse) the template repo. A confirmed update refreshes the template-owned
         //    files too: the new @jdd/ui is only half an update while src/lib is the old shims.
         const existed = repoExists(repoRoot, slug);
@@ -431,11 +460,9 @@ export async function POST(req: Request) {
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
-          writeSiteContent(
-            repoRoot,
-            slug,
-            withoutSampleReviews(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step)))),
-          );
+          const shipped = withoutSampleReviews(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))));
+          if (!passesSeo(shipped)) return;
+          writeSiteContent(repoRoot, slug, shipped);
         } else if (vertical) {
           /**
            * `presetFor`, NOT the raw `VERTICAL_PRESETS[vertical]`.
@@ -452,16 +479,16 @@ export async function POST(req: Request) {
            * `content` — so no shipped client site carried this. It is reachable by any direct
            * API call, which is exactly how the vertical-templates-v1 R6 acceptances drove it.
            */
-          writeSiteContent(
-            repoRoot,
-            slug,
-            withoutSampleReviews(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step)))),
-          );
+          const shipped = withoutSampleReviews(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step))));
+          if (!passesSeo(shipped)) return;
+          writeSiteContent(repoRoot, slug, shipped);
         } else {
           // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
           // other two branches — a preset's placeholder phone would otherwise overwrite a
           // provisioned one just as readily as an edited payload's.
-          copySiteData(repoRoot, slug, (c) => withoutSampleReviews(preserveProvisioned(c)));
+          const shipped = withoutSampleReviews(preserveProvisioned(SEED_CONTENT));
+          if (!passesSeo(shipped)) return;
+          copySiteData(repoRoot, slug, () => shipped);
         }
 
         // 2. Place each selected component.
@@ -537,6 +564,13 @@ export async function POST(req: Request) {
         } else {
           step('Wiring the components into the homepage and setting up imports…');
           wirePage(repoRoot, slug, entries);
+        }
+        // 3b. Every page's title, description, canonical, OG and own JSON-LD, the business node,
+        //     and the sitemap (SEO plan D7, D9, D10): exactly what passesSeo scored.
+        if (shippedSeo) {
+          const { pages, business } = shippedSeo as { pages: Record<string, PageSeo>; business: Record<string, unknown> };
+          step(`Writing titles, canonicals and structured data for ${Object.keys(pages).length} page(s), and the sitemap…`);
+          writePageSeo(repoRoot, slug, pages, business);
         }
 
         // 4. Install dependencies (already done by the confirmed @jdd/ui install, when there was one).
