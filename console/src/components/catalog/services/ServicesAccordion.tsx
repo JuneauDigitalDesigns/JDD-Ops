@@ -82,7 +82,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                         )}
                         <p><E p={`services.items.${i}.d`}>{item.d}</E></p>
                         <a href="#contact" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent">
-                          Get a free quote
+                          Request a quote
                           <ArrowRight size={13} />
                         </a>
                       </div>

@@ -68,7 +68,7 @@ export default function ServiceArea({
           </h2>
           <span className="accent-bar mt-4" aria-hidden="true" />
           <p className={`mt-4 max-w-[42ch] text-[16px] leading-relaxed ${s.body}`}>
-            Not on the list? Call and ask, we travel for bigger jobs.
+            Not on the list? Call and ask.
           </p>
           <a
             href={brand.phoneHref}

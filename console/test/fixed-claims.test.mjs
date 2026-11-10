@@ -57,24 +57,11 @@ export function fixedCopyClaims() {
   return out.filter((c) => (seen.has(`${c.file}|${c.text}`) ? false : seen.add(`${c.file}|${c.text}`)));
 }
 
-/** Found 2026-11-10, awaiting Xander's approval of their rewording (wording file section D).
- *  Key: "file|text". Remove an entry when its fix lands; never add one without his approval. */
+/** Claims awaiting Xander's approval of a rewording. Key: "file|text". Never add one without his
+ *  approval; remove it when its fix lands. */
 export const PENDING = new Set([
-  'contact/ContactCardOverlap.tsx|Get a free estimate',
-  "finalCta/LawnFinalCta.tsx|We'll call with a flat quote. Usually same day.",
-  'finalCta/RoofingFinalCta.tsx|Book my free inspection',
-  "hero/LawnHero.tsx|We'll call with a flat quote. Usually same day.",
-  'hero/PlumbingHero.tsx|Taking calls now · same-day slots available',
-  'hero/RoofingHero.tsx|Licensed · Bonded · GAF Certified',
-  'hero/RoofingHero.tsx|Get a free inspection',
-  'nav/NavEmergencyBar.tsx|24/7 emergency service. We answer day or night.',
-  'nav/RoofingNav.tsx|Free inspection',
-  'services/ServicesAccordion.tsx|Get a free quote',
-  'trust/DetailTrust.tsx|No mobile fee inside the ring. Beyond it, call. For coating and correction work we travel further.',
-  'trust/HvacServiceArea.tsx|Not on the list? Call and ask. We travel for bigger jobs across the region.',
-  "trust/LawnTrust.tsx|We route by neighbourhood, so your crew is already nearby. That's how the same day every week actually holds.",
-  'trust/RoofingTrust.tsx|Outside the list? Call anyway. We travel for full replacements and commercial work.',
-  'trust/ServiceArea.tsx|Not on the list? Call and ask, we travel for bigger jobs.',
+  // Empty since Xander approved all 15 rewrites (2026-11-10, section D). Keep it empty: a new
+  // hard-coded claim is reworded to promise nothing, or wired to the client's fact.
 ]);
 
 /** Claims that render ONLY when the client's own fact supports them. Each entry names the fact. */
@@ -101,4 +88,19 @@ test('the scanner sees claims across multi-line JSX text and HTML entities', () 
   assert.deepEqual(claimsIn(decode('so your crew is already nearby. That&rsquo;s how the same day'.replace(/\s+/g, ' '))).sort(), ['response time', 'same day']);
   assert.deepEqual(claimsIn('We travel for bigger jobs across the region.'), ['travel']);
   assert.deepEqual(claimsIn('No mobile fee inside the ring.'), ['no fee']);
+});
+
+// Rows 1 and 3 are wired to the client's facts. Checked as source: both components import
+// @/data/site, whose @jdd/schema values the tsx test loader can't resolve yet.
+test("row 1: the Roofing hero kicker states only the client's own license and badges", () => {
+  const s = readFileSync(join(CATALOG, 'hero/RoofingHero.tsx'), 'utf8');
+  assert.ok(!stripComments(s).includes('Licensed · Bonded · GAF Certified'), 'the fixed kicker is back');
+  assert.ok(s.includes("[brand.license?.trim() ? 'Licensed' : '', ...(extensions?.trustBadges ?? [])]"), 'the kicker is not built from the facts');
+  assert.ok(s.includes('{kicker.length > 0 && ('), 'the kicker must hide without facts');
+});
+
+test("row 3: the emergency bar shows only the client's announcement, hidden without one", () => {
+  const s = readFileSync(join(CATALOG, 'nav/NavEmergencyBar.tsx'), 'utf8');
+  assert.ok(!stripComments(s).includes('24/7 emergency service'), 'the 24/7 fallback is back');
+  assert.ok(s.includes('{msg && ('), 'the bar must hide without an announcement');
 });
