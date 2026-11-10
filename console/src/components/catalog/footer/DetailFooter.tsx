@@ -1,10 +1,13 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// DetailFooter — near-black footer, mirrored 1:1 (#detail footer.ftr). Same structure as
-// HvacFooter (brand column + client link columns + derived contact column + legal bar); the
-// ground is the mockup's own `--near-black` (#08090C), one step darker than the page's own
-// `--bg` (#0D0E12) — not the same literal value, so it stays a hardcoded hex rather than the
-// bg-bg token. Fixed design, no skin.
+// DetailFooter — near-black footer, premium pass (2026-11-09, approved mockup). Same structure as
+// HvacFooter (brand column + client link columns + derived contact column + legal bar) on the
+// ink-panel, one step darker than the page's own bg: champagne mark, blurb, gold-bordered trust
+// badge chips, muted uppercase column heads, links that brighten on hover, accent contact icons.
+// Reads brand.* + footer.* + extensions.trustBadges.
+//
+// Every colour is a palette token (ink-panel, on-ink, on-ink-soft, rule-ink, accent); the mark
+// is the accent pulled toward black and the badge border is the accent at 30%.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Phone, EnvelopeSimple, MapPin } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
@@ -14,38 +17,44 @@ export const meta = {
   id: 'detail-footer',
   category: 'footer',
   label: 'Car Detailing / Footer',
-  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges'],
+  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'brand.license', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges'],
   sharedDeps: ['@phosphor-icons/react', '@/lib/editable'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
 
+const GOLD_MARK = 'linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent) 65%, black))';
+
 export default function DetailFooter({ content = CONTENT }: { content?: SiteContent }) {
   const { footer, brand, extensions } = content;
   const badges = extensions.trustBadges ?? [];
-  const col = 'block py-[5px] text-[14.5px] text-[#AEB7C4] transition-colors hover:text-[#fff]';
+  const col = 'block py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk';
+  const head = 'mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-[color:color-mix(in_srgb,var(--on-ink-soft)_80%,transparent)]';
 
   return (
-    <footer className="pb-8 pt-16" style={{ background: '#08090C', color: '#6C7686', borderTop: '1px solid #1B1E26' }}>
-      <div className="mx-auto max-w-[1180px] px-6">
+    <footer className="bg-inkPanel pb-8 pt-16 text-onInkSoft">
+      <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1.1fr]">
-          <div>
-            <a href="/" className="flex items-center gap-[11px] text-[#fff]">
+          <div className="md:col-span-2 lg:col-span-1">
+            <a href="/" className="flex items-center gap-[11px] text-onInk">
               <span
-                className="grid h-9 w-9 place-items-center rounded-[8px] text-[#0D0E12] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-                style={{ background: 'linear-gradient(145deg,#C9A14B,#8A6A26)' }}
+                className="h-9 w-9 shrink-0 rounded-[8px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+                style={{ background: GOLD_MARK }}
                 aria-hidden="true"
               />
               <span className="font-heading text-[22px] font-extrabold leading-none tracking-[-0.016em]">
                 <E p="brand.name">{brand.name}</E>
-                {brand.tagline && <small className="mt-0.5 block font-sans text-[11px] font-medium text-[#6C7686]"><E p="brand.tagline">{brand.tagline}</E></small>}
+                {brand.tagline && <small className="mt-1 block font-sans text-[11px] font-medium tracking-[0.04em] text-onInkSoft"><E p="brand.tagline">{brand.tagline}</E></small>}
               </span>
             </a>
             <p className="mt-4 max-w-[34ch] text-[14.5px] leading-[1.6]"><E p="footer.blurb">{footer.blurb}</E></p>
             {badges.length > 0 && (
               <div className="mt-[18px] flex flex-wrap gap-2">
                 {badges.map((b, i) => (
-                  <span key={b} className="rounded-[4px] px-[11px] py-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-accent" style={{ border: '1px solid rgba(201,161,75,0.3)' }}>
+                  <span
+                    key={b}
+                    className="rounded-[4px] border border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)] px-[11px] py-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-accent"
+                  >
                     <E p={`extensions.trustBadges.${i}`}>{b}</E>
                   </span>
                 ))}
@@ -55,28 +64,28 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
 
           {footer.cols.map((c, ci) => (
             <div key={c.h || ci}>
-              <h4 className="mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-accent"><E p={`footer.cols.${ci}.h`}>{c.h}</E></h4>
+              <h4 className={head}><E p={`footer.cols.${ci}.h`}>{c.h}</E></h4>
               {c.links.map((l, li) => (
                 <a key={l.href + li} href={l.href} className={col}><E p={`footer.cols.${ci}.links.${li}.label`}>{l.label}</E></a>
               ))}
             </div>
           ))}
 
-          <div>
-            <h4 className="mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-accent">Contact</h4>
-            <a href={brand.phoneHref} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-[#AEB7C4] hover:text-[#fff]">
+          <div className="min-w-0">
+            <h4 className={head}>Contact</h4>
+            <a href={brand.phoneHref} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk">
               <Phone size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.phone">{brand.phone}</E>
             </a>
-            <a href={`mailto:${brand.email}`} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-[#AEB7C4] hover:text-[#fff]">
-              <EnvelopeSimple size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
+            <a href={`mailto:${brand.email}`} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft transition-colors [overflow-wrap:anywhere] hover:text-onInk">
+              <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
             </a>
-            <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-[#AEB7C4]">
+            <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
               <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.address">{brand.address}</E>
             </span>
           </div>
         </div>
 
-        <div className="mt-11 flex flex-wrap justify-between gap-4 pt-[22px] text-[13px]" style={{ borderTop: '1px solid #1B1E26' }}>
+        <div className="mt-11 flex flex-wrap justify-between gap-4 border-t border-ruleInk pt-[22px] text-[13px]">
           <span><E p="footer.legal">{footer.legal}</E></span>
           {brand.license && <span>Licensed &amp; insured · {brand.license}</span>}
         </div>
