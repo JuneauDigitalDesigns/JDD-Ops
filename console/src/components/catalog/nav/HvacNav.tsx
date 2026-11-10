@@ -71,14 +71,14 @@ export default function HvacNav({
           <span className="min-w-0 font-heading text-[18px] font-semibold leading-none tracking-[-0.01em] text-ink md:text-[22px]">
             <E p="brand.name">{brand.name}</E>
             {brand.tagline && (
-              <small className="mt-0.5 hidden font-sans text-[11px] font-medium tracking-[0.04em] text-inkSoft md:block">
+              <small className="mt-0.5 hidden font-sans text-[11px] font-medium tracking-[0.04em] text-inkSoft lg:block">
                 <E p="brand.tagline">{brand.tagline}</E>
               </small>
             )}
           </span>
         </a>
 
-        <div className="ml-2 hidden items-center gap-1 md:flex">
+        <div className="ml-2 hidden items-center gap-1 lg:flex">
           {nav.map((item, i) => {
             const link = (
               <a
@@ -126,14 +126,14 @@ export default function HvacNav({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2.5 sm:gap-[18px]">
-          <a href={brand.phoneHref} className="hidden items-center gap-2 font-heading text-[19px] font-semibold text-ink md:flex">
+          <a href={brand.phoneHref} className="hidden items-center gap-2 font-heading text-[19px] font-semibold text-ink lg:flex">
             <Phone size={18} weight="fill" className="text-accent" aria-hidden="true" />
             <E p="brand.phone">{brand.phone}</E>
           </a>
           <a
             href={brand.phoneHref}
             aria-label={`Call ${brand.phone}`}
-            className="grid h-[42px] w-[42px] place-items-center rounded-[10px] border border-rule text-accent md:hidden"
+            className="grid h-[42px] w-[42px] place-items-center rounded-[10px] border border-rule text-accent lg:hidden"
           >
             <Phone size={18} weight="fill" aria-hidden="true" />
           </a>
@@ -147,7 +147,7 @@ export default function HvacNav({
           <button
             {...mm.button}
             aria-label={mm.open ? 'Close menu' : 'Open menu'}
-            className={`grid h-[42px] w-[42px] place-items-center rounded-[10px] text-ink md:hidden ${focusRing}`}
+            className={`grid h-[42px] w-[42px] place-items-center rounded-[10px] text-ink lg:hidden ${focusRing}`}
           >
             {mm.open ? <X size={20} weight="bold" aria-hidden="true" /> : <List size={20} weight="bold" aria-hidden="true" />}
           </button>
@@ -157,7 +157,7 @@ export default function HvacNav({
       {/* Phone menu: the same links, in the server HTML, shown when the menu button opens it. */}
       <div
         {...mm.panel}
-        className="shadow-brand-3 absolute inset-x-0 top-full max-h-[calc(100vh-80px)] overflow-auto border-b border-rule bg-bg px-5 pb-[22px] pt-2 md:hidden"
+        className="shadow-brand-3 absolute inset-x-0 top-full max-h-[calc(100vh-80px)] overflow-auto border-b border-rule bg-bg px-5 pb-[22px] pt-2 lg:hidden"
       >
         <ul>
           {nav.map((item, i) => (
