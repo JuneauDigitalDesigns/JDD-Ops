@@ -34,6 +34,7 @@ export const SELF_ANIMATED: ReadonlySet<string> = new Set([
   // whole page-tall body would leave it half-faded while it is read.
   'HvacServiceDetail',
   'LawnServiceDetail',
+  'PlumbingServiceDetail',
   'RoofingServiceDetail',
   'NavMinimal',
   'RecentJobsGrid',
