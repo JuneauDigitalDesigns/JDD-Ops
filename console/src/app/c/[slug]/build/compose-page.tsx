@@ -19,6 +19,9 @@ import HvacNav from '@/components/catalog/nav/HvacNav';
 import HvacServiceHeader from '@/components/catalog/pageHeader/HvacServiceHeader';
 import HvacServiceDetail from '@/components/catalog/services/HvacServiceDetail';
 import HvacFinalCta from '@/components/catalog/finalCta/HvacFinalCta';
+import DetailServiceHeader from '@/components/catalog/pageHeader/DetailServiceHeader';
+import DetailServiceDetail from '@/components/catalog/services/DetailServiceDetail';
+import DetailFinalCta from '@/components/catalog/finalCta/DetailFinalCta';
 import LawnServiceHeader from '@/components/catalog/pageHeader/LawnServiceHeader';
 import LawnServiceDetail from '@/components/catalog/services/LawnServiceDetail';
 import LawnFinalCta from '@/components/catalog/finalCta/LawnFinalCta';
@@ -40,6 +43,9 @@ const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: st
   HvacServiceHeader: (p) => <HvacServiceHeader {...p} />,
   HvacServiceDetail: (p) => <HvacServiceDetail {...p} />,
   HvacFinalCta: (p) => <HvacFinalCta {...p} />,
+  DetailServiceHeader: (p) => <DetailServiceHeader {...p} />,
+  DetailServiceDetail: (p) => <DetailServiceDetail {...p} />,
+  DetailFinalCta: (p) => <DetailFinalCta {...p} />,
   LawnServiceHeader: (p) => <LawnServiceHeader {...p} />,
   LawnServiceDetail: (p) => <LawnServiceDetail {...p} />,
   LawnFinalCta: (p) => <LawnFinalCta {...p} />,
