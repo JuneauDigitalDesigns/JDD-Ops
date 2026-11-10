@@ -8,26 +8,34 @@
 // hairline. A card whose image slot is empty falls back to the icon-only card (tile in the body).
 // Cards lift on hover and arrive one after another (rv-stagger). Photos route through imageAt().
 // Every colour is a palette token. Content schema-driven. Fixed design, no skin.
+//
+// Service pages (Xander 2026-11-10): a service with its own page is a link to it (the whole card),
+// with "Details" and an arrow in the tag row; a section-only service is a plain card, linked from
+// nowhere. Every card carries id="<slug>". Edit paths use the ORIGINAL services.items index, so a
+// blank item ahead of a filled one can't send an edit to the wrong service (the old filtered index
+// could).
 // ─────────────────────────────────────────────────────────────────────────────
+import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { imageAt } from '@/lib/localImage';
+import { serviceRefs } from '@/lib/serviceLinks';
 
 export const meta = {
   id: 'lawn-services',
   category: 'services',
   label: 'Lawn / Photo-band services',
-  consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['@/lib/editable', '@/lib/icons', '@/lib/localImage'],
+  consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items', 'servicePages'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/localImage', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
 
 export default function LawnServices({ content = CONTENT }: { content?: SiteContent }) {
   const { services } = content;
-  const items = services.items.filter((it) => it.t?.trim());
-  if (!items.length) return null;
+  const refs = serviceRefs(content);
+  if (!refs.length) return null;
 
   return (
     <section className="bg-bg py-16 lg:py-24">
@@ -48,8 +56,11 @@ export default function LawnServices({ content = CONTENT }: { content?: SiteCont
         </div>
 
         <div className="rv-stagger mt-8 grid gap-4 sm:grid-cols-2 lg:mt-11 lg:grid-cols-3 lg:gap-[22px]">
-          {items.map((item, i) => {
+          {refs.map((ref) => {
+            const i = ref.index;
+            const item = services.items[i];
             const photo = item.image?.url;
+            const Card = ref.href ? 'a' : 'div';
             const tile = (
               <span
                 className={`grid h-14 w-14 place-items-center rounded-[15px] border border-rule text-accent transition-colors duration-300 group-hover:border-accent group-hover:bg-accent group-hover:text-accentFg ${
@@ -61,8 +72,10 @@ export default function LawnServices({ content = CONTENT }: { content?: SiteCont
               </span>
             );
             return (
-              <div
-                key={item.n ?? i}
+              <Card
+                key={ref.slug}
+                id={ref.slug}
+                {...(ref.href ? { href: ref.href } : {})}
                 className="group hover-lift shadow-brand-1 flex flex-col overflow-hidden rounded-[22px] border border-rule bg-bg hover:shadow-brand-3"
               >
                 {photo && (
@@ -86,15 +99,21 @@ export default function LawnServices({ content = CONTENT }: { content?: SiteCont
                       <E p={`services.items.${i}.d`}>{item.d}</E>
                     </p>
                   )}
-                  {item.tag && (
+                  {(item.tag || ref.href) && (
                     <div className="mt-auto pt-[18px]">
-                      <div className="border-t border-rule pt-[18px] text-[13px] font-bold uppercase tracking-[0.04em] text-accent">
-                        <E p={`services.items.${i}.tag`}>{item.tag}</E>
+                      <div className="flex items-center gap-2 border-t border-rule pt-[18px] text-[13px] font-bold uppercase tracking-[0.04em] text-accent">
+                        {item.tag && <E p={`services.items.${i}.tag`}>{item.tag}</E>}
+                        {ref.href && (
+                          <span className="ml-auto flex items-center gap-1.5 text-[14px] normal-case tracking-normal">
+                            Details
+                            <ArrowRight size={16} weight="bold" aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-[3px]" />
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
