@@ -28,7 +28,10 @@ export default function NavEmergencyBar({
 }) {
   const s = skinClasses(skin);
   const { brand, announcement, nav } = content;
-  const msg = announcement ?? '24/7 emergency service. We answer day or night.';
+  // The bar carries only the client's own announcement, and is hidden without one (Xander
+  // 2026-11-10, wording file section D row 3). It used to fall back to "24/7 emergency service.
+  // We answer day or night." on every client, whatever their hours.
+  const msg = announcement?.trim() ?? '';
   // Render the page links whenever this is a multi-page site (more than the lone home link that
   // navLinksFor emits for a single-page composition). This is what lets a 4+ page client reach
   // Services/About/Contact from the Emergency-bar nav; a single-page site keeps the lean
@@ -42,12 +45,14 @@ export default function NavEmergencyBar({
   const ctaHref = multiPage ? (nav.find((n) => n.href === '/contact')?.href ?? '/') : '#cta';
   return (
     <header>
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-accent px-6 py-2.5 text-center text-sm font-medium text-accentFg">
-        <span className="inline-flex items-center gap-1.5"><Warning size={16} weight="fill" /><E p="announcement">{msg}</E></span>
-        <a href={brand.phoneHref} className="inline-flex items-center gap-1.5 rounded-full bg-bg/15 px-3 py-0.5 hover:bg-bg/25">
-          <Phone size={14} weight="fill" /><E p="brand.phone">{brand.phone}</E>
-        </a>
-      </div>
+      {msg && (
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-accent px-6 py-2.5 text-center text-sm font-medium text-accentFg">
+          <span className="inline-flex items-center gap-1.5"><Warning size={16} weight="fill" /><E p="announcement">{msg}</E></span>
+          <a href={brand.phoneHref} className="inline-flex items-center gap-1.5 rounded-full bg-bg/15 px-3 py-0.5 hover:bg-bg/25">
+            <Phone size={14} weight="fill" /><E p="brand.phone">{brand.phone}</E>
+          </a>
+        </div>
+      )}
       <nav className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b ${s.rule} ${s.section} px-6 py-4`} aria-label="Main navigation">
         <span className={`font-heading text-lg font-bold ${s.heading}`}><E p="brand.name">{brand.name}</E></span>
         {showLinks && (

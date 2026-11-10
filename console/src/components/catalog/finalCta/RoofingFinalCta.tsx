@@ -96,7 +96,7 @@ export default function RoofingFinalCta({
           surface="dark"
           layout="row"
           className="mt-[34px] max-w-[780px]"
-          submitLabel="Book my free inspection"
+          submitLabel="Book my inspection"
           {...(service ? { withMessage: true, initialMessage: serviceMessage(service) } : {})}
         />
 

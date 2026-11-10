@@ -110,3 +110,28 @@ test('primaryCity: the address locality, then the first service area town, then 
   assert.equal(primaryCity(c('123 Main St', ['Groveland'])), 'Groveland', 'a street alone is not a city');
   assert.equal(primaryCity(c('')), '');
 });
+
+test('the console holds no copy of the rule: servicePages.ts only re-exports @jdd/schema', async () => {
+  // Xander, 2026-11-10: the rule lives in exactly one place. @jdd/schema v1.32.2 added a "default"
+  // export condition, so this re-export now loads under the test runner too.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/lib/servicePages.ts', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.ok(!/\bfunction\b|=>|\bconst\b/.test(src), 'servicePages.ts defines logic of its own');
+  assert.match(src, /from '@jdd\/schema'/);
+  const schema = await import('@jdd/schema');
+  const local = await import('../src/lib/servicePages.ts');
+  // tsx loads the shim through the CommonJS path, a separate module instance from this ESM
+  // import, so compare what the functions DO on the same content rather than their identity.
+  const c = site([
+    { t: 'Drain Cleaning & Repair', typicalJobs: ['x', 'y'], priceFrom: '$9' },
+    { t: 'Gas Lines' },
+    { t: 'Drain Cleaning & Repair', included: ['a', 'b', 'c'], areas: ['Clermont'] },
+  ]);
+  c.brand = { address: '12 Main St, Clermont, FL 34711' };
+  assert.deepEqual(local.serviceSlugs(c), schema.serviceSlugs(c));
+  assert.deepEqual(local.pickServicePages(c, 10), schema.pickServicePages(c, 10));
+  assert.deepEqual([0, 1, 2].map((i) => local.servicePageFacts(c, i)), [0, 1, 2].map((i) => schema.servicePageFacts(c, i)));
+  assert.equal(local.primaryCity(c), schema.primaryCity(c));
+  assert.equal(local.FACTS_MIN, schema.FACTS_MIN);
+});

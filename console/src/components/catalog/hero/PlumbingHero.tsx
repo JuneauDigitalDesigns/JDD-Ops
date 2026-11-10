@@ -72,7 +72,7 @@ export default function PlumbingHero({ content = CONTENT }: { content?: SiteCont
               style={{ boxShadow: '0 0 0 4px color-mix(in srgb, var(--live) 22%, transparent)' }}
               aria-hidden="true"
             />
-            Taking calls now · same-day slots available
+            Taking calls now
           </span>
 
           <h1 className="mt-[22px] font-heading text-[40px] font-extrabold leading-none tracking-[-0.02em] text-onInk sm:text-[clamp(42px,5.2vw,64px)]">

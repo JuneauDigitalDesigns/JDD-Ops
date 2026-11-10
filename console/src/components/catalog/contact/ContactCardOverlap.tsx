@@ -92,7 +92,7 @@ export default function ContactCardOverlap({
                 accessible name) and a "Something went wrong." with no recovery route.
                 <LeadForm> owns labels, validation, aria-invalid, the sent state and an error
                 that points at the phone number. */}
-            <h3 className={`font-heading text-xl font-bold ${s.heading}`}>Get a free estimate</h3>
+            <h3 className={`font-heading text-xl font-bold ${s.heading}`}>Request a quote</h3>
             <LeadForm
               mode={mode}
               className="mt-5"
