@@ -16,10 +16,22 @@ import { defaultSkin } from '@/lib/skins';
 import PageHeaderSimple from '@/components/catalog/pageHeader/PageHeaderSimple';
 import HvacPageHeader from '@/components/catalog/pageHeader/HvacPageHeader';
 import HvacNav from '@/components/catalog/nav/HvacNav';
+import HvacServiceHeader from '@/components/catalog/pageHeader/HvacServiceHeader';
+import HvacServiceDetail from '@/components/catalog/services/HvacServiceDetail';
+import HvacFinalCta from '@/components/catalog/finalCta/HvacFinalCta';
+import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
 import type { CategoryEntry } from './categories';
 import { navHref, type PageInstance, type SectionRef, type SiteComposition } from '@/lib/pages';
 
 export type ComposedNode = { key: string; node: ReactNode };
+
+/** The sections that take `serviceSlug` on a per-service page, by name. Kept in step with
+ *  SERVICE_PAGE_SECTIONS (lib/servicePageSections.ts), which the export uses for the same job. */
+const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: string }) => ReactNode> = {
+  HvacServiceHeader: (p) => <HvacServiceHeader {...p} />,
+  HvacServiceDetail: (p) => <HvacServiceDetail {...p} />,
+  HvacFinalCta: (p) => <HvacFinalCta {...p} />,
+};
 
 /** A neutral header used when a subpage has no generated header copy yet. */
 function placeholderHeader(label: string): PageHeaderContent {
@@ -39,6 +51,11 @@ export function renderSection(
 ): ReactNode {
   if (ref.name === 'HvacNav') {
     return <HvacNav content={effective} currentPath={navHref(page.route)} />;
+  }
+  // A per-service page: its service sections render that one service (the export passes the same
+  // slug), so the Studio previews exactly the page that ships.
+  if (page.pageType === 'service' && SERVICE_PAGE_SECTIONS.has(ref.name) && SERVICE_RENDER[ref.name]) {
+    return SERVICE_RENDER[ref.name]({ content: effective, serviceSlug: page.route.slice('services/'.length) });
   }
   if (ref.categoryId === 'pageHeader') {
     const data = effective.subpages?.[page.route]?.header ?? placeholderHeader(page.label);
