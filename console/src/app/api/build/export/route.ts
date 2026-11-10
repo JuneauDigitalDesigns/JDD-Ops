@@ -45,6 +45,7 @@ import { loadGithubToken } from '@/lib/opsSecrets';
 import { deleteDraft } from '@/lib/draft';
 import { lockedReason } from '@/lib/onboardingGate';
 import { loadProvisionedFields } from '@/lib/provisionedFields';
+import { stripSampleReviews } from '@/lib/sampleReviews';
 
 /** npm install and next build are both legitimately slow; past this they are stuck, not slow. */
 const NPM_TIMEOUT_MS = 10 * 60_000;
@@ -304,6 +305,17 @@ export async function POST(req: Request) {
           return merged;
         };
 
+        /** Drop any sample review an old preset baked into this client's content. Every write of
+         *  site.ts goes through this: it is the gate a direct API call cannot skip, where the
+         *  Studio's own strip (BuildWizard's effective) only covers what the Studio sends. */
+        const withoutSampleReviews = (c: SiteContent): SiteContent => {
+          const { content: cleaned, removed } = stripSampleReviews(c);
+          if (removed > 0) {
+            step(`Removed ${removed} sample review${removed === 1 ? '' : 's'} left over from an old industry preset. Real reviews are kept.`);
+          }
+          return cleaned;
+        };
+
         // 1. Copy (or reuse) the template repo. A confirmed update refreshes the template-owned
         //    files too: the new @jdd/ui is only half an update while src/lib is the old shims.
         const existed = repoExists(repoRoot, slug);
@@ -422,7 +434,7 @@ export async function POST(req: Request) {
           writeSiteContent(
             repoRoot,
             slug,
-            preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))),
+            withoutSampleReviews(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step)))),
           );
         } else if (vertical) {
           /**
@@ -443,13 +455,13 @@ export async function POST(req: Request) {
           writeSiteContent(
             repoRoot,
             slug,
-            preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step))),
+            withoutSampleReviews(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step)))),
           );
         } else {
           // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
           // other two branches — a preset's placeholder phone would otherwise overwrite a
           // provisioned one just as readily as an edited payload's.
-          copySiteData(repoRoot, slug, preserveProvisioned);
+          copySiteData(repoRoot, slug, (c) => withoutSampleReviews(preserveProvisioned(c)));
         }
 
         // 2. Place each selected component.

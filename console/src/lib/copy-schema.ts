@@ -44,10 +44,13 @@ export interface CopyResult {
     sub: string;
     projects?: { t: string; loc: string; yr: string; scope: string; size: string; caption: string }[];
   };
+  // The reviews section's heading only. NO items (operator decision, 2026-11-10): a review is a
+  // real customer's words, supplied by the client, never written by the copywriter. Removed from
+  // the output schema rather than ignored after the fact, as PLAN D4 did for about.stats, so the
+  // model is never offered the option. See test/no-generated-testimonials.test.mjs.
   testimonials: {
     eyebrow: string;
     title: string;
-    items: { q: string; a: string; r: string; company?: string; stars?: number }[];
   };
   faq: { eyebrow: string; title: string; sub: string; items: { q: string; a: string }[] };
   finalCta: { eyebrow: string; headline: string; headlineEmphasis?: string; sub: string; cta: string; secondary?: string; frictionReducers?: string[] };
@@ -135,10 +138,8 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
     },
     ['eyebrow', 'title', 'sub'],
   ),
-  testimonials: obj(
-    { eyebrow: str, title: str, items: arr(obj({ q: str, a: str, r: str, company: str, stars: num }, ['q', 'a', 'r'])) },
-    ['eyebrow', 'title', 'items'],
-  ),
+  // Heading only; items intentionally absent (see CopyResult.testimonials above).
+  testimonials: obj({ eyebrow: str, title: str }, ['eyebrow', 'title']),
   faq: obj(
     { eyebrow: str, title: str, sub: str, items: arr(obj({ q: str, a: str }, ['q', 'a'])) },
     ['eyebrow', 'title', 'sub', 'items'],
