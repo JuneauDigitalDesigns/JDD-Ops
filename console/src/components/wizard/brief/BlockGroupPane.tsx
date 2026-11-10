@@ -61,19 +61,39 @@ function BlockEditor({
 }
 
 export default function BlockGroupPane({
-  blockIds, blocks, content, setField, onUpdate,
+  blockIds, blocks, content, setField, onUpdate, columns = false, widths,
 }: {
   blockIds: CopyBriefBlockId[];
   blocks: ResolvedBlock[];
   content: SiteContent;
   setField: SetField;
   onUpdate: Update;
+  /** The intake boards (2026-11-10): blocks side by side, filling the height, each card
+   *  scrolling inside itself only if a window is too small. The page never scrolls. */
+  columns?: boolean;
+  /** CSS grid-template-columns for `columns` mode; equal columns when absent. */
+  widths?: string;
 }) {
   const present = blockIds
     .map((id) => blocks.find((b) => b.id === id))
     .filter((b): b is ResolvedBlock => Boolean(b));
 
   if (present.length === 0) return null;
+
+  if (columns) {
+    return (
+      <div
+        className="grid h-full min-h-0 gap-3.5"
+        style={{ gridTemplateColumns: widths ?? `repeat(${present.length}, minmax(0, 1fr))` }}
+      >
+        {present.map((block) => (
+          <div key={block.id} className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-uiCardRule bg-uiBg p-4">
+            <BlockEditor block={block} content={content} setField={setField} onUpdate={onUpdate} variant="card" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   // A block that has the screen to itself keeps the page-level heading; a group gets sub-cards.
   // Wrapping a lone block in a card would float one small bordered box in a wide empty screen.

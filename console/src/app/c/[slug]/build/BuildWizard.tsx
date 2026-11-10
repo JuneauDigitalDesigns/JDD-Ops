@@ -27,6 +27,7 @@ import { defaultCompositionFor } from './page-templates';
 import { applyVerticalTemplate } from './vertical-templates';
 import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
+import { landingStepId } from '@/lib/intake-steps';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
@@ -134,9 +135,9 @@ function freshBundle(seed: SiteContent | null): WizardBundle {
     selections: {},
     skins: {},
     order: [],
-    // 'intake' is step 1 — the client-intake review screen. migrateStepId maps the legacy
+    // 'business' is step 1 (lib/intake-steps.ts). migrateStepId maps the legacy
     // 'brief' here too, so either value is safe; this is the canonical new one.
-    intakeStage: 'intake',
+    intakeStage: 'business',
     brief: normalizeVerdicts((seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief()),
     copyModel: DEFAULT_MODEL_ID,
     // Seed from the vertical's whole-site template when one exists; else the generic 4-page site.
@@ -224,7 +225,7 @@ export default function BuildWizard({
   // separate details/scanUrl/source/genSections fields — they were lifted into the bundle in
   // the first place because the step tree unmounts on navigation, and `brief` inherits that
   // same reasoning: it has to survive the Intake step's own sub-stage navigation too.
-  const [intakeStage, setIntakeStage] = useState<IntakeStageId>('intake');
+  const [intakeStage, setIntakeStage] = useState<IntakeStageId>('business');
   const [brief, setBrief] = useState<CopyBrief>(emptyCopyBrief);
   const [copyModel, setCopyModel] = useState<string>(DEFAULT_MODEL_ID);
 
@@ -460,12 +461,16 @@ export default function BuildWizard({
     setSelections(b.selections ?? {});
     setSkins(b.skins ?? {});
     setOrder(b.order ?? []);
-    setIntakeStage(b.intakeStage ?? 'intake');
     // Falls back to the durably-saved brief (site.ts's _meta.copyBrief, P4 of the intake
     // rebuild) rather than an empty one — a bundle can be missing the key entirely (an old
     // save predating the Brief stage) or the client's localStorage can simply be gone, and
     // either way the brief the operator built last time should still be there.
-    setBrief(normalizeVerdicts(b.brief ?? (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief()));
+    const nextBrief = normalizeVerdicts(b.brief ?? (seed?._meta.copyBrief as CopyBrief | undefined) ?? emptyCopyBrief());
+    // Once the intake has run, opening it lands on Still to do (lib/intake-steps.ts). Decided
+    // here, at hydration: IntakeStep's own mount check runs before the bundle is applied on a
+    // fresh page load, so it alone would read the empty initial brief and miss lastRunAt.
+    setIntakeStage(landingStepId(b.intakeStage, nextBrief.lastRunAt));
+    setBrief(nextBrief);
     setCopyModel(b.copyModel ?? DEFAULT_MODEL_ID);
     // Prefer a saved composition; otherwise lift the legacy selections/order (existing clients),
     // otherwise the default 4-page site. ensureSectionIds backfills stable ids on any composition
@@ -870,6 +875,7 @@ export default function BuildWizard({
                   copyModel={copyModel}
                   onCopyModelChange={setCopyModel}
                   pages={intakePages}
+                  edits={edits}
                 />
               </div>
             )}
