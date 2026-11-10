@@ -9,11 +9,16 @@
 // literal hex: the ground is ink with a touch of accent, the text is bg, the sub and reducers are
 // bg eased toward ink, dark gold is the accent pulled toward black. The card is ink-panel with the
 // rule as its border, so a brand or per-section palette reaches the whole band.
+//
+// On a service page (Xander 2026-11-10) wirePages passes serviceSlug and the form opens with
+// "Service: {service}" in its message box. The band is id="cta", the target of the service page's
+// "Ask for a quote" button (as HvacFinalCta).
 // ─────────────────────────────────────────────────────────────────────────────
 import { CheckCircle } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
+import { serviceBySlug, serviceMessage } from '@/lib/serviceLinks';
 
 /** Dark gold: legible as text on the light band, where the champagne accent is not. */
 const DARK_GOLD = 'color-mix(in srgb, var(--accent) 65%, black)';
@@ -37,17 +42,27 @@ export const meta = {
   category: 'finalCta',
   label: 'Car Detailing / Inverted light band',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.headlineEmphasis', 'finalCta.sub', 'finalCta.cta', 'finalCta.frictionReducers'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
 
-export default function DetailFinalCta({ content = CONTENT }: { content?: SiteContent }) {
+export default function DetailFinalCta({
+  content = CONTENT,
+  serviceSlug,
+}: {
+  content?: SiteContent;
+  /** On a service page (wirePages and the Studio pass it): the form opens with "Service: {service}"
+   *  in its message box, the page's only form (Xander 2026-11-10). */
+  serviceSlug?: string;
+}) {
   const { finalCta, _meta } = content;
+  const service = serviceBySlug(content, serviceSlug);
   const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
     <section
+      id="cta"
       className="py-16 sm:py-24"
       style={{ background: 'color-mix(in srgb, var(--ink) 94%, var(--accent) 6%)', color: 'var(--bg)' }}
     >
@@ -82,7 +97,13 @@ export default function DetailFinalCta({ content = CONTENT }: { content?: SiteCo
             <E p="finalCta.cta">{finalCta.cta}</E>
           </h3>
           <p className="mt-1.5 text-[13.5px] leading-[1.5] text-onInkSoft">Tell us what&apos;s going on. We&apos;ll call you right back.</p>
-          <LeadForm mode={mode} surface="dark" className="mt-3.5" submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>} />
+          <LeadForm
+            mode={mode}
+            surface="dark"
+            className="mt-3.5"
+            submitLabel={<E p="finalCta.cta">{finalCta.cta}</E>}
+            {...(service ? { withMessage: true, initialMessage: serviceMessage(service) } : {})}
+          />
         </div>
       </div>
     </section>
