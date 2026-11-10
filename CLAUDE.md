@@ -543,6 +543,29 @@ posts the tick as `callConsent`. `/api/contact` is the real gate:
 The wording is word for word as the operator approved it. A lawyer has not reviewed it. Don't
 reword it without sign-off.
 
+**Every submission passes a human check first (operator decision, 2026-11-09).** The form
+(`@jdd/ui` v1.5.0+) renders a Cloudflare Turnstile widget (managed, invisible unless Cloudflare is
+unsure) and posts its token. `/api/contact` sends it to the agency's `/api/ingest/admit`, which
+verifies it (the token's hostname must be the host the form posted to), applies the per-visitor
+limits and claims the AI callback, then returns a single-use admission that `call-consent` and
+`lead` require. The route never dials on its own say-so.
+
+- Keys: one widget for all client sites. Its public key is the master `CLIENT_TURNSTILE_SITE_KEY`,
+  written into each `.env.local` as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Its secret lives only on the
+  agency, as `LEAD_FORM_TURNSTILE_SECRET_KEY` (`TURNSTILE_SECRET_KEY` there is the agency's own
+  quote-form widget). No key: no widget, leads still arrive, no AI callback.
+- Limits, all at the agency (`lead-gate.ts`, `lead-admit.ts`, env-tunable): one AI call per number
+  per site per 24 h (kept even if Retell refuses, so a resubmit never re-dials), two per number
+  across sites, 100 per site a day; repeats from one phone/email within 24 h merge into one lead
+  with one owner text; owner texts 6 an hour and 30 a day per site; 3 submissions per visitor per
+  10 minutes and 10 a day per site.
+- **Never throttle a genuine lead.** Every cap holds back a call or a text; only a failed check or
+  one visitor sending again and again is refused, in words approved on 2026-11-09 (in `@jdd/ui`'s
+  `src/turnstile.ts`; don't reword them without sign-off).
+- Fail safe: agency or Cloudflare unreachable means no call; the lead is still recorded where it can be.
+- A site moves to "admission required" by itself the first time its production route asks for one.
+  `checkRepoFormRoutePairing` refuses an export that pairs a form and route on different sides of this.
+
 **When the call can't go out, the form offers a message box (operator decision, 2026-11-09).**
 The route answers `{ ok: true, callback: 'unavailable', followUpId: <leadId> }` on a callback site
 whose lead was recorded instead of called. The form then shows a box, and what the visitor types

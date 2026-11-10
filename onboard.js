@@ -2373,6 +2373,13 @@ async function syncVercelEnv(siteSlug, content, clientDir, plan) {
     return { skippedAll: true };
   }
   try {
+    // Without it the form has no human check. That fails safe (leads arrive, no AI callback), so
+    // it is a warning, but a Growth client with no key gets no callbacks at all.
+    if (!readEnvLocal(clientDir).NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+      console.warn(
+        '  ⚠ No NEXT_PUBLIC_TURNSTILE_SITE_KEY for this site: its lead form has no human check, so leads arrive but no AI callback is placed. Set CLIENT_TURNSTILE_SITE_KEY in jdd-ops/.env and re-run.',
+      );
+    }
     const result = await syncEnvToVercel({
       slug: siteSlug,
       clientDir,

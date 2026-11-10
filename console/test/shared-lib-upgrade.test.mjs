@@ -47,6 +47,9 @@ const PRE_CONSENT_ROUTE = read(path.join(PAIRING, 'contact.route.pre-consent.ts.
 const CURRENT_CONSENT_TEXT = read(path.join(UI_SRC, 'lead-consent-text.ts'));
 const CURRENT_FORM = read(path.join(UI_SRC, 'LeadForm.tsx'));
 const OLD_FORM = read(path.join(PAIRING, 'LeadForm.v1.0.7.tsx.txt'));
+/** The last form and route from before the human check (2026-11-09). */
+const PRE_CHECK_FORM = read(path.join(PAIRING, 'LeadForm.v1.4.0.tsx.txt'));
+const PRE_ADMIT_ROUTE = read(path.join(PAIRING, 'contact.route.pre-admit.ts.txt'));
 
 function write(file, text) {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -187,6 +190,28 @@ test('a consent form beside the route from before consent is refused: the AI wou
 test('an old form beside an old route is refused too: every route now must check consent', () => {
   const r = checkFormRoutePairing({ consentTextSrc: null, leadFormSrc: OLD_FORM, routeSrc: PRE_CONSENT_ROUTE });
   assert.equal(r.ok, false);
+});
+
+test('a form without the human check beside the route that verifies one is refused: every lead would be', () => {
+  const r = checkFormRoutePairing({
+    consentTextSrc: CURRENT_CONSENT_TEXT,
+    leadFormSrc: PRE_CHECK_FORM,
+    routeSrc: CURRENT_ROUTE,
+    installedLabel: 'v1.4.0',
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /@jdd\/ui v1\.4\.0 has no human check/);
+  assert.match(r.reason, /every lead would be refused/);
+});
+
+test('a form with the human check beside a route that never verifies it is refused', () => {
+  const r = checkFormRoutePairing({ consentTextSrc: CURRENT_CONSENT_TEXT, leadFormSrc: CURRENT_FORM, routeSrc: PRE_ADMIT_ROUTE });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /look protected and not be/);
+});
+
+test('the installed form is the one with the human check', () => {
+  assert.match(CURRENT_FORM, /turnstileToken/, 'console/package.json must pin @jdd/ui v1.5.0 or later');
 });
 
 test('a consent version or wording the route does not know is refused', () => {

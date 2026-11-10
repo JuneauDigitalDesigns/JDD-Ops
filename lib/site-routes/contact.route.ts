@@ -43,14 +43,95 @@ function toE164(raw: string): string | null {
 // consent, or nowhere to keep it, makes no call: the lead goes to the inbox and the owner is
 // texted, the same as a callback Retell refuses.
 //
+// ── The human check, and what a flood can't do (operator decision, 2026-11-09) ────────────────
+// Every submission is first sent to the agency's `/api/ingest/admit` with the form's Cloudflare
+// Turnstile token. The agency verifies it (never this route: the secret stays there), applies the
+// per-visitor limits, claims the AI callback (one call per number per site per 24 h), and answers
+// with a single-use admission that the consent save and the lead record must carry.
+//
+//   - Refused (403 not-verified, 429 too-many): passed straight back. The form shows the approved
+//     words for each. Nothing is called or recorded.
+//   - Admitted with the callback held (the number was called today, a cap, Cloudflare down): no
+//     call. The lead is recorded like any callback that couldn't go out.
+//   - The agency can't be reached: no call (a call we can't count is a call we don't make). The
+//     lead is still offered to the ingest, which takes it from a site not yet moved over; if that
+//     fails too, the form shows the phone number, as it always has.
+//
+// Never throttle a genuine lead: every limit at the agency holds back a call or a text, and only
+// a failed check or one visitor sending again and again is refused.
+//
 // Resend is gone entirely. It was the whole delivery mechanism for Starter and it failed open:
 // `RESEND_API_KEY` seeded empty on a fresh client and `syncVercelEnv` skips empty values, so the
 // key never reached Vercel and this route 502'd on every lead until someone noticed by hand.
+
+/** The visitor's address as Vercel reports it. Vercel overwrites `x-forwarded-for` at its edge. */
+function clientIp(req: Request): string | null {
+  const forwarded = req.headers.get('x-forwarded-for');
+  return (forwarded ? forwarded.split(',')[0].trim() : req.headers.get('x-real-ip')) || null;
+}
+
+/** The form's own fields for the human check. Never forwarded with the lead. */
+const HONEYPOT_FIELD = 'jdd_hp';
+const NOT_FORWARDED = new Set(['turnstileToken', HONEYPOT_FIELD, 'admissionId', 'callbackPlaced']);
+
+type Admission =
+  | { kind: 'admitted'; admissionId: string; callback: boolean }
+  | { kind: 'refused'; status: 403 | 429; error: 'not-verified' | 'too-many' }
+  | { kind: 'unreachable' };
+
+/**
+ * Ask the agency whether this submission may proceed, and whether it may place the AI call.
+ * Four seconds at most: the visitor is waiting on this response.
+ */
+async function admitSubmission(
+  req: Request,
+  input: { turnstileToken: unknown; phone: string | null; email: string; wantsCallback: boolean },
+): Promise<Admission> {
+  const token = process.env.LEAD_INGEST_TOKEN;
+  if (!process.env.LEAD_INGEST_URL || !token) {
+    console.error('[contact] LEAD_INGEST_URL/LEAD_INGEST_TOKEN not set — nothing can be admitted');
+    return { kind: 'unreachable' };
+  }
+  try {
+    const res = await fetch(new URL('/api/ingest/admit', process.env.LEAD_INGEST_URL), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        turnstileToken: shortString(input.turnstileToken, 2048),
+        ip: clientIp(req),
+        phone: input.phone,
+        email: input.email || null,
+        wantsCallback: input.wantsCallback,
+        // The token must have been solved on the host the form was posted to, and only the
+        // production deployment's first ask moves this site over to admissions at the agency.
+        host: req.headers.get('x-forwarded-host') || req.headers.get('host'),
+        deployment: process.env.VERCEL_ENV ?? null,
+        // Without a site key the form renders no widget, so there is no token to expect. The
+        // agency then records the lead and places no call, until the key is set.
+        humanCheck: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ? 'on' : 'off',
+      }),
+      signal: AbortSignal.timeout(4000),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { admissionId?: unknown; callback?: unknown; error?: unknown }
+      | null;
+    if (res.ok && typeof body?.admissionId === 'string') {
+      return { kind: 'admitted', admissionId: body.admissionId, callback: body.callback === 'allowed' };
+    }
+    if (res.status === 403 && body?.error === 'not-verified') return { kind: 'refused', status: 403, error: 'not-verified' };
+    if (res.status === 429 && body?.error === 'too-many') return { kind: 'refused', status: 429, error: 'too-many' };
+    console.error('[contact] admit answered', res.status);
+  } catch (e) {
+    console.error('[contact] admit unreachable:', e);
+  }
+  return { kind: 'unreachable' };
+}
 
 /** Record the lead in the client's portal. Returns its id, or null when it wasn't stored. */
 async function recordLead(
   data: Record<string, unknown>,
   callbackPlaced: boolean,
+  admissionId: string | null,
 ): Promise<{ leadId: string | null } | null> {
   const url = process.env.LEAD_INGEST_URL;
   const token = process.env.LEAD_INGEST_TOKEN;
@@ -60,14 +141,16 @@ async function recordLead(
   }
   try {
     // The WHOLE body is forwarded, not a whitelist. That is what lets a new form field — or the
-    // consent object the lead form captures — arrive without this file changing again.
+    // consent object the lead form captures — arrive without this file changing again. The one
+    // exception is the human check's plumbing, which is no part of the lead.
+    const forwarded = Object.fromEntries(Object.entries(data).filter(([k]) => !NOT_FORWARDED.has(k)));
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ ...data, callbackPlaced }),
+      body: JSON.stringify({ ...forwarded, callbackPlaced, ...(admissionId ? { admissionId } : {}) }),
     });
     if (!res.ok) {
       console.error('[contact] lead ingest failed:', res.status, (await res.text()).slice(0, 300));
@@ -181,6 +264,7 @@ async function saveCallConsentProof(
   proof: CallConsentProof,
   phone: string,
   name: unknown,
+  admissionId: string,
 ): Promise<boolean> {
   const token = process.env.LEAD_INGEST_TOKEN;
   if (!process.env.LEAD_INGEST_URL || !token) {
@@ -189,15 +273,15 @@ async function saveCallConsentProof(
   }
   try {
     const url = new URL('/api/ingest/call-consent', process.env.LEAD_INGEST_URL);
-    const forwarded = req.headers.get('x-forwarded-for');
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       body: JSON.stringify({
         ...proof,
         phone,
+        admissionId,
         name: shortString(name, 200),
-        ip: forwarded ? forwarded.split(',')[0].trim() : req.headers.get('x-real-ip') || 'unknown',
+        ip: clientIp(req) || 'unknown',
         userAgent: shortString(req.headers.get('user-agent'), 500) || 'unknown',
       }),
     });
@@ -294,8 +378,30 @@ async function placeCallback(toNumber: string, leadName: unknown): Promise<boole
   }
 }
 
+/** Larger than any form this catalog renders, by a distance. */
+const MAX_BODY_BYTES = 16 * 1024;
+
 export async function POST(req: Request) {
-  const data = await req.json().catch(() => ({}) as Record<string, unknown>);
+  // A browser marks a same-origin fetch. Anything it marks otherwise was posted from another
+  // site's page, which no form of ours does. A non-browser sends no mark and meets the human check.
+  const fetchSite = req.headers.get('sec-fetch-site');
+  if (fetchSite && fetchSite !== 'same-origin') {
+    return NextResponse.json({ ok: false, error: 'not-verified' }, { status: 403 });
+  }
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: 'Payload too large' }, { status: 413 });
+  }
+  const raw = await req.text().catch(() => '');
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: 'Payload too large' }, { status: 413 });
+  }
+  let data: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(raw);
+    data = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    data = {};
+  }
 
   // The second step of a callback site's form, only ever reached after a call that didn't go out.
   const followUp = (data as { followUp?: unknown }).followUp;
@@ -307,6 +413,11 @@ export async function POST(req: Request) {
   const emailRaw = String((data as { email?: unknown }).email ?? '').trim();
   const toNumber = phoneRaw ? toE164(phoneRaw) : null;
 
+  // The honeypot: an input no person can see or reach was filled. Answered like a success, so a
+  // script learns nothing, and nothing is admitted, called, recorded or texted.
+  const honeypot = data[HONEYPOT_FIELD];
+  if (typeof honeypot === 'string' && honeypot.trim()) return NextResponse.json({ ok: true });
+
   // A submission with no reachable contact is not a lead. Reject before doing any work.
   if (!toNumber && !emailRaw) {
     return NextResponse.json(
@@ -315,16 +426,32 @@ export async function POST(req: Request) {
     );
   }
 
+  // Consent is checked here, before asking the agency, so a callback is only claimed for a
+  // submission that could actually be dialed.
+  const callbackSite = process.env.LEAD_CALLBACK === 'on';
+  const { name, callConsent } = data as { name?: unknown; callConsent?: unknown };
+  const proof = callbackSite && toNumber ? await verifiedCallConsent(callConsent) : null;
+  if (callbackSite && toNumber && !proof) {
+    console.warn('[contact] no valid call consent — not dialing, recording the lead instead');
+  }
+
+  const admission = await admitSubmission(req, {
+    turnstileToken: data.turnstileToken,
+    phone: toNumber,
+    email: emailRaw,
+    wantsCallback: Boolean(proof),
+  });
+  if (admission.kind === 'refused') {
+    return NextResponse.json({ ok: false, error: admission.error }, { status: admission.status });
+  }
+  const admissionId = admission.kind === 'admitted' ? admission.admissionId : null;
+
   // Dial first: whether the callback went out decides whether the submission is recorded at all.
   // The caller is waiting on this response, and `create-phone-call` only queues the call, so
   // the added latency is one API round trip rather than the length of a conversation.
   let callbackPlaced = false;
-  if (process.env.LEAD_CALLBACK === 'on' && toNumber) {
-    const { name, callConsent } = data as { name?: unknown; callConsent?: unknown };
-    const proof = await verifiedCallConsent(callConsent);
-    if (!proof) {
-      console.warn('[contact] no valid call consent — not dialing, recording the lead instead');
-    } else if (await saveCallConsentProof(req, proof, toNumber, name)) {
+  if (proof && toNumber && admission.kind === 'admitted' && admission.callback) {
+    if (await saveCallConsentProof(req, proof, toNumber, name, admission.admissionId)) {
       callbackPlaced = await placeCallback(toNumber, name);
     }
   }
@@ -340,7 +467,7 @@ export async function POST(req: Request) {
   // No callback went out — Starter / web-only by design, or a Growth callback Retell refused, or
   // no dialable number. Nobody else is going to reach this person, so the submission is recorded
   // and the owner is told now. A refused callback is a system failure, not a lost lead.
-  const stored = await recordLead(data as Record<string, unknown>, false);
+  const stored = await recordLead(data, false, admissionId);
 
   // Nothing happened at all: the form must say so and show the phone number as a fallback.
   if (!stored) {
