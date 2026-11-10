@@ -50,7 +50,7 @@ export function buildReviewGroups(pages: ReviewPage[]): ReviewGroup[] {
       label: p.label,
       // The Services page additionally reviews services.items[].detail (the prose that actually
       // appears on /services); every other non-home page is header + SEO only.
-      sections: p.pageType === 'services' ? ['subpages', 'services'] : ['subpages'],
+      sections: p.pageType === 'services' ? ['subpages', 'services'] : p.pageType === 'service' ? ['subpages', 'servicePages'] : ['subpages'],
     }));
   return [home, ...nonHome];
 }
