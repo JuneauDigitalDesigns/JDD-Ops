@@ -52,3 +52,13 @@ test('category suggestions: the industry categories and the client\'s own, never
   const content = { services: { items: [{ tag: 'Cooling' }, { tag: 'Plans' }] } };
   assert.deepEqual(categorySuggestions(['Heating', 'Cooling', 'heating'], content, 'Cooling'), ['Heating', 'Plans']);
 });
+
+test('suggestion chips come only from the shared approved lists (Xander, "Move them now")', async () => {
+  const src = readFileSync(path.join(ROOT, 'src/components/wizard/intake/ServicesStep.tsx'), 'utf8');
+  assert.match(src, /serviceSuggestions\(vertical, item\.t\)/, 'read from @jdd/schema by the service label');
+  assert.match(src, /notIn\(sugg\.included, item\.included\)/);
+  assert.match(src, /notIn\(sugg\.jobs, item\.typicalJobs\)/);
+  const { serviceSuggestions } = await import('@jdd/schema');
+  assert.ok(serviceSuggestions('hvac', 'AC Installation & Service').included.length > 0);
+  assert.deepEqual(serviceSuggestions('hvac', 'AC Repair').included, [], 'a hand-typed name gets none');
+});

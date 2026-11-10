@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, CaretLeft, CaretRight, CheckCircle, CircleNotch, Plus, Trash, UploadSimple } from '@phosphor-icons/react';
-import { serviceSlugs, menuFor } from '@jdd/schema';
+import { serviceSlugs, menuFor, serviceSuggestions } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { servicePageHint } from '@/lib/intake-todo';
@@ -185,6 +185,8 @@ function GuidedService({
   const myPhotos = projects.map((p, k) => ({ p, k })).filter(({ p }) => p.service && p.service === slug);
   const myQuestions = questions.map((q, k) => ({ q, k })).filter(({ q }) => q.service && q.service === slug);
   const menuTags = menuFor(vertical)?.services.map((s) => s.tag) ?? [];
+  // Approved per-service suggestions, matched by the service's menu label (v1.33.0).
+  const sugg = serviceSuggestions(vertical, item.t);
   const name = item.t?.trim() || 'Untitled';
 
   /** Store the slug the first time anything is tagged to this service (spec §2). */
@@ -278,23 +280,29 @@ function GuidedService({
         )}
 
         {part === 'included' && (
-          <ListPart
-            values={item.included ?? []}
-            onChange={(v) => setField(`${base}.included`, v)}
-            placeholder="e.g. Written quote before any work"
-            meter={{ have: (item.included ?? []).filter((x) => x.trim()).length, need: SERVICE_GATE.INCLUDED_MIN }}
-            inputId={`${base}.included`}
-          />
+          <>
+            <ListPart
+              values={item.included ?? []}
+              onChange={(v) => setField(`${base}.included`, v)}
+              placeholder="e.g. Written quote before any work"
+              meter={{ have: (item.included ?? []).filter((x) => x.trim()).length, need: SERVICE_GATE.INCLUDED_MIN }}
+              inputId={`${base}.included`}
+            />
+            <Suggest values={notIn(sugg.included, item.included)} plus onPick={(v) => setField(`${base}.included`, [...(item.included ?? []), v])} />
+          </>
         )}
 
         {part === 'problems' && (
-          <ListPart
-            values={item.typicalJobs ?? []}
-            onChange={(v) => setField(`${base}.typicalJobs`, v)}
-            placeholder="e.g. AC blowing warm air"
-            meter={{ have: (item.typicalJobs ?? []).filter((x) => x.trim()).length, need: SERVICE_GATE.TYPICAL_JOBS_MIN }}
-            inputId={`${base}.typicalJobs`}
-          />
+          <>
+            <ListPart
+              values={item.typicalJobs ?? []}
+              onChange={(v) => setField(`${base}.typicalJobs`, v)}
+              placeholder="e.g. AC blowing warm air"
+              meter={{ have: (item.typicalJobs ?? []).filter((x) => x.trim()).length, need: SERVICE_GATE.TYPICAL_JOBS_MIN }}
+              inputId={`${base}.typicalJobs`}
+            />
+            <Suggest values={notIn(sugg.jobs, item.typicalJobs)} plus onPick={(v) => setField(`${base}.typicalJobs`, [...(item.typicalJobs ?? []), v])} />
+          </>
         )}
 
         {part === 'towns' && (
@@ -358,6 +366,11 @@ function GuidedService({
                 />
               </div>
             ))}
+            <Suggest
+              values={notIn(sugg.questions, myQuestions.map(({ q }) => q.q))}
+              plus
+              onPick={(v) => { ensureSlug(); setQuestions([...questions, { q: v, a: '', service: slug }]); }}
+            />
             <button type="button" className="btn" onClick={() => { ensureSlug(); setQuestions([...questions, { q: '', a: '', service: slug }]); }}>
               <Plus size={13} /> Question
             </button>
@@ -396,19 +409,27 @@ function GuidedService({
   );
 }
 
-/** Tap-to-fill choices under a field. Only real choices: the industry's own categories, or
- *  the onboarding form's job lengths. */
-function Suggest({ values, onPick }: { values: readonly string[]; onPick: (v: string) => void }) {
+/** Tap-to-fill choices under a field. Only real, approved choices: the industry's own
+ *  categories, the onboarding form's job lengths, and the approved per-service suggestions on
+ *  @jdd/schema's industry menu (serviceSuggestions, v1.33.0). `plus` marks a tap that ADDS to a
+ *  list rather than filling a field. */
+function Suggest({ values, onPick, plus }: { values: readonly string[]; onPick: (v: string) => void; plus?: boolean }) {
   if (values.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="mt-2 flex max-w-3xl flex-wrap gap-1.5">
       {values.map((v) => (
         <button key={v} type="button" onClick={() => onPick(v)} className="inline-flex h-7 items-center rounded-full border border-dashed border-uiCardRule px-2.5 text-[12.5px] text-uiFg2 hover:border-uiAccent hover:text-uiInk">
-          {v}
+          {plus ? `+ ${v}` : v}
         </button>
       ))}
     </div>
   );
+}
+
+/** Suggestions not already in the list (case-insensitive). */
+function notIn(suggested: string[], present: string[] | undefined | null): string[] {
+  const have = new Set((present ?? []).map((x) => x.trim().toLowerCase()));
+  return suggested.filter((s) => !have.has(s.trim().toLowerCase()));
 }
 
 /** A list part (Included in the job, Problems it fixes): what's there, the box for the next one,
