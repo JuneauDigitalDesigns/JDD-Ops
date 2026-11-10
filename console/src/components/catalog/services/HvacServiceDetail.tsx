@@ -140,7 +140,7 @@ export default function HvacServiceDetail({ content = CONTENT, serviceSlug }: { 
               <aside id="pricing" className="shadow-brand-3 relative scroll-mt-24 overflow-hidden rounded-[18px] bg-inkPanel p-8 text-onInk">
                 <span className="accent-bar absolute inset-x-0 top-0 !h-1 !w-auto !rounded-none" aria-hidden="true" />
                 <span className="block text-[12px] font-bold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,var(--accent-2)_45%,var(--on-ink))]">{W.startingAt}</span>
-                <b className="mt-3 block font-heading text-[46px] font-semibold leading-none tabular-nums lg:text-[56px]">
+                <b className="mt-3 block font-heading text-[46px] font-semibold leading-none lg:text-[56px]">
                   <E p={`services.items.${n}.priceFrom`}>{price}</E>
                 </b>
                 <a
