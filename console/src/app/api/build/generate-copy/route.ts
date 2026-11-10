@@ -8,6 +8,8 @@ import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { chunkSections } from '@/lib/copy-brief/chunking';
 import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
 import { guardDashes, dashRewriteMessage } from '@/lib/copy-brief/dash-guard';
+import { pickServicePages } from '@/lib/servicePages';
+import { MAX_PAGES } from '@/lib/pages';
 import { isValidModelId, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 
 export const runtime = 'nodejs';
@@ -66,7 +68,10 @@ export async function POST(req: Request) {
   const requestedOrAll = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
   // `subpages` is only generable when the build actually has subpages — drop it otherwise,
   // whether it arrived via an explicit sections list or the "all sections" default.
-  const sections = subpages.length ? requestedOrAll : requestedOrAll.filter((s) => s !== 'subpages');
+  const withSubpages = subpages.length ? requestedOrAll : requestedOrAll.filter((s) => s !== 'subpages');
+  // `servicePages` likewise only when a service earns its own page (service-page-spec.md §1):
+  // never ask for copy for a page that will not exist.
+  const sections = pickServicePages(base, MAX_PAGES).length ? withSubpages : withSubpages.filter((s) => s !== 'servicePages');
   const chunks = chunkSections(sections);
   const wantedSet = new Set<Section>(['brand', ...sections]);
 

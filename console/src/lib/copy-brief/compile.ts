@@ -15,6 +15,52 @@
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import { MAX_PAGES } from '@/lib/pages';
+import { pickServicePages, primaryCity, serviceSlugs } from '@/lib/servicePages';
+
+/** The services the copywriter writes page copy for: exactly the ones the gate gives a page
+ *  (service-page-spec.md §1), so a thin service never gets copy for a page it will never have. */
+export function servicePageIndices(content: unknown): number[] {
+  return pickServicePages(content, MAX_PAGES);
+}
+
+/**
+ * The instruction for the `servicePages` section (service-page-spec.md §3 blocks 3, 6, 10).
+ * Carries each qualifying service's own facts inline, because the per-service facts are not in
+ * the site-wide facts paragraph. '' when no service earns a page, so the section is never asked
+ * for. Wording goes to Xander for word-for-word approval with the PR.
+ */
+export function servicePagesInstruction(content: unknown): string {
+  const picked = servicePageIndices(content);
+  if (!picked.length) return '';
+  const c = (content ?? {}) as Record<string, any>;
+  const items: Record<string, any>[] = Array.isArray(c.services?.items) ? c.services.items : [];
+  const slugs = serviceSlugs(content);
+  const questions: Record<string, any>[] = Array.isArray(c.extensions?.customerQuestions) ? c.extensions.customerQuestions : [];
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) : []);
+  const facts = picked.map((i) => {
+    const s = items[i] ?? {};
+    const own = questions.filter((q) => q && q.service === slugs[i] && typeof q.q === 'string' && q.q.trim()).map((q) => q.q.trim());
+    const out: Record<string, unknown> = { slug: slugs[i], name: s.t };
+    if (list(s.included).length) out.included = list(s.included);
+    if (list(s.typicalJobs).length) out.typicalJobs = list(s.typicalJobs);
+    if (list(s.areas).length) out.towns = list(s.areas);
+    if (list(s.brands).length) out.brands = list(s.brands);
+    if (typeof s.priceFrom === 'string' && s.priceFrom.trim()) out.startingPrice = s.priceFrom.trim();
+    if (typeof s.duration === 'string' && s.duration.trim()) out.howLong = s.duration.trim();
+    if (own.length) out.customerQuestions = own;
+    return out;
+  });
+  const city = primaryCity(content);
+  const where = city ? ` in ${city}` : '';
+  return [
+    `- servicePages: one item per service below, each { slug, intro, expect, faq }, for that service's own page.`,
+    `intro: 2 to 3 sentences; the first says plainly that the business does this service${where} and how to book it${city ? `, and names ${city} once` : ''}.`,
+    'expect: up to 4 short lines on booking, timing and estimates, only what the facts below state; an empty list when they state nothing.',
+    'faq: 3 to 5 questions about this service only, phrased the way a customer asks. Use the customer\'s own questions listed below first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
+    `Use only these facts for each service, and write for no service that is not listed:\n${JSON.stringify(facts, null, 2)}`,
+  ].join(' ');
+}
 
 const HOME_SERVICE_SYSTEM = `You are the JDD Brand Copywriter, a senior conversion copywriter for local home-service businesses.
 

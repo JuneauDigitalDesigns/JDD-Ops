@@ -9,6 +9,8 @@
  */
 import type { SiteContent } from '@/data/site';
 import type { CopyResult, Section } from '@/lib/copy-schema';
+import { serviceSlugs } from '@/lib/servicePages';
+import { servicePageIndices } from '@/lib/copy-brief/compile';
 
 function mergeArray<B, C>(base: B[], copy: C[] | undefined, apply: (b: B, c: C) => B): B[] {
   if (!Array.isArray(base)) return base;
@@ -184,6 +186,28 @@ export function applyGeneratedCopy(
       };
     }
     generated.subpages = map;
+  }
+
+  if (want.has('servicePages') && copy.servicePages?.items?.length) {
+    // Slug-keyed onto services.items[i].page (service-page-spec.md §4), and ONLY for services the
+    // gate gives a page: copy the model returns for a thin or unknown service is dropped, never
+    // stored for a page that will not exist. Applied on top of this run's services overlay when
+    // there is one, so card copy and page copy generated together both land.
+    const slugs = serviceSlugs(base);
+    const allowed = new Set(servicePageIndices(base).map((i) => slugs[i]));
+    const bySlug = new Map(copy.servicePages.items.filter((it) => it.slug && allowed.has(it.slug)).map((it) => [it.slug, it]));
+    if (bySlug.size) {
+      const services = generated.services ?? base.services;
+      generated.services = {
+        ...services,
+        items: services.items.map((item, i) => {
+          const it = bySlug.get(slugs[i]);
+          if (!it) return item;
+          // `page` arrives with @jdd/schema v1.32.0; typed structurally until the console pins it.
+          return { ...item, page: { intro: it.intro, expect: it.expect ?? [], faq: (it.faq ?? []).map((f) => ({ q: f.q, a: f.a })) } } as typeof item;
+        }),
+      };
+    }
   }
 
   return generated;
