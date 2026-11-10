@@ -158,6 +158,26 @@ function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVe
   );
 }
 
+/**
+ * One section's wireframe with its verdict bar, on its own: the intake's Review step shows one
+ * section at a time (2026-11-10 redesign) instead of the whole site as one long page.
+ */
+export function SectionReviewCard({
+  section, route, content, setField, verdict,
+}: {
+  section: Section;
+  route?: string;
+  content: SiteContent;
+  setField: (path: string, value: unknown) => void;
+  verdict: SectionVerdict;
+}) {
+  return (
+    <EditProvider setField={setField}>
+      <SectionWireframeCard section={section} route={route} content={content} verdict={verdict} />
+    </EditProvider>
+  );
+}
+
 function SectionWireframeCard({
   section, route, content, verdict,
 }: { section: Section; route?: string; content: SiteContent; verdict: SectionVerdict }) {
