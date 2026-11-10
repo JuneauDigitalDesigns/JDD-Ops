@@ -24,7 +24,6 @@ Write real, specific, benefit-led marketing copy grounded in the business facts 
 - Only include a business name, phone, email, address, or license/credential when it appears in the provided website notes or operator details — otherwise omit those fields entirely.
 - No placeholder text and no clichés (e.g. "top-notch", "one-stop shop", "we go the extra mile", "unmatched quality", "your satisfaction is our priority").
 - Match the exact section counts you are asked for.
-- Testimonials must read like real first-person homeowner quotes; use a first name + last initial and a plausible role, never a fabricated named company.
 - SEO: title <= 60 chars (include the business name and city when known), description <= 155 chars.
 
 Return ONLY a JSON object that conforms to the provided output schema. No prose, no markdown, no code fences.`;
@@ -38,7 +37,6 @@ Write warm, reassuring, benefit-led marketing copy grounded in the business fact
 - HEALTH GUARDRAILS: make NO medical claims and NO promises of specific health outcomes or results. Do not imply diagnosis, cure, or treatment of any condition. Do not reference insurance coverage, pricing, or reimbursement. Avoid absolute or superlative health promises (e.g. "cure", "guaranteed results", "pain-free", "best care"). Keep everything supportive and non-committal about outcomes.
 - No placeholder text and no clichés (e.g. "top-notch", "world-class", "we go the extra mile", "your satisfaction is our priority").
 - Match the exact section counts you are asked for.
-- Testimonials must read like real first-person client quotes about experience and feeling supported (never about medical outcomes); use a first name + last initial and a plausible role.
 - SEO: title <= 60 chars (include the business name and city when known), description <= 155 chars.
 
 Return ONLY a JSON object that conforms to the provided output schema. No prose, no markdown, no code fences.`;
@@ -52,7 +50,8 @@ export interface SectionCounts {
   // NO `stats` — PLAN D4: a statistic is client-supplied only, never something the copywriter
   // is told a count for (counting implies "write N of these").
   services: number;
-  testimonials: number;
+  // NO `testimonials` (operator decision, 2026-11-10), for the same reason as stats: a count
+  // sent to the model ("keep these exact counts") reads as "write this many".
   faq: number;
   heroBullets: number;
   heroFriction: number;
@@ -85,9 +84,10 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
     case 'work':
       return '- work: eyebrow, title, sub; include projects ONLY if real projects/case studies are grounded in the notes.';
     case 'testimonials':
-      return counts.testimonials === 0
-        ? `- testimonials: return { eyebrow: "", title: "", items: [] } — no real customer reviews are in the provided facts, so write NOTHING invented here. Leave items empty; the section will be hidden.`
-        : `- testimonials: eyebrow, title, and exactly ${counts.testimonials} items {q = quote, a = "First L.", r = role, company = optional location/company, stars = 1–5}. Each quote must name a SPECIFIC situation and what happened — the problem, the response, the result. Generic praise is a failure: never write a quote whose main content is an adjective ("great", "amazing", "awesome", "professional", "highly recommend"). Vary length and voice between quotes so they do not read as one author.`;
+      // Heading only, whatever is in the slots (operator decision, 2026-11-10). The old line asked
+      // for "exactly N items" against the scaffold's three blank slots, so every generated site
+      // shipped three invented five-star quotes.
+      return "- testimonials: eyebrow and title only, the heading of the reviews section. Never write review quotes, reviewer names or star ratings: reviews are real customers' words that the client supplies, and the section stays hidden until they do.";
     case 'faq':
       return `- faq: eyebrow, title, sub, and exactly ${counts.faq} question/answer pairs. Write the questions a real customer asks before buying, phrased the way they would phrase them. Answer each in ≤ 2 sentences, grounded strictly in the facts — if a question cannot be answered from the facts, ask a different question rather than speculating. Never state a price, a warranty length, or a response time that is not given to you.`;
     case 'finalCta':
@@ -119,7 +119,6 @@ export function countsFor(base: SiteContent): SectionCounts {
   return {
     pillars: base.about.pillars.length,
     services: base.services.items.length,
-    testimonials: base.testimonials.items.length,
     faq: base.faq.items.length,
     heroBullets: base.hero.heroBullets.length,
     heroFriction: base.hero.frictionReducers.length,

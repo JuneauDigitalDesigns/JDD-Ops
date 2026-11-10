@@ -196,7 +196,8 @@ function resolveStructure(ctx: BriefContext): StructureBlock {
     // NO 'stats' entry (PLAN D4, 2026-10-28): stats are no longer in the model's output schema
     // at all, so a count control here would be a dead, misleading slider — adjusting it would
     // change nothing, since the copywriter is never asked to write stats.
-    { key: 'testimonials', label: 'Testimonials', count: structureOverrides.testimonials ?? counts.testimonials, defaultCount: ctx.vertical.structure.testimonials ?? counts.testimonials, locked: false },
+    // NO 'testimonials' entry either (operator decision, 2026-11-10): the copywriter no longer
+    // writes review quotes, so the slider would only tell it how many to invent.
     { key: 'faq', label: 'FAQ', count: structureOverrides.faq ?? counts.faq, defaultCount: ctx.vertical.structure.faq ?? counts.faq, locked: false },
     { key: 'heroBullets', label: 'Hero bullets', count: structureOverrides.heroBullets ?? counts.heroBullets, defaultCount: ctx.vertical.structure.heroBullets ?? counts.heroBullets, locked: false },
     { key: 'heroFrictionReducers', label: 'Hero friction reducers', count: structureOverrides.heroFrictionReducers ?? counts.heroFriction, defaultCount: ctx.vertical.structure.heroFrictionReducers ?? counts.heroFriction, locked: false },
@@ -222,7 +223,7 @@ function resolveSections(ctx: BriefContext): SectionsBlock {
       ? subpagesInstruction(subpages)
       : sectionInstructionLine(section, {
           pillars: counts.pillars, services: counts.services,
-          testimonials: counts.testimonials, faq: counts.faq, heroBullets: counts.heroBullets,
+          faq: counts.faq, heroBullets: counts.heroBullets,
           heroFriction: counts.heroFriction, ctaFriction: counts.ctaFriction,
         }) ?? '';
     const override = stringOverride(ctx, 'sections', section);
