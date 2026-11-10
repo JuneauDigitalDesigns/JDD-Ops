@@ -28,6 +28,7 @@ export const meta = {
   category: 'hero',
   label: 'Roofing / Standard hero',
   consumes: [
+    'brand.license', 'extensions.trustBadges',
     'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.cta', 'hero.frictionReducers',
     'brand.phone', 'brand.phoneHref', 'images.hero.slides',
   ],
@@ -51,8 +52,15 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 }
 
 export default function RoofingHero({ content = CONTENT }: { content?: SiteContent }) {
-  const { hero, brand, images, _meta } = content;
+  const { hero, brand, images, _meta, extensions } = content;
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
+  // The kicker states only the client's own facts (Xander 2026-11-10, wording file section D
+  // row 1): "Licensed" only with a license number, then the client's certification badges.
+  // Hidden when there are none. It used to say "Licensed · Bonded · GAF Certified" to every roofer.
+  const kicker = [brand.license?.trim() ? 'Licensed' : '', ...(extensions?.trustBadges ?? [])]
+    .map((k) => k?.trim() ?? '')
+    .filter(Boolean)
+    .slice(0, 3);
   const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
 
   return (
@@ -78,9 +86,11 @@ export default function RoofingHero({ content = CONTENT }: { content?: SiteConte
 
       <div className="relative mx-auto grid w-full max-w-[1120px] grid-cols-1 gap-8 px-5 pb-12 pt-16 sm:px-6 lg:grid-cols-[1fr_360px] lg:items-end lg:gap-12 lg:pb-[88px] lg:pt-[150px]">
         <div className="min-w-0 max-w-[680px]">
-          <span className="inline-flex items-center border-l-[3px] border-[color:var(--accent-2)] py-2 pl-[11px] pr-3 text-[12px] font-bold uppercase tracking-[0.2em] text-[color:var(--accent-2)] backdrop-blur-[6px]" style={{ background: 'color-mix(in srgb, var(--ink-panel) 55%, transparent)' }}>
-            Licensed · Bonded · GAF Certified
-          </span>
+          {kicker.length > 0 && (
+            <span className="inline-flex items-center border-l-[3px] border-[color:var(--accent-2)] py-2 pl-[11px] pr-3 text-[12px] font-bold uppercase tracking-[0.2em] text-[color:var(--accent-2)] backdrop-blur-[6px]" style={{ background: 'color-mix(in srgb, var(--ink-panel) 55%, transparent)' }}>
+              {kicker.join(' · ')}
+            </span>
+          )}
 
           <h1 className="mt-[22px] text-balance font-heading text-[44px] font-extrabold leading-[0.95] tracking-[-0.024em] text-onInk sm:text-[clamp(46px,6.2vw,78px)]">
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
@@ -136,7 +146,7 @@ export default function RoofingHero({ content = CONTENT }: { content?: SiteConte
             surface="light"
             layout="stack"
             className="mt-4 border-t border-rule pt-4"
-            submitLabel="Get a free inspection"
+            submitLabel="Book an inspection"
           />
         </div>
       </div>

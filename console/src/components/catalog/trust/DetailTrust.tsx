@@ -60,7 +60,7 @@ export default function DetailTrust({ content = CONTENT }: { content?: SiteConte
         </h2>
         <p className="mx-auto mt-4 max-w-[52ch] text-[17px] leading-[1.65] text-inkSoft">
           {radius
-            ? 'No mobile fee inside the ring. Beyond it, call. For coating and correction work we travel further.'
+            ? 'Outside the ring? Call and ask.'
             : "Not on the list? Call and ask. We'll tell you straight whether we can get to you."}
         </p>
         <div className="mt-[30px] flex flex-wrap items-center justify-center gap-y-2.5">

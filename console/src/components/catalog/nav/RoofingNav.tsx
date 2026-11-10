@@ -3,7 +3,7 @@
 // RoofingNav — "structural / weatherproof" nav, premium pass (2026-11-09, approved mockup).
 // Sticky blurred bar on a hairline rule: the accent-bar logo mark (4px corners, roofing's hard
 // edge) + brand name/tagline, route links from content.nav with an accent underline that grows
-// from the left, the phone in the display face, and the accent "Free inspection" button to the
+// from the left, the phone in the display face, and the accent "Book inspection" button to the
 // contact page (D7). Route links stay data-driven, no hardcoded anchors.
 //
 // Services menu + phone menu (Xander 2026-11-10, service-pages mockup `roofing`): "Services" stays
@@ -144,7 +144,7 @@ export default function RoofingNav({
             className="inline-flex items-center whitespace-nowrap rounded-[4px] bg-accent px-3 py-[11px] text-[13.5px] font-extrabold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98] md:px-[22px] md:py-[13px] md:text-[15px]"
             style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
           >
-            Free inspection
+            Book inspection
           </a>
           <button
             {...mm.button}
