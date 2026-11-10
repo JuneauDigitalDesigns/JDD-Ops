@@ -46,11 +46,16 @@ test('typicalJobs (2+) plus a tagged real review qualifies', () => {
   assert.ok(servicePageFacts(c, 0).have.includes('review'));
 });
 
-test('areas only count when they narrow the service area', () => {
+test("a service's own towns count whenever present (Xander 2026-11-10: own towns only)", () => {
+  // The page lists only the service's own towns and hides the block without them; there is no
+  // fallback to the site's service area. So towns the client named for this service are a fact
+  // about it even when they happen to be every town the business covers.
   const all = site([{ t: 'Roof Repair', included: ['a', 'b', 'c'], areas: ['Clermont', 'Groveland', 'Minneola'] }]);
-  assert.equal(qualifiesForServicePage(all, 0), false, 'every town is not a fact about this service');
+  assert.equal(qualifiesForServicePage(all, 0), true);
   const some = site([{ t: 'Roof Repair', included: ['a', 'b', 'c'], areas: ['Clermont'] }]);
   assert.equal(qualifiesForServicePage(some, 0), true);
+  const none = site([{ t: 'Roof Repair', included: ['a', 'b', 'c'], areas: [] }]);
+  assert.equal(qualifiesForServicePage(none, 0), false, 'no towns, no fact: the site area is never borrowed');
 });
 
 test('blank strings are not facts', () => {

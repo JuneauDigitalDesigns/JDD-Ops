@@ -7,8 +7,8 @@
  * real, client-supplied facts before it gets a page:
  *
  *   core:  `included` with 3+ items, or `typicalJobs` with 2+
- *   plus:  at least one more fact (the other core list, a starting price, brands, areas that
- *          narrow the service area, or a real review / job photo / customer question tagged to it)
+ *   plus:  at least one more fact (the other core list, a starting price, brands, this service's
+ *          own towns, or a real review / job photo / customer question tagged to it)
  *
  * A service that misses stays a card on /services (`/services#<slug>`): no page, no sitemap
  * entry, no dead link. Nothing here generates copy, and nothing is ever padded to pass.
@@ -83,8 +83,6 @@ export function servicePageFacts(
   const item = obj(arr(obj(c.services).items)[index]);
   const slug = serviceSlugs(content)[index] ?? '';
   const ext = obj(c.extensions);
-  const siteArea = new Set(filled(ext.serviceArea).map((a) => a.toLowerCase()));
-  const areas = filled(item.areas);
   const taggedTo = (list: unknown[]) => list.map(obj).some((x) => str(x.service) === slug && slug !== '');
 
   const has: Record<ServiceFact, boolean> = {
@@ -92,8 +90,9 @@ export function servicePageFacts(
     typicalJobs: filled(item.typicalJobs).length >= TYPICAL_JOBS_MIN,
     priceFrom: str(item.priceFrom) !== '',
     brands: filled(item.brands).length > 0,
-    // Areas are a fact about THIS service only when they narrow the site's service area.
-    areas: areas.length > 0 && (siteArea.size === 0 || areas.length < siteArea.size),
+    // This service's own towns, whenever present (Xander 2026-11-10, "own towns only"): the page
+    // lists only these and hides the block without them, never borrowing the site's service area.
+    areas: filled(item.areas).length > 0,
     review: taggedTo(arr(obj(c.testimonials).items).filter((t) => str(obj(t).q) !== '')),
     photo: taggedTo(arr(obj(c.work).projects)),
     question: taggedTo(arr(ext.customerQuestions).filter((q) => str(obj(q).q) !== '')),
