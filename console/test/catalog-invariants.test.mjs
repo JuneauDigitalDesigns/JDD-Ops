@@ -130,6 +130,15 @@ test('no component owns a lead form', () => {
   assert.deepEqual(bad.map((c) => c.rel), [], 'these should use <LeadForm> from @/lib/LeadForm');
 });
 
+test('every hero mounts the lead form (operator decision 2026-11-09)', () => {
+  // "There needs to be one right then and there, as soon as the person lands on the web page."
+  // Every hero, generic or vertical, carries the shared <LeadForm>; the per-site switch is an
+  // empty hero.formLabel, so the mount is unconditional at the source level. Lawn, Detail,
+  // HeroSplit and HeroOverlap had none until this rule.
+  const bad = ALL.filter((c) => c.category === 'hero' && !/<LeadForm\b/.test(c.src));
+  assert.deepEqual(bad.map((c) => c.rel), [], 'every hero mounts <LeadForm> from @/lib/LeadForm');
+});
+
 test('every lead form takes its mode from the plan', () => {
   // `mode` is how the plan reaches the form. A form left on the default (phone), or hard-coded to
   // it, would show a Starter visitor the AI-call consent box for a call that site never makes.

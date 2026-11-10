@@ -599,6 +599,27 @@
   .hero-rise, .hero-slide, .hero-bar { animation: none; }
 }
 
+/* Premium material shared by the vertical templates (2026-11-09 visual upgrade). Kept in step
+   with template/src/styles/globals.css. --star and --live are FIXED semantics, like --urgent:
+   review stars and a "taking calls" dot are not brand colours and no Studio slot moves them.
+   Brand-tinted shadows read --ink so a section or brand palette recolours them. */
+:root { --star: #F6B54A; --live: #49D18B; }
+.shadow-brand-1 { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent); }
+.shadow-brand-2 { box-shadow: 0 2px 6px color-mix(in srgb, var(--ink) 8%, transparent), 0 14px 30px -12px color-mix(in srgb, var(--ink) 24%, transparent); }
+.shadow-brand-3 { box-shadow: 0 4px 10px color-mix(in srgb, var(--ink) 9%, transparent), 0 26px 50px -16px color-mix(in srgb, var(--ink) 32%, transparent); }
+.hover-lift { transition: transform .25s cubic-bezier(.16, 1, .3, 1), box-shadow .25s cubic-bezier(.16, 1, .3, 1); }
+.hover-lift:hover { transform: translateY(-4px); }
+/* Children of a card grid inside a revealed section arrive one after another: the same
+   scroll-driven range as .rv, offset 40px per child. No JavaScript, nothing hidden at rest. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .rv-stagger > * { animation: rv-in linear both; animation-timeline: view(); animation-range: entry 0px entry 220px; }
+    .rv-stagger > :nth-child(2) { animation-range: entry 40px entry 260px; }
+    .rv-stagger > :nth-child(3) { animation-range: entry 80px entry 300px; }
+    .rv-stagger > :nth-child(n+4) { animation-range: entry 120px entry 340px; }
+  }
+}
+
 /* Scroll reveal for sections that bring no motion of their own (console/src/lib/revealPolicy.ts
    decides which; the exporter puts the .rv class on them). A CSS scroll-driven animation: no
    JavaScript, nothing hidden at first paint. A browser without animation-timeline, or a visitor
