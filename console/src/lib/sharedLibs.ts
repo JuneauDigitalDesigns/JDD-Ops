@@ -347,6 +347,17 @@ export function checkFormRoutePairing(input: {
         'so the form would look protected and not be. The current route is jdd-ops/lib/site-routes/contact.route.ts.',
     };
   }
+  // v1.6.0: a form whose widget couldn't run (a host not on the widget) says so, and the route
+  // must pass that on, or the agency refuses every one of those leads as a failed check.
+  if (/\bturnstileStatus\b/.test(input.leadFormSrc ?? '') && !/\bturnstileStatus\b/.test(input.routeSrc)) {
+    return {
+      ok: false,
+      reason:
+        `The lead form from ${installed} reports when its human-check widget couldn't run, but src/app/api/contact/route.ts ` +
+        "doesn't pass that on, so every lead from a host missing from the widget would be refused. The current route is " +
+        'jdd-ops/lib/site-routes/contact.route.ts.',
+    };
+  }
   return { ok: true, version: form.version };
 }
 

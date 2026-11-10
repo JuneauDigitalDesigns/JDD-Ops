@@ -32,6 +32,8 @@ export type AuditAction =
   | 'agent.prompt.push'
   | 'agent.ai_statement'
   | 'domain.add'
+  // A hostname put on the site's lead-form Turnstile widget: hostnames only, never a secret.
+  | 'turnstile.hostnames'
   | 'domain.verify'
   | 'canonical.set'
   | 'plan.upgrade'

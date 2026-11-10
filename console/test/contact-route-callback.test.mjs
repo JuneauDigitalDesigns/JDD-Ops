@@ -357,6 +357,7 @@ test('the token goes to the agency with the visitor, and is never stored with th
     host: 'www.acme.example',
     deployment: 'production',
     humanCheck: 'on',
+    siteKey: '0x4AAAAAAAsitekey',
   });
   assert.equal(calls.ingest.length, 1);
   assert.equal(calls.ingest[0].turnstileToken, undefined);
@@ -430,4 +431,32 @@ test('an oversized body is refused unread', async () => {
   const res = await submit({ name: 'Dana', email: 'dana@example.com', message: 'x'.repeat(20_000) });
   assert.equal(res.status, 413);
   assert.equal(calls.admit.length, 0);
+});
+
+/* ── the widget can't run (operator decision, 2026-11-09: never lose a lead) ──── */
+
+test("the form says its widget couldn't run: the agency is told, so it keeps the lead", async () => {
+  process.env.LEAD_CALLBACK = 'on';
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0x4AAAAAAAsitekey';
+  // As the agency answers an unchecked submission: admitted, callback held.
+  admitAnswer = () => Response.json({ ok: true, admissionId: 'adm_x', callback: 'held', verification: 'unavailable' });
+  try {
+    await submit({ name: 'Dana', phone: '4075550188', callConsent: validConsent(), turnstileStatus: 'error' });
+  } finally {
+    delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  }
+  assert.equal(calls.admit[0].body.humanCheck, 'widget-error');
+  assert.equal(calls.admit[0].body.siteKey, '0x4AAAAAAAsitekey', 'so the right widget secret is used');
+  assert.equal(calls.ingest[0].turnstileStatus, undefined, 'plumbing, not part of the lead');
+});
+
+test('a token wins over a claimed error: the check runs', async () => {
+  process.env.LEAD_CALLBACK = 'off';
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0x4AAAAAAAsitekey';
+  try {
+    await submit({ name: 'Dana', email: 'dana@example.com', turnstileToken: 'tok', turnstileStatus: 'error' });
+  } finally {
+    delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  }
+  assert.equal(calls.admit[0].body.humanCheck, 'on');
 });

@@ -281,3 +281,15 @@ export function loadTeardownCredentials(): {
     clerkSecretKey: pick('CLERK_SECRET_KEY'),
   };
 }
+
+/**
+ * The Cloudflare API token (Account › Turnstile › Edit) and account id, for keeping each client
+ * site's hostnames on the lead-form Turnstile widget pool (lib/turnstile-pool.js). Returned to the
+ * caller only, never put in process.env or a response body. Null unless both are set.
+ */
+export function loadCloudflareCredentials(): { token: string; accountId: string } | null {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const token = process.env.CLOUDFLARE_API_TOKEN || ops.CLOUDFLARE_API_TOKEN;
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ops.CLOUDFLARE_ACCOUNT_ID;
+  return token && accountId ? { token, accountId } : null;
+}

@@ -3,6 +3,7 @@ import { loadVercelCredentials } from '@/lib/opsSecrets';
 import { loadVercelSync, type DomainConfig, type ProjectDomain } from '@/lib/vercelSync';
 import { loadManageTarget, resolveLiveUrl } from '@/lib/manageSites';
 import { appendAudit } from '@/lib/audit';
+import { addHostnamesToSiteWidget } from '@/lib/turnstilePool';
 
 /**
  * A site's domains, and — the important part — where it ACTUALLY serves.
@@ -101,7 +102,41 @@ export async function POST(req: Request) {
   }
 
   const { ctx, resolved } = target;
-  const { addProjectDomain, getDomainConfig } = await loadVercelSync();
+  const { addProjectDomain, getDomainConfig, listProjectDomains } = await loadVercelSync();
+
+  // The lead form's human check first (operator decision, 2026-11-09). Cloudflare won't render the
+  // widget on a host it doesn't list, so a domain attached without being added would run its lead
+  // form with no check: leads still arrive, but no AI call is placed for any of them. Refusing
+  // here attaches nothing, so there is never a moment when the domain serves without it.
+  const existing = await listProjectDomains(resolved.site.slug);
+  const widget = await addHostnamesToSiteWidget({
+    slug: ctx.slug,
+    siteSlug: resolved.site.slug,
+    siteKey: resolved.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '',
+    hostnames: [...(existing.ok ? existing.domains.map((d) => d.name) : []), domain],
+  });
+  if (!widget.ok) {
+    appendAudit({
+      slug: ctx.slug,
+      siteSlug: resolved.site.slug,
+      action: 'domain.add',
+      ok: false,
+      summary: `Did not attach ${domain}: it could not be added to the site's Turnstile widget`,
+      detail: { domain },
+    });
+    return NextResponse.json({ error: `${domain} was not attached. ${widget.error}` }, { status: 409 });
+  }
+  if (widget.added.length) {
+    appendAudit({
+      slug: ctx.slug,
+      siteSlug: resolved.site.slug,
+      action: 'turnstile.hostnames',
+      ok: true,
+      summary: `Added ${widget.added.join(', ')} to the site's Turnstile widget`,
+      detail: { hostnames: widget.added, siteKey: widget.siteKey },
+    });
+  }
+
   const added = await addProjectDomain(resolved.site.slug, domain);
 
   if (!added.ok) {

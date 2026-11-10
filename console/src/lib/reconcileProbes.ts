@@ -95,6 +95,21 @@ export interface ReconcileProbesModule {
     teamId: string | null;
     domain: string;
   }): Promise<DomainExpiryProbe>;
+  probeTurnstileHostnames(args: {
+    token: string | null;
+    accountId: string | null;
+    siteKey: string | null | undefined;
+    vercelHost: string;
+    domains: string[];
+  }): Promise<TurnstileHostnamesProbe>;
+}
+
+/** The lead form's Turnstile widget vs the hosts the site serves on. null ⇒ not checked. */
+export interface TurnstileHostnamesProbe {
+  checked: boolean;
+  siteKeyKnown: boolean | null;
+  missing: string[] | null;
+  hostnames: string[];
 }
 
 const cache = new Map<string, Promise<ReconcileProbesModule>>();
