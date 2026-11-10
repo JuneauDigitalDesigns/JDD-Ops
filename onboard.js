@@ -2542,10 +2542,9 @@ async function resolveVercelHostStrict(slug) {
 function resolvePortalIdentity(intake, baseSlug, emailOverride = null) {
   const isTestClient = baseSlug.startsWith('_e2e') || FORCE_TEST_PORTAL;
   const testEmail = process.env.PORTAL_TEST_EMAIL || null;
-  const testPassword = process.env.PORTAL_TEST_PASSWORD || null;
-  const useTestLogin = isTestClient && !!testEmail && !!testPassword;
+  const useTestLogin = isTestClient && !!testEmail;
   if (isTestClient && !useTestLogin) {
-    console.warn(`  ⚠ Test client but PORTAL_TEST_EMAIL / PORTAL_TEST_PASSWORD not set in .env — falling back to brand.email with no password.`);
+    console.warn(`  ⚠ Test client but PORTAL_TEST_EMAIL not set in .env — falling back to brand.email.`);
   }
 
   const override = emailOverride && emailOverride.trim() ? emailOverride.trim() : null;
@@ -2560,7 +2559,7 @@ function resolvePortalIdentity(intake, baseSlug, emailOverride = null) {
     console.warn(`  ⚠ Sites disagree on brand.email (${[...emails].join(', ')}) — all sites attach to ${email}. Use --link-portal --email to change it.`);
   }
 
-  return { email, useTestLogin, testPassword };
+  return { email, useTestLogin };
 }
 
 /**
@@ -2735,61 +2734,44 @@ async function ensureClientRecordForSite({ email, siteSlug, account }) {
 }
 
 /**
- * Test clients only: ensure a Clerk login exists with a known password.
- * Runs once per client, after every site has been attached.
+ * Test clients only: record which Clerk user signs in as PORTAL_TEST_EMAIL. Read-only in Clerk.
+ *
+ * It never creates a user and never sets or resets a password (operator rule, 2026-11-10:
+ * "Onboarding shouldnt be setting or resetting a clerk password"). Portal access is by Clerk
+ * invitation only. This step used to set the PORTAL_TEST_EMAIL account's password to
+ * PORTAL_TEST_PASSWORD on every test-client run, and that account is the operator's own sign-in,
+ * so a re-run silently overwrote a password he had changed. test/no-clerk-passwords.test.mjs holds
+ * the rule. With no Clerk user for the address it says so, for an invitation to be sent.
  */
-async function provisionPortalTestLogin({ email, useTestLogin, testPassword, primaryClientDir, baseSlug }) {
+async function recordPortalTestLogin({ email, useTestLogin, primaryClientDir }) {
   if (!useTestLogin || !email) return;
 
   if (DRY_RUN) {
-    dryLog(`would create/update Clerk test login ${email} (+ password)`);
+    dryLog(`would look up the existing Clerk login for ${email} (read-only: no user created, no password set)`);
     return;
   }
 
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
-    console.warn(`  ⚠ CLERK_SECRET_KEY not set — portal account linked, but no test login created.`);
+    console.warn(`  ⚠ CLERK_SECRET_KEY not set — portal account linked; the Clerk login wasn't looked up.`);
     return;
-  }
-
-  const clerk = createClerkClient({ secretKey });
-  const existingUserId = readEnvLocal(primaryClientDir).CLERK_USER_ID;
-
-  if (existingUserId) {
-    try {
-      await clerk.users.updateUser(existingUserId, { password: testPassword, skipPasswordChecks: true });
-      console.log(`  Portal test login → ${email} (password: PORTAL_TEST_PASSWORD in jdd-ops/.env)`);
-      return existingUserId;
-    } catch (err) {
-      console.warn(`  ⚠ Saved CLERK_USER_ID ${existingUserId} did not update (${err?.message ?? err}); resolving by email…`);
-    }
   }
 
   let user;
   try {
-    user = await clerk.users.createUser({
-      emailAddress: [email],
-      password: testPassword,
-      skipPasswordChecks: true,
-    });
+    const list = await createClerkClient({ secretKey }).users.getUserList({ emailAddress: [email] });
+    user = list.data?.[0];
   } catch (err) {
-    if (err?.errors?.[0]?.code === 'form_identifier_exists') {
-      const list = await clerk.users.getUserList({ emailAddress: [email] });
-      user = list.data?.[0];
-      if (user) {
-        await clerk.users.updateUser(user.id, { password: testPassword, skipPasswordChecks: true });
-      } else {
-        console.warn(`  ⚠ Could not create or find Clerk test user for ${email}`);
-        return;
-      }
-    } else {
-      console.warn(`  ⚠ Clerk test user creation failed: ${err?.message ?? err}`);
-      return;
-    }
+    console.warn(`  ⚠ Could not look up the Clerk login for ${email}: ${err?.message ?? err}`);
+    return;
+  }
+  if (!user) {
+    console.warn(`  ⚠ No Clerk login for ${email}. Invite that address to the portal; onboarding never creates logins.`);
+    return;
   }
 
-  console.log(`  Portal test login → ${email} (password: PORTAL_TEST_PASSWORD in jdd-ops/.env; user ${user.id})`);
-  patchEnvLocal(primaryClientDir, 'CLERK_USER_ID', user.id);
+  console.log(`  Portal test login → ${email} (Clerk user ${user.id}; its password is not touched)`);
+  if (readEnvLocal(primaryClientDir).CLERK_USER_ID !== user.id) patchEnvLocal(primaryClientDir, 'CLERK_USER_ID', user.id);
   return user.id;
 }
 
@@ -2845,7 +2827,7 @@ async function linkPortal(slug, opts = {}) {
   const primaryClientDir = primaryClientDirFor(slug, intake);
   const sharedBaseId = readEnvLocal(primaryClientDir).AIRTABLE_BASE_ID || null;
 
-  const { email, useTestLogin, testPassword } = resolvePortalIdentity(intake, slug, emailOverride);
+  const { email, useTestLogin } = resolvePortalIdentity(intake, slug, emailOverride);
   if (!email) {
     fail(0, `No email available for "${slug}" — pass --email addr.`);
   }
@@ -2870,7 +2852,7 @@ async function linkPortal(slug, opts = {}) {
     });
   }
 
-  await provisionPortalTestLogin({ email, useTestLogin, testPassword, primaryClientDir, baseSlug: slug });
+  await recordPortalTestLogin({ email, useTestLogin, primaryClientDir });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -3367,7 +3349,7 @@ async function main() {
 
   // Resolved once, up front: every site of a client attaches to the same portal account, and
   // knowing the address before the loop lets each site link as soon as it is done.
-  const { email: portalEmail, useTestLogin, testPassword } = resolvePortalIdentity(intake, baseSlug);
+  const { email: portalEmail, useTestLogin } = resolvePortalIdentity(intake, baseSlug);
 
   for (let i = 0; i < intake.sites.length; i++) {
     const site = intake.sites[i];
@@ -3495,12 +3477,10 @@ async function main() {
 
   // Step 10 (tail): the Clerk test login, once per client, after every site is attached.
   log(10, `Portal test login`);
-  await provisionPortalTestLogin({
+  await recordPortalTestLogin({
     email: portalEmail,
     useTestLogin,
-    testPassword,
     primaryClientDir: primaryClientDirFor(baseSlug, intake),
-    baseSlug,
   });
 
   await printHandoff({ intake, provisioned, sharedBaseId, baseSlug, portalEmail });

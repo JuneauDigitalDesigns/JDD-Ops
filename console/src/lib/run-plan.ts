@@ -48,7 +48,7 @@ const DETAIL: Record<PhaseLabel, string> = {
   [PHASE_LABELS.vercel]: 'Create/link the Vercel project and sync env',
   [PHASE_LABELS.deploy]: 'Trigger a preview deployment — review it, then promote in the Vercel dashboard',
   [PHASE_LABELS.portal]: 'Create the Clerk portal account record',
-  [PHASE_LABELS.testLogin]: 'Create or update the Clerk test login for the portal',
+  [PHASE_LABELS.testLogin]: 'Look up the Clerk test login for the portal (never sets a password)',
 };
 
 function planned(
