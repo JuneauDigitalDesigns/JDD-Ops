@@ -139,6 +139,21 @@ test('every hero mounts the lead form (operator decision 2026-11-09)', () => {
   assert.deepEqual(bad.map((c) => c.rel), [], 'every hero mounts <LeadForm> from @/lib/LeadForm');
 });
 
+test('the deliberate exception: a service page header never mounts the lead form (Xander 2026-11-10)', () => {
+  // "Service pages should have the lead form at the bottom only, usually users come from the home
+  // page and scroll down the service pages." A service page's header is its hero, so the rule
+  // above would otherwise pull a form into it. Named here, not left to the category, so the
+  // exception can't drift: every service header and service body is form-free, and the page's
+  // one form is its final CTA, which takes serviceSlug to open prefilled.
+  const service = ALL.filter((c) => /Service(Header|Detail)\.tsx$/.test(c.rel));
+  assert.ok(service.length >= 2, 'found the service page sections');
+  const withForm = service.filter((c) => /<LeadForm\b/.test(c.src));
+  assert.deepEqual(withForm.map((c) => c.rel), [], 'a service header or body carries no form');
+  for (const c of service.filter((x) => x.rel.endsWith('ServiceHeader.tsx'))) {
+    assert.equal(c.category, 'pageHeader', `${c.rel} is a page header, not a hero, so the every-hero rule never reaches it`);
+  }
+});
+
 test('every lead form takes its mode from the plan', () => {
   // `mode` is how the plan reaches the form. A form left on the default (phone), or hard-coded to
   // it, would show a Starter visitor the AI-call consent box for a call that site never makes.
