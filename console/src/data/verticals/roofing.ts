@@ -112,11 +112,11 @@ export const CONTENT: SiteContent = {
   testimonials: {
     eyebrow: "What Clients Say",
     title:   "Real Reviews from Real Customers",
-    items: [
-      { q: "After the hailstorm, they were on my roof the next morning for an inspection and handled the entire insurance claim. New roof looks amazing.", a: "David K.", r: "Homeowner", company: null, stars: 5 },
-      { q: "Got three quotes and theirs was competitive, but they were the only ones who could start within the week. Done in a day and a half, spotless cleanup.", a: "Karen M.", r: "Homeowner", company: null, stars: 5 },
-      { q: "The 30-year warranty was the deciding factor. They explained every step and checked in with us throughout the job. Highly recommended.", a: "Robert S.", r: "Homeowner", company: null, stars: 5 },
-    ],
+    // Empty by default (operator decision, 2026-11-10): a review is a real customer's words,
+    // supplied by the client, never a sample. The reviews section is hidden until there are real
+    // ones. The quotes this used to carry are in lib/sampleReviews.ts, which strips them from any
+    // client that still has them baked in.
+    items: [],
   },
 
   faq: {
