@@ -1,16 +1,17 @@
 'use client';
 // ─────────────────────────────────────────────────────────────────────────────
-// LawnStats — "seasonal / organic / airy" stat slot, mirrored 1:1 (#lawn .statband / .srail).
-// DUAL (D14, 2026-10-28 resolution): a conventional four-tile trust band (icon ABOVE the
-// numeral — HVAC's steel top-notch, roofing's dark ledger, detailing's hairline strip are each
-// vertical's own treatment of the same under-hero slot), plus a slim season-rail timeline
-// beneath it — demoted from an earlier four-card treatment that was too loud for this slot.
+// LawnStats — "seasonal / organic / airy" stat slot, premium pass (2026-11-09, approved mockup).
+// DUAL (D14, 2026-10-28 resolution): the four white stat tiles became one HAIRLINE LEDGER on the
+// soft band — each stat's positional icon in a soft green tile BESIDE the numeral, cells split by
+// vertical rules — and beneath it the season rail as a TIMELINE: "Your year with us", a rule with
+// a dot per season. Phone: a 2×2 ledger with the icon above the numeral, and a two-column rail
+// without the connecting rule.
 //
 // Both halves are client-supplied and degrade INDEPENDENTLY (D5):
-//   about.stats empty    -> the stat band is not rendered (D4 — a statistic is never generated)
+//   about.stats empty    -> the stat ledger is not rendered (D4 — a statistic is never generated)
 //   about.seasons absent -> the rail is not rendered (we do not describe a programme the
 //                           client doesn't actually run)
-// Fixed design, no skin.
+// Every colour is a palette token (the icon tile is accent mixed into bg). Fixed design, no skin.
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
@@ -44,27 +45,31 @@ export default function LawnStats({ content = CONTENT }: { content?: SiteContent
   if (!stats.length && !seasons.length) return null;
 
   return (
-    <section className="bg-bgSoft py-[56px]">
-      <div className="mx-auto max-w-[1140px] px-6">
+    <section className="bg-bgSoft py-12 lg:py-16">
+      <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
         {stats.length > 0 && (
-          <div className="grid grid-cols-2 gap-[22px] lg:grid-cols-4">
+          <div className="grid grid-cols-2 border-y border-rule lg:grid-cols-4">
             {stats.map((s, i) => (
               <div
                 key={s.l || i}
-                className="rounded-[22px] border border-rule bg-bg px-[22px] py-6 shadow-[0_1px_2px_rgba(22,37,26,0.04)]"
+                className={`flex min-w-0 flex-col gap-2.5 px-4 py-[18px] lg:flex-row lg:items-start lg:gap-4 lg:px-7 lg:py-[26px] ${
+                  i % 2 === 0 ? 'pl-0' : 'border-l border-rule'
+                } ${i >= 2 ? 'border-t border-rule' : ''} lg:border-t-0 ${i > 0 ? 'lg:border-l lg:border-rule lg:pl-7' : 'lg:pl-0'}`}
               >
                 <span
-                  className="mb-3.5 grid h-[38px] w-[38px] place-items-center rounded-[12px] text-accent"
-                  style={{ background: '#E2EDDB' }}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] text-accent"
+                  style={{ background: 'color-mix(in srgb, var(--accent) 12%, var(--bg))' }}
                   aria-hidden="true"
                 >
                   {STAT_ICONS[i % STAT_ICONS.length]}
                 </span>
-                <div className="font-heading text-[40px] font-extrabold leading-none tracking-[-0.03em] text-ink">
-                  <E p={`about.stats.${i}.n`}>{s.n}</E>
-                </div>
-                <div className="mt-[7px] text-[13.5px] font-semibold leading-[1.35] text-inkSoft">
-                  <E p={`about.stats.${i}.l`}>{s.l}</E>
+                <div className="min-w-0">
+                  <div className="font-heading text-[38px] font-extrabold leading-none tracking-[-0.02em] text-ink lg:text-[44px]">
+                    <E p={`about.stats.${i}.n`}>{s.n}</E>
+                  </div>
+                  <div className="mt-1.5 text-[13.5px] font-semibold leading-[1.35] text-inkSoft">
+                    <E p={`about.stats.${i}.l`}>{s.l}</E>
+                  </div>
                 </div>
               </div>
             ))}
@@ -72,19 +77,25 @@ export default function LawnStats({ content = CONTENT }: { content?: SiteContent
         )}
 
         {seasons.length > 0 && (
-          <div className={stats.length ? 'mt-[30px] border-t border-rule pt-[26px]' : ''}>
-            <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-accent">Your year with us</div>
-            <div className="mt-4 grid grid-cols-2 gap-5 md:grid-cols-4">
+          <div className={stats.length ? 'mt-[34px] border-t border-rule pt-7' : ''}>
+            <div className="flex items-center gap-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-accent">
+              <span className="accent-bar !h-[3px] !w-7" aria-hidden="true" />
+              Your year with us
+            </div>
+            <div className="relative mt-[18px] grid grid-cols-2 gap-5 md:grid-cols-4">
+              {/* The timeline's rule: one hairline the season dots sit on (desktop only). */}
+              <span className="absolute left-0 right-0 top-1 hidden h-px bg-rule md:block" aria-hidden="true" />
               {seasons.map((s, i) => (
-                <div key={s.key} className="relative pt-[21px]">
-                  <span className="absolute left-0 top-0 h-[9px] w-[9px] rounded-full bg-accent" aria-hidden="true" />
-                  {i < seasons.length - 1 && (
-                    <span className="absolute left-[13px] top-1 hidden h-px flex-1 bg-rule md:right-[-20px] md:block" aria-hidden="true" />
-                  )}
-                  <div className="text-[11.5px] font-extrabold uppercase tracking-[0.15em] text-accent">
+                <div key={s.key} className="relative min-w-0 pt-[22px]">
+                  <span
+                    className="absolute left-0 top-0 h-[9px] w-[9px] rounded-full bg-accent"
+                    style={{ boxShadow: '0 0 0 4px var(--bg-soft)' }}
+                    aria-hidden="true"
+                  />
+                  <div className="text-[11.5px] font-extrabold uppercase leading-none tracking-[0.15em] text-accent">
                     <E p={`about.seasons.${i}.label`}>{s.label}</E>
                   </div>
-                  <div className="mt-[5px] text-[14px] leading-[1.5] text-inkSoft">
+                  <div className="mt-1.5 text-[14px] leading-[1.5] text-inkSoft">
                     <E p={`about.seasons.${i}.body`}>{s.body}</E>
                   </div>
                 </div>
