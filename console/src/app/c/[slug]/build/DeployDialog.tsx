@@ -16,6 +16,7 @@ import {
 import {
   DeployProgress, NextStep, SharedLibsPanel, upgradeConfirmation, useSharedLibPlan,
 } from './SharedLibs';
+import SeoCheckPanel from './SeoCheckPanel';
 
 /**
  * Ship studio changes to a client's LIVE site.
@@ -398,6 +399,12 @@ export default function DeployDialog({
               slug={slug}
               onRecheck={() => setRefreshKey((k) => k + 1)}
             />
+          )}
+
+          {status.kind === 'ready' && (
+            <div className="mt-5">
+              <SeoCheckPanel content={effective} composition={composition} vertical={vertical} />
+            </div>
           )}
 
           {status.kind === 'ready' && !status.payload.blocker && libs.plan && (

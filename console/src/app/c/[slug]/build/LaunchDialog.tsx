@@ -11,6 +11,7 @@ import type { SiteContent } from '@/data/site';
 import { defaultSkin, supportsSkin } from '@/lib/skins';
 import { EASE } from '@/lib/motion';
 import { NextStep, SharedLibsPanel, upgradeConfirmation, useSharedLibPlan } from './SharedLibs';
+import SeoCheckPanel from './SeoCheckPanel';
 
 // Export + destination, lifted out of the old FinalizePanel. The Studio canvas owns
 // composition and editing; this owns only "ship it". It opens from the top bar's Launch
@@ -259,6 +260,10 @@ export default function LaunchDialog({
               {effectiveSlug && <span className="codechip inline-block">clients/{effectiveSlug}/repo</span>}
             </div>
           )}
+
+          <div className="mt-4">
+            <SeoCheckPanel content={effective} composition={composition} vertical={vertical} />
+          </div>
 
           {slugHasRepo && libs.plan && (
             <SharedLibsPanel
