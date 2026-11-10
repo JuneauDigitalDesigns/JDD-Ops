@@ -5,8 +5,9 @@
  * neutral statement of what a thing is: console copy never addresses anyone or asks.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, PencilSimple, Plus, X } from '@phosphor-icons/react';
+import { PencilSimple, Plus, X } from '@phosphor-icons/react';
 import { SOURCE_LABEL, type FactSource } from '@/lib/intake-sources';
+import { typeLiveChip, settleLiveChip } from '@/lib/live-chip';
 
 /** A bordered panel that fills its grid cell and never grows the page: its body scrolls inside
  *  the card only when a window is too small for the content. */
@@ -110,24 +111,36 @@ export function ChipListEditor({
   inputId?: string;
 }) {
   const [draft, setDraft] = useState('');
-  const full = max !== undefined && values.length >= max;
-  function add() {
-    const v = draft.trim();
-    if (!v || full) return;
-    if (!values.some((x) => x.toLowerCase() === v.toLowerCase())) onChange([...values, v]);
-    setDraft('');
+  // The item being typed is already saved as the list's last entry (lib/live-chip.ts).
+  const [live, setLive] = useState<number | null>(null);
+  const committed = live === null ? values.length : values.length - 1;
+  const full = max !== undefined && committed >= max && live === null;
+  function type(text: string) {
+    if (full) return;
+    setDraft(text);
+    const next = typeLiveChip(values, live, text);
+    setLive(next.live);
+    onChange(next.values);
   }
+  /** Enter, Add or leaving the box: the typed item is already saved; start the next one. */
+  function settle() {
+    const next = settleLiveChip(values, live);
+    if (next !== values) onChange(next);
+    setDraft('');
+    setLive(null);
+  }
+  const add = settle;
   return (
     <div className="space-y-2">
-      {values.length > 0 && (
+      {committed > 0 && (
         <ul className="flex flex-wrap gap-1.5">
-          {values.map((v, i) => (
+          {values.map((v, i) => i === live ? null : (
             <li key={`${v}-${i}`} className="inline-flex h-7 items-center gap-1 rounded-full border border-uiCardRule bg-panel pl-2.5 pr-1 text-[13px]">
               {v}
               <button
                 type="button"
                 aria-label={`Remove ${v}`}
-                onClick={() => onChange(values.filter((_, j) => j !== i))}
+                onClick={() => { const base = settleLiveChip(values, live); setDraft(''); setLive(null); onChange(base.filter((x) => x !== v)); }}
                 className="flex h-5 w-5 items-center justify-center rounded-full text-uiFg3 hover:bg-uiSurface hover:text-uiInk"
               >
                 <X size={11} />
@@ -141,7 +154,8 @@ export function ChipListEditor({
           id={inputId}
           value={draft}
           disabled={full}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => type(e.target.value)}
+          onBlur={settle}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           placeholder={full ? `${max} maximum` : placeholder}
           aria-label={placeholder ?? addLabel}
@@ -213,16 +227,22 @@ export function FactRow({
   const supplied = source === 'form' || source === 'close' || source === 'console';
   const [draft, setDraft] = useState('');
   const ref = useRef<HTMLInputElement>(null);
+  /** The value when the row was opened: Escape puts it back. */
+  const opened = useRef<unknown>(null);
   useEffect(() => {
     if (!open) return;
+    opened.current = value;
     setDraft(Array.isArray(value) ? value.filter(Boolean).join(', ') : value == null ? '' : String(value));
     requestAnimationFrame(() => ref.current?.focus());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  function save() {
-    onSave(list ? draft.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean) : draft.trim());
-    onClose();
+  // Autosave (Xander, 2026-11-10): every keystroke is written through, so nothing typed waits
+  // on a button or is lost on a step change, a reload or a closed tab. The input keeps the raw
+  // text; the saved value is trimmed (and split, for a list).
+  function change(t: string) {
+    setDraft(t);
+    onSave(list ? t.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean) : t.trim());
   }
 
   if (open) {
@@ -230,22 +250,20 @@ export function FactRow({
       <div className="grid grid-cols-[16px_118px_minmax(0,1fr)] items-center gap-2 bg-[color-mix(in_srgb,var(--ui-surface)_60%,transparent)] px-3.5 py-2.5">
         <StatusMark ok={supplied} optional={optional} />
         <label htmlFor={`fact-${path}`} className="text-[12.5px] text-uiFg2">{label}</label>
-        <div className="flex items-center gap-1.5">
-          <input
-            id={`fact-${path}`}
-            ref={ref}
-            data-field-path={path}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
-            placeholder={list ? 'Comma-separated' : undefined}
-            className={INPUT}
-          />
-          <button type="button" onClick={save} className="btn btn-sm btn-primary shrink-0" aria-label={`Save ${label}`}>
-            <Check size={12} /> Save
-          </button>
-          <button type="button" onClick={onClose} className="btn btn-sm shrink-0">Cancel</button>
-        </div>
+        <input
+          id={`fact-${path}`}
+          ref={ref}
+          data-field-path={path}
+          value={draft}
+          onChange={(e) => change(e.target.value)}
+          onBlur={onClose}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onClose();
+            if (e.key === 'Escape') { onSave(opened.current); onClose(); }
+          }}
+          placeholder={list ? 'Comma-separated' : undefined}
+          className={INPUT}
+        />
       </div>
     );
   }

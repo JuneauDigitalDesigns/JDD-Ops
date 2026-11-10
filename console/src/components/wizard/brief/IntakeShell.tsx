@@ -20,6 +20,9 @@ import type { SourceContext } from '@/lib/intake-sources';
 import type { TodoItem } from '@/lib/intake-todo';
 import type { CopyRisks } from '@/lib/copyRisks';
 import type { RiskTarget } from '@/lib/intake-risks';
+import type { ReviewDraft } from '@/lib/review-draft';
+import type { SaveStatus } from '@/lib/autosave';
+import SaveIndicator from '../intake/SaveIndicator';
 import { INTAKE_STEPS, stepIndex, type IntakeStepDef } from '@/lib/intake-steps';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import type { VerticalId } from '@/lib/verticals';
@@ -51,7 +54,7 @@ export default function IntakeShell({
   brief, verticalDef, imported, tickedSections, copyModel, onCopyModelChange,
   onGenerated, onClearGenerated, hasGenerated,
   verdictFor, pages, unreviewed, gateReason, onApprove,
-  todo, counts, stats, risks,
+  todo, counts, stats, risks, reviewDraft, onReviewDraftChange, saveStatus, onRetrySave,
 }: {
   activeId: string;
   onSelect: (id: string) => void;
@@ -87,6 +90,10 @@ export default function IntakeShell({
   stats: Array<{ value: string; label: string; ok?: boolean }>;
   /** client-seo's copyRisks over the effective content: the Still to do warning (SEO plan D2). */
   risks: CopyRisks;
+  reviewDraft: ReviewDraft | null;
+  onReviewDraftChange: (d: ReviewDraft | null) => void;
+  saveStatus: SaveStatus;
+  onRetrySave: () => void;
 }) {
   const reduce = useReducedMotion();
   const [dir, setDir] = useState(1);
@@ -119,8 +126,11 @@ export default function IntakeShell({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-uiCardRule bg-uiBg px-6 py-1.5">
-        <StepRail steps={INTAKE_STEPS} activeId={activeId} counts={counts} onSelect={select} />
+      <div className="flex shrink-0 items-center gap-4 border-b border-uiCardRule bg-uiBg px-6 py-1.5">
+        <div className="min-w-0 flex-1">
+          <StepRail steps={INTAKE_STEPS} activeId={activeId} counts={counts} onSelect={select} />
+        </div>
+        <SaveIndicator status={saveStatus} onRetry={onRetrySave} />
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -156,7 +166,9 @@ export default function IntakeShell({
                 <ServicesStep content={content} setField={setField} focusService={focus.service} />
               )}
               {step.kind === 'area' && <AreaStep content={content} sources={sources} setField={setField} />}
-              {step.kind === 'reviews' && <ReviewsStep content={content} sources={sources} setField={setField} />}
+              {step.kind === 'reviews' && (
+                <ReviewsStep content={content} sources={sources} setField={setField} reviewDraft={reviewDraft} onReviewDraftChange={onReviewDraftChange} />
+              )}
               {step.kind === 'words' && step.blockIds && (
                 <WordsStep blockIds={step.blockIds} blocks={blocks} content={content} setField={setField} onUpdate={onUpdate} />
               )}

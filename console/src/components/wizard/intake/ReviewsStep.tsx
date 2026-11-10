@@ -14,13 +14,13 @@
  * Reviews saved before provenance existed have no `source`. They stay on the site, marked
  * "Source not recorded" for someone to complete, and are never hidden.
  */
-import { useState } from 'react';
-import { PencilSimple, Star, Trash } from '@phosphor-icons/react';
+import { CheckCircle, PencilSimple, Star, Trash } from '@phosphor-icons/react';
 import { REVIEW_SOURCES, serviceSlugs, type ReviewSource } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { realReviews } from '@/lib/intake-todo';
 import { sourceOf, type SourceContext } from '@/lib/intake-sources';
+import { EMPTY_DRAFT, applyDraft, draftFromReview, draftMissing, type ReviewDraft } from '@/lib/review-draft';
 import { Card, Tag, SourceChip, INPUT, FIELD_LABEL } from './ui';
 
 type Review = SiteContent['testimonials']['items'][number];
@@ -31,26 +31,14 @@ const SOURCE_LABEL: Record<ReviewSource, string> = {
 const NEEDS_LINK = new Set<ReviewSource>(['google', 'yelp', 'facebook']);
 const BLANK: Review = { q: '', a: '', r: '', company: null, stars: 5 };
 
-interface Draft {
-  source: ReviewSource | '';
-  sourceUrl: string;
-  a: string;
-  stars: number;
-  date: string;
-  q: string;
-  service: string;
-  company: string;
-  verbatim: boolean;
-}
-
-const EMPTY: Draft = { source: 'google', sourceUrl: '', a: '', stars: 5, date: '', q: '', service: '', company: '', verbatim: false };
-
 export default function ReviewsStep({
-  content, sources, setField,
+  content, sources, setField, reviewDraft, onReviewDraftChange,
 }: {
   content: SiteContent;
   sources: SourceContext;
   setField: SetField;
+  reviewDraft: ReviewDraft | null;
+  onReviewDraftChange: (d: ReviewDraft | null) => void;
 }) {
   const items = content.testimonials?.items ?? [];
   const saved = realReviews(content);
@@ -69,62 +57,35 @@ export default function ReviewsStep({
     setField('extensions.reviewBadge', !r && !c && !url ? null : { rating: r, count: c, url });
   }
 
-  const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [editing, setEditing] = useState<number | null>(null);
-  const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-
+  // The draft is the wizard's (saved in its bundle), not this component's: it survives a step
+  // change, a reload and a closed tab. It becomes a review by itself once complete.
+  const draft = reviewDraft ?? EMPTY_DRAFT;
+  const editing = draft.index;
+  const missing = draftMissing(draft);
   const linkNeeded = draft.source !== '' && NEEDS_LINK.has(draft.source);
-  const ready = Boolean(draft.source && draft.a.trim() && draft.q.trim() && draft.verbatim && (!linkNeeded || draft.sourceUrl.trim()));
 
-  function edit(i: number) {
-    const t = items[i];
-    setEditing(i);
-    setDraft({
-      source: (t.source as ReviewSource | undefined) ?? '',
-      sourceUrl: t.sourceUrl ?? '',
-      a: t.a ?? '',
-      stars: t.stars || 5,
-      date: t.date ?? '',
-      q: t.q ?? '',
-      service: t.service ?? '',
-      company: t.company ?? '',
-      verbatim: false,
-    });
+  function set(patch: Partial<ReviewDraft>) {
+    const next = { ...draft, ...patch };
+    const applied = applyDraft(items, next);
+    if (applied) {
+      setField('testimonials.items', applied.items);
+      next.index = applied.index;
+      // Tagging a review to a service stores that service's slug the first time (spec §2).
+      if (next.service) {
+        const k = slugs.indexOf(next.service);
+        if (k >= 0 && !services[k]?.slug) setField(`services.items.${k}.slug`, next.service);
+      }
+    }
+    onReviewDraftChange(next);
   }
 
-  function save() {
-    if (!ready || !draft.source) return;
-    const review: Review = {
-      q: draft.q.trim(),
-      a: draft.a.trim(),
-      r: editing !== null ? items[editing]?.r ?? '' : '',
-      company: draft.company.trim() || null,
-      stars: draft.stars,
-      source: draft.source,
-      ...(draft.sourceUrl.trim() ? { sourceUrl: draft.sourceUrl.trim() } : {}),
-      ...(draft.date.trim() ? { date: draft.date.trim() } : {}),
-      ...(draft.service ? { service: draft.service } : {}),
-    };
-    const next = [...items];
-    if (editing !== null) next[editing] = review;
-    else {
-      const blank = next.findIndex((t) => !t?.q?.trim());
-      if (blank >= 0) next[blank] = review;
-      else next.push(review);
-    }
-    setField('testimonials.items', next);
-    // Tagging a review to a service stores that service's slug the first time (spec §2).
-    if (draft.service) {
-      const k = slugs.indexOf(draft.service);
-      if (k >= 0 && !services[k]?.slug) setField(`services.items.${k}.slug`, draft.service);
-    }
-    setDraft(EMPTY);
-    setEditing(null);
+  function edit(i: number) {
+    onReviewDraftChange(draftFromReview(items[i], i));
   }
 
   function remove(i: number) {
     setField('testimonials.items', items.map((t, j) => (j === i ? BLANK : t)));
-    if (editing === i) { setEditing(null); setDraft(EMPTY); }
+    if (editing === i) onReviewDraftChange(null);
   }
 
   return (
@@ -245,11 +206,19 @@ export default function ReviewsStep({
             <input type="checkbox" checked={draft.verbatim} onChange={(e) => set({ verbatim: e.target.checked })} className="mt-0.5 h-4 w-4" style={{ accentColor: 'var(--accent)' }} />
             <span>Copied word for word from the review. Not edited, not combined.</span>
           </label>
-          <div className="flex gap-2">
-            <button type="button" onClick={save} disabled={!ready} className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50">
-              {editing !== null ? 'Save changes' : 'Save review'}
-            </button>
-            <button type="button" onClick={() => { setDraft(EMPTY); setEditing(null); }} className="btn">Clear</button>
+          {/* No Save button (autosave, 2026-11-10): the draft is kept as typed, and is the review
+              once complete. The line says which of the two it is. */}
+          <div className="flex items-center gap-3">
+            <p className="min-w-0 flex-1 text-xs leading-snug" role="status" style={{ color: missing.length ? 'var(--ui-fg-3)' : 'var(--ok)' }}>
+              {missing.length === 0 ? (
+                <span className="inline-flex items-center gap-1.5 font-semibold"><CheckCircle size={14} weight="fill" /> Saved as a review.</span>
+              ) : editing !== null ? (
+                <>Changes kept as a draft. The saved review updates once it has: {missing.join(', ')}.</>
+              ) : (
+                <>Draft, kept here. Becomes a review once it has: {missing.join(', ')}.</>
+              )}
+            </p>
+            <button type="button" onClick={() => onReviewDraftChange(null)} className="btn btn-sm shrink-0">New review</button>
           </div>
         </Card>
 

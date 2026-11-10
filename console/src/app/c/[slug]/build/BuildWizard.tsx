@@ -29,6 +29,8 @@ import { chosenServicePages } from './service-page-sync';
 import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import { landingStepId } from '@/lib/intake-steps';
+import { createAutosaver, combineStatus, postJson, type Autosaver, type SaveStatus } from '@/lib/autosave';
+import type { ReviewDraft } from '@/lib/review-draft';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
@@ -87,6 +89,9 @@ type WizardBundle = {
   siteComposition: SiteComposition;
   /** Epoch ms of this save, so the newer of this browser's copy and the server draft opens. */
   savedAt?: number;
+  /** A review being typed on the intake's Reviews step, not yet complete enough to be a review
+   *  (autosave, 2026-11-10). Kept here so it survives a step change, a reload and a closed tab. */
+  reviewDraft?: ReviewDraft | null;
 };
 
 /**
@@ -229,6 +234,7 @@ export default function BuildWizard({
   const [intakeStage, setIntakeStage] = useState<IntakeStageId>('business');
   const [brief, setBrief] = useState<CopyBrief>(emptyCopyBrief);
   const [copyModel, setCopyModel] = useState<string>(DEFAULT_MODEL_ID);
+  const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null);
 
   // ── Builder layer ─────────────────────────────────────────────────────────
   const [selections, setSelections] = useState<Selections>({});
@@ -241,7 +247,37 @@ export default function BuildWizard({
   // A ref rather than state: it must not itself trigger a render, and it is always read in
   // the same tick the selection it describes is reconciled.
   const pendingInsert = useRef<{ id: string; at: number } | null>(null);
-  const saveDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The wizard's two server writes (the draft bundle, and the brief into site.ts), each
+  // debounced, retried and reporting a status (lib/autosave.ts). One saver per client; a slug
+  // change remounts this component (see the hydration effect).
+  const draftSaver = useRef<Autosaver<{ slug: string; bundle: WizardBundle }> | null>(null);
+  const briefSaver = useRef<Autosaver<{ slug: string; brief: CopyBrief }> | null>(null);
+  const [draftStatus, setDraftStatus] = useState<SaveStatus>({ state: 'idle', failures: 0 });
+  const [briefStatus, setBriefStatus] = useState<SaveStatus>({ state: 'idle', failures: 0 });
+  const [localSaveError, setLocalSaveError] = useState<string | null>(null);
+  useEffect(() => {
+    const d = createAutosaver<{ slug: string; bundle: WizardBundle }>(postJson('/api/build/save-draft'));
+    const b = createAutosaver<{ slug: string; brief: CopyBrief }>(postJson('/api/build/save-brief'));
+    draftSaver.current = d;
+    briefSaver.current = b;
+    const offD = d.subscribe(setDraftStatus);
+    const offB = b.subscribe(setBriefStatus);
+    return () => {
+      // Send what's queued before letting go (a client switch remounts this component).
+      void d.flush();
+      void b.flush();
+      offD(); offB();
+      d.dispose(); b.dispose();
+    };
+  }, [slug]);
+  const saveStatus = useMemo<SaveStatus>(() => {
+    const s = combineStatus(draftStatus, briefStatus);
+    return localSaveError && s.state !== 'error' ? { state: 'error', error: localSaveError, failures: 1 } : s;
+  }, [draftStatus, briefStatus, localSaveError]);
+  const retrySave = useCallback(() => {
+    draftSaver.current?.retry();
+    briefSaver.current?.retry();
+  }, []);
   /**
    * False until the hydration effect has applied this client's saved bundle. Guards the
    * persist effect below: effects run in declaration order, so on the very first commit
@@ -341,27 +377,23 @@ export default function BuildWizard({
     if (!hydrated.current) return;
     const bundle: WizardBundle = {
       vertical, imported, generated, edits, selections, skins, order,
-      intakeStage, brief, copyModel, siteComposition,
+      intakeStage, brief, copyModel, siteComposition, reviewDraft,
       savedAt: Date.now(),
     };
     try {
       window.localStorage.setItem(bundleKey(slug), JSON.stringify(bundle));
-    } catch {
-      /* storage full or unavailable */
+      setLocalSaveError(null);
+    } catch (e) {
+      // Storage full or blocked: shown, not swallowed. The server copy below still saves.
+      setLocalSaveError(e instanceof Error ? e.message : 'Browser storage unavailable');
     }
-    // Also save to the server (debounced) so the draft survives cache clears and
-    // mid-generation refreshes. Fire-and-forget — no user-visible error state.
-    if (saveDraftTimer.current) clearTimeout(saveDraftTimer.current);
-    saveDraftTimer.current = setTimeout(() => {
-      fetch('/api/build/save-draft', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug, bundle }),
-      }).catch(() => { /* best-effort */ });
-    }, 700);
+    // Also save to the server (debounced, retried, status shown) so the draft survives cache
+    // clears and mid-generation refreshes. It was fire-and-forget until the autosave change
+    // (2026-11-10): a failed save left nothing to see.
+    draftSaver.current?.schedule({ slug, bundle });
   }, [
     slug, vertical, imported, generated, edits, selections, skins, order,
-    intakeStage, brief, copyModel, siteComposition,
+    intakeStage, brief, copyModel, siteComposition, reviewDraft,
   ]);
 
   // Persist the brief durably to clients/{slug}/site.ts (_meta.copyBrief) — separate from the
@@ -369,18 +401,21 @@ export default function BuildWizard({
   // in the intake rebuild plan). The brief has to survive past launch, so it needs its own
   // debounced save straight to the file the export route never touches. Watches only `brief`
   // (not the whole bundle) so an unrelated Studio edit doesn't trigger an extra write here.
-  const saveBriefTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydrated.current) return;
-    if (saveBriefTimer.current) clearTimeout(saveBriefTimer.current);
-    saveBriefTimer.current = setTimeout(() => {
-      fetch('/api/build/save-brief', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug, brief }),
-      }).catch(() => { /* best-effort */ });
-    }, 700);
+    briefSaver.current?.schedule({ slug, brief });
   }, [slug, brief]);
+
+  // Nothing typed is lost on closing the tab: send whatever is queued now, keepalive. (This
+  // browser's storage already holds every change; this covers the server copies.)
+  useEffect(() => {
+    const flush = () => {
+      void draftSaver.current?.flush({ keepalive: true });
+      void briefSaver.current?.flush({ keepalive: true });
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, []);
 
   // ── Undo/redo — two view-scoped stacks (Intake vs Studio) ─────────────────
   // Each step's undo/redo drives its own stack. Both snapshots include `edits` (shared: the
@@ -491,6 +526,7 @@ export default function BuildWizard({
     setIntakeStage(landingStepId(b.intakeStage, nextBrief.lastRunAt));
     setBrief(nextBrief);
     setCopyModel(b.copyModel ?? DEFAULT_MODEL_ID);
+    setReviewDraft(b.reviewDraft ?? null);
     // Prefer a saved composition; otherwise lift the legacy selections/order (existing clients),
     // otherwise the default 4-page site. ensureSectionIds backfills stable ids on any composition
     // that predates them (older bundles, legacy lifts) so per-section styling can key off them.
@@ -752,6 +788,7 @@ export default function BuildWizard({
         intakeStage: saved?.intakeStage ?? draftBundle?.intakeStage as IntakeStageId | undefined,
         brief: (saved?.brief ?? draftBundle?.brief as CopyBrief | undefined) ?? (seed?._meta.copyBrief as CopyBrief | undefined),
         copyModel: saved?.copyModel ?? draftBundle?.copyModel as string | undefined,
+        reviewDraft: saved?.reviewDraft ?? (draftBundle?.reviewDraft as ReviewDraft | null | undefined),
       });
     } else {
       // ── Never exported: local storage wins, then the server draft, then a fresh start. ──
@@ -895,6 +932,10 @@ export default function BuildWizard({
                   onCopyModelChange={setCopyModel}
                   pages={intakePages}
                   edits={edits}
+                  reviewDraft={reviewDraft}
+                  onReviewDraftChange={setReviewDraft}
+                  saveStatus={saveStatus}
+                  onRetrySave={retrySave}
                 />
               </div>
             )}

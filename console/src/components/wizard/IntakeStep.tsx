@@ -13,6 +13,8 @@ import { sourceOf, isSupplied, type SourceContext } from '@/lib/intake-sources';
 import { intakeTodo, attentionByStep, servicePageHint, realReviews, BUSINESS_GROUPS } from '@/lib/intake-todo';
 import { SERVICE_GATE } from '@/lib/service-gate';
 import { copyRisks } from '@/lib/copyRisks';
+import type { ReviewDraft } from '@/lib/review-draft';
+import type { SaveStatus } from '@/lib/autosave';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
 import { migrateStepId, landingStepId } from '@/lib/intake-steps';
 import IntakeShell from './brief/IntakeShell';
@@ -55,6 +57,10 @@ export default function IntakeStep({
   onCopyModelChange,
   pages,
   edits,
+  reviewDraft,
+  onReviewDraftChange,
+  saveStatus,
+  onRetrySave,
 }: {
   stage: IntakeStageId;
   onStageChange: (s: IntakeStageId) => void;
@@ -78,6 +84,12 @@ export default function IntakeStep({
   pages: ReviewPage[];
   /** The operator's edits by path: an edited value's source is Console (lib/intake-sources.ts). */
   edits: Record<string, unknown>;
+  /** A review being typed, kept in the wizard's saved bundle (autosave). */
+  reviewDraft: ReviewDraft | null;
+  onReviewDraftChange: (d: ReviewDraft | null) => void;
+  /** The wizard's save status, shown in the intake (autosave). */
+  saveStatus: SaveStatus;
+  onRetrySave: () => void;
 }) {
 
   // Only the six built-in verticals are visible client-side today — a custom/overridden
@@ -242,6 +254,10 @@ export default function IntakeStep({
       counts={counts}
       stats={stats}
       risks={risks}
+      reviewDraft={reviewDraft}
+      onReviewDraftChange={onReviewDraftChange}
+      saveStatus={saveStatus}
+      onRetrySave={onRetrySave}
       vertical={vertical}
       onVerticalChange={onVerticalChange}
       clientPickedVertical={clientPickedVertical}
