@@ -18,6 +18,7 @@ import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { servicePageHint } from '@/lib/intake-todo';
 import { SERVICE_GATE } from '@/lib/service-gate';
+import { serviceAreasToStore } from '@/lib/service-areas';
 import { Card, ChipListEditor, ToggleChips, Tag, INPUT, FIELD_LABEL } from './ui';
 
 type Item = SiteContent['services']['items'][number];
@@ -209,7 +210,12 @@ function ServicePanel({
           <JobPhotos
             name={item.t}
             photos={myPhotos}
-            onAdd={(p) => { ensureSlug(); setField('work.projects', [...projects, { ...p, service: slug }]); }}
+            onAdd={(p) => {
+              ensureSlug();
+              setField('work.projects', [...projects, { ...p, service: slug }]);
+              // Photo 1 is also the service's own picture, as the onboarding form maps it.
+              if (!item.image?.url && p.image) setField(`${base}.image`, p.image);
+            }}
             onCaption={(k, caption) => setField('work.projects', projects.map((p, j) => (j === k ? { ...p, caption, image: p.image ? { ...p.image, alt: caption } : p.image } : p)))}
             onRemove={(k) => setField('work.projects', projects.filter((_, j) => j !== k))}
           />
@@ -234,11 +240,11 @@ function ServicePanel({
             <ToggleChips
               options={area}
               selected={item.areas ?? []}
-              onChange={(v) => setField(`${base}.areas`, v)}
+              onChange={(v) => setField(`${base}.areas`, serviceAreasToStore(v, area))}
               emptyNote="No service area yet (Area & profiles step)."
             />
             <p className="mt-1.5 text-2xs leading-relaxed text-uiFg3">
-              Towns ticked here show as an areas block on its page. None ticked: no areas block.
+              Only this service's own towns, shown as an areas block on its page. None ticked: no areas block. Every town ticked is stored as none.
             </p>
           </div>
           <div>

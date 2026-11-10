@@ -155,3 +155,14 @@ test('a preset star rating is a required item: it is an invented rating on a rea
   const ok = intakeTodo(GATE, { imported: own, preset: withBadge, edits: {}, effective: own });
   assert.equal(ok.some((i) => i.key === 'extensions.reviewBadge'), false);
 });
+
+test('ticking every town for a service stores none: "everywhere" is not a subset (client-seo, 2026-11-10)', async () => {
+  const { serviceAreasToStore } = await import('../src/lib/service-areas.ts');
+  const area = ['Winter Park', 'Maitland', 'Orlando'];
+  assert.deepEqual(serviceAreasToStore(['Winter Park', 'Maitland'], area), ['Winter Park', 'Maitland']);
+  assert.deepEqual(serviceAreasToStore(['orlando', 'Winter Park', 'Maitland'], area), []);
+  // Under the gate as it now stands (areas count whenever present), storing the full list
+  // would give a service the areas fact for free.
+  const full = { services: { items: [{ t: 'AC', areas: area }] }, extensions: { serviceArea: area } };
+  assert.ok(GATE.servicePageFacts(full, 0).have.includes('areas'));
+});
