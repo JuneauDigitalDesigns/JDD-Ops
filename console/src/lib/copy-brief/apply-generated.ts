@@ -120,9 +120,11 @@ export function applyGeneratedCopy(
       ...base.testimonials,
       eyebrow: t.eyebrow ?? base.testimonials.eyebrow,
       title: t.title ?? base.testimonials.title,
-      items: mergeArray(base.testimonials.items, t.items, (b, c) => ({
-        ...b, q: c.q ?? b.q, a: c.a ?? b.a, r: c.r ?? b.r, company: c.company ?? b.company, stars: c.stars ?? b.stars,
-      })),
+      // ALWAYS base.testimonials.items, never model output (operator decision, 2026-11-10): the
+      // client's real reviews, or the scaffold's blank slots, which the review sections skip.
+      // Never [] in place of blanks: deepMerge reads [] as missing and the preset's sample
+      // quotes would fill it.
+      items: base.testimonials.items,
     };
   }
 

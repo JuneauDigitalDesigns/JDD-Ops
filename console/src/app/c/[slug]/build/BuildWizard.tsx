@@ -7,6 +7,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
 import { deepMerge, applyEdits } from '@/lib/merge';
+import { stripSampleReviews } from '@/lib/sampleReviews';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import type { CopyBrief } from '@jdd/schema';
@@ -251,10 +252,13 @@ export default function BuildWizard({
   // Effective = vertical preset ← imported ← generated ← user edits (top).
   const effective = useMemo(
     () => {
-      const merged = applyEdits(
+      // Sample reviews from an old preset can be baked into a client's imported content. Strip
+      // them AFTER the merge (so the emptied list can't fall through to a preset), here so the
+      // preview shows what the export will ship (lib/sampleReviews.ts).
+      const merged = stripSampleReviews(applyEdits(
         deepMerge(deepMerge(presetFor(vertical), imported ?? {}), generated ?? {}),
         edits,
-      );
+      )).content;
       // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
       // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
       // content. Left hidden while empty, so an untouched Work section stays off (and the
