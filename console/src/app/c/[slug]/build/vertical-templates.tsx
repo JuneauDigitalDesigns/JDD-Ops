@@ -353,7 +353,11 @@ export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> =
     build: plumbingTemplate,
     serviceSections: () => [S('pageHeader', 'PlumbingServiceHeader'), S('services', 'PlumbingServiceDetail'), S('finalCta', 'PlumbingFinalCta')],
   },
-  'car-detailing': { label: 'Car Detailing — Standard', build: detailTemplate },
+  'car-detailing': {
+    label: 'Car Detailing — Standard',
+    build: detailTemplate,
+    serviceSections: () => [S('pageHeader', 'DetailServiceHeader'), S('services', 'DetailServiceDetail'), S('finalCta', 'DetailFinalCta')],
+  },
 };
 
 /** The template for a vertical, or null when none is built yet. */
