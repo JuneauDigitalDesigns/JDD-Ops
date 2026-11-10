@@ -20,7 +20,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { displayAddress, profileLinks, type ProfileKind } from '@/lib/serviceLinks';
 
-/** D11 heading. Pending Xander's word-for-word approval: one constant to change. */
+/** D11 heading, approved word for word by Xander on 2026-11-10. */
 const FIND_US_ON = 'Find us on';
 const PROFILE_ICON: Record<ProfileKind, Icon> = {
   google: GoogleLogo, facebook: FacebookLogo, yelp: Star, bbb: SealCheck, angi: HouseLine,
