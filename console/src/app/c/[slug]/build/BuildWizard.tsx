@@ -35,6 +35,7 @@ import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
 import { newerBundle } from '@/lib/wizardBundle';
+import { useHydrationGate } from '@/lib/hydrationGate';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
 const bundleKey = (slug: string) => `jdd-wizard:${slug}`;
@@ -279,13 +280,17 @@ export default function BuildWizard({
     briefSaver.current?.retry();
   }, []);
   /**
-   * False until the hydration effect has applied this client's saved bundle. Guards the
-   * persist effect below: effects run in declaration order, so on the very first commit
-   * persist would fire BEFORE hydration with this render's empty initial state — and write
-   * that emptiness over a real saved bundle. (Hydration's setState can't reach persist's
-   * closure in the same commit, so ordering alone doesn't fix it.)
+   * False until this render is SHOWING the bundle the hydration effect applied for this slug.
+   * Guards every effect below that saves or reshapes state: effects run in declaration order,
+   * so on the very first commit they fire BEFORE hydration with this render's empty initial
+   * state — and would write that emptiness over a real saved bundle.
+   *
+   * State, not a ref (2026-11-11). The ref flipped to true as soon as hydration ran, a render
+   * before the applied bundle existed, so Strict Mode's re-run of the first render's effects
+   * saved the empty initial state and hydration then read it back as this client's work. See
+   * lib/hydrationGate.ts.
    */
-  const hydrated = useRef(false);
+  const [hydrated, markHydrated] = useHydrationGate(slug);
 
   // Effective = vertical preset ← imported ← generated ← user edits (top).
   const effective = useMemo(
@@ -366,15 +371,15 @@ export default function BuildWizard({
   // Compared by route so the effect settles after one update. Never before hydration, or the
   // empty first render would strip a saved composition's pages.
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     const next = syncServicePages(siteComposition, chosenServicePages(effective, siteComposition));
     if (servicePageSlugs(next).join('|') !== servicePageSlugs(siteComposition).join('|')) setSiteComposition(next);
-  }, [effective, siteComposition]);
+  }, [hydrated, effective, siteComposition]);
 
   // Persist the per-client bundle on any change — but never before hydration has run, or
   // the first commit's empty state would clobber what's in storage. See `hydrated`.
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     const bundle: WizardBundle = {
       vertical, imported, generated, edits, selections, skins, order,
       intakeStage, brief, copyModel, siteComposition, reviewDraft,
@@ -392,7 +397,7 @@ export default function BuildWizard({
     // (2026-11-10): a failed save left nothing to see.
     draftSaver.current?.schedule({ slug, bundle });
   }, [
-    slug, vertical, imported, generated, edits, selections, skins, order,
+    hydrated, slug, vertical, imported, generated, edits, selections, skins, order,
     intakeStage, brief, copyModel, siteComposition, reviewDraft,
   ]);
 
@@ -402,9 +407,9 @@ export default function BuildWizard({
   // debounced save straight to the file the export route never touches. Watches only `brief`
   // (not the whole bundle) so an unrelated Studio edit doesn't trigger an extra write here.
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     briefSaver.current?.schedule({ slug, brief });
-  }, [slug, brief]);
+  }, [hydrated, slug, brief]);
 
   // Nothing typed is lost on closing the tab: send whatever is queued now, keepalive. (This
   // browser's storage already holds every change; this covers the server copies.)
@@ -750,12 +755,13 @@ export default function BuildWizard({
    * the server read out of clients/{slug}/site.ts.
    *
    * This is what step 1 used to do on choose. It has to live down here because it needs
-   * applyBundle and both history stacks, and it flips `hydrated` so the persist effect
+   * applyBundle and both history stacks, and it opens `hydrated` so the persist effect
    * above knows the state it's looking at is real — see the note there.
+   *
+   * Safe to run twice (Strict Mode does): it only reads storage, and nothing has written to
+   * storage until the render that shows what it applied.
    */
   useEffect(() => {
-    hydrated.current = false;
-
     const saved = readBundle(slug);
 
     if (manifest || composition) {
@@ -799,7 +805,9 @@ export default function BuildWizard({
     // Undo across a client switch would restore another client's content into this one.
     intakeHistory.clear();
     studioHistory.clear();
-    hydrated.current = true;
+    // Batched with applyBundle's setState calls, so the gate opens in the same render that
+    // shows the applied bundle — never in one still showing the initial state.
+    markHydrated(slug);
     // Re-runs only on a client change, which in practice means a remount from the router.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
