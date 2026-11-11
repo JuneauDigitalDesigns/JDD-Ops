@@ -23,6 +23,7 @@
  */
 import { copyRisks, factsText, getPath, visibleCopy } from '@/lib/copyRisks';
 import { findDashes } from '@/lib/copy-brief/dash-guard';
+import { toE164 } from '@jdd/schema';
 import { primaryCity, qualifiesForServicePage, serviceSlugs } from '@/lib/servicePages';
 import type { PageSeo, SeoPageRef } from '@/lib/pageSeo';
 
@@ -44,6 +45,44 @@ const NEAR_ME = /\bnear me\b/i;
 const NUMBER = /\$?\d[\d,]*(?:\.\d+)?%?/g;
 
 const digitsOf = (token: string) => token.replace(/[^\d.]/g, '').replace(/\.$/, '');
+
+/**
+ * A phone number as copy writes it: (407) 555-0177, 407-555-0177, 407.555.0177,
+ * +1 407 555 0177, 4075550177. Matched as one run BEFORE the copy is split into NUMBER tokens.
+ *
+ * Why (2026-11-11): factNumbers stores the phone as ONE digits token ("4075550177"), but NUMBER
+ * splits "Call 407-555-0177" into "407", "555" and "0177", none of which is that token. So every
+ * mention of the client's own number was three blocking "not in the client's facts" findings:
+ * Tracewell's SEO check had 9 of them across work.sub, faq.items.2.a and finalCta.secondary.
+ */
+const PHONE = /(?<![\d+])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)/g;
+
+/** Every phone the client stated, as E.164: brand.phone, brand.phoneHref, and any phone written
+ *  in the facts. SiteContent has no other phone field. */
+function factPhones(content: unknown): Set<string> {
+  const brand = obj(obj(content).brand);
+  const out = new Set<string>();
+  const add = (raw: string) => {
+    const e164 = toE164(raw.replace(/^tel:/i, ''));
+    if (e164) out.add(e164);
+  };
+  add(str(brand.phone));
+  add(str(brand.phoneHref));
+  for (const m of factsText(content).matchAll(PHONE)) add(m[0]);
+  return out;
+}
+
+/** Blank out each run of the client's own phone so its pieces aren't read as numbers. A phone
+ *  the client didn't state is left in place, so its pieces are still flagged. */
+function maskKnownPhones(text: string, phones: Set<string>): string {
+  return text.replace(PHONE, (run) => (phones.has(toE164(run) ?? '') ? ' ' : run));
+}
+
+/** The current year in a copyright line ("© 2026 …", "Copyright 2026 …") is not a claim. Only
+ *  there: a bare "2026" anywhere else is still checked. */
+function maskCopyrightYear(text: string, year: number): string {
+  return text.replace(new RegExp(`((?:©|\\bcopyright\\b)\\s*(?:©\\s*)?)${year}(?!\\d)`, 'gi'), '$1');
+}
 
 /** Every number the client stated: facts plus contact details (a street number, a ZIP, the
  *  phone) and the service-area towns. */
@@ -82,7 +121,7 @@ export function scoreSite(
   content: unknown,
   pages: SeoPageRef[],
   pageSeo: Record<string, PageSeo>,
-  opts: { preset?: unknown } = {},
+  opts: { preset?: unknown; now?: Date } = {},
 ): SiteScore {
   const hard: string[] = [];
   const soft: string[] = [];
@@ -110,9 +149,11 @@ export function scoreSite(
 
   // ── Invented facts: numbers the client never stated ──
   const known = factNumbers(content);
+  const phones = factPhones(content);
+  const year = (opts.now ?? new Date()).getFullYear();
   for (const [path, text] of copy) {
     if (isPreset(path, text)) continue; // D2: preset copy warns, below
-    for (const m of text.matchAll(NUMBER)) {
+    for (const m of maskCopyrightYear(maskKnownPhones(text, phones), year).matchAll(NUMBER)) {
       const token = m[0];
       const digits = digitsOf(token);
       if (!digits) continue;
