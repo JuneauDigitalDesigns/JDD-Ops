@@ -46,7 +46,13 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
   const list = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) : []);
   const facts = picked.map((i) => {
     const s: Record<string, any> = { ...(factItems[i] ?? {}), t: factItems[i]?.t ?? items[i]?.t };
-    const own = questions.filter((q) => q && q.service === slugs[i] && typeof q.q === 'string' && q.q.trim()).map((q) => q.q.trim());
+    // A question the client answered is fixed (client-faq.ts): the page shows it first, word for
+    // word, so the model gets it with its answer, as context and as something not to rewrite. A
+    // question without an answer is the model's to answer, as before.
+    const tagged = questions.filter((q) => q && q.service === slugs[i] && typeof q.q === 'string' && q.q.trim());
+    const answered = (q: Record<string, any>) => typeof q.a === 'string' && q.a.trim() !== '';
+    const fixed = tagged.filter(answered).map((q) => ({ q: q.q, a: q.a }));
+    const own = tagged.filter((q) => !answered(q)).map((q) => q.q.trim());
     const out: Record<string, unknown> = { slug: slugs[i], name: s.t };
     if (list(s.included).length) out.included = list(s.included);
     if (list(s.typicalJobs).length) out.typicalJobs = list(s.typicalJobs);
@@ -54,6 +60,7 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
     if (list(s.brands).length) out.brands = list(s.brands);
     if (typeof s.priceFrom === 'string' && s.priceFrom.trim()) out.startingPrice = s.priceFrom.trim();
     if (typeof s.duration === 'string' && s.duration.trim()) out.howLong = s.duration.trim();
+    if (fixed.length) out.fixedQuestions = fixed;
     if (own.length) out.customerQuestions = own;
     return out;
   });
@@ -63,7 +70,7 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
     `- servicePages: one item per service below, each { slug, intro, expect, faq }, for that service's own page.`,
     `intro: 2 to 3 sentences; the first says plainly that the business does this service${where} and how to book it${city ? `, and names ${city} once` : ''}.`,
     'expect: up to 4 short lines on booking, timing and estimates, only what the facts below state; an empty list when they state nothing.',
-    'faq: 3 to 5 questions about this service only, phrased the way a customer asks. Use the customer\'s own questions listed below first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
+    'faq: questions about this service only, phrased the way a customer asks, so that together with the service\'s fixedQuestions the page has 3 to 5 in all. The fixedQuestions are the client\'s own questions and answers and the page shows them first, word for word: never repeat, reword or merge them, and write none of them into faq. Use the customer\'s own questions listed under customerQuestions first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
     `Use only these facts for each service, and write for no service that is not listed:\n${JSON.stringify(facts, null, 2)}`,
   ].join(' ');
 }

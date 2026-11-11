@@ -20,7 +20,8 @@
  */
 import type { Section } from '@/lib/copy-schema';
 import { COPY_FACT_PATHS, FACT_KEY_FOR_PATH } from './facts';
-import { groundedAt, groundedString } from './grounded';
+import { groundedAt, groundedFor, groundedString } from './grounded';
+import { clientFaq } from './client-faq';
 import { compileChipGroup } from './resolve';
 import type {
   BriefContext,
@@ -280,6 +281,22 @@ function sectionsSegment(blocks: ResolvedBlock[], sections: Section[]): PromptSe
   return { blockId: 'sections', label: sectionsBlock.label, text: `Write brand copy for ONLY these sections:\n${lines.join('\n')}` };
 }
 
+/**
+ * The client's own home-FAQ questions and answers, when this chunk writes the FAQ. They are
+ * placed first in the FAQ word for word after generation (apply-generated.ts, client-faq.ts);
+ * this tells the model so, and gives it their answers as facts. Service-tagged ones travel in the
+ * servicePages instruction instead.
+ */
+function fixedFaqSegment(ctx: BriefContext, sections: Section[]): PromptSegment | null {
+  if (!sections.includes('faq')) return null;
+  const home = clientFaq(ctx.effective, groundedFor(ctx)).home;
+  if (!home.length) return null;
+  return {
+    blockId: null, label: 'Fixed FAQ',
+    text: `The client's own questions and answers. They appear first in the FAQ exactly as written, so do not repeat, reword or merge them, and do not write them into faq.items; write the other questions only:\n${JSON.stringify(home, null, 2)}`,
+  };
+}
+
 export function userSegments(ctx: BriefContext, blocks: ResolvedBlock[], sections: Section[]): PromptSegment[] {
   const label = ctx.vertical.label;
   const segments: Array<PromptSegment | null> = [
@@ -294,6 +311,7 @@ export function userSegments(ctx: BriefContext, blocks: ResolvedBlock[], section
     voiceSynthesisSegment(blocks),
     offersSegment(blocks),
     structureSegment(ctx, blocks),
+    fixedFaqSegment(ctx, sections),
     sectionsSegment(blocks, sections),
     { blockId: null, label: 'Closing', text: `Be specific and grounded in the ${label} vertical. Return only JSON matching the schema.` },
   ];
