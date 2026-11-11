@@ -18,9 +18,9 @@
  * block produced each paragraph and lets a click jump back to it, which needs the origin
  * preserved — compileBriefPrompt is a thin join over the same segments this exposes.
  */
-import { getPath } from '@/lib/merge';
 import type { Section } from '@/lib/copy-schema';
 import { COPY_FACT_PATHS, FACT_KEY_FOR_PATH } from './facts';
+import { groundedAt, groundedString } from './grounded';
 import { compileChipGroup } from './resolve';
 import type {
   BriefContext,
@@ -139,7 +139,10 @@ function factsSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment
   const out: Record<string, unknown> = {};
   for (const path of COPY_FACT_PATHS) {
     const key = FACT_KEY_FOR_PATH[path] ?? path;
-    const v = getPath(ctx.effective, path);
+    // Grounded, not effective: a fact the client didn't give used to fall through to the
+    // preset's sample (the tagline "Comfort in every season.", the badge "Licensed & insured ·
+    // CAC1234567") and was sent under this heading as the client's (Tracewell, 2026-11-11).
+    const v = groundedAt(ctx, path);
     const present = Array.isArray(v) ? v.length > 0 : typeof v === 'string' ? v.trim().length > 0 : v != null;
     if (present) out[key] = v;
   }
@@ -149,7 +152,7 @@ function factsSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment
   if (!Object.keys(out).length) return null;
   return {
     blockId: 'facts', label: 'Business facts',
-    text: `Business facts (from the client's onboarding intake / preset):\n${JSON.stringify(out, null, 2)}`,
+    text: `Business facts (from the client's onboarding intake and the operator):\n${JSON.stringify(out, null, 2)}`,
   };
 }
 
@@ -228,15 +231,25 @@ function offersSegment(blocks: ResolvedBlock[]): PromptSegment | null {
 function structureSegment(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment | null {
   const structure = find<StructureBlock>(blocks, 'structure');
   if (!structure.enabled) return null;
+  // The counts are layout and come from the composition (effective), preset included. The
+  // reference is text the model is told to respect, so it is grounded: the preset's hero
+  // ("Licensed & insured · 24/7 emergency service" / "AC out? We can be there today.") was sent
+  // as this client's existing hero (Tracewell, 2026-11-11). A previous run's generated hero is
+  // not sent either: it would hand the model back whatever that run invented.
   const counts: Record<string, number> = {};
   for (const e of structure.entries) counts[e.key] = e.count;
-  const ref = {
-    ...counts,
-    reference: {
-      hero: { eyebrow: ctx.effective.hero.eyebrow, headline: ctx.effective.hero.headline },
-      serviceTags: ctx.effective.services.items.map((s) => s.tag),
-    },
-  };
+  const hero: Record<string, string> = {};
+  const eyebrow = groundedString(ctx, 'hero.eyebrow');
+  const headline = groundedString(ctx, 'hero.headline');
+  if (eyebrow) hero.eyebrow = eyebrow;
+  if (headline) hero.headline = headline;
+  const serviceTags = ctx.effective.services.items
+    .map((_, i) => groundedString(ctx, `services.items.${i}.tag`))
+    .filter(Boolean);
+  const reference: Record<string, unknown> = {};
+  if (Object.keys(hero).length) reference.hero = hero;
+  if (serviceTags.length) reference.serviceTags = serviceTags;
+  const ref = Object.keys(reference).length ? { ...counts, reference } : counts;
   return {
     blockId: 'structure', label: structure.label,
     text: `Existing structure to respect. Keep these exact counts:\n${JSON.stringify(ref, null, 2)}`,

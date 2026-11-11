@@ -11,6 +11,7 @@ import { getPath } from '@/lib/merge';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
 import { countsFor, sectionInstructionLine, servicePageIndices, servicePagesInstruction, subpagesInstruction } from './compile';
+import { groundedFor, groundedString, groundedStrings } from './grounded';
 import type {
   BriefContext,
   ChipGroup,
@@ -165,12 +166,23 @@ function resolvePositioning(ctx: BriefContext): PositioningBlock {
   };
 }
 
+/** A saved chip selection, limited to the chips on offer now. Ticked chips were once offered
+ *  from `effective`, i.e. from the preset whenever the client gave none, so a selection saved
+ *  then can hold a preset badge the operator never typed. Free text is kept: that was typed. */
+function onlyOffered(group: ChipGroup): ChipGroup {
+  const offered = new Set(group.options);
+  return { ...group, selected: group.selected.filter((s) => offered.has(s)) };
+}
+
+/** Defaults come from what the client gave or the operator typed (grounded.ts), never from
+ *  `effective`: with no client announcement that was the preset's "24/7 emergency HVAC service"
+ *  line, sent as this client's current promotion (Tracewell, 2026-11-11). */
 function resolveOffers(ctx: BriefContext): OffersBlock {
-  const promo = textPart(ctx, 'offers', 'promo', 'Current promotion', ctx.effective.announcement ?? '');
-  const trustBadges = ctx.effective.extensions?.trustBadges ?? [];
-  const proof = chipGroup(ctx, 'offers', 'proof', 'Proof points', trustBadges, trustBadges);
-  const towns = ctx.effective.extensions?.serviceArea ?? [];
-  const serviceArea = chipGroup(ctx, 'offers', 'serviceArea', 'Service area', towns, towns);
+  const promo = textPart(ctx, 'offers', 'promo', 'Current promotion', groundedString(ctx, 'announcement'));
+  const trustBadges = groundedStrings(ctx, 'extensions.trustBadges');
+  const proof = onlyOffered(chipGroup(ctx, 'offers', 'proof', 'Proof points', trustBadges, trustBadges));
+  const towns = groundedStrings(ctx, 'extensions.serviceArea');
+  const serviceArea = onlyOffered(chipGroup(ctx, 'offers', 'serviceArea', 'Service area', towns, towns));
   const total = (promo.text.trim() ? 1 : 0) + proof.selected.length + serviceArea.selected.length;
   return {
     id: 'offers', kind: 'offers', label: 'Offers, proof & coverage', channel: 'user',
@@ -227,7 +239,7 @@ function resolveSections(ctx: BriefContext): SectionsBlock {
     const defaultText = section === 'subpages'
       ? subpagesInstruction(subpages)
       : section === 'servicePages'
-      ? servicePagesInstruction(ctx.effective)
+      ? servicePagesInstruction(ctx.effective, groundedFor(ctx))
       : sectionInstructionLine(section, {
           pillars: counts.pillars, services: counts.services,
           faq: counts.faq, heroBullets: counts.heroBullets,

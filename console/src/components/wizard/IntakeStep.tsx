@@ -113,8 +113,8 @@ export default function IntakeStep({
   );
 
   const blocks = useMemo(
-    () => resolveBrief({ vertical: verticalDef, effective, imported, brief, tickedSections }),
-    [verticalDef, effective, imported, brief, tickedSections],
+    () => resolveBrief({ vertical: verticalDef, effective, imported, preset: presetFor(vertical), edits, brief, tickedSections }),
+    [verticalDef, effective, imported, vertical, edits, brief, tickedSections],
   );
 
   /** Where each value came from: the form, the close, the console, or nowhere yet. */
