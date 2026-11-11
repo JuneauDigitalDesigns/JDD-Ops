@@ -3,7 +3,7 @@ import { PhoneCall, Envelope, InstagramLogo, FacebookLogo } from '@phosphor-icon
 import { CONTENT, type SiteContent } from '@/data/site';
 import FindUsOn from '@/lib/FindUsOn';
 import { E } from '@/lib/editable';
-import { Copyright } from '@/lib/BrandBox';
+import { AgencyCredit, Copyright } from '@/lib/BrandBox';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
@@ -64,6 +64,7 @@ export default function FooterMinimal({
             <Copyright content={content} />
             {brand.license ? <> · Lic. <E p="brand.license">{brand.license}</E></> : ''}
           </p>
+          <AgencyCredit />
           <div className="flex flex-wrap items-center gap-4">
             {footer.legalLinks.length > 0 ? (
               footer.legalLinks.map((l, li) => (

@@ -20,7 +20,7 @@ import {
 import type { Icon } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { BrandBox, Copyright } from '@/lib/BrandBox';
+import { BrandBox, AgencyCredit, Copyright } from '@/lib/BrandBox';
 import { displayAddress, profileLinks, footerColumns, type ProfileKind } from '@/lib/serviceLinks';
 
 /** D11 heading, approved word for word by Xander on 2026-11-10. */
@@ -158,6 +158,7 @@ export default function DetailFooter({ content = CONTENT }: { content?: SiteCont
 
         <div className="mt-11 flex flex-wrap justify-between gap-4 border-t border-ruleInk pt-[22px] text-[13px]">
           <span><Copyright content={content} /></span>
+          <AgencyCredit />
           {brand.license && <span>Licensed &amp; insured · {brand.license}</span>}
         </div>
       </div>

@@ -53,6 +53,26 @@ export function BrandBox({
   );
 }
 
+/** The agency's site, the credit's only link. */
+export const AGENCY_URL = 'https://www.juneaudigitaldesigns.com';
+
+/**
+ * "Created by Juneau Digital Designs" in every footer's bottom bar, the name the link (Xander
+ * 2026-11-11, words picked by him). rel="nofollow": the same link in the footer of every client site
+ * is what Google calls a link scheme unless it passes no ranking (his call, 2026-11-11). Not
+ * editable: it is the agency's, not the client's.
+ */
+export function AgencyCredit({ className = '' }: { className?: string }) {
+  return (
+    <span className={className}>
+      Created by{' '}
+      <a href={AGENCY_URL} rel="nofollow noopener" target="_blank" className="underline-offset-2 hover:underline">
+        Juneau Digital Designs
+      </a>
+    </span>
+  );
+}
+
 /** "© 2026 <legal name>. All rights reserved." The name stays editable where it lives. */
 export function Copyright({ content, year = new Date().getFullYear() }: { content: unknown; year?: number }) {
   const n = legalName(content);

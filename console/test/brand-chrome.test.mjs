@@ -204,3 +204,22 @@ test('the chrome helpers are byte-identical in the console and the template', ()
     assert.equal(read(path.join(OPS, 'template/src/lib', f)), read(path.join(CONSOLE, 'src/lib', f)), `${f}: console and template copies differ`);
   }
 });
+
+// ── The agency credit (Xander 2026-11-11) ──────────────────────────────────────
+
+test('every footer credits the agency between the copyright and the licence line, nofollow', async () => {
+  for (const name of FOOTERS) {
+    const c = tracewell();
+    c.brand.license = 'CAC1820000';
+    const html = await render('footer', name, c);
+    const link = /<a [^>]*href="https:\/\/www\.juneaudigitaldesigns\.com"[^>]*>Juneau Digital Designs<\/a>/.exec(html)?.[0];
+    assert.ok(link, `${name}: no link to the agency site`);
+    assert.match(link, /rel="nofollow noopener"/, `${name}: the credit must be nofollow`);
+    const t = text(html);
+    assert.ok(t.includes('Created by Juneau Digital Designs'), `${name}: wording`);
+    const at = (s) => t.indexOf(s);
+    assert.ok(at('All rights reserved.') < at('Created by'), `${name}: the credit follows the copyright`);
+    // The licence line is the bar's last; a trust badge higher up can carry the same words.
+    if (t.includes('Licensed &amp; insured · CAC1820000')) assert.ok(at('Created by') < t.lastIndexOf('Licensed &amp; insured · CAC1820000'), `${name}: the credit sits before the licence line`);
+  }
+});

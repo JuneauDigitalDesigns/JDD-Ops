@@ -5,7 +5,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import FindUsOn from '@/lib/FindUsOn';
 import { displayAddress, footerColumns } from '@/lib/serviceLinks';
 import { E } from '@/lib/editable';
-import { BrandBox, Copyright } from '@/lib/BrandBox';
+import { BrandBox, AgencyCredit, Copyright } from '@/lib/BrandBox';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
@@ -127,6 +127,7 @@ export default function FooterColumns({
         {/* Bottom strip */}
         <div className={`mt-8 flex flex-wrap items-center justify-between gap-2 border-t ${s.rule} pt-6 text-xs ${s.body}`}>
           <p><Copyright content={content} /></p>
+          <AgencyCredit />
           <div className="flex gap-4">
             {footer.legalLinks.map((l, li) => (
               <a key={l.label} href={l.href} className="hover:text-accent"><E p={`footer.legalLinks.${li}.label`}>{l.label}</E></a>
