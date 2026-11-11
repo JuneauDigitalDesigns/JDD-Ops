@@ -167,7 +167,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Your Detailing Company | Professional Auto Detailing",
     description:       "Professional auto detailing, interior, exterior, paint correction, ceramic coatings, and mobile service.",
-    canonical:         "https://yourdetailingco.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },

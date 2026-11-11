@@ -6,8 +6,7 @@ import { Check, ArrowUUpLeft, ArrowUUpRight } from '@phosphor-icons/react';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
-import { deepMerge, applyEdits } from '@/lib/merge';
-import { stripSampleReviews } from '@/lib/sampleReviews';
+import { effectiveContent } from '@/lib/effectiveContent';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import type { CopyBrief } from '@jdd/schema';
@@ -292,25 +291,10 @@ export default function BuildWizard({
    */
   const [hydrated, markHydrated] = useHydrationGate(slug);
 
-  // Effective = vertical preset ← imported ← generated ← user edits (top).
+  // Effective = vertical preset ← imported ← generated ← user edits (top). Sample reviews and
+  // placeholder canonicals are stripped there, so the preview shows what the export ships.
   const effective = useMemo(
-    () => {
-      // Sample reviews from an old preset can be baked into a client's imported content. Strip
-      // them AFTER the merge (so the emptied list can't fall through to a preset), here so the
-      // preview shows what the export will ship (lib/sampleReviews.ts).
-      const merged = stripSampleReviews(applyEdits(
-        deepMerge(deepMerge(presetFor(vertical), imported ?? {}), generated ?? {}),
-        edits,
-      )).content;
-      // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
-      // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
-      // content. Left hidden while empty, so an untouched Work section stays off (and the
-      // preview still injects sample projects via fillImagePlaceholders's includeWork).
-      if (merged.work?.projects?.length && merged.work.hidden) {
-        return { ...merged, work: { ...merged.work, hidden: false } };
-      }
-      return merged;
-    },
+    () => effectiveContent(vertical, imported, generated, edits),
     [vertical, imported, generated, edits],
   );
   // Fill empty/preset image slots with per-vertical topical stock so the build catalog

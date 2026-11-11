@@ -167,7 +167,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Your Wellness Practice | Whole-Person Wellness Care",
     description:       "Whole-person wellness practice offering consultations, personalized care plans, and ongoing support. New clients welcome, book online.",
-    canonical:         "https://yourwellnesspractice.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },
