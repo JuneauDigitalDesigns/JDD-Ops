@@ -38,8 +38,9 @@ function isPlainObject(x: unknown): x is Json {
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 
 /** `value` with everything that is blank or equal to the preset's value removed. Undefined when
- *  nothing is left. Objects and object lists are compared key by key and index by index; a list
- *  of strings is dropped when, blanks aside, it is the preset's list at the same path. */
+ *  nothing is left. Objects are compared key by key; a record in a list is dropped only when it is
+ *  the preset's record at that index; a list of strings is dropped when, blanks aside, it is the
+ *  preset's list at the same path. */
 export function withoutPreset(value: unknown, preset: unknown): unknown {
   if (value === null || value === undefined) return undefined;
   if (typeof value === 'string') {
@@ -58,9 +59,15 @@ export function withoutPreset(value: unknown, preset: unknown): unknown {
       if (!kept.length || key(kept) === key(presetKept)) return undefined;
       return kept;
     }
-    // Lists of records (services.items): positional, so compare index by index and keep the
-    // positions, which other code (servicePageIndices) indexes into.
-    const kept = value.map((v, i) => withoutPreset(v, presetList[i]));
+    // Lists of records (services.items, about.stats): positional, so compare index by index and
+    // keep the positions, which other code (servicePageIndices) indexes into. A record is the
+    // preset's only when nothing in it differs; otherwise it is kept whole, blanks aside, so a
+    // client's own stat { n: "24/7", l: "Emergency line" } keeps its "24/7" although the preset's
+    // stat at that index says "24/7" too.
+    const kept = value.map((v, i) => {
+      if (!isPlainObject(v)) return withoutPreset(v, presetList[i]);
+      return withoutPreset(v, presetList[i]) === undefined ? undefined : withoutPreset(v, undefined);
+    });
     return kept.some((v) => v !== undefined) ? kept : undefined;
   }
   if (isPlainObject(value)) {
