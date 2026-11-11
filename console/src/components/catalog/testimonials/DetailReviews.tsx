@@ -13,14 +13,14 @@
 import { Star } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 
 export const meta = {
   id: 'detail-reviews',
   category: 'testimonials',
   label: 'Car Detailing / Two large quotes',
   consumes: ['testimonials.eyebrow', 'testimonials.items', 'extensions.reviewBadge', 'images.testimonials.avatars'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -77,7 +77,9 @@ export default function DetailReviews({ content = CONTENT }: { content?: SiteCon
               </blockquote>
               <figcaption className="mt-6 flex items-center gap-[13px] border-t border-[color:color-mix(in_srgb,var(--ink)_9%,transparent)] pt-5">
                 {avatars[i] ? (
-                  <span className="h-11 w-11 shrink-0 rounded-full bg-cover bg-center" style={{ backgroundImage: `url(${imageAt(avatars[i], 640)})` }} />
+                  <span className="relative h-11 w-11 shrink-0 rounded-full isolate overflow-hidden">
+                    <CoverImage url={avatars[i]} alt="" sizes="96px" />
+                  </span>
                 ) : (
                   <span
                     className="grid h-11 w-11 shrink-0 place-items-center rounded-full font-heading text-[18px] font-extrabold text-accentFg"

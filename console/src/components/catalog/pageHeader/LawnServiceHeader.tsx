@@ -18,7 +18,7 @@
 import { Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import { primaryCity, serviceBySlug, servicePhoto, serviceQuestions } from '@/lib/serviceLinks';
 
 export const meta = {
@@ -26,7 +26,7 @@ export const meta = {
   category: 'pageHeader',
   label: 'Lawn / Service page header',
   consumes: ['services.items', 'brand.address', 'brand.phone', 'brand.phoneHref', 'extensions.serviceArea', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -51,11 +51,10 @@ export default function LawnServiceHeader({ content = CONTENT, serviceSlug }: { 
     <section id="top" className="relative isolate flex items-center overflow-hidden bg-inkPanel2 text-onInk lg:min-h-[560px]">
       {photo && (
         <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${imageAt(photo.url, 1536)})` }}
-          role="img"
-          aria-label={photo.alt}
-        />
+          className="absolute inset-0 isolate overflow-hidden"
+        >
+          <CoverImage url={photo.url} alt={photo.alt} sizes="100vw" priority />
+        </div>
       )}
       {/* Forest wash: one grade for any client photo (colour blend of the forest panel). */}
       <div className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />
