@@ -205,6 +205,7 @@ export default function IntakeShell({
                   onGenerated={onGenerated}
                   onClearGenerated={onClearGenerated}
                   hasGenerated={hasGenerated}
+                  pages={pages}
                 />
               )}
               {step.kind === 'review' && (

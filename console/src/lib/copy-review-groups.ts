@@ -60,3 +60,20 @@ export function buildReviewGroups(pages: ReviewPage[]): ReviewGroup[] {
 export function reviewKeys(groups: ReviewGroup[]): VerdictKey[] {
   return groups.flatMap((g) => g.sections.map((s) => verdictKey(s, g.route || undefined)));
 }
+
+/**
+ * The per-page review keys a run's new overlay puts copy behind: `{route}:subpages` for every page
+ * whose header or SEO differs from the overlay before the run. The gate counts a key as unreviewed
+ * only while it is ticked, and nothing ticks a per-page key, so until this the page headers a run
+ * wrote would have reached the site with no one reading them. Unchanged pages are left as they are.
+ */
+export function rewrittenPageKeys(
+  before: { subpages?: Record<string, unknown> } | null | undefined,
+  after: { subpages?: Record<string, unknown> } | null | undefined,
+): VerdictKey[] {
+  const prev = before?.subpages ?? {};
+  const next = after?.subpages ?? {};
+  return Object.keys(next)
+    .filter((route) => route && JSON.stringify(next[route]) !== JSON.stringify(prev[route]))
+    .map((route) => verdictKey('subpages', route));
+}

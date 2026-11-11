@@ -10,6 +10,9 @@ import { CHUNK_SIZE, chunkSections } from '@/lib/copy-brief/chunking';
 import { editsFrom } from '@/lib/copy-brief/grounded';
 import { presetFor } from '@/lib/verticals';
 import { isValidModelId, modelOption, estimateCost, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
+import { planRunSections, type CopyPage } from '@/lib/copy-brief/run-sections';
+import { pickServicePages } from '@/lib/servicePages';
+import { MAX_PAGES } from '@/lib/pages';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +25,8 @@ interface Body {
   brief?: CopyBrief;
   sections?: Section[];
   model?: string;
+  /** The pages besides Home that the `subpages` section writes for (copy-brief/run-sections.ts). */
+  subpages?: CopyPage[];
 }
 
 /**
@@ -47,13 +52,17 @@ export async function POST(req: Request) {
   const model = modelOption(modelId);
 
   const requested = Array.isArray(body.sections) ? body.sections.filter((s): s is Section => ALL_SECTIONS.includes(s)) : [];
-  const sections = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
+  // The same plan generate-copy runs, so the estimate prices the chunks Generate will send.
+  const subpages = Array.isArray(body.subpages) ? body.subpages : [];
+  const { sections } = planRunSections({
+    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, MAX_PAGES).length > 0,
+  });
   const chunks = chunkSections(sections);
 
   const ctx = {
     vertical, effective: base, imported: body.imported ?? null,
     preset: presetFor(vertical.id), edits: editsFrom(body.edits), brief,
-    tickedSections: sections,
+    tickedSections: sections, subpages,
   };
   const blocks = resolveBrief(ctx);
 

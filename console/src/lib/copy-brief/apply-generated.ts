@@ -12,6 +12,7 @@ import type { CopyResult, Section } from '@/lib/copy-schema';
 import { serviceSlugs } from '@/lib/servicePages';
 import { servicePageIndices } from '@/lib/copy-brief/compile';
 import { clientFaq, pinFixed, withoutRepeats } from '@/lib/copy-brief/client-faq';
+import { normalizeRoute } from '@/lib/copy-brief/run-sections';
 
 function mergeArray<B, C>(base: B[], copy: C[] | undefined, apply: (b: B, c: C) => B): B[] {
   if (!Array.isArray(base)) return base;
@@ -22,6 +23,10 @@ export function applyGeneratedCopy(
   base: SiteContent,
   copy: Partial<CopyResult>,
   want: Set<Section>,
+  /** `subpageRoutes`: the pages this run asked headers for. Given, a reply item for any other
+   *  route is dropped, and "/about" lands on "about": an item stored under a key no page reads
+   *  looks generated and is never shown. */
+  opts: { subpageRoutes?: string[] } = {},
 ): Partial<SiteContent> {
   const generated: Partial<SiteContent> = {};
 
@@ -178,9 +183,11 @@ export function applyGeneratedCopy(
     // page's copy never drops the others. Each item folds header + per-page SEO into the
     // SiteContent.subpages[route] shape; a cta only survives when BOTH label and href are given.
     const map = { ...(base.subpages ?? {}) };
+    const allowed = opts.subpageRoutes ? new Set(opts.subpageRoutes.map(normalizeRoute)) : null;
     for (const it of copy.subpages.items) {
-      if (!it.route) continue;
-      map[it.route] = {
+      const route = it.route ? normalizeRoute(it.route) : '';
+      if (!route || (allowed && !allowed.has(route))) continue;
+      map[route] = {
         header: {
           eyebrow: it.eyebrow,
           title: it.title,
