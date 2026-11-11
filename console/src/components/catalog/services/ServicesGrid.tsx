@@ -19,6 +19,7 @@
 // depth note in the mockup).
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
+import { serviceAnchor } from '@/lib/serviceLinks';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { skinClasses, type SkinId } from '@/lib/skins';
@@ -28,7 +29,7 @@ export const meta = {
   category: 'services',
   label: 'Services / Card grid',
   consumes: ['services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/skins', '@/lib/icons'],
+  sharedDeps: ['@/lib/serviceLinks', '@phosphor-icons/react', '@/lib/skins', '@/lib/icons'],
   skins: ['soft', 'default'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'card-grid',
@@ -73,7 +74,8 @@ export default function ServicesGrid({
           {items.map((item, i) => (
             <li
               key={item.n ?? i}
-              className={`flex flex-col rounded-2xl border p-6 transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 ${
+              id={serviceAnchor(content, item) || undefined}
+              className={`scroll-mt-24 flex flex-col rounded-2xl border p-6 transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 ${
                 dark
                   ? 'border-ruleInk bg-inkPanel2 shadow-[0_14px_30px_-12px_rgba(0,0,0,.5)] hover:shadow-[0_22px_42px_-14px_rgba(0,0,0,.6)]'
                   : 'border-rule/70 bg-bg shadow-[0_1px_2px_rgba(28,16,9,.05),0_14px_30px_-12px_rgba(28,16,9,.22)] hover:shadow-[0_2px_4px_rgba(28,16,9,.06),0_22px_42px_-14px_rgba(28,16,9,.28)]'

@@ -3,16 +3,17 @@ import type { CSSProperties } from 'react';
 import { PhoneCall, Envelope, MapPin, InstagramLogo, FacebookLogo } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import FindUsOn from '@/lib/FindUsOn';
-import { displayAddress } from '@/lib/serviceLinks';
+import { displayAddress, footerColumns } from '@/lib/serviceLinks';
 import { E } from '@/lib/editable';
+import { BrandBox, Copyright } from '@/lib/BrandBox';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
   id: 'footer-columns',
   category: 'footer',
   label: 'Footer / Columns',
-  consumes: ['brand.name', 'brand.long', 'brand.license', 'brand.established', 'brand.address', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.cols', 'footer.social', 'footer.legalLinks', 'footer.legal'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
+  consumes: ['images.footer.logoImage', 'brand.name', 'brand.long', 'brand.license', 'brand.established', 'brand.address', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.social', 'footer.legalLinks', 'services.items', 'servicePages', 'nav'],
+  sharedDeps: ['@/lib/BrandBox', '@phosphor-icons/react', '@/lib/skins'],
   skins: ['inverted', 'default'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'column-grid',
@@ -36,6 +37,7 @@ export default function FooterColumns({
 }) {
   const s = skinClasses(skin);
   const { brand, footer } = content;
+  const cols = footerColumns(content);
   return (
     // No `border-t`. The surface change is what separates the footer from the section above
     // it now; a hairline on top of a surface change is the belt-and-braces the recomposition
@@ -44,11 +46,14 @@ export default function FooterColumns({
       <div className="mx-auto max-w-6xl">
         <div
           className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[var(--footer-cols)]"
-          style={{ '--footer-cols': `1.5fr 1fr${footer.cols.length > 0 ? ` repeat(${footer.cols.length},1fr)` : ''}` } as CSSProperties}
+          style={{ '--footer-cols': `1.5fr 1fr${cols.length > 0 ? ` repeat(${cols.length},1fr)` : ''}` } as CSSProperties}
         >
           {/* Company */}
           <div>
-            <p className={`font-heading text-lg font-bold ${s.heading}`}><E p="brand.long">{brand.long}</E></p>
+            <div className="flex items-center gap-3">
+              <BrandBox content={content} radius="rounded-md" fallback={null} />
+              <p className={`font-heading text-lg font-bold ${s.heading}`}><E p="brand.long">{brand.long}</E></p>
+            </div>
             {brand.established && (
               <p className={`mt-1 text-sm ${s.body}`}><E p="brand.established">{brand.established}</E></p>
             )}
@@ -103,14 +108,14 @@ export default function FooterColumns({
           </div>
 
           {/* Footer columns from schema */}
-          {footer.cols.map((col, ci) => (
+          {cols.map((col) => (
             <div key={col.h}>
-              <p className={`font-semibold ${s.heading}`}><E p={`footer.cols.${ci}.h`}>{col.h}</E></p>
+              <p className={`font-semibold ${s.heading}`}>{col.h}</p>
               <ul className="mt-3 space-y-2">
-                {col.links.map((link, li) => (
+                {col.links.map((link) => (
                   <li key={link.label}>
                     <a href={link.href} className={`text-sm ${s.body} transition-colors hover:text-accent`}>
-                      <E p={`footer.cols.${ci}.links.${li}.label`}>{link.label}</E>
+                      <E p={link.path}>{link.label}</E>
                     </a>
                   </li>
                 ))}
@@ -121,7 +126,7 @@ export default function FooterColumns({
 
         {/* Bottom strip */}
         <div className={`mt-8 flex flex-wrap items-center justify-between gap-2 border-t ${s.rule} pt-6 text-xs ${s.body}`}>
-          <p><E p="footer.legal">{footer.legal}</E></p>
+          <p><Copyright content={content} /></p>
           <div className="flex gap-4">
             {footer.legalLinks.map((l, li) => (
               <a key={l.label} href={l.href} className="hover:text-accent"><E p={`footer.legalLinks.${li}.label`}>{l.label}</E></a>

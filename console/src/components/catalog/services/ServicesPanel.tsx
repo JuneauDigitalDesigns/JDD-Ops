@@ -9,6 +9,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
+import { serviceAnchor } from '@/lib/serviceLinks';
 import { E } from '@/lib/editable';
 import { responsiveImage } from '@/lib/img';
 
@@ -17,7 +18,7 @@ export const meta = {
   category: 'services',
   label: 'Services / Bento',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react'],
+  sharedDeps: ['@/lib/serviceLinks', 'framer-motion', '@phosphor-icons/react'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'dense-mosaic',
   /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
@@ -63,7 +64,8 @@ export default function ServicesPanel({ content = CONTENT }: { content?: SiteCon
             return (
               <motion.article
                 key={item.n ?? i}
-                className={`group relative isolate flex flex-col justify-end overflow-hidden rounded-2xl ${spanFor(i)}`}
+                id={serviceAnchor(content, item) || undefined}
+                className={`scroll-mt-24 group relative isolate flex flex-col justify-end overflow-hidden rounded-2xl ${spanFor(i)}`}
                 initial={reduce ? false : { opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.2 }}

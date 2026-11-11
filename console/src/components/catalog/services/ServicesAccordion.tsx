@@ -10,6 +10,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { CaretDown, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT } from '@/data/site';
 import type { SiteContent } from '@/data/site';
+import { serviceAnchor } from '@/lib/serviceLinks';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { imageAt } from '@/lib/localImage';
@@ -19,7 +20,7 @@ export const meta = {
   category: 'services',
   label: 'Services / Accordion',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/icons'],
+  sharedDeps: ['@/lib/serviceLinks', 'framer-motion', '@phosphor-icons/react', '@/lib/icons'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'sticky-swap',
   /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
@@ -60,7 +61,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
               const on = i === openIdx;
               const nn = String(item.n ?? i + 1).padStart(2, '0');
               return (
-                <li key={item.n ?? i} className="border-b border-rule last:border-b-0">
+                <li key={item.n ?? i} id={serviceAnchor(content, item) || undefined} className="scroll-mt-24 border-b border-rule last:border-b-0">
                   <button
                     type="button"
                     onClick={() => setOpen(i)}

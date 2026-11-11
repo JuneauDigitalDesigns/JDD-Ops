@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CONTENT, type SiteContent } from '@/data/site';
+import { serviceAnchor } from '@/lib/serviceLinks';
 import { E } from '@/lib/editable';
 import { responsiveImage } from '@/lib/img';
 import { skinClasses, type SkinId } from '@/lib/skins';
@@ -23,7 +24,7 @@ export const meta = {
   category: 'services',
   label: 'Services / Spotlight',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
+  sharedDeps: ['@/lib/serviceLinks', 'framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['soft', 'default', 'inverted'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'stacked-panels',
@@ -108,10 +109,11 @@ export default function ServicesSpotlight({
                 <button
                   type="button"
                   key={it.n ?? i}
+                  id={serviceAnchor(content, it) || undefined}
                   onMouseEnter={() => setActive(i)}
                   onFocus={() => setActive(i)}
                   onClick={() => setActive(i)}
-                  className={`border-l-2 py-4 text-left transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${on ? 'border-accent pl-7' : `pl-5 ${s.rule}`}`}
+                  className={`scroll-mt-24 border-l-2 py-4 text-left transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${on ? 'border-accent pl-7' : `pl-5 ${s.rule}`}`}
                 >
                   <span className={`block text-[11px] font-bold tracking-[0.14em] ${on ? 'text-accent' : s.body}`}>{String(i + 1).padStart(2, '0')}</span>
                   <span className={`mt-1 block font-heading text-2xl font-semibold leading-tight tracking-[-0.01em] ${on ? s.heading : s.body}`}><E p={`services.items.${i}.t`}>{it.t}</E></span>

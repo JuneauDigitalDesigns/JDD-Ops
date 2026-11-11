@@ -63,7 +63,7 @@ export default function PlumbingServices({ content = CONTENT }: { content?: Site
                 key={ref.slug}
                 id={ref.slug}
                 {...(ref.href ? { href: ref.href } : {})}
-                className="group hover-lift shadow-brand-1 relative flex flex-col rounded-[20px] border border-rule bg-bg p-6 hover:shadow-[0_4px_10px_rgba(16,33,46,0.09),0_26px_50px_-16px_rgba(16,33,46,0.3)] lg:p-7"
+                className="group scroll-mt-24 hover-lift shadow-brand-1 relative flex flex-col rounded-[20px] border border-rule bg-bg p-6 hover:shadow-[0_4px_10px_rgba(16,33,46,0.09),0_26px_50px_-16px_rgba(16,33,46,0.3)] lg:p-7"
               >
                 {item.tag && (
                   <span className="absolute right-[22px] top-[22px] rounded-full bg-bgSoft px-[11px] py-[6px] text-[11px] font-bold uppercase leading-none tracking-[0.09em] text-accent">

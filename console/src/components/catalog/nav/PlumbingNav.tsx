@@ -20,6 +20,7 @@
 import { Phone, List, X, CaretDown } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { BrandBox } from '@/lib/BrandBox';
 import { useDisclosure } from '@/lib/disclosure';
 import { linkedServices } from '@/lib/serviceLinks';
 
@@ -27,8 +28,8 @@ export const meta = {
   id: 'plumbing-nav',
   category: 'nav',
   label: 'Plumbing / Nav',
-  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'nav', 'services.items', 'servicePages'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/disclosure', '@/lib/serviceLinks'],
+  consumes: ['images.footer.logoImage', 'brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'nav', 'services.items', 'servicePages'],
+  sharedDeps: ['@/lib/BrandBox', '@phosphor-icons/react', '@/lib/editable', '@/lib/disclosure', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -65,9 +66,17 @@ export default function PlumbingNav({
     >
       <div className="mx-auto flex h-[64px] max-w-[1120px] items-center gap-2.5 px-5 sm:gap-7 sm:px-6 md:h-[74px]">
         <a href="/" className="flex min-w-0 items-center gap-2.5 md:gap-[11px]">
-          <span
-            className="accent-bar !h-8 !w-8 shrink-0 !rounded-full md:!h-9 md:!w-9 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-            aria-hidden="true"
+          <BrandBox
+            content={content}
+            radius="rounded-full"
+            size="sm"
+            ring
+            fallback={
+              <span
+                className="accent-bar !h-8 !w-8 shrink-0 !rounded-full md:!h-9 md:!w-9 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+                aria-hidden="true"
+              />
+            }
           />
           <span className="min-w-0 font-heading text-[16px] font-extrabold leading-[1.05] tracking-[-0.02em] text-ink sm:text-[19px] md:text-[22px] md:leading-none">
             <E p="brand.name">{brand.name}</E>

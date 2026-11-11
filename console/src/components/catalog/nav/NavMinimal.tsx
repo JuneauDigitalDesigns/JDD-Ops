@@ -17,6 +17,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { List, X, PhoneCall } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { BrandBox } from '@/lib/BrandBox';
 import { useScrolled } from '@/lib/useScrolled';
 import { skinClasses, type SkinId } from '@/lib/skins';
 import { EASE, stillFor } from '@/lib/motion';
@@ -25,8 +26,8 @@ export const meta = {
   id: 'nav-minimal',
   category: 'nav',
   label: 'Nav / Standard',
-  consumes: ['nav', 'hero.cta', 'brand.name', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['framer-motion', '@phosphor-icons/react', '@/lib/useScrolled', '@/lib/skins', '@/lib/motion'],
+  consumes: ['images.footer.logoImage', 'nav', 'hero.cta', 'brand.name', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['@/lib/BrandBox', 'framer-motion', '@phosphor-icons/react', '@/lib/useScrolled', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'inverted'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'sticky-bar',
@@ -71,7 +72,8 @@ export default function NavMinimal({
       className={`sticky top-0 z-50 border-b ${s.rule} ${s.section} backdrop-blur transition-shadow duration-200 ${scrolled ? 'shadow-sm' : ''}`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-6">
-        <a href={homeHref} className={`font-heading text-lg font-bold ${s.heading}`}>
+        <a href={homeHref} className={`flex min-w-0 items-center gap-2.5 font-heading text-lg font-bold ${s.heading}`}>
+          <BrandBox content={content} radius="rounded-md" ring fallback={null} />
           <E p="brand.name">{brand.name}</E>
         </a>
 

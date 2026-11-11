@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { motion, useReducedMotion } from 'framer-motion';
 import { CONTENT, type SiteContent } from '@/data/site';
+import { serviceAnchor } from '@/lib/serviceLinks';
 import { E } from '@/lib/editable';
 import { responsiveImage } from '@/lib/img';
 import { skinClasses, type SkinId } from '@/lib/skins';
@@ -18,7 +19,7 @@ export const meta = {
   category: 'services',
   label: 'Services / Showcase',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['framer-motion', '@/lib/skins', '@/lib/motion'],
+  sharedDeps: ['@/lib/serviceLinks', 'framer-motion', '@/lib/skins', '@/lib/motion'],
   skins: ['default', 'soft'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'editorial-index',
@@ -61,7 +62,8 @@ export default function ServicesShowcase({
             return (
               <motion.div
                 key={item.n ?? i}
-                className={`group grid grid-cols-[2.5rem_1fr] items-baseline gap-x-4 border-t ${s.rule} py-6 lg:grid-cols-[3rem_minmax(0,1fr)_34%] lg:gap-x-8 ${last ? `border-b ${s.rule}` : ''}`}
+                id={serviceAnchor(content, item) || undefined}
+                className={`scroll-mt-24 group grid grid-cols-[2.5rem_1fr] items-baseline gap-x-4 border-t ${s.rule} py-6 lg:grid-cols-[3rem_minmax(0,1fr)_34%] lg:gap-x-8 ${last ? `border-b ${s.rule}` : ''}`}
                 initial={still ? false : { opacity: 0, y: 14 }}
                 whileInView={still ? undefined : { opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.2 }}

@@ -3,14 +3,15 @@ import { PhoneCall, Envelope, InstagramLogo, FacebookLogo } from '@phosphor-icon
 import { CONTENT, type SiteContent } from '@/data/site';
 import FindUsOn from '@/lib/FindUsOn';
 import { E } from '@/lib/editable';
+import { Copyright } from '@/lib/BrandBox';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
   id: 'footer-minimal',
   category: 'footer',
   label: 'Footer / Minimal',
-  consumes: ['brand.name', 'brand.long', 'brand.license', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.social', 'footer.legalLinks', 'footer.legal'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
+  consumes: ['brand.name', 'brand.long', 'brand.license', 'brand.phone', 'brand.phoneHref', 'brand.email', 'footer.blurb', 'footer.social', 'footer.legalLinks'],
+  sharedDeps: ['@/lib/BrandBox', '@phosphor-icons/react', '@/lib/skins'],
   skins: ['default', 'soft', 'inverted'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'inline-strip',
@@ -60,7 +61,7 @@ export default function FooterMinimal({
         {/* Bottom row: legal + contact */}
         <div className={`flex flex-wrap items-center justify-between gap-4 text-sm ${s.body}`}>
           <p>
-            <E p="footer.legal">{footer.legal}</E>
+            <Copyright content={content} />
             {brand.license ? <> · Lic. <E p="brand.license">{brand.license}</E></> : ''}
           </p>
           <div className="flex flex-wrap items-center gap-4">
