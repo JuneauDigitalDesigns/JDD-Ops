@@ -38,10 +38,12 @@ export default function DetailContact({ content = CONTENT }: { content?: SiteCon
             <Phone size={20} weight="fill" className="text-accent" aria-hidden="true" />
             <E p="brand.phone">{brand.phone}</E>
           </a>
-          <a href={`mailto:${brand.email}`} className="flex items-center gap-3 font-semibold text-inkSoft transition-colors [overflow-wrap:anywhere] hover:text-ink">
-            <Envelope size={18} weight="bold" className="shrink-0 text-accent" aria-hidden="true" />
-            <E p="brand.email">{brand.email}</E>
-          </a>
+          {brand.email && (
+            <a href={`mailto:${brand.email}`} className="flex items-center gap-3 font-semibold text-inkSoft transition-colors [overflow-wrap:anywhere] hover:text-ink">
+              <Envelope size={18} weight="bold" className="shrink-0 text-accent" aria-hidden="true" />
+              <E p="brand.email">{brand.email}</E>
+            </a>
+          )}
           {mapsUrl ? (
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 text-inkSoft transition-colors hover:text-ink">
               <MapPin size={18} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />

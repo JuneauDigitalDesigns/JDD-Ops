@@ -11,6 +11,7 @@ import { presetFor, type VerticalId } from '@/lib/verticals';
 import { deepMerge, applyEdits } from '@/lib/merge';
 import { stripSampleReviews } from '@/lib/sampleReviews';
 import { stripPlaceholderCanonical } from '@/lib/placeholderCanonical';
+import { stripPresetIdentity } from '@/lib/presetIdentity';
 
 export function effectiveContent(
   vertical: VerticalId,
@@ -18,16 +19,18 @@ export function effectiveContent(
   generated: Partial<SiteContent> | null,
   edits: Record<string, unknown>,
 ): SiteContent {
-  // Sample reviews and placeholder canonicals from an old preset can be baked into a client's
-  // imported or generated content. Strip them AFTER the merge (so the emptied value can't fall
-  // through to a preset), here so the preview shows what the export will ship
-  // (lib/sampleReviews.ts, lib/placeholderCanonical.ts).
-  const merged = stripPlaceholderCanonical(
+  // Sample reviews, placeholder canonicals and sample business identity (name, legal line,
+  // phone, email, address, license, tagline, SEO title and description) fill every gap the client
+  // left, and an old run can have baked them into imported or generated content. Strip them AFTER
+  // the merge (so the emptied value can't fall through to a preset), here so the preview shows
+  // what the export will ship and the copy run's base carries none of them
+  // (lib/sampleReviews.ts, lib/placeholderCanonical.ts, lib/presetIdentity.ts).
+  const merged = stripPresetIdentity(stripPlaceholderCanonical(
     stripSampleReviews(applyEdits(
       deepMerge(deepMerge(presetFor(vertical), imported ?? {}), generated ?? {}),
       edits,
     )).content,
-  ).content;
+  ).content).content;
   // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
   // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
   // content. Left hidden while empty, so an untouched Work section stays off (and the

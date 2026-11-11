@@ -79,9 +79,11 @@ export default function HomePage() {
       <section className="bg-bgSoft px-6 py-16 text-center">
         <h2 className="text-2xl">Get in touch</h2>
         <p className="mt-2 text-inkSoft">{CONTENT.brand.address}</p>
-        <p className="mt-1">
-          <a href={`mailto:${CONTENT.brand.email}`} className="text-accent">{CONTENT.brand.email}</a>
-        </p>
+        {CONTENT.brand.email && (
+          <p className="mt-1">
+            <a href={`mailto:${CONTENT.brand.email}`} className="text-accent">{CONTENT.brand.email}</a>
+          </p>
+        )}
       </section>
 
       <footer className="border-t border-rule px-6 py-8 text-sm text-inkSoft">
