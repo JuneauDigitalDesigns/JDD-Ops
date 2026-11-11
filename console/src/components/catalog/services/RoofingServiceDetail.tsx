@@ -27,7 +27,7 @@
 import { Check, Plus } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import {
   relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions, serviceRefs,
 } from '@/lib/serviceLinks';
@@ -37,7 +37,7 @@ export const meta = {
   category: 'services',
   label: 'Roofing / Service page body',
   consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -258,7 +258,9 @@ export default function RoofingServiceDetail({ content = CONTENT, serviceSlug }:
             )}
             {photos.slice(0, review ? 1 : 3).map((ph) => (
               <figure key={ph.path} className="shadow-brand-1 flex flex-col overflow-hidden rounded-[6px] border border-rule bg-bg">
-                <div className="min-h-[220px] flex-1 bg-cover bg-center" style={{ backgroundImage: `url(${imageAt(ph.url, 1024)})` }} role="img" aria-label={ph.alt} />
+                <div className="relative min-h-[220px] flex-1 isolate overflow-hidden">
+                  <CoverImage url={ph.url} alt={ph.alt} sizes="(min-width: 1024px) 50vw, 100vw" />
+                </div>
                 {(ph.title || ph.meta) && (
                   <figcaption className="px-[22px] py-[18px]">
                     {ph.title && <b className="block font-heading text-[18px] font-extrabold leading-[1.2] tracking-[-0.01em] text-ink"><E p={`${ph.path}.t`}>{ph.title}</E></b>}

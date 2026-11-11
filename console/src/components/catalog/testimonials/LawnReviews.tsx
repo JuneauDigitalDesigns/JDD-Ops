@@ -11,14 +11,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 
 export const meta = {
   id: 'lawn-reviews',
   category: 'testimonials',
   label: 'Lawn / Hairline reviews',
   consumes: ['testimonials.eyebrow', 'testimonials.title', 'testimonials.items', 'extensions.reviewBadge', 'images.testimonials.avatars'],
-  sharedDeps: ['@/lib/editable', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@/lib/editable'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -57,11 +57,10 @@ function Quote({ t, i, avatar, featured }: { t: Item; i: number; avatar: string 
       <figcaption className={`flex items-center gap-3 ${featured ? 'mt-8' : 'mt-[22px] border-t border-rule pt-[18px]'}`}>
         {avatar ? (
           <span
-            className={`shrink-0 rounded-full bg-cover bg-center ${size}`}
-            style={{ backgroundImage: `url(${imageAt(avatar, 640)})` }}
-            role="img"
-            aria-label={t.a}
-          />
+            className={`relative shrink-0 rounded-full ${size} isolate overflow-hidden`}
+          >
+            <CoverImage url={avatar} alt={t.a} sizes="96px" />
+          </span>
         ) : (
           <span
             className={`grid shrink-0 place-items-center rounded-full font-heading font-extrabold text-[color:var(--accent-2-fg)] ${size}`}

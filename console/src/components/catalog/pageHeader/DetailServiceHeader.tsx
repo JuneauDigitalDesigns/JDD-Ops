@@ -18,7 +18,7 @@
 import { Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import { primaryCity, serviceBySlug, servicePhoto, serviceQuestions } from '@/lib/serviceLinks';
 
 export const meta = {
@@ -26,7 +26,7 @@ export const meta = {
   category: 'pageHeader',
   label: 'Car Detailing / Service page header',
   consumes: ['services.items', 'brand.address', 'brand.phone', 'brand.phoneHref', 'extensions.serviceArea', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -54,11 +54,11 @@ export default function DetailServiceHeader({ content = CONTENT, serviceSlug }: 
     <section id="top" className="relative isolate flex items-center overflow-hidden bg-inkPanel text-center text-onInk sm:min-h-[600px]">
       {photo && (
         <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${imageAt(photo.url, 1536)})`, filter: 'saturate(.82) contrast(1.06)' }}
-          role="img"
-          aria-label={photo.alt}
-        />
+          className="absolute inset-0 isolate overflow-hidden"
+          style={{ filter: 'saturate(.82) contrast(1.06)' }}
+        >
+          <CoverImage url={photo.url} alt={photo.alt} sizes="100vw" priority />
+        </div>
       )}
       {/* Darker in the middle than the home hero's vignette: the intro sits on the busiest part of the photo. */}
       <div

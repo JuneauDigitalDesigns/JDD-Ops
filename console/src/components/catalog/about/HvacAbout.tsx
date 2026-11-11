@@ -9,14 +9,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 
 export const meta = {
   id: 'hvac-about',
   category: 'about',
   label: 'HVAC / About',
   consumes: ['about.eyebrow', 'about.title', 'about.body', 'about.pillars', 'extensions.ownerName', 'images.about.feature'],
-  sharedDeps: ['@/lib/editable', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@/lib/editable'],
   signature: false,
   verticalTemplate: true,
 } as const;
@@ -72,11 +72,9 @@ export default function HvacAbout({ content = CONTENT }: { content?: SiteContent
           <div className="relative ml-4 mt-3">
             <span className="absolute -left-4 -top-4 h-[60%] w-[60%] rounded-[16px] bg-[color:var(--accent-2-soft)]" aria-hidden="true" />
             <div
-              className="shadow-brand-3 relative aspect-[4/5] overflow-hidden rounded-[16px] bg-cover bg-center"
-              style={{ backgroundImage: `url(${imageAt(feature, 1024)})` }}
-              role="img"
-              aria-label={`${content.brand.name} team`}
+              className="shadow-brand-3 relative aspect-[4/5] overflow-hidden rounded-[16px] isolate"
             >
+              <CoverImage url={feature} alt={`${content.brand.name} team`} sizes="(min-width: 1024px) 50vw, 100vw" />
               <div className="absolute inset-0 bg-[color:var(--accent-2)] opacity-30 mix-blend-color" aria-hidden="true" />
             </div>
           </div>

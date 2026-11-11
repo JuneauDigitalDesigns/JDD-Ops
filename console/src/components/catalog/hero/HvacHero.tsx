@@ -27,7 +27,11 @@ import { PhoneCall, Check, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
+import { primaryCity } from '@/lib/serviceLinks';
+
+/** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
+const placeAlt = (c: SiteContent) => [c.brand.name, primaryCity(c)].filter(Boolean).join(' in ');
 
 export const meta = {
   id: 'hvac-hero',
@@ -38,7 +42,7 @@ export const meta = {
     'hero.frictionReducers', 'brand.phone', 'brand.phoneHref', 'brand.license',
     'extensions.reviewBadge', 'images.hero.slides',
   ],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -70,11 +74,10 @@ export default function HvacHero({ content = CONTENT }: { content?: SiteContent 
       {/* Full-bleed background photograph */}
       {slide && (
         <div
-          className="absolute inset-0 bg-cover bg-[62%_50%]"
-          style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }}
-          role="img"
-          aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} technician`}
-        />
+          className="absolute inset-0 isolate overflow-hidden"
+        >
+          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif position="object-[62%_50%]" />
+        </div>
       )}
       {/* Navy wash: one grade for any photo (colour blend of the structural accent) */}
       <div className="absolute inset-0 bg-[color:var(--accent-2)] opacity-55 mix-blend-color" aria-hidden="true" />
