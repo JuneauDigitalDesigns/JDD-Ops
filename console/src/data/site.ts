@@ -310,7 +310,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Peak Home Services | HVAC & Plumbing in Juneau, AK",
     description:       "Juneau's trusted HVAC, plumbing, and home services company. Same-day diagnostics, price-lock guarantee, and 24/7 emergency support.",
-    canonical:         "https://peakhomeservices.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },

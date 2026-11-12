@@ -7,6 +7,7 @@ import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { chunkSections } from '@/lib/copy-brief/chunking';
 import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
+import { withoutCarriedCanonical } from '@/lib/placeholderCanonical';
 import { guardDashes, dashRewriteMessage } from '@/lib/copy-brief/dash-guard';
 import { pickServicePages } from '@/lib/servicePages';
 import { MAX_PAGES } from '@/lib/pages';
@@ -162,7 +163,10 @@ export async function POST(req: Request) {
         }
 
         const merged: Partial<CopyResult> = Object.assign({}, ...ok.map((r) => r.result));
-        const generated = applyGeneratedCopy(base, merged, wantedSet);
+        // Never carry a canonical: applyGeneratedCopy spreads the base's seo, which is how the
+        // HVAC preset's https://yourhvaccompany.com got written into a client's generated copy
+        // (lib/placeholderCanonical.ts).
+        const generated = withoutCarriedCanonical(applyGeneratedCopy(base, merged, wantedSet));
         send({ type: 'done', generated });
       } catch (e) {
         send({ type: 'error', message: e instanceof Error ? e.message : 'Generation failed.' });

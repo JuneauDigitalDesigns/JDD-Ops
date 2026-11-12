@@ -5,6 +5,7 @@ import { loadManageTarget } from '@/lib/manageSites';
 import { resolveRepoRoot, rewriteClientSchema } from '@/lib/export';
 import { accountStoreConfigured, attachSiteToAccount, getAccountEmailByUserId } from '@/lib/accountStore';
 import { appendAudit } from '@/lib/audit';
+import { isPlaceholderCanonical, normalizeCanonical } from '@/lib/placeholderCanonical';
 
 /**
  * Point `seo.canonical` at the domain that actually serves the site.
@@ -41,14 +42,14 @@ export async function POST(req: Request) {
   if (!canonical) {
     return NextResponse.json({ error: 'No canonical URL given.' }, { status: 400 });
   }
-  let normalized: string;
-  try {
-    const parsed = new URL(canonical.startsWith('http') ? canonical : `https://${canonical}`);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('bad protocol');
-    // Store it bare — no trailing slash. template/src/app/robots.ts strips one anyway, and
-    // structuredData uses it as a schema.org @id base where a stray slash shows up.
-    normalized = `${parsed.protocol}//${parsed.host}${parsed.pathname.replace(/\/$/, '')}`;
-  } catch {
+  // A preset or template sample is refused outright (lib/placeholderCanonical.ts): it is
+  // someone else's domain. Stored bare, no trailing slash: template/src/app/robots.ts strips one
+  // anyway, and structuredData uses it as a schema.org @id base where a stray slash shows up.
+  if (isPlaceholderCanonical(canonical)) {
+    return NextResponse.json({ error: `"${canonical}" is a sample address, not this client's.` }, { status: 400 });
+  }
+  const normalized = normalizeCanonical(canonical);
+  if (!normalized) {
     return NextResponse.json({ error: `"${canonical}" isn't a valid URL.` }, { status: 400 });
   }
 
@@ -101,6 +102,8 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    // FindingsList reads this: false shows "Already correct." rather than "Fixed."
+    changed: previous !== normalized,
     canonical: normalized,
     previous,
     kv,
