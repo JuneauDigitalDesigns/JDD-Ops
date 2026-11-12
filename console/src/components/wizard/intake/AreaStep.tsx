@@ -8,7 +8,11 @@
  * site mirrors the profile. Profiles are only ones that exist (no placeholders); the footer and
  * the structured data's sameAs read them (client-seo).
  */
-import { PROFILE_KINDS, type ProfileKind } from '@jdd/schema';
+import { useState } from 'react';
+import { PROFILE_KINDS, TOP_TOWNS_MAX, type ProfileKind } from '@jdd/schema';
+import { Trash, ArrowSquareOut } from '@phosphor-icons/react';
+import { townPageRows, toggleTopTown, isSourceUrl, addTownNote, type TownNote } from '@/lib/intake-towns';
+import { townChoices } from '@/lib/service-areas';
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { sourceOf, type SourceContext } from '@/lib/intake-sources';
@@ -32,6 +36,15 @@ export default function AreaStep({
   const towns = ext.serviceArea ?? [];
   const sab = ext.serviceAreaBusiness;
   const profiles = (ext.profiles ?? []) as Profile[];
+  // Local SEO (Xander, 2026-11-12, approved as the canvas's row 8): the client's top towns, each
+  // town's progress towards a page of its own, and the operator's sourced notes (lib/intake-towns.ts).
+  const own = townChoices(towns);
+  const top = ((ext as { topTowns?: string[] | null }).topTowns ?? []) as string[];
+  const notes = ((ext as { townNotes?: TownNote[] | null }).townNotes ?? []) as TownNote[];
+  const rows = townPageRows(content);
+  const [noteDraft, setNoteDraft] = useState<TownNote>({ town: '', text: '', sourceUrl: '' });
+  const nextNotes = addTownNote(content, notes, noteDraft);
+  const canAdd = nextNotes !== null;
 
   function setProfile(kind: ProfileKind, url: string, label?: string) {
     const rest = profiles.filter((p) => p.kind !== kind);
@@ -47,7 +60,7 @@ export default function AreaStep({
         <span className="text-xs text-uiFg3">Towns served, the address on the site, and profiles on other sites.</span>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-3.5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-3.5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_300px]">
         <Card
           title="Service area"
           right={<><SourceChip source={sourceOf(sources, 'extensions.serviceArea')} /><span className="font-chromeMono text-2xs text-uiFg3">{towns.length} / 20 towns</span></>}
@@ -61,6 +74,50 @@ export default function AreaStep({
             max={20}
             inputId="extensions.serviceArea"
           />
+
+          <div>
+            <p className={FIELD_LABEL}>
+              Top 3 towns <SourceChip source={sourceOf(sources, 'extensions.topTowns')} />
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {own.map((t) => {
+                const n = top.indexOf(t);
+                const on = n >= 0;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={on}
+                    disabled={!on && top.length >= TOP_TOWNS_MAX}
+                    onClick={() => {
+                      const next = toggleTopTown(content, top, t);
+                      setField('extensions.topTowns', next.length ? next : null);
+                    }}
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors disabled:opacity-40 ${on
+                      ? 'border border-[rgba(31,111,120,.45)] bg-[rgba(31,111,120,.12)] font-semibold text-[#174f56]'
+                      : 'border border-dashed border-uiCardRule text-uiFg3 hover:text-uiInk'}`}
+                  >
+                    {on && <span className="flex h-[17px] w-[17px] items-center justify-center rounded-full bg-[#1f6f78] font-chromeMono text-[10.5px] text-[#f4ecd8]">{n + 1}</span>}
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {rows.length > 0 && (
+            <div>
+              <p className={FIELD_LABEL}>Town pages</p>
+              <ul className="overflow-hidden rounded-[10px] border border-uiCardRule/70 bg-panel" data-testid="town-pages">
+                {rows.map((r) => (
+                  <li key={r.town} className="flex justify-between gap-3 border-t border-uiCardRule/40 px-3 py-1.5 text-[13px] first:border-t-0">
+                    <span className="text-uiInk">{r.town}</span>
+                    <span className={`font-chromeMono text-[11px] ${r.status === 'own' ? 'text-ok' : r.status === 'main' ? 'text-uiFg3' : 'text-[#7d500f]'}`}>{r.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <fieldset>
             <legend className={FIELD_LABEL}>
@@ -100,6 +157,70 @@ export default function AreaStep({
               className={INPUT}
             />
           </label>
+        </Card>
+
+        <Card
+          title="Town notes"
+          right={<span className="font-chromeMono text-2xs text-uiFg3">{notes.length}</span>}
+          bodyClassName="flex flex-col gap-3 p-4"
+        >
+          {notes.map((n, k) => (
+            <div key={k} className="flex shrink-0 flex-col gap-1.5 rounded-[10px] border border-uiCardRule/70 bg-panel px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-6 items-center rounded-full border border-[rgba(31,111,120,.45)] bg-[rgba(31,111,120,.12)] px-2.5 text-[12.5px] font-semibold text-[#174f56]">{n.town}</span>
+                <button
+                  type="button"
+                  aria-label="Remove note"
+                  onClick={() => { const next = notes.filter((_, j) => j !== k); setField('extensions.townNotes', next.length ? next : null); }}
+                  className="ml-auto rounded p-1 text-uiFg3 hover:text-uiInk"
+                >
+                  <Trash size={13} />
+                </button>
+              </div>
+              <p className="text-[13.5px] leading-snug text-uiInk">{n.text}</p>
+              <a href={n.sourceUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 truncate font-chromeMono text-[11.5px] text-uiAccent">
+                <ArrowSquareOut size={12} className="shrink-0" /> {n.sourceUrl.replace(/^https?:\/\//, '')}
+              </a>
+            </div>
+          ))}
+          <div className="flex shrink-0 flex-col gap-2.5 border-t border-uiCardRule/60 pt-3">
+            <label className="block max-w-[240px]">
+              <span className={FIELD_LABEL}>Town</span>
+              <select value={noteDraft.town} onChange={(e) => setNoteDraft({ ...noteDraft, town: e.target.value })} className={INPUT}>
+                <option value="">None</option>
+                {own.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className={FIELD_LABEL}>Note</span>
+              <textarea
+                value={noteDraft.text}
+                onChange={(e) => setNoteDraft({ ...noteDraft, text: e.target.value })}
+                rows={2}
+                className="w-full rounded-lg border border-ruleStrong bg-panel px-2.5 py-1.5 text-[13.5px] text-fg outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block">
+              <span className={FIELD_LABEL}>Source link <Tag tone="warn">Required</Tag></span>
+              <input
+                value={noteDraft.sourceUrl}
+                placeholder="https://"
+                onChange={(e) => setNoteDraft({ ...noteDraft, sourceUrl: e.target.value })}
+                aria-invalid={noteDraft.sourceUrl.trim() !== '' && !isSourceUrl(noteDraft.sourceUrl)}
+                className={`${INPUT} ${noteDraft.sourceUrl.trim() && !isSourceUrl(noteDraft.sourceUrl) ? 'border-danger' : ''}`}
+              />
+            </label>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={!canAdd}
+                onClick={() => { if (nextNotes) { setField('extensions.townNotes', nextNotes); setNoteDraft({ town: noteDraft.town, text: '', sourceUrl: '' }); } }}
+                className="btn btn-sm btn-primary disabled:opacity-40"
+              >
+                Add note
+              </button>
+            </div>
+          </div>
         </Card>
 
         <Card

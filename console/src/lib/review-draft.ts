@@ -8,7 +8,7 @@
  * for a public review, and the word-for-word tick. From then on it is that review (`index`), and
  * each further edit writes straight to it while it stays complete.
  */
-import type { SiteContent, ReviewSource } from '@jdd/schema';
+import { canonicalTown, type SiteContent, type ReviewSource } from '@jdd/schema';
 
 type Review = SiteContent['testimonials']['items'][number];
 
@@ -20,6 +20,9 @@ export interface ReviewDraft {
   date: string;
   q: string;
   service: string;
+  /** The town the review is from: one of the client's towns, or '' (local SEO, 2026-11-12). */
+  town: string;
+  /** Kept as saved: before `town` existed, the Town box wrote here, and it can hold a company name. */
   company: string;
   verbatim: boolean;
   /** The saved review this draft is, once it has been saved. */
@@ -27,7 +30,7 @@ export interface ReviewDraft {
 }
 
 export const EMPTY_DRAFT: ReviewDraft = {
-  source: 'google', sourceUrl: '', a: '', stars: 5, date: '', q: '', service: '', company: '', verbatim: false, index: null,
+  source: 'google', sourceUrl: '', a: '', stars: 5, date: '', q: '', service: '', town: '', company: '', verbatim: false, index: null,
 };
 
 const NEEDS_LINK = new Set<string>(['google', 'yelp', 'facebook']);
@@ -54,12 +57,18 @@ export function draftToReview(d: ReviewDraft, role = ''): Review {
     ...(d.sourceUrl.trim() ? { sourceUrl: d.sourceUrl.trim() } : {}),
     ...(d.date.trim() ? { date: d.date.trim() } : {}),
     ...(d.service ? { service: d.service } : {}),
+    // A town tag puts the review on that town's page, and on its town + service page when the
+    // service matches too. Saved as exactly `town`.
+    ...(d.town?.trim() ? { town: d.town.trim() } : {}),
   };
 }
 
 /** A saved review opened for editing. A review saved with a source was ticked when saved; one
  *  from before provenance existed must be ticked again before an edit is saved. */
-export function draftFromReview(t: Review, index: number): ReviewDraft {
+export function draftFromReview(t: Review, index: number, content?: unknown): ReviewDraft {
+  // A review saved before `town` existed may hold its town in `company` (the old Town box). It
+  // becomes the town only when it IS one of the client's towns: `company` also holds company names.
+  const fromCompany = !t.town && content ? canonicalTown(content, t.company ?? '') : '';
   return {
     source: (t.source as ReviewSource | undefined) ?? '',
     sourceUrl: t.sourceUrl ?? '',
@@ -68,7 +77,8 @@ export function draftFromReview(t: Review, index: number): ReviewDraft {
     date: t.date ?? '',
     q: t.q ?? '',
     service: t.service ?? '',
-    company: t.company ?? '',
+    town: t.town ?? fromCompany,
+    company: fromCompany ? '' : (t.company ?? ''),
     verbatim: Boolean(t.source),
     index,
   };
