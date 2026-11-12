@@ -85,6 +85,19 @@ export interface CopyResult {
       faq: { q: string; a: string }[];
     }[];
   };
+  /** Town page copy (local SEO, 2026-11-12; @jdd/schema v1.34.0): one item per town that earns
+   *  /areas/<slug> (lib/townPages.ts). The intro lands in content.areaCopy[slug].intro and the meta
+   *  description in subpages['areas/<slug>'].seo.description. Only the intros and descriptions are
+   *  generated: the H1 and title are fixed patterns, and every other block renders from tagged
+   *  facts. Only requested when a town qualifies. */
+  townPages?: {
+    items: { slug: string; intro: string; seoDescription: string }[];
+  };
+  /** Town + service page copy: one item per town + service page the export lists, landing in
+   *  content.areaCopy[town].spokes[service].intro and subpages['areas/<town>/<service>']. */
+  townServicePages?: {
+    items: { town: string; service: string; intro: string; seoDescription: string }[];
+  };
 }
 
 export type Section = keyof CopyResult;
@@ -133,6 +146,7 @@ export function parseVerdictKey(k: VerdictKey): { route?: string; section: Secti
 export const ALL_SECTIONS: Section[] = [
   'brand', 'announcement', 'trust', 'hero', 'about', 'services',
   'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo', 'subpages', 'servicePages',
+  'townPages', 'townServicePages',
 ];
 
 const str = { type: 'string' } as const;
@@ -199,6 +213,21 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
       items: arr(obj(
         { slug: str, intro: str, body: arr(str), includedNotes: arr(str), signNotes: arr(str), expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
         ['slug', 'intro', 'body', 'includedNotes', 'signNotes', 'expect', 'faq'],
+      )),
+    },
+    ['items'],
+  ),
+  // Copy only: no town name, photo, review or note is written back (each is the client's or the
+  // operator's), and no identity field.
+  townPages: obj(
+    { items: arr(obj({ slug: str, intro: str, seoDescription: str }, ['slug', 'intro', 'seoDescription'])) },
+    ['items'],
+  ),
+  townServicePages: obj(
+    {
+      items: arr(obj(
+        { town: str, service: str, intro: str, seoDescription: str },
+        ['town', 'service', 'intro', 'seoDescription'],
       )),
     },
     ['items'],

@@ -17,6 +17,7 @@ import type { VerticalId } from '@/lib/verticals';
 import type { Section } from '@/lib/copy-schema';
 import { PAGE_CAPS } from '@jdd/schema';
 import { pickServicePages, primaryCity, serviceSlugs } from '@/lib/servicePages';
+import { townPageFacts, townServicePageFacts } from '@/lib/townPages';
 
 /** The services the copywriter writes page copy for: exactly the ones the gate gives a page
  *  (service-page-spec.md §1), so a thin service never gets copy for a page it will never have. */
@@ -78,6 +79,53 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
     'expect: up to 4 short lines on booking, timing and estimates, only what the facts below state; an empty list when they state nothing.',
     'faq: questions about this service only, phrased the way a customer asks, so that together with the service\'s fixedQuestions the page has 3 to 5 in all. The fixedQuestions are the client\'s own questions and answers and the page shows them first, word for word: never repeat, reword or merge them, and write none of them into faq. Use the customer\'s own questions listed under customerQuestions first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
     `Use only these facts for anything about each service and this business, and write for no service that is not listed:\n${JSON.stringify(facts, null, 2)}`,
+  ].join(' ');
+}
+
+/**
+ * The rules both local page types share (L7, L9 and the house rules). The jobs, reviews and notes
+ * render on the page from the client's and the operator's own words, and are what makes a town page
+ * its own; a paraphrase of a review or a note would be a generated sentence carrying a local claim
+ * without its source.
+ */
+// TOWN_RULES is PR #101 items 4 and 9, approved word for word by Xander on 2026-11-12.
+const TOWN_RULES = 'The reviews and notes are shown on the page as written, with their sources, so never quote, restate or add to them. Never state a local code, permit, rule or condition. No town lists, never write "near me", and use no number the facts do not give.';
+
+/**
+ * The instruction for the `townPages` section: a 2-sentence intro and a meta description for each
+ * town page the schema's gate gives (lib/townPages.ts). '' when no town earns one.
+ * Wording approved word for word by Xander on 2026-11-12 (PR #101, items 1 to 5); don't reword
+ * without his sign-off.
+ */
+export function townPagesInstruction(content: unknown, factsFrom: unknown = content): string {
+  const facts = townPageFacts(content, factsFrom);
+  if (!facts.length) return '';
+  return [
+    '- townPages: one item per town below, each { slug, intro, seoDescription }, for that town\'s own page.',
+    'intro: exactly 2 sentences, the plain answer first: that the business works in the town and where it is based (basedIn), then how to book, from the business facts. Name the town once, name no other town but basedIn, and do not repeat the page heading, which is the trade and the town. Build both sentences on the work done in this town (jobs and servicesHere below), so that no run of 8 words is shared with another town\'s intro, even with the town names swapped.',
+    'seoDescription: one sentence of at most 155 characters naming what the business does in the town and ending in a reason to act, from the facts; not the intro\'s wording, and no run of 8 words shared with another town\'s.',
+    TOWN_RULES,
+    `Use only these facts for each town, with the business facts above, and write for no town that is not listed:\n${JSON.stringify(facts, null, 2)}`,
+  ].join(' ');
+}
+
+/**
+ * The instruction for the `townServicePages` section: a 2-sentence intro and a meta description
+ * for each town + service page the export lists and the spoke gate passes. '' when there is none
+ * (always, until Phase 3 approves one). The service page's own facts (what's included, the jobs,
+ * the price) are not sent: they stay on the service page, which this page links to.
+ * Wording approved word for word by Xander on 2026-11-12 (PR #101, items 6 to 10); don't reword
+ * without his sign-off.
+ */
+export function townServicePagesInstruction(content: unknown, factsFrom: unknown = content): string {
+  const facts = townServicePageFacts(content, factsFrom);
+  if (!facts.length) return '';
+  return [
+    '- townServicePages: one item per page below, each { town, service, intro, seoDescription }, for that service\'s page in that town.',
+    'intro: exactly 2 sentences, the plain answer first: that the business does this service in the town, then how to book it, from the business facts. Name the town once, and do not repeat the page heading, which is the service and the town. Build both sentences on this town\'s jobs for this service and on typicalVisit, howLong and priceFactors below, so that no run of 8 words is shared with another page or with the service\'s own page, even with the names swapped. Never state a price.',
+    'seoDescription: one sentence of at most 155 characters naming the service and the town and ending in a reason to act, from the facts; not the intro\'s wording, and no run of 8 words shared with another page\'s.',
+    TOWN_RULES,
+    `Use only these facts for each page, with the business facts above, and write for no page that is not listed:\n${JSON.stringify(facts, null, 2)}`,
   ].join(' ');
 }
 

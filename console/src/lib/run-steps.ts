@@ -18,7 +18,7 @@ export const RUN_STEPS: RunStep[] = [
   { kind: 'sections', label: 'Top of the home page', sections: ['announcement', 'trust', 'hero'] },
   { kind: 'sections', label: 'Middle of the home page', sections: ['about', 'services', 'work', 'testimonials'] },
   { kind: 'sections', label: 'Bottom of the home page', sections: ['faq', 'finalCta', 'footer'] },
-  { kind: 'sections', label: 'Other pages', sections: ['seo', 'subpages', 'servicePages'] },
+  { kind: 'sections', label: 'Other pages', sections: ['seo', 'subpages', 'servicePages', 'townPages', 'townServicePages'] },
   { kind: 'model', label: 'Model' },
   { kind: 'summary', label: 'Summary' },
 ];
