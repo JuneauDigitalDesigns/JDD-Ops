@@ -14,7 +14,7 @@
  * stores the service's slug the first time, so a rename never detaches it.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, CaretLeft, CaretRight, CheckCircle, CircleNotch, Plus, Trash, UploadSimple } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, CaretLeft, CaretRight, CheckCircle, CircleNotch, Plus, Trash, UploadSimple, Warning } from '@phosphor-icons/react';
 import { serviceSlugs, menuFor, serviceSuggestions } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
@@ -25,20 +25,25 @@ import {
   SERVICE_PARTS, BASICS_LABEL, DURATION_CHOICES, partsDone, partsProgress, nextPart, prevPart, categorySuggestions,
   type ServicePartId,
 } from '@/lib/service-parts';
-import { Card, ChipListEditor, ToggleChips, Tag, INPUT } from './ui';
+import { Card, ChipListEditor, ToggleChips, Tag, INPUT, SourceChip } from './ui';
+import { removalPlan, removalRows, removeService, serviceFromClient } from '@/lib/service-remove';
+import type { SourceContext } from '@/lib/intake-sources';
 
 type Item = SiteContent['services']['items'][number];
 type Project = SiteContent['work']['projects'][number];
 type Question = { q: string; a: string; service?: string };
 
-const PAGE_SIZE = 9;
+// Eight rows and the Add service row fit the list's column at 1440x900 with no scroll.
+const PAGE_SIZE = 8;
 const BIG_INPUT = 'h-11 w-full rounded-[10px] border border-ruleStrong bg-panel px-3 text-[15px] text-fg outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]';
 
 export default function ServicesStep({
-  content, setField, focusService, vertical, onDone,
+  content, setField, focusService, vertical, onDone, sources,
 }: {
   content: SiteContent;
   setField: SetField;
+  /** Where values came from: a service the client's form listed asks for a tick before removal. */
+  sources?: SourceContext;
   /** A service Still to do jumped to: it opens on its Summary. */
   focusService?: number;
   /** The vertical, for its own service categories. */
@@ -75,6 +80,17 @@ export default function ServicesStep({
     open(items.length);
   }
 
+  // Removing asks first (Xander, 2026-11-12), and more firmly for a service the client listed.
+  const [removing, setRemoving] = useState<number | null>(null);
+  function confirmRemove(idx: number) {
+    for (const [p, v] of Object.entries(removeService(content, idx))) setField(p, v);
+    setRemoving(null);
+    const nextSel = Math.max(0, Math.min(idx === i ? idx : i > idx ? i - 1 : i, items.length - 2));
+    setSel(nextSel);
+    setPart('basics');
+    setPage(Math.floor(nextSel / PAGE_SIZE));
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3.5 px-6 py-4">
       <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1">
@@ -82,16 +98,19 @@ export default function ServicesStep({
         <span className="font-chromeMono text-2xs text-uiFg3">
           {items.length} service{items.length === 1 ? '' : 's'} · {items.filter((_, k) => servicePageHint(SERVICE_GATE, content, k).page).length} with their own page
         </span>
-        <button type="button" onClick={addService} className="btn btn-sm ml-auto"><Plus size={12} /> Service</button>
       </div>
 
       {items.length === 0 ? (
         <div className="grid flex-1 place-items-center rounded-xl border border-dashed border-uiCardRule">
-          <p className="text-sm text-uiFg3">No services listed.</p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-uiFg3">No services listed.</p>
+            <button type="button" onClick={addService} className="btn btn-sm"><Plus size={12} /> Add service</button>
+          </div>
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-3.5 lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_340px] 2xl:grid-cols-[280px_minmax(0,1fr)_420px]">
           <Card
+            bodyClassName="flex flex-col"
             title={`Services · ${items.length}`}
             right={pages > 1 && (
               <span className="flex items-center gap-1">
@@ -101,22 +120,35 @@ export default function ServicesStep({
               </span>
             )}
           >
-            <ul>
+            <ul className="flex min-h-0 flex-1 flex-col">
               {shown.map((it, k) => {
                 const idx = page * PAGE_SIZE + k;
                 const done = partsDone(content, idx, slugs[idx] ?? '');
                 const prog = partsProgress(done);
                 const hint = servicePageHint(SERVICE_GATE, content, idx);
                 const on = idx === i;
+                const client = serviceFromClient(sources?.imported, it);
                 return (
-                  <li key={idx}>
+                  <li key={idx} className="group relative">
+                    <button
+                      type="button"
+                      aria-label="Remove service"
+                      title="Remove service"
+                      onClick={() => setRemoving(idx)}
+                      className={`absolute right-2.5 top-2.5 z-[1] flex h-[26px] w-[26px] items-center justify-center rounded-md border text-uiFg3 transition-opacity hover:text-uiInk ${on ? 'border-uiCardRule bg-panel opacity-100' : 'border-transparent opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                    >
+                      <Trash size={13} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => open(idx, on ? part : 'basics')}
                       aria-current={on ? 'true' : undefined}
-                      className={`flex w-full flex-col gap-1 border-l-[3px] px-3.5 py-2.5 text-left transition-colors ${on ? 'border-uiAccent bg-uiSurface' : 'border-transparent hover:bg-uiSurface/60'}`}
+                      className={`flex w-full flex-col gap-1 border-l-[3px] py-2.5 pl-3.5 pr-11 text-left transition-colors ${on ? 'border-uiAccent bg-uiSurface' : 'border-transparent hover:bg-uiSurface/60'}`}
                     >
-                      <span className="truncate text-[14px] font-semibold text-uiInk">{it.t?.trim() || 'Untitled'}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-[14px] font-semibold text-uiInk">{it.t?.trim() || 'Untitled'}</span>
+                        {client && <SourceChip source="form" />}
+                      </span>
                       <span className="flex gap-[3px]" aria-hidden>
                         {(['basics', 'included', 'problems', 'towns', 'photos', 'questions'] as const).map((p) => (
                           <i
@@ -134,6 +166,11 @@ export default function ServicesStep({
                 );
               })}
             </ul>
+            <div className="mt-auto border-t border-uiCardRule/70 p-2.5">
+              <button type="button" onClick={addService} className="btn btn-sm w-full justify-center border-dashed">
+                <Plus size={12} /> Add service
+              </button>
+            </div>
           </Card>
 
           {item && (
@@ -157,6 +194,100 @@ export default function ServicesStep({
           )}
         </div>
       )}
+
+      {removing !== null && items[removing] && (
+        <RemoveServiceDialog
+          key={removing}
+          content={content}
+          index={removing}
+          fromClient={serviceFromClient(sources?.imported, items[removing])}
+          onCancel={() => setRemoving(null)}
+          onRemove={() => confirmRemove(removing)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The removal confirmation (approved on the canvas, row 5, word for word). It lists what goes (the
+ * service's own page and its page copy) and what stays untagged (photos, questions, reviews). A
+ * service the client listed on their onboarding form carries a warning, and Remove stays off
+ * until the tick.
+ */
+function RemoveServiceDialog({
+  content, index, fromClient, onCancel, onRemove,
+}: {
+  content: SiteContent;
+  index: number;
+  fromClient: boolean;
+  onCancel: () => void;
+  onRemove: () => void;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  const plan = removalPlan(content, index, { ownPage: servicePageHint(SERVICE_GATE, content, index).page });
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    cancelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="remove-service-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(20, 18, 12, 0.38)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-[540px] overflow-hidden rounded-2xl border border-ruleStrong bg-panel shadow-overlay"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 px-6 pb-1.5 pt-5">
+          <h3 id="remove-service-title" className="min-w-0 truncate font-display text-[28px] font-bold leading-none text-uiInk">
+            Remove {plan.name}
+          </h3>
+          {fromClient && <span className="ml-auto"><SourceChip source="form" /></span>}
+        </div>
+        <div className="flex flex-col gap-3 px-6 pb-4 pt-2.5">
+          {fromClient && (
+            <p className="flex items-start gap-2.5 rounded-[10px] border px-3.5 py-3 text-[13.5px] font-semibold leading-snug text-uiInk" style={{ background: 'rgba(210,84,47,.10)', borderColor: 'rgba(210,84,47,.45)' }}>
+              <Warning size={16} weight="fill" className="mt-0.5 shrink-0" style={{ color: 'var(--accent-2, #d2542f)' }} />
+              Listed by the client on the onboarding form.
+            </p>
+          )}
+          <dl className="overflow-hidden rounded-[10px] border border-uiCardRule bg-uiBg">
+            {removalRows(plan).map(([term, value], k) => (
+              <div key={term} className={`flex justify-between gap-3.5 px-3.5 py-2.5 text-[13.5px] ${k ? 'border-t border-uiCardRule/70' : ''}`}>
+                <dt className="text-uiFg2">{term}</dt>
+                <dd className={`text-right font-semibold ${value.endsWith('removed') || value === 'Removed' ? 'text-[#a3401f]' : 'text-uiInk'}`}>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          {fromClient && (
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-uiInk">
+              <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="h-[18px] w-[18px] accent-[#a3401f]" />
+              Remove a service the client listed
+            </label>
+          )}
+        </div>
+        <div className="flex justify-end gap-2.5 border-t border-uiCardRule bg-uiSurface px-6 py-3.5">
+          <button ref={cancelRef} type="button" onClick={onCancel} className="btn btn-sm">Cancel</button>
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={fromClient && !confirmed}
+            className="btn btn-sm font-semibold text-[#fbf5e6] disabled:opacity-40"
+            style={{ background: '#a3401f', borderColor: '#a3401f' }}
+          >
+            Remove service
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
