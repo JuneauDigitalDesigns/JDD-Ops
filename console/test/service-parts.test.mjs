@@ -14,7 +14,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('the parts and headers are the approved ones, in order', () => {
   assert.deepEqual(SERVICE_PARTS.map((p) => p.label), [
-    'Basics', 'Included in the job', 'Problems it fixes', 'Towns & brands', 'Photos', 'Customer questions', 'Summary',
+    // 'What affects the price' and 'What happens on a typical visit' added 2026-11-12 (local SEO,
+    // test/services-local-facts.test.mjs).
+    'Basics', 'Included in the job', 'Problems it fixes', 'What affects the price', 'What happens on a typical visit',
+    'Towns & brands', 'Photos', 'Customer questions', 'Summary',
   ]);
   assert.deepEqual(Object.values(BASICS_LABEL), ['Service name', 'Category on the card', 'Starting price', 'Usual job length']);
   assert.deepEqual([...DURATION_CHOICES], ['Under an hour', 'Half a day', 'A full day', 'A few days']);
@@ -36,8 +39,8 @@ test('a part counts as done once it has something in it; photos and questions by
     extensions: { customerQuestions: [{ q: 'Other?', a: '', service: 'heat-pump' }] },
   };
   const done = partsDone(content, 0, 'ac-repair');
-  assert.deepEqual(done, { basics: true, included: true, problems: false, towns: true, photos: true, questions: false });
-  assert.deepEqual(partsProgress(done), { done: 4, of: 6 });
+  assert.deepEqual(done, { basics: true, included: true, problems: false, price: false, visit: false, towns: true, photos: true, questions: false });
+  assert.deepEqual(partsProgress(done), { done: 4, of: 8 });
 });
 
 test('next and back walk the parts; the summary is last', () => {
