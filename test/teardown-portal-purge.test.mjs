@@ -51,6 +51,10 @@ const TOKEN = 'lit_test000000000000000000000000000000000';
  * Four of these (`activity`, `unread`, `task`, `promoted`) had never been listed, and the
  * two `archived` ones are new. The comment above them used to claim the list was complete
  * while it was missing six, which is exactly how a guard stops guarding.
+ *
+ * The Inbox read set (`portal:inbox:v1:read:{acct}:{slug}`, agency `portal-inbox-read.ts`,
+ * 2026-11-12) is a new namespace rather than another `crm:v2` family, and the same SCAN takes
+ * it. Listed so the claim that it does is checked rather than assumed.
  */
 const OWN = [
   `portal:lead:v1:${ACCT}:acme:lead1`,
@@ -66,6 +70,7 @@ const OWN = [
   `portal:crm:v2:promoted:${ACCT}:acme`,
   `portal:crm:v2:archived:${ACCT}:acme`,
   `portal:crm:v2:archived-at:${ACCT}:acme:recAAAAAAAAAAAAAA`,
+  `portal:inbox:v1:read:${ACCT}:acme`,
 ];
 /** Everything that must survive. */
 const SURVIVORS = [
@@ -76,12 +81,14 @@ const SURVIVORS = [
   // The new families are in the trap as well: `acme-2`'s archive must outlive `acme`.
   `portal:crm:v2:archived:${ACCT}:acme-2`,
   `portal:crm:v2:archived-at:${ACCT}:acme-2:recBBBBBBBBBBBBBB`,
+  `portal:inbox:v1:read:${ACCT}:acme-2`,
   // Account-scoped: shared by every site on the account.
   `portal:review:sent:v1:${ACCT}:+14075550100`,
   `portal:crm:v2:owner-email:${ACCT}`,
   // Same slug, different account.
   `portal:lead:v1:${OTHER}:acme:lead1`,
   `portal:crm:v2:index:${OTHER}:acme`,
+  `portal:inbox:v1:read:${OTHER}:acme`,
   // Unrelated.
   `portal:number-owner:v1:+14075550100`,
   'jdd:account:someone',
@@ -264,4 +271,20 @@ test('nothing left to purge is already-gone, not a zero-count success', async ()
   const kv = fakeUpstash({ keys: [...SURVIVORS] });
   const res = await purgePortalSiteData({ ...BASE, accountEmail: OWNER, fetchImpl: kv.impl });
   assert.equal(res.outcome, 'already-gone');
+});
+
+test('an enterprise teardown clears every site’s inbox read set, and no other client’s', async () => {
+  // Xander, 2026-11-12: the Inbox read records go when a client is torn down. The console's
+  // teardown (`/api/manage/teardown`) runs this purge once per site of the client, so an
+  // enterprise client with `acme` and `acme-2` loses both read sets. Another client's read set,
+  // under the same slug, stays.
+  const mine = [`portal:inbox:v1:read:${ACCT}:acme`, `portal:inbox:v1:read:${ACCT}:acme-2`];
+  const theirs = [`portal:inbox:v1:read:${OTHER}:acme`, `portal:inbox:v1:read:${OTHER}:acme-2`];
+  const kv = fakeUpstash({ keys: [...mine, ...theirs] });
+  for (const siteSlug of ['acme', 'acme-2']) {
+    const res = await purgePortalSiteData({ ...BASE, siteSlug, accountEmail: OWNER, fetchImpl: kv.impl });
+    assert.equal(res.outcome, 'deleted', res.message);
+  }
+  for (const k of mine) assert.ok(!kv.store.has(k), `read set survived teardown: ${k}`);
+  for (const k of theirs) assert.ok(kv.store.has(k), `another client’s read set was deleted: ${k}`);
 });
