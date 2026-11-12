@@ -49,3 +49,35 @@ export function runSummary(ticked: Section[]): RunSummary {
 export function generateLabel(count: number, hasGenerated: boolean): string {
   return `${hasGenerated ? 'Regenerate' : 'Generate'} ${count} section${count === 1 ? '' : 's'}`;
 }
+
+// ── The Prompt step's menu (Xander, 2026-11-12, approved as the canvas's row 6) ──────────────────
+// The stepping box became a floating button that opens one window over the prompt: every group's
+// switches side by side, the model and Generate, and each section's progress during a run.
+
+/** The floating button and the window's title; "Generating" while a run is going. */
+export const MENU_LABEL = 'Sections and model';
+export const RUNNING_LABEL = 'Generating';
+
+/** The four section groups, shown side by side in the menu. */
+export const RUN_GROUPS = RUN_STEPS.filter((s): s is Extract<RunStep, { kind: 'sections' }> => s.kind === 'sections');
+
+export type RunStatus = 'idle' | 'writing' | 'done' | 'failed' | 'skipped';
+
+/** One section's place in a run, in the approved words. `Not written` is the existing label for a
+ *  section the run skipped. */
+export function statusLabel(status: RunStatus | undefined, on: boolean): string {
+  if (!on) return 'Off';
+  switch (status) {
+    case 'writing': return 'Writing';
+    case 'done': return 'Done';
+    case 'failed': return 'Failed';
+    case 'skipped': return 'Not written';
+    default: return 'Waiting';
+  }
+}
+
+/** Sections the run has finished with (done, failed or not written), out of those switched on. */
+export function runProgress(statuses: Partial<Record<string, RunStatus>>, on: readonly string[]): { done: number; of: number } {
+  const finished = on.filter((s) => ['done', 'failed', 'skipped'].includes(statuses[s] ?? '')).length;
+  return { done: finished, of: on.length };
+}
