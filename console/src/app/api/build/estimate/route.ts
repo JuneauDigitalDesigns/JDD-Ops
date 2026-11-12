@@ -13,6 +13,7 @@ import { isValidModelId, modelOption, estimateCost, DEFAULT_MODEL_ID } from '@/l
 import { planRunSections, type CopyPage } from '@/lib/copy-brief/run-sections';
 import { pickServicePages } from '@/lib/servicePages';
 import { PAGE_CAPS } from '@jdd/schema';
+import { pickTownPages, pickTownServicePages } from '@/lib/townPages';
 
 export const runtime = 'nodejs';
 
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
   const subpages = Array.isArray(body.subpages) ? body.subpages : [];
   const { sections } = planRunSections({
     requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, PAGE_CAPS.service).length > 0,
+    hasTownPages: pickTownPages(base).length > 0, hasTownServicePages: pickTownServicePages(base).length > 0,
   });
   const chunks = chunkSections(sections);
 

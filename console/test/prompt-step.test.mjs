@@ -35,7 +35,7 @@ test('a switch turns one section on or off and keeps the write order', () => {
 
 test('the summary counts what is on and names what is off', () => {
   const on = SWITCHABLE.filter((s) => !['trust', 'work', 'testimonials'].includes(s));
-  assert.deepEqual(runSummary(on), { on: 10, of: 13, off: ['Trust', 'Work', 'Testimonials'] });
+  assert.deepEqual(runSummary(on), { on: 12, of: 15, off: ['Trust', 'Work', 'Testimonials'] });
   assert.equal(generateLabel(10, false), 'Generate 10 sections');
   assert.equal(generateLabel(1, true), 'Regenerate 1 section');
 });
