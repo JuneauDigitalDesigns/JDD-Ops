@@ -35,7 +35,7 @@ import type { ReviewDraft } from '@/lib/review-draft';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
-import { newerBundle } from '@/lib/wizardBundle';
+import { startingBundle } from '@/lib/wizardBundle';
 import { useHydrationGate } from '@/lib/hydrationGate';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
@@ -172,6 +172,7 @@ export default function BuildWizard({
   draftBundle,
   hasRepo = false,
   exportedContent = null,
+  exportedAt = null,
 }: {
   slug: string;
   seed: SiteContent | null;
@@ -200,6 +201,9 @@ export default function BuildWizard({
    * exported client this is the content baseline, not the intake: see readExportedContent.
    */
   exportedContent?: SiteContent | null;
+  /** Epoch ms the repo was last written (its manifest, else home's page.tsx), or null. A draft
+   *  saved after this is newer work and opens instead of the repo: see startingBundle. */
+  exportedAt?: number | null;
 }) {
   const reduce = useReducedMotion();
 
@@ -758,8 +762,17 @@ export default function BuildWizard({
    */
   useEffect(() => {
     const saved = readBundle(slug);
+    // A draft saved after the repo was last written opens as saved; only older work loses to the
+    // repo (startingBundle). Before 2026-11-12 the repo won on every reload, which threw away the
+    // intake's typed facts and the copy run for every onboarded client.
+    const start = startingBundle({
+      saved,
+      server: draftBundle as Partial<WizardBundle> | null,
+      exported,
+      exportedAt,
+    });
 
-    if (manifest || composition) {
+    if (start.from === 'disk') {
       // ── Already exported: DISK WINS, for CONTENT. ───────────────────────────────────
       // The repo is what the client's site actually is, so opening the studio shows that
       // and nothing else. A stale localStorage draft from some earlier session must not
@@ -792,9 +805,8 @@ export default function BuildWizard({
         reviewDraft: saved?.reviewDraft ?? (draftBundle?.reviewDraft as ReviewDraft | null | undefined),
       });
     } else {
-      // ── Never exported: local storage wins, then the server draft, then a fresh start. ──
-      // The NEWER of the two, not this browser's by default: see newerBundle.
-      applyBundle(newerBundle(saved, draftBundle as Partial<WizardBundle> | null) ?? freshBundle(seed));
+      // ── A saved draft (the newer of this browser's and the server's), else a fresh start. ──
+      applyBundle(start.bundle ?? freshBundle(seed));
     }
 
     // Undo across a client switch would restore another client's content into this one.
