@@ -16,6 +16,7 @@ import {
 } from 'node:fs';
 import { routePath, styleKeyFor, rhythmClass, navHref, type SectionRhythm, type SiteComposition } from '@/lib/pages';
 import { reconcileRoutes } from '@/lib/composition-manifest';
+import { stagedRepoDir } from '@/lib/stagedExport';
 import { REVEAL_CLASS, revealsOnScroll } from '@/lib/revealPolicy';
 import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
 import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
@@ -131,7 +132,9 @@ export function isValidSlug(slug: string): boolean {
 }
 
 export function repoDirFor(repoRoot: string, slug: string): string {
-  return resolve(repoRoot, 'clients', slug, 'repo');
+  // While an export runs, every write goes to its staged copy (lib/stagedExport.ts), so a failed
+  // export never leaves the real repo half-written.
+  return stagedRepoDir(slug) ?? resolve(repoRoot, 'clients', slug, 'repo');
 }
 
 /** Existing client slugs (directories under clients/, dotfiles skipped). */
