@@ -79,9 +79,11 @@ export default function PlumbingHero({ content = CONTENT }: { content?: SiteCont
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-[18px] max-w-[44ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-[18px] max-w-[44ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           {hero.frictionReducers.length > 0 && (
             <div className="hero-rise mt-6 flex flex-wrap gap-[9px]">

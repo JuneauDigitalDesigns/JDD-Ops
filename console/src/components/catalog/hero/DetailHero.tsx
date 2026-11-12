@@ -94,9 +94,11 @@ export default function DetailHero({ content = CONTENT }: { content?: SiteConten
           <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
         </h1>
 
-        <p className="mx-auto mt-5 max-w-[52ch] text-[17px] leading-[1.62] text-onInkSoft sm:text-[18.5px]">
-          <E p="hero.sub">{hero.sub}</E>
-        </p>
+        {hero.sub && (
+          <p className="mx-auto mt-5 max-w-[52ch] text-[17px] leading-[1.62] text-onInkSoft sm:text-[18.5px]">
+            <E p="hero.sub">{hero.sub}</E>
+          </p>
+        )}
 
         <div className="hero-rise mt-8 flex flex-wrap justify-center gap-[13px]">
           <a

@@ -114,9 +114,11 @@ export default function HvacHero({ content = CONTENT }: { content?: SiteContent 
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.55] text-onInkSoft sm:text-[20px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-5 max-w-[46ch] text-[17px] leading-[1.55] text-onInkSoft sm:text-[20px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           <div className="hero-rise mt-8 flex flex-wrap gap-[14px]" style={{ animationDelay: '.08s' }}>
             <a

@@ -29,6 +29,16 @@
  * (555) 555-0100" button, a trust badge with a license number) is emptied when one of those samples
  * appears inside it. Never a pattern: the e2e fixtures' real numbers are 555-01xx too.
  *
+ * Sample CLAIMS go the same way (operator decision, 2026-11-11): a rating, trust badges, logos,
+ * stat tiles and copy that names a placeholder place. The HVAC preset's `reviewBadge` (4.9 from 340)
+ * showed a client with no rating as 4.9 stars from 340 reviews in the hero, the reviews band and the
+ * trust strip; its four badges and "4.9★ From 180+ verified reviews" stat did the same for badges
+ * and stats; "Your City's Trusted Plumbing Pros" headed a hero. A client with no real value shows
+ * nothing. Lists (badges, logos, stats, hero bullets) are compared as a WHOLE list, the way
+ * grounded.ts and intake-sources.ts judge them: a client's own "BBB Accredited" or "4.9★ Customer
+ * rating" sits in a list that is not the preset's and is kept. A list falls through whole, so the
+ * whole list is what a fall-through looks like.
+ *
  * Deliberately NOT listed: the seed's bare name "Peak" and its "Est. 2011", which a real client
  * could plausibly have. Only the default-seed export branch (a direct API call with neither content
  * nor vertical) could ship them, and that branch ships the whole sample site anyway.
@@ -37,6 +47,7 @@
  */
 
 type Json = Record<string, unknown>;
+const isPlainObject = (x: unknown): x is Json => typeof x === 'object' && x !== null && !Array.isArray(x);
 
 export interface SampleIdentity {
   /** Where it shipped from, for the reader. */
@@ -204,6 +215,125 @@ export const IDENTITY_TEXT_FIELDS: readonly string[] = ['footer.legal', 'hero.se
  *  "Licensed & insured · CAC1234567"). */
 export const IDENTITY_TEXT_LISTS: readonly string[] = ['extensions.trustBadges'];
 
+// ── Sample claims ────────────────────────────────────────────────────────────
+
+/** Every rating a preset, the seed or the template has shipped. Matched on rating and count, and
+ *  only with no review link: a client's own badge carries the URL of their reviews. */
+export const RETIRED_SAMPLE_RATINGS: readonly { from: string; rating: number; count: number }[] = [
+  { from: 'data/verticals/hvac.ts', rating: 4.9, count: 340 },
+];
+
+/** Every whole list a preset, the seed or the template has shipped at these paths, read from each
+ *  file's git history (and deprecated/studio/preview's presets). */
+export const RETIRED_SAMPLE_LISTS: Readonly<Record<string, readonly { from: string; list: readonly (string | Json)[] }[]>> = {
+  "extensions.trustBadges": [
+    { from: "data/verticals/hvac.ts", list: ["Licensed & insured · CAC1234567", "24/7 emergency service", "Financing available", "Satisfaction guaranteed"] },
+    { from: "data/verticals/hvac.ts", list: ["NATE Certified Technicians", "EPA 608 Certified", "Energy Star Partner", "BBB Accredited"] },
+    { from: "data/verticals/roofing.ts", list: ["GAF Certified Installer", "Insurance Claims Specialist", "30-Year Workmanship Warranty", "Licensed & Bonded"] },
+    { from: "data/verticals/plumbing.ts", list: ["Licensed & Bonded", "Upfront Pricing", "Background-Checked Technicians", "Satisfaction Guarantee"] },
+    { from: "data/verticals/lawn-care.ts", list: ["Eco-Friendly Products", "Satisfaction Guaranteed", "Locally Owned & Operated", "Fully Insured"] },
+    { from: "data/verticals/car-detailing.ts", list: ["Certified Detailers", "5-Star Google Rating", "100% Satisfaction Guarantee", "Insured & Bonded"] },
+    { from: "data/verticals/health.ts", list: ["Licensed Practitioners", "Privacy-First Care", "Insured & Accredited", "Community Trusted"] },
+    { from: "data/site.ts (the default seed)", list: ["EPA 608 Certified", "NATE-Certified Technicians", "BBB Accredited", "Best of Juneau 2023 & 2024"] },
+  ],
+  "trust.logos": [
+    { from: "data/verticals/hvac.ts", list: ["NATE Certified", "EPA 608 Certified", "Energy Star Partner", "BBB Accredited", "Licensed & Insured"] },
+    { from: "data/verticals/roofing.ts", list: ["GAF Certified", "Insurance Claims Specialist", "30-Year Warranty", "Licensed & Bonded", "BBB Accredited"] },
+    { from: "data/verticals/plumbing.ts", list: ["Licensed & Bonded", "Upfront Pricing", "Background Checked", "24/7 Emergency", "BBB Accredited"] },
+    { from: "data/verticals/lawn-care.ts", list: ["Eco-Friendly Products", "Satisfaction Guaranteed", "Locally Owned", "Fully Insured", "Free Estimates"] },
+    { from: "data/verticals/car-detailing.ts", list: ["Certified Detailers", "5-Star Rated", "100% Satisfaction", "Insured & Bonded", "Mobile Service Available"] },
+    { from: "data/verticals/health.ts", list: ["Licensed Practitioners", "Privacy-First Care", "Insured & Accredited", "5-Star Reviewed", "Community Partner"] },
+    { from: "data/site.ts (the default seed)", list: ["City of Juneau", "Bergmann Properties", "Juneau School District", "EPA 608 Certified", "NATE-Certified", "BBB Accredited", "Best of Juneau 2024"] },
+  ],
+  "about.stats": [
+    { from: "data/verticals/hvac.ts", list: [{ n: "24/7", l: "Emergency service, real humans" }, { n: "18+", l: "Years serving your area" }, { n: "4.9★", l: "From 180+ verified reviews" }, { n: "12", l: "Towns in our coverage area" }] },
+    { from: "data/verticals/hvac.ts", list: [{ n: "24/7", l: "Emergency support" }, { n: "1 hr", l: "Avg. response time" }, { n: "4.9★", l: "Customer rating" }, { n: "100%", l: "Satisfaction guarantee" }] },
+    { from: "data/verticals/roofing.ts", list: [{ n: "500+", l: "Roofs replaced" }, { n: "30 yr", l: "Warranty coverage" }, { n: "4.9★", l: "Customer rating" }, { n: "100%", l: "Satisfaction guarantee" }] },
+    { from: "data/verticals/plumbing.ts", list: [{ n: "24/7", l: "Emergency support" }, { n: "Same Day", l: "Service available" }, { n: "4.9★", l: "Customer rating" }, { n: "100%", l: "Satisfaction guarantee" }] },
+    { from: "data/verticals/lawn-care.ts", list: [{ n: "200+", l: "Lawns maintained" }, { n: "Eco", l: "Certified products" }, { n: "4.9★", l: "Customer rating" }, { n: "100%", l: "Satisfaction guarantee" }] },
+    { from: "data/verticals/car-detailing.ts", list: [{ n: "500+", l: "Vehicles detailed" }, { n: "5★", l: "Google rating" }, { n: "4.9", l: "Average review score" }, { n: "100%", l: "Satisfaction guarantee" }] },
+    { from: "data/verticals/health.ts", list: [{ n: "Same wk", l: "Appointment availability" }, { n: "1:1", l: "Personalized attention" }, { n: "4.9★", l: "Client rating" }, { n: "100%", l: "Confidential & private" }] },
+    { from: "data/site.ts (the default seed)", list: [{ n: "14+", l: "Years in business" }, { n: "2,400+", l: "Jobs completed" }, { n: "4.9", l: "Average review rating" }, { n: "24/7", l: "Emergency support" }] },
+  ],
+  "hero.heroBullets": [
+    { from: "data/verticals/hvac.ts", list: [{ value: "24/7", label: "Emergency line" }, { value: "1 hr", label: "Response time" }, { value: "4.9", label: "Average rating" }, { value: "100%", label: "Satisfaction" }] },
+    { from: "data/verticals/roofing.ts", list: [{ value: "500+", label: "Roofs replaced" }, { value: "30 yr", label: "Workmanship warranty" }, { value: "4.9", label: "Average rating" }, { value: "100%", label: "Satisfaction" }] },
+    { from: "data/verticals/plumbing.ts", list: [{ value: "24/7", label: "Emergency line" }, { value: "Same Day", label: "Service available" }, { value: "4.9", label: "Average rating" }, { value: "100%", label: "Satisfaction" }] },
+    { from: "data/verticals/lawn-care.ts", list: [{ value: "200+", label: "Lawns maintained" }, { value: "Eco", label: "Friendly products" }, { value: "4.9", label: "Average rating" }, { value: "100%", label: "Satisfaction" }] },
+    { from: "data/verticals/car-detailing.ts", list: [{ value: "500+", label: "Vehicles detailed" }, { value: "5★", label: "Google rating" }, { value: "4.9", label: "Average review" }, { value: "100%", label: "Satisfaction" }] },
+    { from: "data/verticals/health.ts", list: [{ value: "Same wk", label: "Appointments" }, { value: "1:1", label: "Personal care" }, { value: "4.9", label: "Average rating" }, { value: "100%", label: "Confidential" }] },
+    { from: "data/site.ts (the default seed)", list: [{ value: "2,400+", label: "Jobs completed" }, { value: "4.9", label: "Average rating" }, { value: "14 yrs", label: "In business" }, { value: "24/7", label: "Emergency line" }] },
+  ],
+};
+
+/** Copy that names a placeholder place, or (the hero badge) states a sample rating, matched exactly
+ *  at its own path. */
+export const RETIRED_SAMPLE_TEXT: Readonly<Record<string, readonly string[]>> = {
+  'hero.eyebrow': [
+    "Your City's Trusted HVAC Experts",
+    "Your City's Trusted Plumbing Pros",
+    "Your City's Trusted Roofing Contractor",
+    "Your City's Whole-Person Wellness Practice",
+    'Your Neighborhood Lawn Experts',
+  ],
+  'hero.sub': [
+    "Same-day repairs, honest flat-rate quotes, and technicians who show up on time. Keeping your city's homes comfortable since 2009.",
+  ],
+  'work.sub': ['Real results from real customers in your neighborhood.'],
+  'hero.badge': ['4.9 / 5, 300+ reviews', '4.9 / 5 — 300+ reviews'],
+};
+
+/** The seed's rating pillar, matched as a record. */
+const RETIRED_SAMPLE_PILLARS: readonly { t: string; d: string }[] = [
+  { t: '4.9-Star Rated', d: 'Over 300 verified reviews across Google and Facebook from real Juneau customers.' },
+];
+
+const itemKey = (v: unknown): string =>
+  typeof v === 'string'
+    ? norm(v)
+    : isPlainObject(v)
+      ? JSON.stringify(Object.keys(v).sort().map((k) => [k, typeof v[k] === 'string' ? norm(v[k] as string) : v[k]]))
+      : JSON.stringify(v);
+
+/** The record keys a sample list at `path` was recorded with ({n, l}, {value, label}), or none. */
+const recordKeysFor = (path: string): string[] | undefined => {
+  const first = RETIRED_SAMPLE_LISTS[path]?.[0]?.list[0];
+  return isPlainObject(first) ? Object.keys(first) : undefined;
+};
+
+/** A list's identity: its non-blank items, normalized, in order. Records are compared on the keys
+ *  the sample was recorded with, so an id or icon added later doesn't hide a sample. */
+const listKey = (list: readonly unknown[], keys?: string[]): string =>
+  JSON.stringify(
+    list
+      .filter((v) => v !== null && v !== undefined && !(typeof v === 'string' && !v.trim()))
+      .map((v) => itemKey(keys && isPlainObject(v) ? Object.fromEntries(keys.map((k) => [k, v[k]])) : v)),
+  );
+
+const SAMPLE_LIST_KEYS = new Map(
+  Object.entries(RETIRED_SAMPLE_LISTS).map(([path, entries]) => [
+    path,
+    new Set(entries.map((e) => listKey(e.list, recordKeysFor(path)))),
+  ]),
+);
+
+/** True when `list` is, blanks aside, a whole list a preset, the seed or the template shipped at `path`. */
+export function isSampleList(path: string, list: unknown): boolean {
+  if (!Array.isArray(list) || !list.length) return false;
+  const known = SAMPLE_LIST_KEYS.get(path);
+  return !!known && known.has(listKey(list, recordKeysFor(path)));
+}
+
+/** True when this review badge is a preset's sample rating. */
+export function isSampleRating(badge: unknown): boolean {
+  if (!isPlainObject(badge)) return false;
+  const url = typeof badge.url === 'string' ? badge.url.trim() : '';
+  return !url && RETIRED_SAMPLE_RATINGS.some((r) => Number(badge.rating) === r.rating && Number(badge.count) === r.count);
+}
+
+const SAMPLE_TEXT = new Map(Object.entries(RETIRED_SAMPLE_TEXT).map(([path, list]) => [path, new Set(list.map(norm))]));
+const SAMPLE_PILLARS = new Set(RETIRED_SAMPLE_PILLARS.map((p) => itemKey({ t: p.t, d: p.d })));
+
 function isSampleOf(kind: Kind, value: string): boolean {
   switch (kind) {
     case 'name': return NAMES.has(norm(value));
@@ -239,7 +369,6 @@ export function isSampleIdentity(path: string, value: unknown): boolean {
   return false;
 }
 
-const isPlainObject = (x: unknown): x is Json => typeof x === 'object' && x !== null && !Array.isArray(x);
 
 function get(obj: unknown, path: string): unknown {
   let cur: unknown = obj;
@@ -279,6 +408,35 @@ export function stripPresetIdentity<T>(content: T): { content: T; removed: Remov
     if (isSampleIdentity(path, value)) {
       out = set(out, path, '');
       removed.push({ path, value });
+    }
+  }
+
+  // Sample claims: the rating, whole sample lists, placeholder-place copy, the seed's rating pillar.
+  // Before the item filter below, so the HVAC badges are judged as the list they fell through as.
+  if (isSampleRating(get(out, 'extensions.reviewBadge'))) {
+    removed.push({ path: 'extensions.reviewBadge', value: JSON.stringify(get(out, 'extensions.reviewBadge')) });
+    out = set(out, 'extensions.reviewBadge', null);
+  }
+  for (const path of Object.keys(RETIRED_SAMPLE_LISTS)) {
+    const list = get(out, path);
+    if (isSampleList(path, list)) {
+      removed.push({ path, value: JSON.stringify(list) });
+      out = set(out, path, []);
+    }
+  }
+  for (const [path, known] of SAMPLE_TEXT) {
+    const value = get(out, path);
+    if (typeof value === 'string' && known.has(norm(value))) {
+      removed.push({ path, value });
+      out = set(out, path, '');
+    }
+  }
+  const pillars = get(out, 'about.pillars');
+  if (Array.isArray(pillars)) {
+    const kept = pillars.filter((p) => !(isPlainObject(p) && SAMPLE_PILLARS.has(itemKey({ t: p.t, d: p.d }))));
+    if (kept.length !== pillars.length) {
+      removed.push({ path: 'about.pillars', value: JSON.stringify(pillars.filter((p) => !kept.includes(p))) });
+      out = set(out, 'about.pillars', kept);
     }
   }
 

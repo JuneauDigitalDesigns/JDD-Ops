@@ -134,9 +134,11 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-[18px] max-w-[46ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18.5px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-[18px] max-w-[46ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18.5px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           {/* The plan picker — lawn care's signature hero device (D8). Real state, not chrome.
               Full 18px inner padding on every edge: nothing inside touches the panel's border. */}
