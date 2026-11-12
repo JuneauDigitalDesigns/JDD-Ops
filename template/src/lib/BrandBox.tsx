@@ -1,5 +1,7 @@
 // The brand box left of the business name in every nav and footer, and the footer's copyright line
 // (Xander 2026-11-11, from his Tracewell front-to-back test; mockup "The logo goes in the brand box").
+// Mockup approved by Xander 2026-11-11: the light tile, and word for word the copyright line
+// (W1), the footer columns (W2, W3) and the Studio label "Logo" (W4). The credit (W5) is his own pick.
 //
 // With a logo, the box is a light tile holding it: the same height and corners as the template's own
 // box, widening for a wide wordmark up to three times its height, never more, so the name keeps its
