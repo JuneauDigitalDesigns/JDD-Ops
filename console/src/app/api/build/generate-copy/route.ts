@@ -15,6 +15,7 @@ import { pickServicePages } from '@/lib/servicePages';
 import { MAX_PAGES } from '@/lib/pages';
 import { isValidModelId, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import { planRunSections, missingSubpageRoutes, SKIP_REASONS, type CopyPage } from '@/lib/copy-brief/run-sections';
+import { sectionPreview } from '@/lib/copy-brief/section-preview';
 
 export const runtime = 'nodejs';
 
@@ -156,7 +157,7 @@ export async function POST(req: Request) {
             if (s === 'subpages' && missing.length) {
               send({ type: 'section', section: s, status: 'skipped', error: SKIP_REASONS.missingRoutes(missing) });
             } else {
-              send({ type: 'section', section: s, status: 'done' });
+              send({ type: 'section', section: s, status: 'done', preview: sectionPreview(s, result) });
             }
           }
           return { chunk, result };

@@ -1,14 +1,17 @@
 'use client';
 
 /**
- * The Prompt step's run box (Xander, 2026-11-10, the approved "Prompt v2" mockup). It used to be a
- * 300px sidebar; now it is a small box floating in the bottom-right corner, just above the intake's
- * Back / Next bar, that steps through: the sections to write a group at a time (a switch beside
- * each name), the model and its estimated cost, and a summary over the Generate button.
- * The steps and their headers are lib/run-steps.ts.
+ * The Prompt step's run menu (Xander, 2026-11-12, approved as the canvas's row 6). A button floats
+ * in the bottom-right corner; pressed, it opens one window over the prompt with every section's
+ * switch (the four groups side by side), the model, the summary and Generate. During a run each
+ * section shows where it is (Waiting, Writing, Done, Failed, Not written) and a finished section
+ * shows its first lines as they arrive (copy-brief/section-preview.ts, sent by the route).
+ *
+ * It replaced the small box that stepped through the same things a group at a time (2026-11-10).
+ * The groups, their headers and the status words are lib/run-steps.ts.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, CircleNotch, Check, X, Warning, Sparkle } from '@phosphor-icons/react';
+import { CircleNotch, Check, X, Warning, Sparkle } from '@phosphor-icons/react';
 import type { CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import type { Section } from '@/lib/copy-schema';
@@ -16,7 +19,7 @@ import { labelFor } from '@/lib/section-labels';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
 import { relativeTime } from '@/lib/relativeTime';
 import { MODEL_OPTIONS, modelOption } from '@/lib/model-pricing';
-import { RUN_STEPS, SWITCHABLE, runSummary, switchSection, generateLabel } from '@/lib/run-steps';
+import { RUN_GROUPS, SWITCHABLE, runSummary, switchSection, generateLabel, runProgress, statusLabel, MENU_LABEL, RUNNING_LABEL } from '@/lib/run-steps';
 import { copyRequestBody, unreportedSections, SKIP_REASONS, type CopyPage } from '@/lib/copy-brief/run-sections';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
@@ -55,7 +58,10 @@ export default function RunControls({
    *  writes no page headers or page SEO at all (copy-brief/run-sections.ts). */
   pages: CopyPage[];
 }) {
-  const [stepAt, setStepAt] = useState(0);
+  const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  /** Each finished section's first lines, as the run sends them (copy-brief/section-preview.ts). */
+  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [statuses, setStatuses] = useState<Record<string, SectionStatus>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [skips, setSkips] = useState<Record<string, string>>({});
@@ -65,8 +71,20 @@ export default function RunControls({
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ticked = new Set(tickedSections);
-  const toggle = (s: Section) =>
+  const toggle = (s: Section) => {
+    // A changed switch starts a new run's worth of choices: the last run's marks stop applying.
+    if (run.kind !== 'idle' && run.kind !== 'running') { setRun({ kind: 'idle' }); setStatuses({}); setPreviews({}); setErrors({}); setSkips({}); }
     onBriefChange((b) => setTickedSections(b, switchSection(tickedSections, s, !ticked.has(s))));
+  };
+
+  // The menu covers the prompt: Escape closes it, and focus starts on Close.
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   // Debounced token/cost estimate whenever the run inputs change.
   useEffect(() => {
@@ -92,6 +110,7 @@ export default function RunControls({
     setRun({ kind: 'running' });
     setErrors({});
     setSkips({});
+    setPreviews({});
     const initial: Record<string, SectionStatus> = {};
     for (const s of tickedSections) initial[s] = 'idle';
     setStatuses(initial);
@@ -148,6 +167,9 @@ export default function RunControls({
             const section = String(msg.section);
             reported[section] = String(msg.status);
             setStatuses((prev) => ({ ...prev, [section]: msg.status as SectionStatus }));
+            if (msg.status === 'done' && typeof msg.preview === 'string' && msg.preview) {
+              setPreviews((prev) => ({ ...prev, [section]: msg.preview as string }));
+            }
             if (msg.status === 'failed' && msg.error) {
               setErrors((prev) => ({ ...prev, [section]: String(msg.error) }));
             }
@@ -188,161 +210,174 @@ export default function RunControls({
   }
 
   const busy = run.kind === 'running';
-  const step = RUN_STEPS[stepAt];
   const summary = runSummary(tickedSections);
   const cost = estimating ? 'estimating…' : estimate ? `~$${estimate.estCostUsd.toFixed(2)}` : '—';
-  const failures = Object.entries(errors);
-  const skipped = Object.entries(skips);
+  const onSections = SWITCHABLE.filter((s) => ticked.has(s));
+  const progress = runProgress(statuses, onSections);
+  // A run's marks show from Generate until a switch is changed again.
+  const showRun = run.kind !== 'idle';
 
   return (
-    <div
-      data-testid="run-box"
-      className="absolute bottom-3.5 right-6 z-10 flex h-[316px] w-[340px] flex-col overflow-hidden rounded-[14px] border border-ruleStrong bg-panel shadow-overlay"
-    >
-      <div className="flex shrink-0 items-center gap-2 border-b border-uiCardRule px-2.5 pb-2 pt-2.5">
-        <button
-          type="button"
-          aria-label="Previous"
-          onClick={() => setStepAt((i) => Math.max(0, i - 1))}
-          disabled={stepAt === 0}
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-uiCardRule bg-uiBg text-uiInk disabled:opacity-30"
-        >
-          <ArrowLeft size={14} />
-        </button>
-        <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-          <p className="truncate font-display text-[19px] font-bold leading-none text-uiInk">{step.label}</p>
-          <div className="flex gap-1" aria-hidden>
-            {RUN_STEPS.map((s, i) => (
-              <i key={s.label} className={`block h-[3px] w-3.5 rounded-sm ${i === stepAt ? 'bg-uiAccent' : 'bg-uiCardRule'}`} />
-            ))}
-          </div>
-        </div>
-        <button
-          type="button"
-          aria-label="Next"
-          onClick={() => setStepAt((i) => Math.min(RUN_STEPS.length - 1, i + 1))}
-          disabled={stepAt === RUN_STEPS.length - 1}
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-uiCardRule bg-uiBg text-uiInk disabled:opacity-30"
-        >
-          <ArrowRight size={14} />
-        </button>
-      </div>
+    <>
+      <button
+        type="button"
+        data-testid="run-menu-button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="absolute bottom-4 right-6 z-10 flex h-12 items-center gap-2.5 rounded-full bg-[#d2542f] px-5 text-[15px] font-semibold text-[#f4ecd8] shadow-[0_12px_28px_rgba(210,84,47,.35),0_2px_6px_rgba(20,18,12,.15)] transition-transform hover:-translate-y-0.5"
+      >
+        {busy ? <CircleNotch size={16} className="animate-spin" /> : <Sparkle size={16} weight="fill" />}
+        {MENU_LABEL}
+        <span className="rounded-full bg-[rgba(244,236,216,.22)] px-2.5 py-0.5 font-chromeMono text-xs">
+          {busy ? `${progress.done}/${progress.of}` : summary.on}
+        </span>
+      </button>
 
-      <div className="flex min-h-0 flex-1 flex-col px-3.5 pb-3 pt-1.5">
-        {step.kind === 'sections' && step.sections.map((s) => {
-          const on = ticked.has(s);
-          return (
-            <div key={s} className="flex h-11 items-center gap-2.5 border-b border-uiCardRule last:border-b-0">
-              <span className={`text-sm ${on ? 'font-semibold text-uiInk' : 'text-uiFg3'}`}>{labelFor(s)}</span>
-              <StatusIcon status={statuses[s] ?? 'idle'} />
+      {open && (
+        <div className="absolute inset-0 z-20" data-testid="run-menu">
+          <div className="absolute inset-0 bg-[rgba(20,18,12,.38)]" onClick={() => setOpen(false)} aria-hidden />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="run-menu-title"
+            className="absolute inset-x-6 inset-y-3.5 flex flex-col overflow-hidden rounded-2xl border border-ruleStrong bg-panel shadow-overlay"
+          >
+            <div className="flex shrink-0 items-center gap-3.5 border-b border-uiCardRule px-5 py-4">
+              <h3 id="run-menu-title" className="font-display text-[30px] font-bold leading-none text-uiInk">
+                {busy ? RUNNING_LABEL : MENU_LABEL}
+              </h3>
+              {showRun && (
+                <>
+                  <span className="font-chromeMono text-[13px] text-uiFg3">{progress.done} of {progress.of} sections</span>
+                  <span className="h-1.5 w-56 overflow-hidden rounded-full bg-uiCardRule" aria-hidden>
+                    <i className="block h-full bg-uiAccent transition-[width]" style={{ width: `${progress.of ? (100 * progress.done) / progress.of : 0}%` }} />
+                  </span>
+                </>
+              )}
               <button
+                ref={closeRef}
                 type="button"
-                role="switch"
-                aria-checked={on}
-                aria-label={labelFor(s)}
-                onClick={() => toggle(s)}
-                disabled={busy}
-                className="relative ml-auto inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors disabled:opacity-50"
-                style={{ background: on ? 'var(--ui-accent)' : 'var(--ui-rule-strong)' }}
+                aria-label="Close"
+                onClick={() => setOpen(false)}
+                className="ml-auto flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-uiCardRule text-uiInk hover:border-uiAccent"
               >
-                <span
-                  className="inline-block h-4 w-4 rounded-full bg-panel transition-transform"
-                  style={{ transform: on ? 'translateX(19px)' : 'translateX(3px)' }}
-                />
+                <X size={16} />
               </button>
             </div>
-          );
-        })}
 
-        {step.kind === 'model' && (
-          <>
-            <div role="radiogroup" aria-label="Model">
-              {MODEL_OPTIONS.map((m) => (
-                <label key={m.id} className={`flex h-9 cursor-pointer items-center gap-2.5 text-sm ${m.id === model ? 'font-semibold text-uiInk' : 'text-uiFg2'}`}>
-                  <input
-                    type="radio"
-                    name="copy-model"
-                    value={m.id}
-                    checked={m.id === model}
-                    onChange={() => onModelChange(m.id)}
-                    disabled={busy}
-                    className="accent-[var(--ui-accent)]"
-                  />
-                  {m.label}
-                </label>
+            <div className="grid min-h-0 flex-1 grid-cols-[repeat(4,minmax(0,1fr))_330px]">
+              {RUN_GROUPS.map((g) => (
+                <div key={g.label} className="flex min-h-0 flex-col overflow-hidden border-r border-uiCardRule px-4 py-4">
+                  <p className="mb-2 font-display text-[20px] font-bold leading-tight text-uiInk">{g.label}</p>
+                  {g.sections.map((s) => {
+                    const on = ticked.has(s);
+                    const status = statuses[s];
+                    const note = errors[s] || skips[s];
+                    return (
+                      <div key={s} className="flex min-h-[52px] flex-col justify-center gap-1 border-b border-uiCardRule/70 py-1.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`text-[14.5px] ${on ? 'font-semibold text-uiInk' : 'text-uiFg3'}`}>{labelFor(s)}</span>
+                          <span className="ml-auto flex shrink-0 items-center gap-2.5">
+                          {(busy || (showRun && on && status && status !== 'idle')) && <StatusTag status={status} on={on} />}
+                          {!busy && (
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={on}
+                              aria-label={labelFor(s)}
+                              onClick={() => toggle(s)}
+                              className="relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors"
+                              style={{ background: on ? 'var(--ui-accent)' : 'var(--ui-rule-strong)' }}
+                            >
+                              <span
+                                className="inline-block h-4 w-4 rounded-full bg-panel transition-transform"
+                                style={{ transform: on ? 'translateX(19px)' : 'translateX(3px)' }}
+                              />
+                            </button>
+                          )}
+                          </span>
+                        </div>
+                        {showRun && status === 'done' && previews[s] && (
+                          <p className="line-clamp-2 border-l-2 border-[rgba(63,143,92,.5)] pl-2 text-[12.5px] leading-snug text-uiFg2">{previews[s]}</p>
+                        )}
+                        {showRun && (status === 'failed' || status === 'skipped') && note && (
+                          <p className={`line-clamp-2 text-2xs ${status === 'failed' ? 'text-danger' : 'text-warn'}`} title={note}>{note}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               ))}
-            </div>
-            <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-t border-uiCardRule pt-2.5">
-              <p className="kicker w-full">Estimated cost</p>
-              <p className="font-display text-[26px] font-bold leading-none text-uiInk">{cost}</p>
-              {estimate && !estimating && (
-                <p className="mono text-2xs text-uiFg3">
-                  ~{estimate.estInputTokens.toLocaleString()} in / ~{estimate.estOutputTokens.toLocaleString()} out
-                </p>
-              )}
-            </div>
-            <button type="button" onClick={() => setStepAt(RUN_STEPS.length - 1)} className="btn btn-sm mt-auto self-end">
-              Next: Summary <ArrowRight size={14} />
-            </button>
-          </>
-        )}
 
-        {step.kind === 'summary' && (
-          <>
-            <dl className="flex flex-col gap-1.5 pt-1.5 text-[13px] text-uiFg2">
-              <SummaryLine term="Sections" value={`${summary.on} of ${summary.of}`} />
-              {summary.off.length > 0 && <SummaryLine term="Off" value={summary.off.join(', ')} />}
-              <SummaryLine term="Model" value={modelOption(model).label} />
-              <SummaryLine term="Estimated cost" value={cost} />
-            </dl>
-            <div className="mt-2 flex min-h-0 flex-col gap-1 overflow-hidden">
-              {run.kind === 'done' && (
-                <p className="flex items-center gap-1.5 text-xs text-ok">
-                  <Check size={14} weight="bold" /> Copy applied — review it on the next stage.
-                </p>
-              )}
-              {run.kind === 'error' && (
-                <p className="flex items-center gap-1.5 text-xs text-danger">
-                  <Warning size={14} className="shrink-0" /> <span className="truncate">{run.message}</span>
-                </p>
-              )}
-              {run.kind !== 'idle' && failures.map(([s, msg]) => (
-                <p key={s} className="truncate text-2xs text-danger">{labelFor(s as Section)}: {msg}</p>
-              ))}
-              {run.kind !== 'idle' && skipped.map(([s, msg]) => (
-                <p key={s} className="truncate text-2xs text-warn" title={msg}>{labelFor(s as Section)}: {msg}</p>
-              ))}
-              {/* `lastRunAt` is stamped on approve, not on generate, so this reads "last
-                  approved" rather than "last generated". */}
-              {!busy && (brief.lastRunAt || hasGenerated) && (
-                <div className="flex items-center justify-between gap-2">
-                  {brief.lastRunAt ? (
-                    <p className="mono text-2xs text-uiInkSoft">Last approved {relativeTime(brief.lastRunAt)}</p>
-                  ) : <span />}
-                  {hasGenerated && (
-                    <button type="button" onClick={onClearGenerated} className="mono text-2xs text-uiInkSoft hover:text-uiInk">
-                      Revert generated copy
-                    </button>
+              <div className="flex min-h-0 flex-col gap-2.5 bg-uiSurface px-4 py-4">
+                <p className="kicker">Model</p>
+                <div role="radiogroup" aria-label="Model">
+                  {MODEL_OPTIONS.map((m) => (
+                    <label key={m.id} className={`flex h-[34px] cursor-pointer items-center gap-2.5 text-sm ${m.id === model ? 'font-semibold text-uiInk' : 'text-uiFg2'}`}>
+                      <input
+                        type="radio"
+                        name="copy-model"
+                        value={m.id}
+                        checked={m.id === model}
+                        onChange={() => onModelChange(m.id)}
+                        disabled={busy}
+                        className="accent-[var(--ui-accent)]"
+                      />
+                      {m.label}
+                    </label>
+                  ))}
+                </div>
+                <dl className="flex flex-col gap-1.5 border-t border-uiCardRule pt-2.5 text-[13px] text-uiFg2">
+                  <SummaryLine term="Sections" value={`${summary.on} of ${summary.of}`} />
+                  {summary.off.length > 0 && <SummaryLine term="Off" value={summary.off.join(', ')} />}
+                  <SummaryLine term="Model" value={modelOption(model).label} />
+                  <SummaryLine term="Estimated cost" value={cost} />
+                </dl>
+                <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
+                  {run.kind === 'done' && (
+                    <p className="flex items-center gap-1.5 text-xs text-ok">
+                      <Check size={14} weight="bold" /> Copy applied — review it on the next stage.
+                    </p>
+                  )}
+                  {run.kind === 'error' && (
+                    <p className="flex items-center gap-1.5 text-xs text-danger">
+                      <Warning size={14} className="shrink-0" /> <span className="truncate">{run.message}</span>
+                    </p>
+                  )}
+                  {/* `lastRunAt` is stamped on approve, not on generate, so this reads "last
+                      approved" rather than "last generated". */}
+                  {!busy && (brief.lastRunAt || hasGenerated) && (
+                    <div className="flex items-center justify-between gap-2">
+                      {brief.lastRunAt ? (
+                        <p className="mono text-2xs text-uiInkSoft">Last approved {relativeTime(brief.lastRunAt)}</p>
+                      ) : <span />}
+                      {hasGenerated && (
+                        <button type="button" onClick={onClearGenerated} className="mono text-2xs text-uiInkSoft hover:text-uiInk">
+                          Revert generated copy
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={generate}
+                  disabled={busy || summary.on === 0}
+                  className="btn btn-primary mt-auto h-[46px] w-full shrink-0 justify-center text-[15px]"
+                >
+                  {busy ? <CircleNotch size={15} className="animate-spin" /> : <Sparkle size={15} weight="fill" />}
+                  {/* Switched-on sections only: tickedSections also holds the per-page review keys
+                      ("about:subpages"), which the route does not run, so its length overstated the run
+                      and, with no section on, enabled a button that would have written every section. */}
+                  {busy ? 'Generating…' : generateLabel(summary.on, hasGenerated)}
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={generate}
-              disabled={busy || summary.on === 0}
-              className="btn btn-primary mt-auto h-[42px] w-full shrink-0 justify-center"
-            >
-              {busy ? <CircleNotch size={15} className="animate-spin" /> : <Sparkle size={15} weight="fill" />}
-              {/* Switched-on sections only: tickedSections also holds the per-page review keys
-                  ("about:subpages"), which the route does not run, so its length overstated the run
-                  and, with no section on, enabled a button that would have written every section. */}
-              {busy ? 'Generating…' : generateLabel(summary.on, hasGenerated)}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -355,10 +390,22 @@ function SummaryLine({ term, value }: { term: string; value: string }) {
   );
 }
 
-function StatusIcon({ status }: { status: SectionStatus }) {
-  if (status === 'writing') return <CircleNotch size={13} className="shrink-0 animate-spin text-uiInkSoft" />;
-  if (status === 'done') return <Check size={13} weight="bold" className="shrink-0 text-ok" />;
-  if (status === 'failed') return <X size={13} weight="bold" className="shrink-0 text-danger" />;
-  if (status === 'skipped') return <Warning size={13} weight="bold" className="shrink-0 text-warn" aria-label="Not written" />;
-  return null;
+/** A section's place in the run, in the approved words, beside its name while a run shows. */
+function StatusTag({ status, on }: { status: SectionStatus | undefined; on: boolean }) {
+  const label = statusLabel(status, on);
+  const tone = !on ? 'text-uiFg3'
+    : status === 'done' ? 'text-ok'
+    : status === 'writing' ? 'text-uiAccent'
+    : status === 'failed' ? 'text-danger'
+    : status === 'skipped' ? 'text-warn'
+    : 'text-uiFg3';
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 font-chromeMono text-[11px] ${tone}`}>
+      {on && status === 'writing' && <CircleNotch size={12} className="animate-spin" />}
+      {on && status === 'done' && <Check size={12} weight="bold" />}
+      {on && status === 'failed' && <X size={12} weight="bold" />}
+      {on && status === 'skipped' && <Warning size={12} weight="bold" />}
+      {label}
+    </span>
+  );
 }
