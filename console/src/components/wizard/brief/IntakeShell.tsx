@@ -165,7 +165,7 @@ export default function IntakeShell({
                 />
               )}
               {step.kind === 'services' && (
-                <ServicesStep content={content} setField={setField} sources={sources} focusService={focus.service} vertical={vertical} onDone={() => select('area')} />
+                <ServicesStep content={content} setField={setField} sources={sources} generated={generated} focusService={focus.service} vertical={vertical} onDone={() => select('area')} />
               )}
               {step.kind === 'area' && <AreaStep content={content} sources={sources} setField={setField} />}
               {step.kind === 'reviews' && (
