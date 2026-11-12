@@ -69,12 +69,14 @@ export default function LawnContact({ content = CONTENT }: { content?: SiteConte
             </span>
             <E p="brand.phone">{brand.phone}</E>
           </a>
-          <a href={`mailto:${brand.email}`} className="flex min-w-0 items-center gap-3.5 break-all border-b border-rule py-[18px] font-semibold text-inkSoft transition-colors hover:text-ink">
-            <span className={tile} style={tileBg} aria-hidden="true">
-              <Envelope size={18} weight="bold" />
-            </span>
-            <E p="brand.email">{brand.email}</E>
-          </a>
+          {brand.email && (
+            <a href={`mailto:${brand.email}`} className="flex min-w-0 items-center gap-3.5 break-all border-b border-rule py-[18px] font-semibold text-inkSoft transition-colors hover:text-ink">
+              <span className={tile} style={tileBg} aria-hidden="true">
+                <Envelope size={18} weight="bold" />
+              </span>
+              <E p="brand.email">{brand.email}</E>
+            </a>
+          )}
           {mapsUrl ? (
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3.5 border-b border-rule py-[18px] text-inkSoft transition-colors hover:text-ink">
               <span className={tile} style={tileBg} aria-hidden="true">

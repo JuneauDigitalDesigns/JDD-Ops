@@ -25,14 +25,18 @@ import { Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
+import { primaryCity } from '@/lib/serviceLinks';
+
+/** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
+const placeAlt = (c: SiteContent) => [c.brand.name, primaryCity(c)].filter(Boolean).join(' in ');
 
 export const meta = {
   id: 'plumbing-hero',
   category: 'hero',
   label: 'Plumbing / Split intake hero',
   consumes: ['hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.frictionReducers', 'brand.phone', 'brand.phoneHref', 'images.hero.slides'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -79,9 +83,11 @@ export default function PlumbingHero({ content = CONTENT }: { content?: SiteCont
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-[18px] max-w-[44ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-[18px] max-w-[44ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           {hero.frictionReducers.length > 0 && (
             <div className="hero-rise mt-6 flex flex-wrap gap-[9px]">
@@ -104,11 +110,10 @@ export default function PlumbingHero({ content = CONTENT }: { content?: SiteCont
         {slide && (
           <>
             <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }}
-              role="img"
-              aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} plumbing work`}
-            />
+              className="absolute inset-0 isolate overflow-hidden"
+            >
+              <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif />
+            </div>
             {/* Navy wash: one grade for any client photo (colour blend of accent2). */}
             <div className="absolute inset-0 bg-accent opacity-40 mix-blend-color" aria-hidden="true" />
             {/* Seam: the panel runs into the photo. Top-down on a phone, left-to-right on desktop. */}

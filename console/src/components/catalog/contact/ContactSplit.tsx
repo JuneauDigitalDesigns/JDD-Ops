@@ -56,10 +56,12 @@ export default function ContactSplit({
               <PhoneCall size={18} className="shrink-0 text-accent" />
               <E p="brand.phone">{brand.phone}</E>
             </a>
-            <a href={`mailto:${brand.email}`} className={`flex items-center gap-3 ${s.body} hover:text-accent`}>
-              <Envelope size={18} className="shrink-0 text-accent" />
-              <E p="brand.email">{brand.email}</E>
-            </a>
+            {brand.email && (
+              <a href={`mailto:${brand.email}`} className={`flex items-center gap-3 ${s.body} hover:text-accent`}>
+                <Envelope size={18} className="shrink-0 text-accent" />
+                <E p="brand.email">{brand.email}</E>
+              </a>
+            )}
             {mapsUrl ? (
               <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className={`flex items-start gap-3 ${s.body} hover:text-accent`}>
                 <MapPin size={18} className="mt-0.5 shrink-0 text-accent" />

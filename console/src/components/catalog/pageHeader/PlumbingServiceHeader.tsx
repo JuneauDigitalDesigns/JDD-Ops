@@ -17,7 +17,7 @@
 import { Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import { primaryCity, serviceBySlug, servicePhoto, serviceQuestions } from '@/lib/serviceLinks';
 
 export const meta = {
@@ -25,7 +25,7 @@ export const meta = {
   category: 'pageHeader',
   label: 'Plumbing / Service page header',
   consumes: ['services.items', 'brand.address', 'brand.phone', 'brand.phoneHref', 'extensions.serviceArea', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -125,11 +125,10 @@ export default function PlumbingServiceHeader({ content = CONTENT, serviceSlug }
       {photo && (
         <div className="relative min-h-[240px] overflow-hidden sm:min-h-[300px] lg:min-h-0">
           <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${imageAt(photo.url, 1536)})` }}
-            role="img"
-            aria-label={photo.alt}
-          />
+            className="absolute inset-0 isolate overflow-hidden"
+          >
+            <CoverImage url={photo.url} alt={photo.alt} sizes="100vw" priority />
+          </div>
           {/* Blue wash: one grade for any client photo. */}
           <div className="absolute inset-0 bg-accent opacity-40 mix-blend-color" aria-hidden="true" />
           {/* Seam: the panel runs into the photo. Top-down on a phone, left-to-right on desktop. */}

@@ -81,7 +81,9 @@ export default function WorkMasonry({
   const header = (
     <div className="mx-auto max-w-6xl px-6">
       <h2 className={`font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="work.title">{work.title}</E></h2>
-      <p className={`mt-3 max-w-xl ${s.body}`}><E p="work.sub">{work.sub}</E></p>
+      {work.sub && (
+        <p className={`mt-3 max-w-xl ${s.body}`}><E p="work.sub">{work.sub}</E></p>
+      )}
     </div>
   );
 
