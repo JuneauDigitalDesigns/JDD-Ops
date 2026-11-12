@@ -24,7 +24,7 @@
  */
 import { copyRisks, factsText, getPath, visibleCopy, type ServicePicks } from '@/lib/copyRisks';
 import { findDashes } from '@/lib/copy-brief/dash-guard';
-import { toE164 } from '@jdd/schema';
+import { isMainCity, qualifiesForAreaPage, qualifiesForSpokePage, toE164, townSlugs } from '@jdd/schema';
 import { primaryCity, qualifiesForServicePage, serviceSlugs } from '@/lib/servicePages';
 import type { PageSeo, SeoPageRef } from '@/lib/pageSeo';
 
@@ -235,6 +235,36 @@ export function scoreSite(
     for (let j = i + 1; j < texts.length; j++) {
       const shared = [...texts[i][1]].find((s) => texts[j][1].has(s));
       if (shared) hard.push(`Service page /${texts[i][0]} shares an 8-word run with /${texts[j][0]}: "${shared}"`);
+    }
+  }
+
+  // ── Town pages and spokes (local SEO, Xander 2026-11-12) ──
+  // L4: never the main city (home is its hub and the service pages are its spokes). L6: a town
+  // page only for a town that earns one. A spoke only where its town page and its service page
+  // exist and 2 facts tie them (the approval itself is the Studio's input, so it is assumed here).
+  const towns = arr(obj(c.extensions).serviceArea).map(str).filter(Boolean);
+  const tSlugs = townSlugs(content);
+  const routes = new Set(pages.map((p) => p.route));
+  for (const p of pages.filter((x) => x.pageType === 'area' || x.pageType === 'spoke')) {
+    const parts = p.route.split('/');
+    const town = towns[tSlugs.indexOf(parts[1] ?? '')] ?? '';
+    if (!town) {
+      hard.push(`Page /${p.route} names no town the client covers`);
+      continue;
+    }
+    if (isMainCity(content, town)) {
+      hard.push(`Page /${p.route} is for the main city (${town}): home is its page, and the service pages are its town + service pages`);
+      continue;
+    }
+    if (p.pageType === 'area' && !qualifiesForAreaPage(content, town)) {
+      hard.push(`Town page /${p.route} ("${town}") does not have enough local facts for a page of its own (3 of 2 kinds: job photos, reviews, sourced notes)`);
+    }
+    if (p.pageType === 'spoke') {
+      const idx = slugs.indexOf(parts[2] ?? '');
+      if (idx < 0) hard.push(`Town + service page /${p.route} has no matching service`);
+      else if (!routes.has(`areas/${parts[1]}`) || !qualifiesForSpokePage(content, town, idx, true)) {
+        hard.push(`Town + service page /${p.route} needs its town page, its service page and 2 facts tagged to both`);
+      }
     }
   }
 

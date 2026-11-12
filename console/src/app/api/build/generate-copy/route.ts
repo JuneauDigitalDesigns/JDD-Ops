@@ -12,7 +12,7 @@ import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
 import { withoutCarriedCanonical } from '@/lib/placeholderCanonical';
 import { guardDashes, dashRewriteMessage } from '@/lib/copy-brief/dash-guard';
 import { pickServicePages } from '@/lib/servicePages';
-import { MAX_PAGES } from '@/lib/pages';
+import { PAGE_CAPS } from '@jdd/schema';
 import { isValidModelId, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import { planRunSections, missingSubpageRoutes, SKIP_REASONS, type CopyPage } from '@/lib/copy-brief/run-sections';
 import { sectionPreview } from '@/lib/copy-brief/section-preview';
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   // Dropping it silently is how the page headers looked written for the whole of the Tracewell
   // test while Generate never sent a page list (lib/copy-brief/run-sections.ts).
   const { sections, skipped } = planRunSections({
-    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, MAX_PAGES).length > 0,
+    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, PAGE_CAPS.service).length > 0,
   });
   const chunks = chunkSections(sections);
   const wantedSet = new Set<Section>(['brand', ...sections]);

@@ -11,6 +11,7 @@ import * as links from '../src/lib/serviceLinks.ts';
 import * as gate from '../src/lib/servicePages.ts';
 import { useDisclosure } from '../src/lib/disclosure.ts';
 import { SERVICE_PAGE_SECTIONS } from '../src/lib/servicePageSections.ts';
+import { sectionSlugAttrs } from '../src/lib/areaPageSections.ts';
 import {
   VERTICAL_TEMPLATES, applyVerticalTemplate, servicePageSlugs, syncServicePages, verticalServicePage,
 } from '../src/app/c/[slug]/build/vertical-templates.tsx';
@@ -193,8 +194,13 @@ test('syncing service pages keeps an existing page as it is, adds new ones, drop
 
 test('the export gives the slug to exactly the service sections, and the Studio renders the same ones', () => {
   const exporter = read(path.join(CONSOLE, 'src/lib/export.ts'));
-  assert.match(exporter, /serviceSlug && SERVICE_PAGE_SECTIONS\.has\(ref\.name\) \? ` serviceSlug=\$\{JSON\.stringify\(serviceSlug\)\}` : ''/);
-  assert.match(exporter, /const serviceSlug = page\.pageType === 'service' \?/);
+  // Since the town pages (2026-11-12) the slug props come from one function, sectionSlugAttrs
+  // (areaPageSections.ts); test/area-pages-export.test.mjs pins what it hands to whom.
+  assert.match(exporter, /const slugAttr = \(ref: \{ name: string \}\) => sectionSlugAttrs\(page, ref\.name\);/);
+  for (const name of SERVICE_PAGE_SECTIONS) {
+    assert.equal(sectionSlugAttrs({ pageType: 'service', route: 'services/ac-repair' }, name), ' serviceSlug="ac-repair"');
+  }
+  assert.equal(sectionSlugAttrs({ pageType: 'service', route: 'services/ac-repair' }, 'ServicesAccordion'), '');
   const compose = read(path.join(CONSOLE, 'src/app/c/[slug]/build/compose-page.tsx'));
   const rendered = [...compose.matchAll(/^\s{2}(\w+): \(p\) => </gm)].map((m) => m[1]).sort();
   assert.deepEqual(rendered, [...SERVICE_PAGE_SECTIONS].sort(), 'compose-page.tsx renders every service section with its slug');

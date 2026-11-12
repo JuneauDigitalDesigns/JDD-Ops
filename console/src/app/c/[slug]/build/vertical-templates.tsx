@@ -19,6 +19,7 @@
  */
 import { newSectionId, type PageInstance, type PageTypeId, type SectionRef, type SiteComposition } from '@/lib/pages';
 import type { VerticalId } from '@/lib/verticals';
+import { pageMetaFor } from './page-templates';
 
 /** A section ref with a freshly minted stable id and no rhythm (see file header). */
 const S = (categoryId: string, name: string): SectionRef => ({ id: newSectionId(), categoryId, name });
@@ -296,6 +297,14 @@ export type VerticalTemplate = {
    *  the Studio give the same serviceSlug, so its form opens prefilled). Absent until a vertical's
    *  service page is built. */
   serviceSections?: () => SectionRef[];
+  /** Local SEO (Xander, 2026-11-12; Templates builds them after the mockups are approved): the
+   *  sections of one town page (/areas/<town>), one town + service spoke (/areas/<town>/<service>)
+   *  and the /areas index. wirePages hands area and spoke sections listed in AREA_PAGE_SECTIONS
+   *  their `townSlug` (and a spoke's `serviceSlug`). Absent until a vertical's pages are built, and
+   *  then syncAreaPages leaves the composition alone. */
+  areaSections?: () => SectionRef[];
+  spokeSections?: () => SectionRef[];
+  areasIndexSections?: () => SectionRef[];
 };
 
 /** One per-service page for a vertical: route `services/<slug>`, nav-hidden (linked from the
@@ -323,6 +332,58 @@ export function syncServicePages(comp: SiteComposition, chosen: { slug: string; 
     .map(({ slug, label }) => existing.get(`services/${slug}`) ?? verticalServicePage(vertical, slug, label))
     .filter((p): p is PageInstance => p !== null);
   return { ...comp, pages: [...comp.pages.filter((p) => p.pageType !== 'service'), ...service] };
+}
+
+/**
+ * Bring a composition's town pages and spokes in line with the gate (area-page-sync.ts:
+ * chosenAreaPages, chosenSpokePages, both deciding through @jdd/schema). Pure, and the twin of
+ * syncServicePages: an existing page keeps its PageInstance (section ids, styles, renames); a new
+ * one is built from the vertical; one no longer chosen is removed, and the export then redirects
+ * its URL (L3). A spoke is kept only under a town page that exists.
+ *
+ * The /areas index arrives with the first town page and leaves with the last one, but only an
+ * index this function added (templateId `<vertical>:areas`): an operator's own Service Areas page
+ * is never touched. Its label is the existing page-type label; the "Areas" nav wording waits on
+ * Xander's approval and is Templates' change to make.
+ *
+ * A composition that isn't a vertical template, or whose vertical has no town page yet, comes
+ * back unchanged.
+ */
+export function syncAreaPages(
+  comp: SiteComposition,
+  areas: { town: string; slug: string }[],
+  spokes: { townSlug: string; service: string; label: string }[],
+): SiteComposition {
+  const vertical = templateIdFor(comp);
+  const vt = vertical ? verticalTemplateFor(vertical) : null;
+  if (!vertical || !vt?.areaSections) return comp;
+  const existing = new Map(comp.pages.filter((p) => p.pageType === 'area' || p.pageType === 'spoke').map((p) => [p.route, p]));
+  const areaPages: PageInstance[] = areas.map(({ town, slug }) =>
+    existing.get(`areas/${slug}`) ?? { route: `areas/${slug}`, pageType: 'area', label: town, templateId: `${vertical}:area`, navVisible: false, sections: vt.areaSections!() },
+  );
+  const live = new Set(areas.map((a) => a.slug));
+  const spokePages: PageInstance[] = vt.spokeSections
+    ? spokes
+        .filter((s) => live.has(s.townSlug))
+        .map(({ townSlug, service, label }) =>
+          existing.get(`areas/${townSlug}/${service}`) ?? {
+            route: `areas/${townSlug}/${service}`, pageType: 'spoke', label, templateId: `${vertical}:spoke`, navVisible: false, sections: vt.spokeSections!(),
+          },
+        )
+    : [];
+  const ownIndex = `${vertical}:areas`;
+  let rest = comp.pages.filter((p) => p.pageType !== 'area' && p.pageType !== 'spoke');
+  if (!areaPages.length) rest = rest.filter((p) => !(p.pageType === 'areas' && p.templateId === ownIndex));
+  else if (vt.areasIndexSections && !rest.some((p) => p.pageType === 'areas')) {
+    rest = [...rest, { route: 'areas', pageType: 'areas', label: pageMetaFor('areas').label, templateId: ownIndex, navVisible: true, sections: vt.areasIndexSections() }];
+  }
+  return { ...comp, pages: [...rest, ...areaPages, ...spokePages] };
+}
+
+/** The routes of a composition's town pages and spokes, in order: what the Studio compares to
+ *  tell whether syncAreaPages changed anything. */
+export function areaPageRoutes(comp: SiteComposition): string[] {
+  return comp.pages.filter((p) => p.pageType === 'area' || p.pageType === 'spoke' || p.pageType === 'areas').map((p) => p.route);
 }
 
 /** The slugs of a composition's service pages, in order: what the export writes into

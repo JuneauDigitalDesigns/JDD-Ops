@@ -36,7 +36,7 @@ const pages = [
 test('D7 title patterns, one per page type', () => {
   const s = buildPageSeo(content(), pages, 'hvac');
   assert.equal(s[''].title, 'Furnace & AC Repair in Clermont | Peak Air', 'a generated home title in the approved form is kept');
-  assert.equal(s.services.title, 'HVAC Services in Clermont | Peak Air');
+  assert.equal(s.services.title, 'All HVAC Services | Peak Air', 'L5 (Xander, 2026-11-12): no city, so it stops overlapping home');
   assert.equal(s.about.title, 'About Peak Air | HVAC in Clermont');
   assert.equal(s.contact.title, 'Contact Peak Air | Clermont HVAC');
   assert.equal(s['services/furnace-repair'].title, 'Furnace Repair in Clermont | Peak Air');
@@ -49,7 +49,7 @@ test('a home title not in the approved form falls back to the pattern', () => {
 
 test('without a city the city parts drop out', () => {
   const s = buildPageSeo(content({ brand: { name: 'Peak Air', address: '', phone: '' }, extensions: {} }), pages, 'hvac');
-  assert.equal(s.services.title, 'HVAC Services | Peak Air');
+  assert.equal(s.services.title, 'All HVAC Services | Peak Air');
   assert.equal(s.about.title, 'About Peak Air | HVAC');
   assert.equal(s.contact.title, 'Contact Peak Air | HVAC');
   assert.equal(s['services/furnace-repair'].title, 'Furnace Repair | Peak Air');

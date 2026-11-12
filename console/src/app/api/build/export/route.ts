@@ -38,6 +38,7 @@ import { findMissingLocalImages } from '@/lib/imageRefs';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
 import { servicePageSlugs } from '@/app/c/[slug]/build/vertical-templates';
 import { withStoredSlugs } from '@/app/c/[slug]/build/service-page-sync';
+import { areaPageRefs } from '@/app/c/[slug]/build/area-page-sync';
 import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
 import { footerColumns } from '@/lib/serviceLinks';
 import { withDisplayPhone } from '@/lib/displayPhone';
@@ -252,6 +253,9 @@ export async function POST(req: Request) {
           // (§2), so renaming the service later keeps its published URL.
           content.servicePages = servicePageSlugs(composition);
           content.services = withStoredSlugs(content, content.servicePages).services;
+          // Local SEO (L2, L6): the town pages that exist and the spokes under each. The towns list,
+          // the services list and the town pages link only to these.
+          content.areaPages = areaPageRefs(composition, content);
 
           // The footer's link columns are built from the client's own services and pages, which is
           // what every catalog footer renders (serviceLinks.ts footerColumns; Xander 2026-11-11). Write

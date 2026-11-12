@@ -180,7 +180,7 @@ test('BuildWizard guards its saves with the gate, not a ref', async () => {
   assert.match(src, /const \[hydrated, markHydrated\] = useHydrationGate\(slug\);/);
   assert.match(src, /markHydrated\(slug\);/);
   assert.doesNotMatch(src, /hydrated\.current/, 'a ref guard reads open before the loaded state has rendered');
-  // Every effect that saves or reshapes state checks the gate: the draft, the brief, and the
-  // service-page sync.
-  assert.equal(src.match(/if \(!hydrated\) return;/g)?.length, 3);
+  // Every effect that saves or reshapes state checks the gate: the draft, the brief, the
+  // service-page sync and the town-page sync (local SEO, 2026-11-12).
+  assert.equal(src.match(/if \(!hydrated\) return;/g)?.length, 4);
 });

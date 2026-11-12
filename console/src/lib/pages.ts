@@ -12,6 +12,7 @@
 import type { NavItem } from '@jdd/schema';
 import type { SkinId } from '@/lib/skins';
 import { slugify } from '@/lib/slugify';
+import { PAGE_CAPS } from '@jdd/schema';
 
 /** Where a section sits in the page's vertical rhythm. Decided by the PAGE TEMPLATE, never by the
  *  component (decision 24), which is what makes decision 30d's non-uniform-padding ban enforceable
@@ -30,8 +31,10 @@ export type SectionRef = { id?: string; categoryId: string; name: string; skin?:
 /** The stable identity of a kind of page. Drives defaults, nav label, and route. */
 export type PageTypeId =
   | 'home' | 'services' | 'about' | 'contact'   // the four defaults
-  | 'reviews' | 'gallery' | 'areas'             // optional-5th candidates
-  | 'service';                                  // one generated page per service item (decision 20)
+  | 'reviews' | 'gallery' | 'areas'             // optional-5th candidates ('areas' is also the town pages' index)
+  | 'service'                                   // one generated page per service item (decision 20)
+  | 'area'                                      // one generated page per qualifying town, /areas/<town> (local SEO L2, L6)
+  | 'spoke';                                    // one per approved town + service, /areas/<town>/<service> (L2, Phase 3)
 
 /** A page template = an ordered list of BODY sections (nav/footer/seo are chrome, not here).
  *  Every non-home template MUST begin with a `pageHeader` section. */
@@ -61,10 +64,30 @@ export type SiteComposition = {
 };
 
 // 1, not 3: a legacy single-page client lifts to a one-page composition and must stay valid
-// (single-page sites are still shippable). The default is 4 pages; the operator can add up to MAX.
-// 16 = 4 core + up to 3 optional + up to 9 generated service pages (decision 20).
+// (single-page sites are still shippable). The default is 4 pages.
+//
+// Caps per page type (Xander's local SEO decision L14, 2026-11-12), replacing the single cap of 16
+// that service pages used to share with everything else: the generated kinds are capped by
+// PAGE_CAPS from @jdd/schema (service 11, area 10, spoke 15), and everything else (the 4 core
+// pages, the optional pages and the /areas index) by OTHER_PAGES_MAX. MAX_PAGES is their sum, kept
+// for callers that only need an upper bound.
 export const MIN_PAGES = 1;
-export const MAX_PAGES = 16;
+export const OTHER_PAGES_MAX = 8;
+export const MAX_PAGES = OTHER_PAGES_MAX + PAGE_CAPS.service + PAGE_CAPS.area + PAGE_CAPS.spoke;
+
+/** The cap a page type counts against. */
+export function capFor(pageType: PageTypeId): number {
+  if (pageType === 'service') return PAGE_CAPS.service;
+  if (pageType === 'area') return PAGE_CAPS.area;
+  if (pageType === 'spoke') return PAGE_CAPS.spoke;
+  return OTHER_PAGES_MAX;
+}
+
+/** How many pages of the same cap group as `pageType` the composition has. */
+export function pagesInGroup(comp: Pick<SiteComposition, 'pages'>, pageType: PageTypeId): number {
+  const generated = (t: PageTypeId) => t === 'service' || t === 'area' || t === 'spoke';
+  return comp.pages.filter((p) => (generated(pageType) ? p.pageType === pageType : !generated(p.pageType))).length;
+}
 
 /** Reserved route slugs a custom page may not use (they collide with Next internals). */
 const RESERVED_ROUTES = new Set(['api', '_next', 'images']);
@@ -111,10 +134,12 @@ export function navLinksFor(comp: SiteComposition): NavItem[] {
   return comp.pages.filter((p) => p.navVisible).map((p) => ({ label: p.label, href: navHref(p.route) }));
 }
 
-/** True for a syntactically valid route slug: one lowercase URL segment, or two for a nested
- *  service route like `services/ac-repair` (decision 20). The reserved check is against the FIRST
- *  segment, since that is what collides with a Next internal directory. */
+/** True for a syntactically valid route slug: one lowercase URL segment, two for a nested route
+ *  like `services/ac-repair` (decision 20) or `areas/minneola`, and three only for a town +
+ *  service spoke, `areas/<town>/<service>` (local SEO L2). The reserved check is against the
+ *  FIRST segment, since that is what collides with a Next internal directory. */
 export function isValidRoute(route: string): boolean {
+  if (/^areas\/[a-z0-9-]+\/[a-z0-9-]+$/.test(route)) return true;
   if (!/^[a-z0-9-]+(\/[a-z0-9-]+)?$/.test(route)) return false;
   return !RESERVED_ROUTES.has(route.split('/')[0]);
 }
@@ -137,8 +162,14 @@ export function validateComposition(comp: SiteComposition): SiteComposition {
   if (chrome.footer.categoryId !== 'footer') throw new Error('Chrome footer must be a footer section.');
   if (chrome.seo.categoryId !== 'seo') throw new Error('Chrome seo must be an seo section.');
 
-  if (pages.length < MIN_PAGES || pages.length > MAX_PAGES) {
-    throw new Error(`A site must have between ${MIN_PAGES} and ${MAX_PAGES} pages (has ${pages.length}).`);
+  if (pages.length < MIN_PAGES) {
+    throw new Error(`A site must have at least ${MIN_PAGES} page (has ${pages.length}).`);
+  }
+  // L14: each kind of page against its own cap.
+  const caps: Array<[string, PageTypeId]> = [['service pages', 'service'], ['town pages', 'area'], ['town + service pages', 'spoke'], ['other pages', 'home']];
+  for (const [what, t] of caps) {
+    const n = pagesInGroup(comp, t);
+    if (n > capFor(t)) throw new Error(`A site may have at most ${capFor(t)} ${what} (has ${n}).`);
   }
   if (pages[0]?.route !== '') throw new Error('The first page must be the home page (route "").');
 

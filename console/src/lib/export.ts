@@ -18,7 +18,8 @@ import { routePath, styleKeyFor, rhythmClass, navHref, type SectionRhythm, type 
 import { reconcileRoutes } from '@/lib/composition-manifest';
 import { stagedRepoDir } from '@/lib/stagedExport';
 import { REVEAL_CLASS, revealsOnScroll } from '@/lib/revealPolicy';
-import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
+import { sectionSlugAttrs } from '@/lib/areaPageSections';
+import { writeRedirects } from '@/lib/redirects';
 import type { SiteContent, SectionStyle, IntakeEnvelope } from '@jdd/schema';
 import { SITE_TYPES_SOURCE } from '@jdd/schema';
 import { CONTENT } from '@/data/site';
@@ -625,9 +626,9 @@ export function wirePages(
     );
     // A per-service page (/services/<slug>): its service sections get the slug, so they render
     // that one service and its final CTA opens with "Service: {service}" (service-page-spec.md).
-    const serviceSlug = page.pageType === 'service' ? page.route.slice('services/'.length) : null;
-    const slugAttr = (ref: { name: string }) =>
-      serviceSlug && SERVICE_PAGE_SECTIONS.has(ref.name) ? ` serviceSlug=${JSON.stringify(serviceSlug)}` : '';
+    // A town page and a spoke hand their sections the town (and the spoke's service) the same way
+    // (local SEO, areaPageSections.ts).
+    const slugAttr = (ref: { name: string }) => sectionSlugAttrs(page, ref.name);
     page.sections.forEach((ref, i) => {
       if (ref.categoryId === 'pageHeader' && slugAttr(ref)) {
         lines.push(...emit(`<${ref.name}${slugAttr(ref)} />`, ref));
@@ -650,6 +651,11 @@ export function wirePages(
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, lines.join('\n') + '\n', 'utf8');
   }
+
+  // A permanent redirect for every URL this site has stopped serving (local SEO L3), into
+  // vercel.json. Before reconcileRoutes, which replaces the manifest the redirects read the
+  // previous routes from. See lib/redirects.ts.
+  writeRedirects(repoDir, comp);
 
   // Prunes routes this composition dropped, then records it as the new manifest. Lives in
   // composition-manifest.ts because that module owns "what did the last export write" — and
