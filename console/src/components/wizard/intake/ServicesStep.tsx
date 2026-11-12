@@ -20,7 +20,7 @@ import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { servicePageHint } from '@/lib/intake-todo';
 import { SERVICE_GATE } from '@/lib/service-gate';
-import { serviceAreasToStore } from '@/lib/service-areas';
+import { serviceAreasToStore, townChoices } from '@/lib/service-areas';
 import {
   SERVICE_PARTS, BASICS_LABEL, DURATION_CHOICES, partsDone, partsProgress, nextPart, prevPart, categorySuggestions,
   type ServicePartId,
@@ -178,7 +178,7 @@ function GuidedService({
   const base = `services.items.${index}`;
   const done = partsDone(content, index, slug);
   const hint = servicePageHint(SERVICE_GATE, content, index);
-  const area = content.extensions?.serviceArea ?? [];
+  const area = townChoices(content.extensions?.serviceArea);
   const brandsCarried = content.extensions?.brandsCarried ?? [];
   const projects = content.work?.projects ?? [];
   const questions = (content.extensions?.customerQuestions ?? []) as Question[];
