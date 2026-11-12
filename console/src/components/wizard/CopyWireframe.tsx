@@ -28,6 +28,8 @@ export interface SectionVerdict {
   onAccept: () => void;
   onReroll: () => void;
   onRevert: () => void;
+  /** Write regenerated parts of this section (Review step, 2026-11-12): see lib/review-parts.ts. */
+  onApplyParts?: (w: { sections: Record<string, unknown>; edits: Record<string, unknown> }) => void;
 }
 
 export default function CopyWireframe({
@@ -119,7 +121,7 @@ function ReviewGroupBlock({
   );
 }
 
-function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVerdict }) {
+export function VerdictBar({ section, verdict }: { section: Section; verdict: SectionVerdict }) {
   return (
     <div className="mb-3 flex items-center gap-3 border-b border-uiCardRule pb-3">
       <span className="kicker">{labelFor(section)}</span>
