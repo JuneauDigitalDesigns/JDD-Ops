@@ -188,9 +188,7 @@ export async function POST(req: Request) {
         // Never carry a canonical: applyGeneratedCopy spreads the base's seo, which is how the
         // HVAC preset's https://yourhvaccompany.com got written into a client's generated copy
         // (lib/placeholderCanonical.ts).
-        const generated = withoutCarriedCanonical(
-          applyGeneratedCopy(base, merged, wantedSet, { subpageRoutes: subpages.map((p) => p.route) }),
-        );
+        const generated = withoutCarriedCanonical(applyGeneratedCopy(base, merged, wantedSet, { subpageRoutes: subpages.map((p) => p.route) }));
         send({ type: 'done', generated });
       } catch (e) {
         send({ type: 'error', message: e instanceof Error ? e.message : 'Generation failed.' });
