@@ -21,21 +21,45 @@ export function newerBundle<T extends Stamped>(local: T | null | undefined, serv
 }
 
 /**
- * Which saved copy an EXPORTED client opens with, or null for "the repo's content" (Xander
- * 2026-11-12: "those photos are not making it from the intake wizard into the studio").
+ * Which copy of a client's work opens: a saved draft, the client's repo, or a fresh start.
  *
- * An exported client used to open from the repo every time, with `edits: {}`, and the server draft
- * was never read. But a successful export deletes clients/{slug}/.draft.json (export route), so a
- * server draft that exists is work done since the last export, or the work of an export that
- * failed: the only copy of it. `_e2e_test_growth` lost every intake edit that way, its uploaded
- * photos included: four staged in console/.uploads at 21:35 and 21:39, an export at 22:13 that
- * failed (its repo site.ts is still the template's), and a reload that opened the repo.
+ * A client with a repo the studio can read back used to open from the repo on every load ("disk
+ * wins"), with the edit and generated layers emptied. That was meant for a client exported from
+ * the console, so a stale browser copy could never pose as the live site. But onboard.js gives
+ * every client a repo whose page.tsx reads back, so the rule fired for clients nobody had exported
+ * from the console, and every reload threw away the intake's typed facts (edits) and the copy run
+ * (generated), both already saved (Xander, 2026-11-12: "the business facts are not being saved on
+ * a reload. And copy generation is also not being saved if you get to the studio step and you
+ * haven't exported the project yet").
  *
- * So a server draft wins (the newer of it and this browser's copy). With none, the repo wins as
- * before: a copy in this browser alone may be from before the export, and must not present itself
- * as the live site.
+ * So the repo wins only over work saved BEFORE it was last written (`exportedAt`, the time the
+ * console's export or onboard.js last wrote it). A draft saved after that is newer work and opens
+ * as saved. An unstamped draft can't show it is newer, and an unknown repo time keeps the repo.
+ *
+ * One more case wins for the draft (#90): a server draft that EXISTS. A successful export deletes
+ * clients/{slug}/.draft.json, so one that exists is work no export has shipped, the only copy of
+ * it. That holds even when the repo was written after it: an export writes the composition
+ * manifest while wiring the pages (reconcileRoutes), before `npm run build`, so an export that
+ * fails at the build moves `exportedAt` past the draft and would otherwise open the half-written
+ * repo and drop the draft. (On _e2e_test_growth the 2026-11-11 22:13 export failed earlier, after
+ * copying the template, so its photos were saved by the time rule alone; a build failure would not
+ * have been.) A copy only in this browser still needs the time rule: it may predate the export.
  */
-export function exportedClientDraft<T extends Stamped>(local: T | null | undefined, server: T | null | undefined): T | null {
-  if (!server) return null;
-  return newerBundle(local, server);
+export function startingBundle<T extends Stamped>(o: {
+  saved: T | null | undefined;
+  server: T | null | undefined;
+  /** The client has a repo the studio reads back (a manifest or a parseable home page). */
+  exported: boolean;
+  /** Epoch ms the repo was last written, or null when unknown. */
+  exportedAt: number | null;
+}): { from: 'draft' | 'disk' | 'fresh'; bundle: T | null } {
+  const draft = newerBundle(o.saved, o.server);
+  if (o.exported) {
+    // A server draft survives only an export that did not succeed, or none since: it is unshipped work.
+    const unshipped = Boolean(o.server);
+    const newer = draft && o.exportedAt !== null && (draft.savedAt ?? 0) > o.exportedAt;
+    if (draft && unshipped) return { from: 'draft', bundle: draft };
+    return newer ? { from: 'draft', bundle: draft } : { from: 'disk', bundle: null };
+  }
+  return draft ? { from: 'draft', bundle: draft } : { from: 'fresh', bundle: null };
 }

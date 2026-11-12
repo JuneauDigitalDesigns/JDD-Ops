@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { exportedClientDraft, newerBundle } from '../src/lib/wizardBundle.ts';
+import { startingBundle } from '../src/lib/wizardBundle.ts';
 import { previewSrc, stagedFileName, withStagedPreviews, isStagedFileName } from '../src/lib/stagedUploads.ts';
 import { effectiveContent } from '../src/lib/effectiveContent.ts';
 
@@ -48,24 +48,31 @@ function draftWithPhotos(savedAt) {
   };
 }
 
-test('an exported client with a server draft opens the draft, the only copy of its unsaved work', () => {
+// The 22:13 export, had it failed at `npm run build`: it writes the composition manifest while wiring
+// the pages, before the build, so the repo's write time moves past the draft. #89's time rule alone
+// then opens the half-written repo and drops the only copy of the photos.
+const BUILD_FAILED_AT = Date.parse('2026-11-11T22:20:00Z');
+
+test('an exported client with a server draft opens the draft, even after an export that failed at the build', () => {
   const server = draftWithPhotos(Date.parse('2026-11-11T21:40:00Z'));
   const staleLocal = { ...draftWithPhotos(Date.parse('2026-11-10T09:00:00Z')), edits: {} }; // a browser copy from before
-  assert.equal(exportedClientDraft(staleLocal, server), server, 'the newer server draft wins over an old browser copy');
-  assert.equal(exportedClientDraft(null, server), server);
+  const open = (saved, srv, exportedAt) => startingBundle({ saved, server: srv, exported: true, exportedAt });
+  assert.deepEqual(open(staleLocal, server, BUILD_FAILED_AT), { from: 'draft', bundle: server }, 'a draft that exists is unshipped work: a successful export deletes it');
+  assert.deepEqual(open(null, server, BUILD_FAILED_AT), { from: 'draft', bundle: server });
   const newerLocal = draftWithPhotos(Date.parse('2026-11-11T21:41:00Z'));
-  assert.equal(exportedClientDraft(newerLocal, server), newerLocal, 'a newer copy in this browser wins, as for any client');
-  // No server draft: the last export succeeded (it deletes the draft), so the repo is the truth.
-  assert.equal(exportedClientDraft(staleLocal, null), null, 'a browser copy alone may predate the export');
-  assert.equal(newerBundle(staleLocal, null), staleLocal, 'unchanged for a client never exported');
+  assert.equal(open(newerLocal, server, BUILD_FAILED_AT).bundle, newerLocal, 'a newer copy in this browser wins, as for any client');
+  // No server draft: the last export succeeded, so only a browser copy saved after it may open (#89).
+  assert.deepEqual(open(staleLocal, null, BUILD_FAILED_AT), { from: 'disk', bundle: null }, 'a browser copy alone may predate the export');
+  assert.equal(open(draftWithPhotos(BUILD_FAILED_AT + 60_000), null, BUILD_FAILED_AT).from, 'draft');
+  assert.deepEqual(startingBundle({ saved: staleLocal, server: null, exported: false, exportedAt: null }), { from: 'draft', bundle: staleLocal }, 'never exported: unchanged');
 });
 
-test('the Studio consults the draft before opening an exported client from its repo', () => {
+test('the Studio decides with startingBundle, reading the server draft, before opening a repo', () => {
   const src = read('src/app/c/[slug]/build/BuildWizard.tsx');
-  const hydration = src.slice(src.indexOf('const saved = readBundle(slug);'), src.indexOf('// ── Never exported'));
-  assert.match(hydration, /exportedClientDraft\(saved, draftBundle/, 'an exported client reads the server draft');
-  assert.match(hydration, /if \(unsaved\) \{\s*applyBundle\(unsaved\);\s*\} else if \(manifest \|\| composition\) \{/, 'and opens the repo (edits: {}) only without one');
-  assert.ok(hydration.indexOf('exportedClientDraft(') < hydration.indexOf('edits: {}'));
+  const hydration = src.slice(src.indexOf('const saved = readBundle(slug);'), src.indexOf('applyBundle(start.bundle ?? freshBundle(seed));'));
+  assert.match(hydration, /startingBundle\(\{\s*saved,\s*server: draftBundle/, 'the server draft is read');
+  assert.match(hydration, /if \(start\.from === 'disk'\) \{/, 'the repo (edits: {}) opens only when the rule says so');
+  assert.ok(hydration.indexOf('startingBundle(') < hydration.indexOf('edits: {}'));
 });
 
 test('the restored draft\'s photos survive every strip pass into the Studio\'s content', () => {
