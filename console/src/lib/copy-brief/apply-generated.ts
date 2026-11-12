@@ -37,7 +37,9 @@ export function applyGeneratedCopy(
       if (cb.tagline) brand.tagline = cb.tagline;
       if (cb.name) { brand.name = cb.name; brand.short = cb.short ?? cb.name; }
       else if (cb.short) brand.short = cb.short;
-      if (cb.long) brand.long = cb.long;
+      // brand.long is never read from model output: it is the client's legal name exactly as
+      // signed on the agreement (agency PR #106), and it feeds the copyright line and the SEO
+      // local-business data. It passes through from base, so the intake or an operator edit holds.
       if (cb.established) brand.established = cb.established;
       if (cb.phone) { brand.phone = cb.phone; brand.phoneHref = `tel:${cb.phone.replace(/[^0-9+]/g, '')}`; }
       if (cb.email) brand.email = cb.email;
