@@ -88,12 +88,14 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
  * its own; a paraphrase of a review or a note would be a generated sentence carrying a local claim
  * without its source.
  */
+// TOWN_RULES is PR #101 items 4 and 9, approved word for word by Xander on 2026-11-12.
 const TOWN_RULES = 'The reviews and notes are shown on the page as written, with their sources, so never quote, restate or add to them. Never state a local code, permit, rule or condition. No town lists, never write "near me", and use no number the facts do not give.';
 
 /**
  * The instruction for the `townPages` section: a 2-sentence intro and a meta description for each
- * town page the schema's gate gives (lib/townPages.ts). '' when no town earns one. Wording goes to
- * Xander for word-for-word approval with the PR.
+ * town page the schema's gate gives (lib/townPages.ts). '' when no town earns one.
+ * Wording approved word for word by Xander on 2026-11-12 (PR #101, items 1 to 5); don't reword
+ * without his sign-off.
  */
 export function townPagesInstruction(content: unknown, factsFrom: unknown = content): string {
   const facts = townPageFacts(content, factsFrom);
@@ -111,8 +113,9 @@ export function townPagesInstruction(content: unknown, factsFrom: unknown = cont
  * The instruction for the `townServicePages` section: a 2-sentence intro and a meta description
  * for each town + service page the export lists and the spoke gate passes. '' when there is none
  * (always, until Phase 3 approves one). The service page's own facts (what's included, the jobs,
- * the price) are not sent: they stay on the service page, which this page links to. Wording goes to
- * Xander for word-for-word approval with the PR.
+ * the price) are not sent: they stay on the service page, which this page links to.
+ * Wording approved word for word by Xander on 2026-11-12 (PR #101, items 6 to 10); don't reword
+ * without his sign-off.
  */
 export function townServicePagesInstruction(content: unknown, factsFrom: unknown = content): string {
   const facts = townServicePageFacts(content, factsFrom);

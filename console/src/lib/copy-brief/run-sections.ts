@@ -54,6 +54,7 @@ export function copyRequestBody(input: {
 export const SKIP_REASONS = {
   noPages: 'Not written: this site has no pages besides Home.',
   noServicePages: 'Not written: no service has its own page.',
+  // The two town reasons are PR #101 items 12 and 13, approved word for word by Xander on 2026-11-12.
   noTownPages: 'Not written: no town has enough of its own facts for a page.',
   noTownServicePages: 'Not written: no town and service page is approved with enough facts.',
   unreported: 'Not written: the copy service skipped it.',
