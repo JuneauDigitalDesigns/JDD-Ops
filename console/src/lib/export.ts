@@ -857,40 +857,32 @@ export function rewriteClientSchema(repoRoot: string, slug: string, data: unknow
 }
 
 /**
- * Walk the content tree; for every string value shaped "upload://<file>", copy the staged
- * file from console/.uploads into clients/<slug>/repo/public/images and rewrite the value to
- * "/images/<file>".
+ * Walk the content tree; every "upload://<file>" ref whose staged file is gone collapses to "".
+ * The caller reports those and backfills the slot with placeholder imagery, because a staged
+ * upload vanishing between upload and export used to ship an empty <img> to a live client site
+ * with nothing in the stream to say so.
  *
- * Returns a deep clone with refs resolved, plus the filenames of any refs that could not be
- * resolved. Those still collapse to "" — but the caller reports them and backfills the slot
- * with placeholder imagery, because a staged upload vanishing between upload and export used
- * to ship an empty <img> to a live client site with nothing in the stream to say so.
+ * A ref whose file IS staged stays as it is: the image pipeline (materializeImages) reads it from
+ * console/.uploads and encodes it like any other photo (Xander 2026-11-12). This used to copy the
+ * raw original into public/images and point the site at it, so intake photos skipped compression,
+ * orientation and metadata stripping. Any ref the pipeline didn't turn into `/img/<hash>` is left
+ * for `stagedRefsIn`, and the export refuses rather than ship the raw file.
  */
 export function resolveUploads(
-  repoRoot: string,
-  slug: string,
   content: SiteContent,
+  stageDir: string = resolve(process.cwd(), '.uploads'),
 ): { content: SiteContent; missing: string[] } {
-  const stageDir = resolve(process.cwd(), '.uploads');
-  const publicImg = resolve(repoDirFor(repoRoot, slug), 'public', 'images');
-  let created = false;
   const missing = new Set<string>();
 
   const walk = (v: unknown): unknown => {
     if (typeof v === 'string') {
       if (!v.startsWith('upload://')) return v;
       const file = v.slice('upload://'.length);
-      const src = resolve(stageDir, file);
-      if (!existsSync(src)) {
+      if (!existsSync(resolve(stageDir, file))) {
         missing.add(file);
         return '';
       }
-      if (!created) {
-        mkdirSync(publicImg, { recursive: true });
-        created = true;
-      }
-      copyFileSync(src, resolve(publicImg, file));
-      return `/images/${file}`;
+      return v;
     }
     if (Array.isArray(v)) return v.map(walk);
     if (v && typeof v === 'object') {
@@ -985,4 +977,18 @@ async function lsRemoteTags(remote: string): Promise<Record<string, string>> {
   } catch {
     return {};
   }
+}
+
+/**
+ * Every `upload://` ref still in `content`, by path. Run after the image pipeline: a staged photo
+ * it couldn't encode (too large, not an image) stays a ref, and the export refuses rather than
+ * copy the raw original onto a live site (Xander 2026-11-12).
+ */
+export function stagedRefsIn(content: unknown, prefix = ''): string[] {
+  if (typeof content === 'string') return content.startsWith('upload://') ? [prefix] : [];
+  if (Array.isArray(content)) return content.flatMap((v, i) => stagedRefsIn(v, prefix ? `${prefix}.${i}` : String(i)));
+  if (content && typeof content === 'object') {
+    return Object.entries(content as Record<string, unknown>).flatMap(([k, v]) => stagedRefsIn(v, prefix ? `${prefix}.${k}` : k));
+  }
+  return [];
 }
