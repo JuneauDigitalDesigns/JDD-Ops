@@ -168,8 +168,16 @@ export default function IntakeStep({
         onStageChange('prompt');
       },
       onRevert: () => onSetGeneratedSection(section, priorValue),
+      // Regenerated parts (lib/review-parts.ts): snapshot for Revert, write them, and the section
+      // waits for review again, exactly as after a whole-section run (the gate is unchanged).
+      onApplyParts: (w: { sections: Record<string, unknown>; edits: Record<string, unknown> }) => {
+        setPreRunGenerated(generated);
+        for (const [top, value] of Object.entries(w.sections)) onSetGeneratedSection(top, value);
+        for (const [p, value] of Object.entries(w.edits)) setField(p, value);
+        onBriefChange((b) => setTickedSections(b, [...new Set([...tickedKeys, key])]));
+      },
     };
-  }, [tickedKeys, preRunGenerated, generated, onBriefChange, onStageChange, onSetGeneratedSection]);
+  }, [tickedKeys, preRunGenerated, generated, onBriefChange, onStageChange, onSetGeneratedSection, setField]);
 
   // ── The copy-review gate (a HARD block) ───────────────────────────────────────────────
   // A key is "unreviewed" when it has model-generated copy behind it AND is still ticked
@@ -281,6 +289,7 @@ export default function IntakeStep({
       onGenerated={handleGenerated}
       onClearGenerated={onClearGenerated}
       hasGenerated={Boolean(generated)}
+      generated={generated}
       verdictFor={verdictFor}
       pages={pages}
       unreviewed={unreviewedSet}

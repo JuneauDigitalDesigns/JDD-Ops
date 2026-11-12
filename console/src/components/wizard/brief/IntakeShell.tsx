@@ -52,7 +52,7 @@ export default function IntakeShell({
   blocks, content, setField, onUpdate, sources,
   vertical, onVerticalChange, clientPickedVertical, onReplaceContent,
   brief, verticalDef, imported, tickedSections, copyModel, onCopyModelChange,
-  onGenerated, onClearGenerated, hasGenerated,
+  onGenerated, onClearGenerated, hasGenerated, generated,
   verdictFor, pages, unreviewed, gateReason, onApprove,
   todo, counts, stats, risks, reviewDraft, onReviewDraftChange, saveStatus, onRetrySave,
 }: {
@@ -78,6 +78,8 @@ export default function IntakeShell({
   onGenerated: (p: Partial<SiteContent>) => void;
   onClearGenerated: () => void;
   hasGenerated: boolean;
+  /** The generated layer: the Review step's parts are the text it holds (lib/review-parts.ts). */
+  generated: Partial<SiteContent> | null;
 
   verdictFor: (key: VerdictKey) => SectionVerdict;
   pages: ReviewPage[];
@@ -212,6 +214,8 @@ export default function IntakeShell({
                 <ReviewBoard
                   content={content}
                   setField={setField}
+                  generated={generated}
+                  run={{ vertical, imported, edits: sources.edits, brief, model: copyModel }}
                   verdictFor={verdictFor}
                   pages={pages}
                   unreviewed={unreviewed}

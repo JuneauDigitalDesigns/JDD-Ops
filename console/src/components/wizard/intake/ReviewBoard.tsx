@@ -9,19 +9,37 @@
  * hasn't been read, and blocks Approve, which now sits on Still to do.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, CircleNotch, Sparkle, Warning } from '@phosphor-icons/react';
+import type { CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
-import { verdictKey, type VerdictKey } from '@/lib/copy-schema';
+import { verdictKey, type Section, type VerdictKey } from '@/lib/copy-schema';
 import { buildReviewGroups, type ReviewPage } from '@/lib/copy-review-groups';
 import { labelFor } from '@/lib/section-labels';
-import { SectionReviewCard, type SectionVerdict } from '../CopyWireframe';
+import { getPath } from '@/lib/merge';
+import { EditProvider, E } from '@/lib/editable';
+import { copyRequestBody } from '@/lib/copy-brief/run-sections';
+import { readCopyStream } from '@/lib/copy-brief/read-copy-stream';
+import { sectionParts, applyParts, partsWord, type Part } from '@/lib/review-parts';
+import { SectionReviewCard, VerdictBar, type SectionVerdict } from '../CopyWireframe';
 import { Card, StatusMark, Tag } from './ui';
 
+/** What a part regeneration posts besides the content: the same inputs the Prompt step's run uses. */
+export type ReviewRun = {
+  vertical: string;
+  imported: SiteContent | null;
+  edits: Record<string, unknown>;
+  brief: CopyBrief;
+  model: string;
+};
+
 export default function ReviewBoard({
-  content, setField, verdictFor, pages, unreviewed, hasGenerated, focusSection, focusRoute, focusKey,
+  content, setField, verdictFor, pages, unreviewed, hasGenerated, focusSection, focusRoute, focusKey, generated, run,
 }: {
   content: SiteContent;
   setField: (path: string, value: unknown) => void;
+  /** The generated layer: a section's tickable parts are the text it holds. */
+  generated: Partial<SiteContent> | null;
+  run: ReviewRun;
   verdictFor: (key: VerdictKey) => SectionVerdict;
   pages: ReviewPage[];
   unreviewed: Set<VerdictKey>;
@@ -122,16 +140,35 @@ export default function ReviewBoard({
 
         <div className="flex min-h-0 flex-col gap-2">
           <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-            {cur && (
-              <SectionReviewCard
-                key={cur.key}
-                section={cur.section}
-                route={cur.route}
-                content={content}
-                setField={setField}
-                verdict={verdictFor(cur.key)}
-              />
-            )}
+            {cur && (() => {
+              // Accept moves straight on to the next section (Xander, 2026-11-12).
+              const v = verdictFor(cur.key);
+              const verdict: SectionVerdict = { ...v, onAccept: () => { v.onAccept(); go(pos + 1); } };
+              const parts = sectionParts(cur.key, generated, content);
+              return parts.length ? (
+                <PartsCard
+                  key={cur.key}
+                  section={cur.section}
+                  sectionKey={cur.key}
+                  parts={parts}
+                  content={content}
+                  generated={generated}
+                  setField={setField}
+                  verdict={verdict}
+                  run={run}
+                  pages={pages}
+                />
+              ) : (
+                <SectionReviewCard
+                  key={cur.key}
+                  section={cur.section}
+                  route={cur.route}
+                  content={content}
+                  setField={setField}
+                  verdict={verdict}
+                />
+              );
+            })()}
           </div>
           <div className="flex shrink-0 items-center justify-between">
             <button type="button" className="btn btn-sm" disabled={pos === 0} onClick={() => go(pos - 1)}>
@@ -145,5 +182,112 @@ export default function ReviewBoard({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A generated section as its parts, each with a tick box (approved on the canvas, row 7). Ticking
+ * parts brings up a bar to regenerate just those; the run is the existing copy route for this one
+ * section, and only the ticked parts are taken from it (lib/review-parts.ts). Each part's text is
+ * still click-to-edit.
+ */
+function PartsCard({
+  section, sectionKey, parts, content, generated, setField, verdict, run, pages,
+}: {
+  section: Section;
+  sectionKey: VerdictKey;
+  parts: Part[];
+  content: SiteContent;
+  generated: Partial<SiteContent> | null;
+  setField: (path: string, value: unknown) => void;
+  verdict: SectionVerdict;
+  run: ReviewRun;
+  pages: ReviewPage[];
+}) {
+  const [marked, setMarked] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toggle = (p: string) => setMarked((m) => (m.includes(p) ? m.filter((x) => x !== p) : [...m, p]));
+
+  async function regenerate() {
+    setBusy(true);
+    setError(null);
+    let res: Response;
+    try {
+      res = await fetch('/api/build/generate-copy', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(copyRequestBody({
+          vertical: run.vertical, base: content, imported: run.imported, edits: run.edits, brief: run.brief,
+          sections: [section], model: run.model, pages,
+        })),
+      });
+    } catch {
+      setBusy(false);
+      setError('Could not reach the copy service.');
+      return;
+    }
+    const out = await readCopyStream(res);
+    setBusy(false);
+    if (!out.generated) { setError(out.error ?? null); return; }
+    const w = applyParts(generated, out.generated, marked, run.edits);
+    verdict.onApplyParts?.({ sections: w.sections, edits: w.edits });
+    // A part the run did not return stays ticked, so nothing reads as rewritten that was not.
+    setMarked(w.missing);
+  }
+
+  return (
+    <EditProvider setField={setField}>
+      <div className="relative flex min-h-full flex-col rounded-xl border border-uiCardRule bg-uiBg p-5 pb-20 shadow-raised" data-testid="review-parts" data-key={sectionKey}>
+        <VerdictBar section={section} verdict={verdict} />
+        <ul className="flex flex-col gap-0.5">
+          {parts.map((p) => {
+            const on = marked.includes(p.path);
+            const value = getPath(content, p.path);
+            return (
+              <li
+                key={p.path}
+                className={`grid grid-cols-[26px_150px_minmax(0,1fr)] items-start gap-2.5 rounded-[9px] px-2 py-2 ${on ? 'bg-[rgba(31,111,120,.08)] outline outline-1 outline-[rgba(31,111,120,.35)]' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={busy}
+                  onChange={() => toggle(p.path)}
+                  aria-label={p.label}
+                  className="mt-1 h-[18px] w-[18px] accent-[var(--ui-accent)]"
+                />
+                <span className="pt-1 font-chromeMono text-[10.5px] uppercase tracking-[0.12em] text-uiFg3">{p.label}</span>
+                {busy && on ? (
+                  <span className="flex flex-col gap-1.5 py-1" aria-hidden>
+                    <i className="block h-3 w-11/12 animate-pulse rounded bg-[rgba(31,111,120,.18)]" />
+                    <i className="block h-3 w-3/5 animate-pulse rounded bg-[rgba(31,111,120,.18)]" />
+                  </span>
+                ) : (
+                  <span className="text-[14.5px] leading-snug text-uiInk"><E p={p.path}>{typeof value === 'string' ? value : ''}</E></span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {error && (
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-danger"><Warning size={14} className="shrink-0" /> {error}</p>
+        )}
+        {marked.length > 0 && (
+          <div className="absolute inset-x-4 bottom-3.5 flex items-center gap-3 rounded-xl bg-uiInk py-2.5 pl-4 pr-3 text-[#f4ecd8] shadow-overlay">
+            <span className="font-semibold">{busy ? <>Regenerating {partsWord(marked.length)}…</> : <>{partsWord(marked.length)} marked</>}</span>
+            {!busy && (
+              <button type="button" onClick={() => setMarked([])} className="btn btn-sm ml-auto border-[rgba(244,236,216,.35)] bg-transparent text-[#f4ecd8]">
+                Clear
+              </button>
+            )}
+            <button type="button" onClick={regenerate} disabled={busy} className={`btn btn-sm btn-primary ${busy ? 'ml-auto' : ''}`}>
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
+              Regenerate {partsWord(marked.length)}
+            </button>
+          </div>
+        )}
+      </div>
+    </EditProvider>
   );
 }
