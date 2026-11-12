@@ -22,7 +22,7 @@
 import { Check, MapPin, Plus, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import {
   relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions,
 } from '@/lib/serviceLinks';
@@ -32,7 +32,7 @@ export const meta = {
   category: 'services',
   label: 'HVAC / Service page body',
   consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -250,7 +250,8 @@ export default function HvacServiceDetail({ content = CONTENT, serviceSlug }: { 
               )}
               {photos.slice(0, review ? 1 : 3).map((ph) => (
                 <figure key={ph.path} className="shadow-brand-1 flex flex-col overflow-hidden rounded-[16px] border border-rule bg-bg">
-                  <div className="relative min-h-[220px] flex-1 bg-cover bg-center" style={{ backgroundImage: `url(${imageAt(ph.url, 1024)})` }} role="img" aria-label={ph.alt}>
+                  <div className="relative min-h-[220px] flex-1 isolate overflow-hidden">
+                    <CoverImage url={ph.url} alt={ph.alt} sizes="(min-width: 1024px) 50vw, 100vw" />
                     <div className="absolute inset-0 bg-[color:var(--accent-2)] opacity-30 mix-blend-color" aria-hidden="true" />
                   </div>
                   {(ph.title || ph.meta) && (
@@ -278,7 +279,8 @@ export default function HvacServiceDetail({ content = CONTENT, serviceSlug }: { 
                   <li key={r.slug}>
                     <a href={r.href!} className="group shadow-brand-1 flex items-center gap-4 rounded-[14px] border border-rule bg-bg p-4 transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-[3px] hover:border-[color:var(--accent-2)] hover:shadow-brand-2">
                       {img && (
-                        <span className="relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-[10px] bg-cover bg-center" style={{ backgroundImage: `url(${imageAt(img, 640)})` }} aria-hidden="true">
+                        <span className="relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-[10px] isolate" aria-hidden="true">
+                          <CoverImage url={img} alt="" sizes="96px" />
                           <span className="absolute inset-0 bg-[color:var(--accent-2)] opacity-35 mix-blend-color" aria-hidden="true" />
                         </span>
                       )}

@@ -94,10 +94,12 @@ export default function FooterColumns({
                 <PhoneCall size={19} weight="fill" className="shrink-0 text-accent" aria-hidden="true" />
                 <E p="brand.phone">{brand.phone}</E>
               </a>
-              <a href={`mailto:${brand.email}`} className={`flex min-h-11 items-center gap-2 ${s.body} hover:text-accent`}>
-                <Envelope size={17} className="shrink-0 text-accent" aria-hidden="true" />
-                <E p="brand.email">{brand.email}</E>
-              </a>
+              {brand.email && (
+                <a href={`mailto:${brand.email}`} className={`flex min-h-11 items-center gap-2 ${s.body} hover:text-accent`}>
+                  <Envelope size={17} className="shrink-0 text-accent" aria-hidden="true" />
+                  <E p="brand.email">{brand.email}</E>
+                </a>
+              )}
               {brand.address && (
                 <div className={`flex items-start gap-2 py-2 ${s.body}`}>
                   <MapPin size={17} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />

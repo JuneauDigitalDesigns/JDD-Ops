@@ -83,6 +83,50 @@ test('findings: no city in the home headline (D8), title length, profile links',
   assert.ok(r.soft.some((s) => /profile links/i.test(s)), r.soft.join('\n'));
 });
 
+// ── False positives from Tracewell's SEO check (2026-11-11): 13 blocking findings, 10 false ──
+// brand.phone is stored "4075550177" and the copy writes "Call 407-555-0177", which split into
+// "407", "555" and "0177": three blocking findings per mention. And "© 2026 Tracewell Heating &
+// Air LLC." in footer.legal flagged the copyright year.
+const NOW = new Date('2026-11-11T12:00:00Z');
+const tracewell = (over = {}) => site({ brand: { ...site().brand, name: 'Tracewell Heating & Air', phone: '4075550177' }, ...over });
+const invented = (c) => scoreSite(c, PAGES, buildPageSeo(c, PAGES, 'hvac'), { now: NOW }).hard.filter((h) => /not in the client's facts/.test(h));
+
+test("the client's own phone, in any common format, is not an invented number", () => {
+  for (const written of ['(407) 555-0177', '407-555-0177', '407.555.0177', '+1 407 555 0177', '4075550177', '1-407-555-0177']) {
+    const c = tracewell({ hero: { headline: 'AC repair in Clermont', sub: `Call ${written} any time.` } });
+    assert.deepEqual(invented(c), [], `"${written}" flagged`);
+  }
+  // Every Tracewell field that tripped, verbatim shape.
+  const c = tracewell({
+    hero: { headline: 'AC repair in Clermont', sub: 'x' },
+    work: { sub: 'See recent jobs, then call 407-555-0177.' },
+    finalCta: { secondary: 'Call 407-555-0177' },
+  });
+  assert.deepEqual(invented(c), []);
+  // phoneHref is a phone fact too.
+  const href = site({ brand: { ...site().brand, phone: '', phoneHref: 'tel:+14075550177' }, hero: { headline: 'AC repair in Clermont', sub: 'Call (407) 555-0177.' } });
+  assert.deepEqual(invented(href), []);
+});
+
+test('a different phone, or a different number, is still flagged', () => {
+  const other = invented(tracewell({ hero: { headline: 'AC repair in Clermont', sub: 'Call 407-555-0199 any time.' } })).join(' ');
+  assert.ok(other.includes('"407"') && other.includes('"0199"'), other);
+  const number = invented(tracewell({ hero: { headline: 'AC repair in Clermont', sub: 'Call 407-555-0177. Over 300 jobs done.' } })).join(' ');
+  assert.ok(number.includes('"300"') && !number.includes('"0177"'), number);
+});
+
+test('the current year in a copyright line is not a claim; elsewhere it still is', () => {
+  for (const legal of ['© 2026 Tracewell Heating & Air LLC.', 'Copyright 2026 Tracewell Heating & Air LLC.', 'Copyright © 2026 Tracewell.']) {
+    assert.deepEqual(invented(tracewell({ footer: { legal } })), [], `"${legal}" flagged`);
+  }
+  const stray = invented(tracewell({ hero: { headline: 'AC repair in Clermont', sub: 'Serving Clermont since 2026.' } })).join(' ');
+  assert.ok(stray.includes('"2026"'), 'a bare 2026 outside a copyright line must still be flagged');
+  const mixed = invented(tracewell({ footer: { legal: '© 2026 Tracewell. Rated best of 2026.' } }));
+  assert.equal(mixed.length, 1, mixed.join('\n'));
+  const other = invented(tracewell({ footer: { legal: '© 2019 Tracewell Heating & Air LLC.' } })).join(' ');
+  assert.ok(other.includes('"2019"'), 'only the current year is exempt');
+});
+
 const servicePage = { route: 'services/drain-cleaning', pageType: 'service', label: 'Drain Cleaning', sections: [] };
 const servicePage2 = { route: 'services/water-heaters', pageType: 'service', label: 'Water Heaters', sections: [] };
 const shared = 'We clear kitchen sinks, shower drains and main lines with a camera and a jetter, then we show you what we found.';

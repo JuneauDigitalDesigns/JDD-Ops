@@ -9,14 +9,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { CONTENT, type PageHeaderContent, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 
 export const meta = {
   id: 'hvac-page-header',
   category: 'pageHeader',
   label: 'HVAC / Page header',
   consumes: ['subpages.*.header', 'images.hero.slides'],
-  sharedDeps: ['@/lib/editable', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@/lib/editable'],
   signature: false,
   verticalTemplate: true,
 } as const;
@@ -73,11 +73,9 @@ export default function HvacPageHeader({
         </div>
         {photo && (
           <div
-            className="shadow-brand-3 relative hidden aspect-[4/3] overflow-hidden rounded-[16px] bg-cover bg-center lg:block"
-            style={{ backgroundImage: `url(${imageAt(photo.url, 1024)})` }}
-            role="img"
-            aria-label={photo.alt}
+            className="shadow-brand-3 relative hidden aspect-[4/3] overflow-hidden rounded-[16px] lg:block isolate"
           >
+            <CoverImage url={photo.url} alt={photo.alt} sizes="(min-width: 1024px) 50vw, 100vw" priority />
             <div className="absolute inset-0 bg-[color:var(--accent-2)] opacity-45 mix-blend-color" aria-hidden="true" />
             <div
               className="absolute inset-0"

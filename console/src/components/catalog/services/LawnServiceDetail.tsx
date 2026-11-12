@@ -26,7 +26,7 @@ import { Check, MapPin, Plus, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import {
   relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions,
 } from '@/lib/serviceLinks';
@@ -36,7 +36,7 @@ export const meta = {
   category: 'services',
   label: 'Lawn / Service page body',
   consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -278,7 +278,8 @@ export default function LawnServiceDetail({ content = CONTENT, serviceSlug }: { 
             )}
             {photos.slice(0, review ? 1 : 3).map((ph) => (
               <figure key={ph.path} className="shadow-brand-1 flex flex-col overflow-hidden rounded-[22px] border border-rule bg-bg">
-                <div className="relative min-h-[220px] flex-1 bg-cover bg-center" style={{ backgroundImage: `url(${imageAt(ph.url, 1024)})` }} role="img" aria-label={ph.alt}>
+                <div className="relative min-h-[220px] flex-1 isolate overflow-hidden">
+                  <CoverImage url={ph.url} alt={ph.alt} sizes="(min-width: 1024px) 50vw, 100vw" />
                   <div className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />
                 </div>
                 {(ph.title || ph.meta) && (
@@ -320,11 +321,9 @@ export default function LawnServiceDetail({ content = CONTENT, serviceSlug }: { 
                     >
                       {photo && (
                         <span
-                          className="relative block aspect-[16/9] bg-cover bg-center"
-                          style={{ backgroundImage: `url(${imageAt(photo, 1024)})` }}
-                          role="img"
-                          aria-label={item?.image?.alt ?? r.t}
+                          className="relative block aspect-[16/9] isolate overflow-hidden"
                         >
+                          <CoverImage url={photo} alt={item?.image?.alt ?? r.t} sizes="(min-width: 1024px) 50vw, 100vw" />
                           <span className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />
                           {tile}
                         </span>

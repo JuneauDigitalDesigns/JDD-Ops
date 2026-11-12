@@ -13,8 +13,8 @@
  * *relocation* didn't change anything, before the *redesign* is allowed to.
  */
 import type { SiteContent } from '@/data/site';
-import { VERTICALS, type VerticalId } from '@/lib/verticals';
-import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
+import type { VerticalId } from '@/lib/verticals';
+import type { Section } from '@/lib/copy-schema';
 import { MAX_PAGES } from '@/lib/pages';
 import { pickServicePages, primaryCity, serviceSlugs } from '@/lib/servicePages';
 
@@ -30,17 +30,29 @@ export function servicePageIndices(content: unknown): number[] {
  * the site-wide facts paragraph. '' when no service earns a page, so the section is never asked
  * for. Wording goes to Xander for word-for-word approval with the PR.
  */
-export function servicePagesInstruction(content: unknown): string {
+export function servicePagesInstruction(content: unknown, factsFrom: unknown = content): string {
+  // `content` decides WHICH services get a page and their slugs, exactly as the export does.
+  // `factsFrom` is where each service's facts, the customer questions and the city are read:
+  // the brief passes its grounded content (grounded.ts), so the preset's "123 Main St, Your
+  // City" never becomes the city a service page names (Tracewell, 2026-11-11).
   const picked = servicePageIndices(content);
   if (!picked.length) return '';
   const c = (content ?? {}) as Record<string, any>;
+  const f = (factsFrom ?? {}) as Record<string, any>;
   const items: Record<string, any>[] = Array.isArray(c.services?.items) ? c.services.items : [];
+  const factItems: Record<string, any>[] = Array.isArray(f.services?.items) ? f.services.items : [];
   const slugs = serviceSlugs(content);
-  const questions: Record<string, any>[] = Array.isArray(c.extensions?.customerQuestions) ? c.extensions.customerQuestions : [];
+  const questions: Record<string, any>[] = Array.isArray(f.extensions?.customerQuestions) ? f.extensions.customerQuestions : [];
   const list = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) : []);
   const facts = picked.map((i) => {
-    const s = items[i] ?? {};
-    const own = questions.filter((q) => q && q.service === slugs[i] && typeof q.q === 'string' && q.q.trim()).map((q) => q.q.trim());
+    const s: Record<string, any> = { ...(factItems[i] ?? {}), t: factItems[i]?.t ?? items[i]?.t };
+    // A question the client answered is fixed (client-faq.ts): the page shows it first, word for
+    // word, so the model gets it with its answer, as context and as something not to rewrite. A
+    // question without an answer is the model's to answer, as before.
+    const tagged = questions.filter((q) => q && q.service === slugs[i] && typeof q.q === 'string' && q.q.trim());
+    const answered = (q: Record<string, any>) => typeof q.a === 'string' && q.a.trim() !== '';
+    const fixed = tagged.filter(answered).map((q) => ({ q: q.q, a: q.a }));
+    const own = tagged.filter((q) => !answered(q)).map((q) => q.q.trim());
     const out: Record<string, unknown> = { slug: slugs[i], name: s.t };
     if (list(s.included).length) out.included = list(s.included);
     if (list(s.typicalJobs).length) out.typicalJobs = list(s.typicalJobs);
@@ -48,16 +60,17 @@ export function servicePagesInstruction(content: unknown): string {
     if (list(s.brands).length) out.brands = list(s.brands);
     if (typeof s.priceFrom === 'string' && s.priceFrom.trim()) out.startingPrice = s.priceFrom.trim();
     if (typeof s.duration === 'string' && s.duration.trim()) out.howLong = s.duration.trim();
+    if (fixed.length) out.fixedQuestions = fixed;
     if (own.length) out.customerQuestions = own;
     return out;
   });
-  const city = primaryCity(content);
+  const city = primaryCity(factsFrom);
   const where = city ? ` in ${city}` : '';
   return [
     `- servicePages: one item per service below, each { slug, intro, expect, faq }, for that service's own page.`,
     `intro: 2 to 3 sentences; the first says plainly that the business does this service${where} and how to book it${city ? `, and names ${city} once` : ''}.`,
     'expect: up to 4 short lines on booking, timing and estimates, only what the facts below state; an empty list when they state nothing.',
-    'faq: 3 to 5 questions about this service only, phrased the way a customer asks. Use the customer\'s own questions listed below first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
+    'faq: questions about this service only, phrased the way a customer asks, so that together with the service\'s fixedQuestions the page has 3 to 5 in all. The fixedQuestions are the client\'s own questions and answers and the page shows them first, word for word: never repeat, reword or merge them, and write none of them into faq. Use the customer\'s own questions listed under customerQuestions first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
     `Use only these facts for each service, and write for no service that is not listed:\n${JSON.stringify(facts, null, 2)}`,
   ].join(' ');
 }
@@ -164,7 +177,7 @@ export function subpagesInstruction(subpages: { route: string; pageType: string;
   return `- subpages: exactly one item per route (${routes}), each { route, eyebrow, title, sub, ctaLabel + ctaHref (optional), seoTitle at most 60 chars, seoDescription at most 155 chars }. Every page's header and SEO must be DISTINCT and specific to that page, never a copy of the hero or of another page. About introduces the company; Services frames the offering; Contact invites the visitor to get in touch. seoTitle forms: Services "{trade} Services in {city} | {business name}", About "About {business name} | {trade} in {city}", Contact "Contact {business name} | {city} {trade}", a service page "{service} in {city} | {business name}"; drop the city parts when the facts give no city.`;
 }
 
-/** Build the SectionCounts a base SiteContent implies — shared by buildCopyUserMessage and
+/** Build the SectionCounts a base SiteContent implies — shared by the structure block and
  *  the sections block resolver so "how many of each" is computed in exactly one place. */
 export function countsFor(base: SiteContent): SectionCounts {
   return {
@@ -177,82 +190,6 @@ export function countsFor(base: SiteContent): SectionCounts {
   };
 }
 
-export function buildCopyUserMessage(
-  vertical: VerticalId,
-  base: SiteContent,
-  details?: string,
-  sections: Section[] = ALL_SECTIONS,
-  websiteNotes?: string,
-): string {
-  const want = new Set<Section>(['brand', ...sections]);
-  const label = VERTICALS.find((v) => v.id === vertical)?.label ?? vertical;
-  const b = base.brand;
-  const x = base.extensions;
-  // Everything below `license` comes straight off the client's onboarding form and was
-  // being collected, mapped, written to disk — and then never shown to the model. The
-  // copywriter was writing "serving the local area" while the intake knew the actual towns.
-  // Undefined-safe throughout: extensions is optional and older intakes predate these keys.
-  const facts = {
-    name: b.name, long: b.long, tagline: b.tagline, established: b.established,
-    phone: b.phone, email: b.email, address: b.address, license: b.license,
-    serviceArea: x?.serviceArea?.length ? x.serviceArea : undefined,
-    hours: x?.hours?.all || undefined,
-    certifications: x?.trustBadges?.length ? x.trustBadges : undefined,
-    notableClients: base.trust?.logos?.length ? base.trust.logos : undefined,
-  };
-  const counts = countsFor(base);
-  const reference = {
-    hero: { eyebrow: base.hero.eyebrow, headline: base.hero.headline },
-    serviceTags: base.services.items.map((s) => s.tag),
-  };
-
-  const lines: string[] = [];
-  for (const s of ALL_SECTIONS) {
-    if (!want.has(s)) continue;
-    const line = sectionInstructionLine(s, counts);
-    if (line) lines.push(line);
-  }
-
-  return [
-    `Industry vertical: ${label}.`,
-    `Business facts (from the client's onboarding intake / preset):`,
-    JSON.stringify(facts, null, 2),
-    websiteNotes && websiteNotes.trim()
-      ? `Content scanned from the business's own website. Treat this as ground truth for facts (name, contact, services, reviews) and rewrite/organize it into the copy:\n${websiteNotes.trim()}`
-      : '',
-    // Attributed to the CLIENT, not the operator.
-    //
-    // brandDirectionToDetails() assembles this from what the business owner answered during
-    // onboarding — what makes them different, who they sell to, how they want to sound, what
-    // to avoid. Calling it "guidance from the operator" understated it: an operator's note is
-    // a suggestion, whereas the owner's own account of their business is the most
-    // authoritative positioning input available. The "invent no facts" clause stays.
-    details && details.trim()
-      ? `The business owner's own description of their business, given during onboarding. Authoritative for positioning, audience and tone: follow it closely, but invent no facts beyond it:\n${details.trim()}`
-      : '',
-    `Existing structure to respect. Keep these exact counts:`,
-    JSON.stringify({ ...counts, reference }, null, 2),
-    `Write brand copy for ONLY these sections:`,
-    lines.join('\n'),
-    `Be specific and grounded in the ${label} vertical. Return only JSON matching the schema.`,
-  ].filter(Boolean).join('\n\n');
-}
-
-/**
- * Convenience wrapper bundling both halves of the prompt, for a future Stage 2 "review the
- * full prompt" preview that needs { system, user } together rather than two separate calls.
- * Not yet used by generate-copy/route.ts, which still calls the two functions above directly
- * to keep this move a no-behavior-change relocation.
- */
-export function compilePrompt(
-  vertical: VerticalId,
-  base: SiteContent,
-  details?: string,
-  sections: Section[] = ALL_SECTIONS,
-  websiteNotes?: string,
-): { system: string; user: string } {
-  return {
-    system: brandCopywriterSystem(vertical),
-    user: buildCopyUserMessage(vertical, base, details, sections, websiteNotes),
-  };
-}
+// buildCopyUserMessage and compilePrompt, the pre-Brief prompt builders, were removed on 2026-11-11.
+// Nothing called them, and they still read their facts and hero reference from the merged content,
+// preset included: the leak compile-brief.ts no longer has. Re-wiring them would bring it back.

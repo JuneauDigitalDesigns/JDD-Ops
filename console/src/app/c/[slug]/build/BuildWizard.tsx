@@ -6,9 +6,7 @@ import { Check, ArrowUUpLeft, ArrowUUpRight } from '@phosphor-icons/react';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
-import { deepMerge, applyEdits } from '@/lib/merge';
-import { withDisplayPhone } from '@/lib/displayPhone';
-import { stripSampleReviews } from '@/lib/sampleReviews';
+import { effectiveContent } from '@/lib/effectiveContent';
 import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import type { CopyBrief } from '@jdd/schema';
@@ -36,6 +34,7 @@ import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
 import { newerBundle } from '@/lib/wizardBundle';
+import { useHydrationGate } from '@/lib/hydrationGate';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
 const bundleKey = (slug: string) => `jdd-wizard:${slug}`;
@@ -280,35 +279,22 @@ export default function BuildWizard({
     briefSaver.current?.retry();
   }, []);
   /**
-   * False until the hydration effect has applied this client's saved bundle. Guards the
-   * persist effect below: effects run in declaration order, so on the very first commit
-   * persist would fire BEFORE hydration with this render's empty initial state — and write
-   * that emptiness over a real saved bundle. (Hydration's setState can't reach persist's
-   * closure in the same commit, so ordering alone doesn't fix it.)
+   * False until this render is SHOWING the bundle the hydration effect applied for this slug.
+   * Guards every effect below that saves or reshapes state: effects run in declaration order,
+   * so on the very first commit they fire BEFORE hydration with this render's empty initial
+   * state — and would write that emptiness over a real saved bundle.
+   *
+   * State, not a ref (2026-11-11). The ref flipped to true as soon as hydration ran, a render
+   * before the applied bundle existed, so Strict Mode's re-run of the first render's effects
+   * saved the empty initial state and hydration then read it back as this client's work. See
+   * lib/hydrationGate.ts.
    */
-  const hydrated = useRef(false);
+  const [hydrated, markHydrated] = useHydrationGate(slug);
 
-  // Effective = vertical preset ← imported ← generated ← user edits (top).
+  // Effective = vertical preset ← imported ← generated ← user edits (top). Sample reviews and
+  // placeholder canonicals are stripped there, so the preview shows what the export ships.
   const effective = useMemo(
-    () => {
-      // Sample reviews from an old preset can be baked into a client's imported content. Strip
-      // them AFTER the merge (so the emptied list can't fall through to a preset), here so the
-      // preview shows what the export will ship (lib/sampleReviews.ts).
-      // withDisplayPhone: the phone as the site shows it, (407) 555-0177 with an E.164 tel:, the same as
-      // the export writes (lib/displayPhone.ts). Content imported before @jdd/schema 1.33.3 holds bare digits.
-      const merged = withDisplayPhone(stripSampleReviews(applyEdits(
-        deepMerge(deepMerge(presetFor(vertical), imported ?? {}), generated ?? {}),
-        edits,
-      )).content);
-      // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
-      // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
-      // content. Left hidden while empty, so an untouched Work section stays off (and the
-      // preview still injects sample projects via fillImagePlaceholders's includeWork).
-      if (merged.work?.projects?.length && merged.work.hidden) {
-        return { ...merged, work: { ...merged.work, hidden: false } };
-      }
-      return merged;
-    },
+    () => effectiveContent(vertical, imported, generated, edits),
     [vertical, imported, generated, edits],
   );
   // Fill empty/preset image slots with per-vertical topical stock so the build catalog
@@ -369,15 +355,15 @@ export default function BuildWizard({
   // Compared by route so the effect settles after one update. Never before hydration, or the
   // empty first render would strip a saved composition's pages.
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     const next = syncServicePages(siteComposition, chosenServicePages(effective, siteComposition));
     if (servicePageSlugs(next).join('|') !== servicePageSlugs(siteComposition).join('|')) setSiteComposition(next);
-  }, [effective, siteComposition]);
+  }, [hydrated, effective, siteComposition]);
 
   // Persist the per-client bundle on any change — but never before hydration has run, or
   // the first commit's empty state would clobber what's in storage. See `hydrated`.
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     const bundle: WizardBundle = {
       vertical, imported, generated, edits, selections, skins, order,
       intakeStage, brief, copyModel, siteComposition, reviewDraft,
@@ -395,7 +381,7 @@ export default function BuildWizard({
     // (2026-11-10): a failed save left nothing to see.
     draftSaver.current?.schedule({ slug, bundle });
   }, [
-    slug, vertical, imported, generated, edits, selections, skins, order,
+    hydrated, slug, vertical, imported, generated, edits, selections, skins, order,
     intakeStage, brief, copyModel, siteComposition, reviewDraft,
   ]);
 
@@ -405,9 +391,9 @@ export default function BuildWizard({
   // debounced save straight to the file the export route never touches. Watches only `brief`
   // (not the whole bundle) so an unrelated Studio edit doesn't trigger an extra write here.
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     briefSaver.current?.schedule({ slug, brief });
-  }, [slug, brief]);
+  }, [hydrated, slug, brief]);
 
   // Nothing typed is lost on closing the tab: send whatever is queued now, keepalive. (This
   // browser's storage already holds every change; this covers the server copies.)
@@ -753,12 +739,13 @@ export default function BuildWizard({
    * the server read out of clients/{slug}/site.ts.
    *
    * This is what step 1 used to do on choose. It has to live down here because it needs
-   * applyBundle and both history stacks, and it flips `hydrated` so the persist effect
+   * applyBundle and both history stacks, and it opens `hydrated` so the persist effect
    * above knows the state it's looking at is real — see the note there.
+   *
+   * Safe to run twice (Strict Mode does): it only reads storage, and nothing has written to
+   * storage until the render that shows what it applied.
    */
   useEffect(() => {
-    hydrated.current = false;
-
     const saved = readBundle(slug);
 
     if (manifest || composition) {
@@ -802,7 +789,9 @@ export default function BuildWizard({
     // Undo across a client switch would restore another client's content into this one.
     intakeHistory.clear();
     studioHistory.clear();
-    hydrated.current = true;
+    // Batched with applyBundle's setState calls, so the gate opens in the same render that
+    // shows the applied bundle — never in one still showing the initial state.
+    markHydrated(slug);
     // Re-runs only on a client change, which in practice means a remount from the router.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);

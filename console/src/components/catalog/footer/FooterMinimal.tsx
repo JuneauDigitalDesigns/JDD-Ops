@@ -76,10 +76,12 @@ export default function FooterMinimal({
                   <PhoneCall size={14} weight="bold" />
                   <E p="brand.phone">{brand.phone}</E>
                 </a>
-                <a href={`mailto:${brand.email}`} className="flex items-center gap-1.5 hover:text-accent">
-                  <Envelope size={14} />
-                  <E p="brand.email">{brand.email}</E>
-                </a>
+                {brand.email && (
+                  <a href={`mailto:${brand.email}`} className="flex items-center gap-1.5 hover:text-accent">
+                    <Envelope size={14} />
+                    <E p="brand.email">{brand.email}</E>
+                  </a>
+                )}
               </>
             )}
           </div>

@@ -191,8 +191,9 @@ test('the nav and footer print the formatted number once the Studio and export a
     assert.ok(html.includes('href="tel:+14075550177"'), `${name}: tel: is not E.164`);
     assert.ok(!/(^|[^+\d])4075550177/.test(text(html)), `${name}: bare digits shown`);
   }
-  const wizard = read(path.join(CONSOLE, 'src/app/c/[slug]/build/BuildWizard.tsx'));
-  assert.match(wizard, /withDisplayPhone\(/, 'the Studio preview applies it');
+  // The Studio's preview and its export payload are lib/effectiveContent.ts (BuildWizard calls it).
+  const studio = read(path.join(CONSOLE, 'src/lib/effectiveContent.ts'));
+  assert.match(studio, /withDisplayPhone\(stripPresetIdentity\(/, 'the Studio preview applies it, outermost');
   const route = read(path.join(CONSOLE, 'src/app/api/build/export/route.ts'));
   assert.match(route, /withDisplayPhone\(/, 'the export applies it');
 });

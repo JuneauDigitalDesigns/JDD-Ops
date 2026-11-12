@@ -6,11 +6,15 @@ import { buildCopySchema, ALL_SECTIONS, type Section, type CopyResult } from '@/
 import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { chunkSections } from '@/lib/copy-brief/chunking';
+import { editsFrom } from '@/lib/copy-brief/grounded';
+import { presetFor } from '@/lib/verticals';
 import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
+import { withoutCarriedCanonical } from '@/lib/placeholderCanonical';
 import { guardDashes, dashRewriteMessage } from '@/lib/copy-brief/dash-guard';
 import { pickServicePages } from '@/lib/servicePages';
 import { MAX_PAGES } from '@/lib/pages';
 import { isValidModelId, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
+import { planRunSections, missingSubpageRoutes, SKIP_REASONS, type CopyPage } from '@/lib/copy-brief/run-sections';
 
 export const runtime = 'nodejs';
 
@@ -33,12 +37,15 @@ interface Body {
   vertical?: string;
   base?: SiteContent;
   imported?: SiteContent | null;
+  /** The operator's edits by path. With `imported`, the only source of the brief's facts,
+   *  promotion, proof points and reference: `base` is read for layout only (grounded.ts). */
+  edits?: Record<string, unknown>;
   brief?: CopyBrief;
   sections?: Section[];
   model?: string;
   /** Non-home pages of a multi-page build. Enables the `subpages` section (per-route header +
    *  SEO) and page-aware prompting; omit/empty for a single-page site. */
-  subpages?: { route: string; pageType: string; label: string }[];
+  subpages?: CopyPage[];
 }
 
 const REFUSAL = '__refusal__';
@@ -65,13 +72,14 @@ export async function POST(req: Request) {
   const subpages = Array.isArray(body.subpages) ? body.subpages : [];
 
   const requested = Array.isArray(body.sections) ? body.sections.filter((s): s is Section => ALL_SECTIONS.includes(s)) : [];
-  const requestedOrAll = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
-  // `subpages` is only generable when the build actually has subpages — drop it otherwise,
-  // whether it arrived via an explicit sections list or the "all sections" default.
-  const withSubpages = subpages.length ? requestedOrAll : requestedOrAll.filter((s) => s !== 'subpages');
-  // `servicePages` likewise only when a service earns its own page (service-page-spec.md §1):
-  // never ask for copy for a page that will not exist.
-  const sections = pickServicePages(base, MAX_PAGES).length ? withSubpages : withSubpages.filter((s) => s !== 'servicePages');
+  // `subpages` is only generable when the build has pages besides Home, and `servicePages` only
+  // when a service earns its own page (service-page-spec.md §1): never ask for copy for a page that
+  // will not exist. A requested section that is dropped is REPORTED as skipped, with its reason.
+  // Dropping it silently is how the page headers looked written for the whole of the Tracewell
+  // test while Generate never sent a page list (lib/copy-brief/run-sections.ts).
+  const { sections, skipped } = planRunSections({
+    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, MAX_PAGES).length > 0,
+  });
   const chunks = chunkSections(sections);
   const wantedSet = new Set<Section>(['brand', ...sections]);
 
@@ -84,7 +92,10 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey: key });
   const imported = body.imported ?? null;
 
-  const ctx = { vertical, effective: base, imported, brief, tickedSections: sections, subpages };
+  const ctx = {
+    vertical, effective: base, imported, preset: presetFor(vertical.id), edits: editsFrom(body.edits),
+    brief, tickedSections: sections, subpages,
+  };
   const blocks = resolveBrief(ctx);
 
   const encoder = new TextEncoder();
@@ -102,7 +113,8 @@ export async function POST(req: Request) {
         controller.close();
       };
 
-      send({ type: 'start', sections, chunks: chunks.length });
+      send({ type: 'start', sections, skipped, chunks: chunks.length });
+      for (const s of skipped) send({ type: 'section', section: s.section, status: 'skipped', error: s.reason });
 
       async function generateChunk(chunk: Section[]): Promise<{ chunk: Section[]; result: Partial<CopyResult> } | null> {
         for (const s of chunk) send({ type: 'section', section: s, status: 'writing' });
@@ -138,7 +150,15 @@ export async function POST(req: Request) {
             throw new Error(`Needs review: still contains an em-dash or en-dash after one rewrite (${guarded.stillDashed.join(', ')}).`);
           }
           const result = guarded.result;
-          for (const s of chunk) send({ type: 'section', section: s, status: 'done' });
+          // A page the model left out keeps its old header and SEO, so `subpages` is not done.
+          const missing = chunk.includes('subpages') ? missingSubpageRoutes(subpages, result.subpages) : [];
+          for (const s of chunk) {
+            if (s === 'subpages' && missing.length) {
+              send({ type: 'section', section: s, status: 'skipped', error: SKIP_REASONS.missingRoutes(missing) });
+            } else {
+              send({ type: 'section', section: s, status: 'done' });
+            }
+          }
           return { chunk, result };
         } catch (e) {
           const message =
@@ -156,13 +176,19 @@ export async function POST(req: Request) {
         const ok = settled.filter((r): r is NonNullable<typeof r> => r !== null);
 
         if (ok.length === 0) {
-          send({ type: 'error', message: 'Every section failed. See the per-section errors above.' });
+          send({
+            type: 'error',
+            message: chunks.length ? 'Every section failed. See the per-section errors above.' : SKIP_REASONS.nothingToWrite,
+          });
           finish();
           return;
         }
 
         const merged: Partial<CopyResult> = Object.assign({}, ...ok.map((r) => r.result));
-        const generated = applyGeneratedCopy(base, merged, wantedSet);
+        // Never carry a canonical: applyGeneratedCopy spreads the base's seo, which is how the
+        // HVAC preset's https://yourhvaccompany.com got written into a client's generated copy
+        // (lib/placeholderCanonical.ts).
+        const generated = withoutCarriedCanonical(applyGeneratedCopy(base, merged, wantedSet, { subpageRoutes: subpages.map((p) => p.route) }));
         send({ type: 'done', generated });
       } catch (e) {
         send({ type: 'error', message: e instanceof Error ? e.message : 'Generation failed.' });

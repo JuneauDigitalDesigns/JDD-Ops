@@ -20,6 +20,7 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import { serviceRefs } from '@/lib/serviceLinks';
 
 export const meta = {
@@ -27,7 +28,7 @@ export const meta = {
   category: 'services',
   label: 'Lawn / Photo-band services',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items', 'servicePages'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/localImage', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -80,11 +81,9 @@ export default function LawnServices({ content = CONTENT }: { content?: SiteCont
               >
                 {photo && (
                   <div
-                    className="relative aspect-[16/9] bg-cover bg-center"
-                    style={{ backgroundImage: `url(${imageAt(photo, 1024)})` }}
-                    role="img"
-                    aria-label={item.image?.alt ?? item.t}
+                    className="relative aspect-[16/9] isolate overflow-hidden"
                   >
+                    <CoverImage url={photo} alt={item.image?.alt ?? item.t} sizes="(min-width: 1024px) 50vw, 100vw" />
                     <div className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />
                     {tile}
                   </div>

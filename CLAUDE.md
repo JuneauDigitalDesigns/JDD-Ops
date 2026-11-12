@@ -667,6 +667,18 @@ a CSS background or a single `src`, `responsiveImage`/`responsivePicture` (@jdd/
 `console/test/local-images.test.mjs` fails on a raw use, and the export refuses a build whose pages
 ask for a local image with no file behind it. The live hero 404ed on 2026-11-09 for want of this.
 
+**A photo that fills a box is a `<CoverImage>`, never a CSS background** (`src/lib/CoverImage.tsx`,
+byte-identical in `template/src/lib`). Until 2026-11-11 every vertical hero painted its LCP photo as a
+`background-image` at one fixed width: no srcset (a phone pulled the 1536px file), no AVIF, no
+priority, invisible to the preload scanner. `<CoverImage>` gives a `<picture>` with the pipeline's
+widths and a stated `sizes`. It takes `priority` (eager, `fetchpriority="high"`) for the one photo
+above the fold and is lazy everywhere else. Pass `avif` only for hero slots, the only ones the pipeline
+writes AVIF for. `console/test/image-performance.test.mjs` fails on a CSS-background photo or an `<img>`
+without width, height and loading. The encoder (`src/lib/image-encode.ts`) has its own rules:
+- it applies EXIF orientation and writes no metadata (no EXIF or GPS);
+- it refuses inputs over 25 MB or about 60 megapixels;
+- it serves a plain SVG logo as the SVG itself and rasterizes one with anything active in it.
+
 **Below-the-fold sections animate in.** The bespoke vertical components carry no motion of their own,
 so the exporter marks each section that needs it (`console/src/lib/revealPolicy.ts`) and
 `template/src/styles/globals.css` runs a CSS scroll-driven reveal: no JavaScript, never hidden in a

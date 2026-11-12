@@ -117,9 +117,11 @@ export default function PlumbingFooter({ content = CONTENT }: { content?: SiteCo
             <a href={brand.phoneHref} className={`${contact} transition-colors hover:text-onInk`}>
               <Phone size={16} weight="fill" className="mt-0.5 shrink-0 text-[color:var(--accent-2)]" aria-hidden="true" /><E p="brand.phone">{brand.phone}</E>
             </a>
-            <a href={`mailto:${brand.email}`} className={`${contact} break-all transition-colors hover:text-onInk`}>
-              <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-[color:var(--accent-2)]" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
-            </a>
+            {brand.email && (
+              <a href={`mailto:${brand.email}`} className={`${contact} break-all transition-colors hover:text-onInk`}>
+                <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-[color:var(--accent-2)]" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
+              </a>
+            )}
             {address && (
               <span className={contact}>
                 <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-[color:var(--accent-2)]" aria-hidden="true" />

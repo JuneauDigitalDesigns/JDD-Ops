@@ -13,14 +13,14 @@ import type { SiteContent } from '@/data/site';
 import { serviceAnchor } from '@/lib/serviceLinks';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
-import { imageAt } from '@/lib/localImage';
+import { responsiveImage } from '@/lib/img';
 
 export const meta = {
   id: 'services-accordion',
   category: 'services',
   label: 'Services / Accordion',
   consumes: ['services.eyebrow', 'services.title', 'services.sub', 'services.items'],
-  sharedDeps: ['@/lib/serviceLinks', 'framer-motion', '@phosphor-icons/react', '@/lib/icons'],
+  sharedDeps: ['@/lib/serviceLinks', 'framer-motion', '@phosphor-icons/react', '@/lib/icons', '@/lib/img'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'sticky-swap',
   /** True if this component owns a SIGNATURE motion moment (a scroll-linked transform, a pin,
@@ -78,7 +78,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                       <div className="pb-5 pl-[2.75rem] text-inkSoft">
                         {/* Mobile-only image (desktop uses the sticky panel) */}
                         {item.image?.url && (
-                          <img src={imageAt(item.image.url, 1024)} alt={item.image.alt} loading="lazy" width={1600} height={900}
+                          <img {...responsiveImage(item.image.url)} sizes="100vw" alt={item.image.alt} loading="lazy" decoding="async" width={1600} height={900}
                             className="mb-3 aspect-[16/9] w-full rounded-lg object-cover lg:hidden" />
                         )}
                         <p><E p={`services.items.${i}.d`}>{item.d}</E></p>
@@ -107,7 +107,7 @@ export default function ServicesAccordion({ content = CONTENT }: { content?: Sit
                   transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 >
                   {cur.image?.url ? (
-                    <img src={imageAt(cur.image.url, 1536)} alt={cur.image.alt} width={1600} height={1000} className="h-full w-full object-cover" />
+                    <img {...responsiveImage(cur.image.url)} sizes="(min-width: 1024px) 50vw, 100vw" alt={cur.image.alt} loading="lazy" decoding="async" width={1600} height={1000} className="h-full w-full object-cover" />
                   ) : (
                     // Decision 30(b): the contract §3 hatch instead of a branded gradient slab.
                     // The heavy numeral stays, on the neutral ground, where it reads as an index

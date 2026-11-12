@@ -169,7 +169,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Your Roofing Company | Roof Replacement & Repair",
     description:       "GAF-certified roofing contractor offering roof replacements, storm damage repair, gutter installation, and free inspections.",
-    canonical:         "https://yourroofingcompany.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },

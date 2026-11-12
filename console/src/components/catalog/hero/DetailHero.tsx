@@ -25,14 +25,18 @@ import { Phone, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
+import { primaryCity } from '@/lib/serviceLinks';
+
+/** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
+const placeAlt = (c: SiteContent) => [c.brand.name, primaryCity(c)].filter(Boolean).join(' in ');
 
 export const meta = {
   id: 'detail-hero',
   category: 'hero',
   label: 'Car Detailing / Centred vignette hero',
   consumes: ['hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.cta', 'hero.formLabel', 'hero.frictionReducers', 'brand.phone', 'brand.phoneHref', 'images.hero.slides'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -67,11 +71,11 @@ export default function DetailHero({ content = CONTENT }: { content?: SiteConten
     <header className="relative isolate flex items-center overflow-hidden bg-inkPanel text-center text-onInk sm:min-h-[700px]">
       {slide && (
         <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${imageAt(slide, 1536)})`, filter: 'saturate(.82) contrast(1.06)' }}
-          role="img"
-          aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} detailed vehicle`}
-        />
+          className="absolute inset-0 isolate overflow-hidden"
+          style={{ filter: 'saturate(.82) contrast(1.06)' }}
+        >
+          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif />
+        </div>
       )}
       <div
         className="absolute inset-0"
@@ -94,9 +98,11 @@ export default function DetailHero({ content = CONTENT }: { content?: SiteConten
           <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
         </h1>
 
-        <p className="mx-auto mt-5 max-w-[52ch] text-[17px] leading-[1.62] text-onInkSoft sm:text-[18.5px]">
-          <E p="hero.sub">{hero.sub}</E>
-        </p>
+        {hero.sub && (
+          <p className="mx-auto mt-5 max-w-[52ch] text-[17px] leading-[1.62] text-onInkSoft sm:text-[18.5px]">
+            <E p="hero.sub">{hero.sub}</E>
+          </p>
+        )}
 
         <div className="hero-rise mt-8 flex flex-wrap justify-center gap-[13px]">
           <a

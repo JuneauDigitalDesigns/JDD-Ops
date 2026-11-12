@@ -15,6 +15,8 @@ import {
 } from './opsSecrets';
 import { probeUrl } from './probe';
 import { resolveLiveUrl } from './manageSites';
+import { checkCanonical } from './canonicalCheck';
+import { loadProvisionedFields } from './provisionedFields';
 import { loadReconcileProbes } from './reconcileProbes';
 import { accountStoreConfigured, getAccount } from './accountStore';
 import { clientRecordsConfigured, getClientRecordBySlug } from './clientRecord';
@@ -78,6 +80,24 @@ function promptOnDisk(baseSlug: string, siteCount: number, index: number): strin
     return readFileSync(path, 'utf8');
   } catch {
     return null;
+  }
+}
+
+/**
+ * The canonical the site's repo ships: `seo.canonical` in clients/{slug}/repo/src/data/site.ts,
+ * read with the same extractor the export uses. `undefined` when there is no readable copy, so
+ * the check falls back to clients/{slug}/site.ts; '' when the repo has none.
+ */
+async function shippedCanonical(baseSlug: string, siteCount: number, index: number): Promise<string | null | undefined> {
+  const file = resolve(siteDirFor(baseSlug, siteCount, index), 'repo', 'src', 'data', 'site.ts');
+  if (!existsSync(file)) return undefined;
+  try {
+    const content = (await loadProvisionedFields()).extractContentObject(readFileSync(file, 'utf8'));
+    if (!content) return undefined;
+    const value = (content.seo as { canonical?: unknown } | undefined)?.canonical;
+    return typeof value === 'string' ? value : null;
+  } catch {
+    return undefined;
   }
 }
 
@@ -363,6 +383,18 @@ async function reconcileSite(a: SiteSweepArgs): Promise<void> {
         }),
       );
     }
+
+    // ── The canonical: a domain this project actually serves (lib/canonicalCheck.ts) ──
+    // Reuses the domain list fetched above; no Vercel call of its own. `ok: null` (no project,
+    // no domain) adds nothing: vercel.projectMissing and site.noUrl already say why.
+    const canonical = checkCanonical({
+      slug: a.ctx.slug,
+      siteSlug,
+      shipped: await shippedCanonical(a.ctx.slug, a.siteCount, a.index),
+      intake: site.canonical,
+      domains,
+    });
+    if (canonical.finding) findings.push(f(canonical.finding));
 
     // A domain attached but never verified serves nothing. Vercel reports both separately.
     for (const d of domains?.ok ? domains.domains : []) {

@@ -15,6 +15,7 @@
  *
  * Reads content structurally, so it works on the full SiteContent and on the intake's partial one.
  */
+import { withoutPreset } from '@/lib/copy-brief/grounded';
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {});
@@ -22,6 +23,11 @@ const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(
 /** Top-level keys that hold visible marketing copy. brand, nav, images, extensions, _meta, seo
  *  canonical/ids and overrides are facts, links or settings, never claims. */
 const COPY_ROOTS = ['announcement', 'trust', 'hero', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'footer', 'subpages'];
+/** The SEO fields a searcher reads in the results page. copyRisks scans them for claims and preset
+ *  text (Tracewell's description promised "Emergency help day or night", 2026-11-11); canonical
+ *  and the tracking ids are settings. Not part of visibleCopy, which scorePage's hard export
+ *  checks read and which has never covered seo. */
+const SEO_COPY = ['seo.title', 'seo.description'];
 /** Keys under those roots that are not prose (links, icons, ids, image data). */
 const SKIP_KEYS = new Set(['href', 'url', 'image', 'images', 'icon', 'k', 'n', 'stars', 'route', 'ctaHref', 'cols', 'legalLinks', 'social', 'stats', 'seasons', 'priceFrom']);
 
@@ -29,7 +35,23 @@ const SKIP_KEYS = new Set(['href', 'url', 'image', 'images', 'icon', 'k', 'n', '
  *  Support defaults to the claim's own pattern: the facts saying it is what supports it. */
 const CLAIMS: Array<{ claim: string; re: RegExp; support?: RegExp }> = [
   { claim: 'same day', re: /\bsame[- ]day\b/i },
-  { claim: '24/7', re: /\b24\/7\b|\b24 hours\b|\baround the clock\b/i, support: /\b24\/7\b|\b24 hours\b|\b24h\b|around the clock|all day/i },
+  // The 24/7 claim in other words (Tracewell, 2026-11-11): a run whose client kept Mon to Fri hours
+  // wrote "day or night", "Call us any time" and "Emergency calls any time", and only the literal
+  // "24/7" was caught. Support: the client's hours, where the onboarding wizard writes "Open 24/7"
+  // or, when the emergency box is ticked, "Emergency calls answered 24/7" (juneau-digital-designs
+  // wizard/model.ts hoursLine, into extensions.hours.all), plus the 24/7 stat it derives from them.
+  {
+    claim: '24/7',
+    re: /\b24\/7\b|\b24 hours\b|\baround the clock\b|\bday (or|and) night\b|\bany ?time\b|\bnights?,? (and|or|&) weekends?\b|\bafter[- ]hours\b/i,
+    support: /\b24\/7\b|\b24 hours\b|\b24h\b|around the clock|all day|\bday (or|and) night\b|\bnights?,? (and|or|&) weekends?\b|\bafter[- ]hours\b/i,
+  },
+  // Emergency service is its own promise, not only a 24/7 one: "Emergency HVAC service" and
+  // "Emergency help" were in that run too. The wizard's emergency tick is what supports it.
+  {
+    claim: 'emergency service',
+    re: /\bemergenc(y|ies) (\w+ )?(service|services|calls?|help|repairs?|line|response|visits?|coverage|work)\b/i,
+    support: /\bemergenc|\b24\/7\b|\b24 hours\b|around the clock/i,
+  },
   { claim: 'free estimate', re: /\bfree (estimate|quote|inspection|consultation)s?\b/i, support: /\bfree (estimate|quote|inspection|consultation)s?\b/i },
   { claim: 'licensed', re: /\blicen[sc]ed\b/i, support: /\blicen[sc](ed|e)\b/i },
   { claim: 'insured', re: /\binsured\b/i },
@@ -109,6 +131,7 @@ export function copyRisks(content: unknown, preset: unknown): CopyRisks {
   const strings: Array<[string, string]> = [];
   const c = obj(content);
   for (const root of COPY_ROOTS) walkStrings(c[root], root, strings);
+  for (const path of SEO_COPY) walkStrings(getPath(c, path), path, strings);
 
   const presetCopy: CopyRisk[] = [];
   for (const [path, text] of strings) {
@@ -116,7 +139,10 @@ export function copyRisks(content: unknown, preset: unknown): CopyRisks {
     if (typeof p === 'string' && p.trim() === text.trim()) presetCopy.push({ path, text });
   }
 
-  const facts = factsText(content);
+  // The client's facts, without the preset's: `content` is the merged content, so a client with
+  // no badges carries the HVAC preset's "24/7 emergency service" badge here, and that sample
+  // would "support" the very claim being checked (copy-brief/grounded.ts, 2026-11-11).
+  const facts = factsText((withoutPreset(content, preset) as Json | undefined) ?? {});
   const hasLicense = typeof obj(c.brand).license === 'string' && (obj(c.brand).license as string).trim() !== '';
   const unsupportedClaims: ClaimRisk[] = [];
   for (const [path, text] of strings) {

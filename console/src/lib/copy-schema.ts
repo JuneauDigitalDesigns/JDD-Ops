@@ -4,7 +4,7 @@ export interface CopyResult {
     // Facts — only ever populated when grounded in website notes or operator details.
     name?: string;
     short?: string;
-    long?: string;
+    // No `long`: the legal name as signed is never the copywriter's to write (applyGeneratedCopy).
     established?: string;
     phone?: string;
     email?: string;
@@ -117,7 +117,8 @@ const arr = (items: unknown) => ({ type: 'array', items });
 
 const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
   brand: obj(
-    { tagline: str, name: str, short: str, long: str, established: str, phone: str, email: str, address: str, license: str },
+    // `long` intentionally absent: see CopyResult.brand above.
+    { tagline: str, name: str, short: str, established: str, phone: str, email: str, address: str, license: str },
     ['tagline'],
   ),
   announcement: obj({ text: str }, ['text']),
