@@ -21,7 +21,7 @@ import { Phone, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { CoverImage } from '@/lib/CoverImage';
+import { HeroPhotos, heroPhotos } from '@/lib/PhotoCarousel';
 import { primaryCity } from '@/lib/serviceLinks';
 
 /** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
@@ -36,7 +36,7 @@ export const meta = {
     'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.cta', 'hero.frictionReducers',
     'brand.phone', 'brand.phoneHref', 'images.hero.slides',
   ],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -58,6 +58,8 @@ function Headline({ text, emphasis }: { text: string; emphasis: string | null })
 export default function RoofingHero({ content = CONTENT }: { content?: SiteContent }) {
   const { hero, brand, images, _meta, extensions } = content;
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
+  // Every general work photo, photo 1 first (Xander 2026-11-11: more than one goes in a carousel).
+  const photos = heroPhotos(content, placeAlt(content));
   // The kicker states only the client's own facts (Xander 2026-11-10, wording file section D
   // row 1): "Licensed" only with a license number, then the client's certification badges.
   // Hidden when there are none. It used to say "Licensed · Bonded · GAF Certified" to every roofer.
@@ -70,11 +72,7 @@ export default function RoofingHero({ content = CONTENT }: { content?: SiteConte
   return (
     <section className="relative isolate flex items-end overflow-hidden bg-inkPanel2 text-onInk lg:min-h-[660px]">
       {slide && (
-        <div
-          className="absolute inset-0 isolate overflow-hidden"
-        >
-          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif position="object-[center_30%]" />
-        </div>
+        <HeroPhotos photos={photos} position="object-[center_30%]" controlsClassName="right-4 top-4 lg:right-8 lg:top-8" />
       )}
       {/* Scrim climbs from the BOTTOM — sky stays visible, unlike HVAC's left-to-right scrim. */}
       <div

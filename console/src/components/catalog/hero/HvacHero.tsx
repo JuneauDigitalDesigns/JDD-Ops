@@ -27,7 +27,7 @@ import { PhoneCall, Check, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { CoverImage } from '@/lib/CoverImage';
+import { HeroPhotos, heroPhotos } from '@/lib/PhotoCarousel';
 import { primaryCity } from '@/lib/serviceLinks';
 
 /** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
@@ -42,7 +42,7 @@ export const meta = {
     'hero.frictionReducers', 'brand.phone', 'brand.phoneHref', 'brand.license',
     'extensions.reviewBadge', 'images.hero.slides',
   ],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -65,6 +65,8 @@ export default function HvacHero({ content = CONTENT }: { content?: SiteContent 
   const { hero, brand, extensions, images, _meta } = content;
   const review = extensions.reviewBadge;
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
+  // Every general work photo, photo 1 first (Xander 2026-11-11: more than one goes in a carousel).
+  const photos = heroPhotos(content, placeAlt(content));
   const mode = _meta?.selectedPlan === 'starter' ? 'email' : 'phone';
   const formLabel = hero.formLabel?.trim();
   const license = brand.license?.trim();
@@ -73,11 +75,7 @@ export default function HvacHero({ content = CONTENT }: { content?: SiteContent 
     <section id="top" className="relative isolate flex min-h-[560px] items-center overflow-hidden bg-inkPanel text-onInk lg:min-h-[640px]">
       {/* Full-bleed background photograph */}
       {slide && (
-        <div
-          className="absolute inset-0 isolate overflow-hidden"
-        >
-          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif position="object-[62%_50%]" />
-        </div>
+        <HeroPhotos photos={photos} position="object-[62%_50%]" controlsClassName="bottom-3 left-5 sm:left-6 lg:bottom-6" />
       )}
       {/* Navy wash: one grade for any photo (colour blend of the structural accent) */}
       <div className="absolute inset-0 bg-[color:var(--accent-2)] opacity-55 mix-blend-color" aria-hidden="true" />
