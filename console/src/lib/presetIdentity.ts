@@ -226,6 +226,12 @@ export const RETIRED_SAMPLE_RATINGS: readonly { from: string; rating: number; co
 /** Every whole list a preset, the seed or the template has shipped at these paths, read from each
  *  file's git history (and deprecated/studio/preview's presets). */
 export const RETIRED_SAMPLE_LISTS: Readonly<Record<string, readonly { from: string; list: readonly (string | Json)[] }[]>> = {
+  // The "Where we work" towns (operator decision, 2026-11-12). Judged as a whole list, like the
+  // rest: a client's own list may share towns with these, and an Orlando client serves Orlando.
+  "extensions.serviceArea": [
+    { from: "data/verticals/hvac.ts", list: ["Juneau", "Douglas", "Mendenhall Valley", "Auke Bay", "Lemon Creek", "Thane"] },
+    { from: "data/verticals/hvac.ts", list: ["Orlando", "Winter Park", "Kissimmee", "Apopka", "Sanford", "Oviedo", "Lake Mary", "Altamonte Springs", "Clermont", "Longwood", "Maitland", "Casselberry"] },
+  ],
   "extensions.trustBadges": [
     { from: "data/verticals/hvac.ts", list: ["Licensed & insured · CAC1234567", "24/7 emergency service", "Financing available", "Satisfaction guaranteed"] },
     { from: "data/verticals/hvac.ts", list: ["NATE Certified Technicians", "EPA 608 Certified", "Energy Star Partner", "BBB Accredited"] },

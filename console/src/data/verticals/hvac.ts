@@ -201,25 +201,11 @@ export const CONTENT: SiteContent = {
     hours:      null,
     bookingUrl: null,
     portalUrl:  null,
-    // Towns served. Real onboarding fills this from the intake form — brand-intake splits
-    // the operator's free-text list into an array — but no seed or preset ever set it, so
-    // `areaServed` in the JSON-LD has been an empty array on every site shipped to date.
-    // The preset carries an example so both that and <ServiceArea> have something real.
-    // The Standard "Where we work" chips (HvacServiceArea). Real onboarding replaces these.
-    serviceArea: [
-      'Orlando',
-      'Winter Park',
-      'Kissimmee',
-      'Apopka',
-      'Sanford',
-      'Oviedo',
-      'Lake Mary',
-      'Altamonte Springs',
-      'Clermont',
-      'Longwood',
-      'Maitland',
-      'Casselberry',
-    ],
+    // Towns served: the client's own, from the intake, or none (operator decision, 2026-11-12).
+    // A client with no towns shows no "Where we work" section and no areaServed. The sample
+    // lists this carried (Juneau, then Orlando) are in lib/presetIdentity.ts RETIRED_SAMPLE_LISTS,
+    // which strips them from any content that still holds them.
+    serviceArea: [],
     // decision 29 (Phase 13): the specificity fields. Collected from intake, NEVER seeded with a
     // sample value - a blank is flagged in _meta.missing_fields, not invented.
     ownerName: null,
