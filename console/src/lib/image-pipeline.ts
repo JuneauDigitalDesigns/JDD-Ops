@@ -1,10 +1,9 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import sharp from 'sharp';
 import type { SiteContent } from '@/data/site';
 import { repoDirFor } from '@/lib/export';
+import { MAX_INPUT_BYTES, writeImage } from '@/lib/image-encode';
 
 /**
  * The build-time image pipeline (Phase 11). Fetches each client/stock image ONCE at export,
@@ -92,28 +91,13 @@ function collectSlots(c: SiteContent): Slot[] {
 async function processOne(url: string, slot: Slot, outDir: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`fetch ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  const hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
-  const ratio = RATIOS[slot.ratioKey];
-  const wantAvif = AVIF_RATIO_KEYS.includes(slot.ratioKey) && !slot.isLogo;
-
-  for (const w of WIDTHS) {
-    // A fresh decode per width keeps each output independent; `withoutEnlargement` means a source
-    // smaller than a width is never upscaled (pixels never exceed the source, honouring the plan)
-    // while the file is still emitted at every width name so a component srcSet never 404s.
-    const base = slot.isLogo
-      // Logo: no crop, no grade, no recolour; bound the long edge to w.
-      ? sharp(buf).resize(w, w, { fit: 'inside', withoutEnlargement: true })
-      : sharp(buf)
-          .resize(w, Math.round(w / ratio), { fit: 'cover', position: 'attention', withoutEnlargement: true })
-          // ONE fixed grade, two passes (decision 15/55): saturation pull + contrast lift. No tint
-          // pass - decision 9 already warms the ground, and a tint on top pushes the page to sepia.
-          .modulate({ saturation: 0.88, brightness: 1.02 })
-          .linear(1.04, -6);
-    await base.clone().webp({ quality: 80 }).toFile(join(outDir, `${hash}-${w}.webp`));
-    if (wantAvif) await base.clone().avif({ quality: 55 }).toFile(join(outDir, `${hash}-${w}.avif`));
-  }
-  return `/img/${hash}`;
+  if (Number(res.headers.get('content-length') ?? 0) > MAX_INPUT_BYTES) throw new Error('image too large');
+  return writeImage(Buffer.from(await res.arrayBuffer()), outDir, {
+    ratio: RATIOS[slot.ratioKey],
+    avif: AVIF_RATIO_KEYS.includes(slot.ratioKey) && !slot.isLogo,
+    logo: Boolean(slot.isLogo),
+    widths: WIDTHS,
+  });
 }
 
 /**

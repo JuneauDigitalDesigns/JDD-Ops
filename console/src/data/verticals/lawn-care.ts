@@ -169,7 +169,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Your Lawn Care Company | Lawn Mowing & Treatments",
     description:       "Locally owned lawn care company offering mowing, fertilization, aeration, weed control, and seasonal lawn treatments.",
-    canonical:         "https://yourlawncare.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },

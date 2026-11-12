@@ -186,7 +186,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Your HVAC Company | Heating & Cooling Service",
     description:       "Licensed HVAC contractor offering furnace repair, AC installation, maintenance plans, and 24/7 emergency service.",
-    canonical:         "https://yourhvaccompany.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },

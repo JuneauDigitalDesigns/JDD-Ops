@@ -116,14 +116,18 @@ export default function HeroOverlap({ content = CONTENT }: { content?: SiteConte
             </div>
           )}
 
-          <p className="text-sm font-semibold uppercase tracking-widest text-accent"><E p="hero.eyebrow">{hero.eyebrow}</E></p>
+          {hero.eyebrow && (
+            <p className="text-sm font-semibold uppercase tracking-widest text-accent"><E p="hero.eyebrow">{hero.eyebrow}</E></p>
+          )}
           <span className="accent-bar mt-3" aria-hidden="true" />
           <h1 className="mt-3 font-heading text-4xl leading-tight text-ink md:text-5xl">
             {editing
               ? <E p="hero.headline" fit>{hero.headline}</E>
               : <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />}
           </h1>
-          <p className="mt-4 leading-relaxed text-inkSoft"><E p="hero.sub">{hero.sub}</E></p>
+          {hero.sub && (
+            <p className="mt-4 leading-relaxed text-inkSoft"><E p="hero.sub">{hero.sub}</E></p>
+          )}
 
           <div className="mt-8 flex flex-wrap gap-4">
             <a

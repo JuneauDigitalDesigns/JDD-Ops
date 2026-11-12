@@ -21,7 +21,7 @@ import { CheckCircle } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
 import { serviceBySlug, serviceMessage } from '@/lib/serviceLinks';
 
 export const meta = {
@@ -29,7 +29,7 @@ export const meta = {
   category: 'finalCta',
   label: 'Roofing / Photo-band final CTA',
   consumes: ['finalCta.eyebrow', 'finalCta.headline', 'finalCta.headlineEmphasis', 'finalCta.sub', 'finalCta.frictionReducers', 'images.hero.slides', 'services.items'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -66,7 +66,9 @@ export default function RoofingFinalCta({
     // footer links) scroll here; until 2026-11-10 this section had no id, so those went nowhere.
     <section id="cta" className="relative isolate overflow-hidden bg-inkPanel py-16 text-onInk lg:py-24">
       {slide && (
-        <div className="absolute inset-0 bg-cover bg-[center_35%]" style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }} aria-hidden="true" />
+        <div className="absolute inset-0 isolate overflow-hidden" aria-hidden="true">
+          <CoverImage url={slide} alt="" sizes="100vw" avif position="object-[center_35%]" />
+        </div>
       )}
       <div
         className="absolute inset-0"

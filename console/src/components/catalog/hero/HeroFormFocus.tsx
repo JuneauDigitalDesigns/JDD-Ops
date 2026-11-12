@@ -74,9 +74,11 @@ export default function HeroFormFocus({
           <h1 className={`mt-5 font-heading text-[34px] font-extrabold leading-[1.05] tracking-[-0.015em] sm:text-[42px] lg:text-[54px] ${s.heading}`}>
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
-          <p className={`mt-4 max-w-[46ch] text-[17px] leading-relaxed sm:text-[18px] ${s.body}`}>
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className={`mt-4 max-w-[46ch] text-[17px] leading-relaxed sm:text-[18px] ${s.body}`}>
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           {/* Even on the form-led hero the number stays reachable — someone with a broken
               furnace should never have to fill in a form to reach a person (SPEC §4). */}

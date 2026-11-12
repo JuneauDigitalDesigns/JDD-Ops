@@ -75,5 +75,7 @@ test('the export strips sample reviews before it writes site.ts, on every branch
 });
 
 test("the Studio's effective content drops sample reviews, so the preview matches the export", () => {
-  assert.match(src('app/c/[slug]/build/BuildWizard.tsx'), /stripSampleReviews\(/);
+  // The merge moved to lib/effectiveContent.ts (2026-11-11); BuildWizard calls it.
+  assert.match(src('app/c/[slug]/build/BuildWizard.tsx'), /effectiveContent\(vertical, imported, generated, edits\)/);
+  assert.match(src('lib/effectiveContent.ts'), /stripSampleReviews\(/);
 });

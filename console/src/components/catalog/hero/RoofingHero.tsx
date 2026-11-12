@@ -21,7 +21,11 @@ import { Phone, ArrowRight } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
+import { primaryCity } from '@/lib/serviceLinks';
+
+/** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
+const placeAlt = (c: SiteContent) => [c.brand.name, primaryCity(c)].filter(Boolean).join(' in ');
 
 export const meta = {
   id: 'roofing-hero',
@@ -32,7 +36,7 @@ export const meta = {
     'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.cta', 'hero.frictionReducers',
     'brand.phone', 'brand.phoneHref', 'images.hero.slides',
   ],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -67,11 +71,10 @@ export default function RoofingHero({ content = CONTENT }: { content?: SiteConte
     <section className="relative isolate flex items-end overflow-hidden bg-inkPanel2 text-onInk lg:min-h-[660px]">
       {slide && (
         <div
-          className="absolute inset-0 bg-cover bg-[center_30%]"
-          style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }}
-          role="img"
-          aria-label={images.hero?.slides?.[0]?.alt ?? `${brand.name} roof`}
-        />
+          className="absolute inset-0 isolate overflow-hidden"
+        >
+          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif position="object-[center_30%]" />
+        </div>
       )}
       {/* Scrim climbs from the BOTTOM — sky stays visible, unlike HVAC's left-to-right scrim. */}
       <div
@@ -96,9 +99,11 @@ export default function RoofingHero({ content = CONTENT }: { content?: SiteConte
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[19px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[19px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           <div className="hero-rise mt-[30px] flex flex-wrap gap-3">
             <a

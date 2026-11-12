@@ -169,7 +169,7 @@ export const CONTENT: SiteContent = {
   seo: {
     title:             "Your Plumbing Company | Same-Day Plumbing Service",
     description:       "Licensed plumbing contractor offering same-day service for leaks, drain clearing, water heaters, and 24/7 emergency plumbing.",
-    canonical:         "https://yourplumbingcompany.com",
+    canonical:         "", // never a sample: lib/placeholderCanonical.ts
     googleAnalyticsId: null,
     facebookPixelId:   null,
   },

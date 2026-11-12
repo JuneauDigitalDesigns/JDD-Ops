@@ -29,7 +29,11 @@ import { useState } from 'react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { imageAt } from '@/lib/localImage';
+import { CoverImage } from '@/lib/CoverImage';
+import { primaryCity } from '@/lib/serviceLinks';
+
+/** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
+const placeAlt = (c: SiteContent) => [c.brand.name, primaryCity(c)].filter(Boolean).join(' in ');
 
 export const meta = {
   id: 'lawn-hero',
@@ -39,7 +43,7 @@ export const meta = {
     'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta',
     'extensions.reviewBadge', 'services.items', 'images.hero.slides',
   ],
-  sharedDeps: ['@/lib/editable', '@/lib/LeadForm', '@/lib/localImage'],
+  sharedDeps: ['@/lib/CoverImage', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -85,11 +89,10 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
     <section className="relative isolate flex items-center overflow-hidden bg-inkPanel2 text-onInk lg:min-h-[660px]">
       {slide && (
         <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${imageAt(slide, 1536)})` }}
-          role="img"
-          aria-label={images.hero?.slides?.[0]?.alt ?? `${content.brand.name} lawn`}
-        />
+          className="absolute inset-0 isolate overflow-hidden"
+        >
+          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif />
+        </div>
       )}
       {/* Forest wash: one grade for any client photo (colour blend of the forest panel). */}
       <div className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />
@@ -134,9 +137,11 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-[18px] max-w-[46ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18.5px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-[18px] max-w-[46ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[18.5px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           {/* The plan picker — lawn care's signature hero device (D8). Real state, not chrome.
               Full 18px inner padding on every edge: nothing inside touches the panel's border. */}
