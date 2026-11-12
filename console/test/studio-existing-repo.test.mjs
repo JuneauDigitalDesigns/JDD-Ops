@@ -80,7 +80,8 @@ test('the newer of this browser’s bundle and the server draft opens', () => {
 test('every save is stamped, and hydration takes the newer copy', () => {
   const wizard = src(`${BUILD}/BuildWizard.tsx`);
   assert.match(wizard, /savedAt: Date\.now\(\),/);
-  assert.match(wizard, /applyBundle\(newerBundle\(saved, draftBundle as Partial<WizardBundle> \| null\) \?\? freshBundle\(seed\)\);/);
+  // The newer copy is chosen by startingBundle via newerBundle (test/reload-keeps-work.test.mjs).
+  assert.match(wizard, /applyBundle\(start\.bundle \?\? freshBundle\(seed\)\);/);
   assert.doesNotMatch(wizard, /applyBundle\(saved \?\? draftBundle \?\? freshBundle\(seed\)\)/);
 });
 
@@ -106,7 +107,7 @@ test('reopening an exported client starts from the content the console exported,
   assert.match(page, /const exportedRaw = manifest \|\| composition \? await readExportedContent\(repoDir\) : null;/);
   assert.match(page, /exportedContent=\{exportedContent\}/);
   const wizard = src(`${BUILD}/BuildWizard.tsx`);
-  const diskWins = wizard.slice(wizard.indexOf('if (manifest || composition) {'), wizard.indexOf('} else {', wizard.indexOf('if (manifest || composition) {')));
+  const diskWins = wizard.slice(wizard.indexOf("if (start.from === 'disk') {"), wizard.indexOf('} else {', wizard.indexOf("if (start.from === 'disk') {")));
   assert.match(diskWins, /imported: exportedContent \?\? seed,/);
 
   // And the marker check is the real one: a console-written file reads back, onboard.js's doesn't.

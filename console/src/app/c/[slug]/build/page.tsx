@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { redirect } from 'next/navigation';
 import type { SiteContent } from '@/data/site';
@@ -7,8 +7,8 @@ import { getOnboardingGate } from '@/lib/onboardingGate';
 import { loadIntake, withPlan } from '@/lib/intake';
 import { clientDir } from '@/lib/paths';
 import { readDraft } from '@/lib/draft';
-import { readStudioComposition } from '@/lib/studio-readback';
-import { readCompositionManifest } from '@/lib/composition-manifest';
+import { readStudioComposition, repoPagePath } from '@/lib/studio-readback';
+import { readCompositionManifest, manifestPath } from '@/lib/composition-manifest';
 import { loadProvisionedFields } from '@/lib/provisionedFields';
 import BuildWizard from './BuildWizard';
 
@@ -76,6 +76,11 @@ export default async function BuildPage({ params }: { params: { slug: string } }
   // Same plan stamp as the seed, so the Studio offers the same lead-capture components.
   const exportedContent = exportedRaw ? (withPlan(exportedRaw as Parameters<typeof withPlan>[0], intake?.plan) as SiteContent | null) : null;
 
+  // When the repo was last written: the export writes the manifest, onboard.js and older exports
+  // write home's page.tsx. A draft saved after this is newer work than the repo (startingBundle).
+  const written = [manifestPath(repoDir), repoPagePath(params.slug)].find((p) => existsSync(p));
+  const exportedAt = written ? statSync(written).mtimeMs : null;
+
   return (
     <BuildWizard
       slug={params.slug}
@@ -85,6 +90,7 @@ export default async function BuildPage({ params }: { params: { slug: string } }
       draftBundle={draftBundle}
       hasRepo={hasRepo}
       exportedContent={exportedContent}
+      exportedAt={exportedAt}
     />
   );
 }
