@@ -265,7 +265,7 @@ function sectionsSegment(blocks: ResolvedBlock[], sections: Section[]): PromptSe
     // brand isn't a Sections-block entry (see resolveSections), and is always force-included
     // by generate-copy — this line is the one thing not sourced from a block, matching the
     // old system's own hardcoding of it.
-    '- brand.tagline: short, memorable. Populate brand name/phone/email/address/license ONLY when grounded (see rules); otherwise omit them.',
+    '- brand.tagline: short, memorable.',
   ];
   if (sectionsBlock.enabled) {
     for (const entry of sectionsBlock.entries) {

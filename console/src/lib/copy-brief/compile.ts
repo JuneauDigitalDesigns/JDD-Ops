@@ -132,7 +132,7 @@ export function sectionInstructionLine(section: Section, counts: SectionCounts):
     // without sign-off. The facts-only contact rule and exact counts the old role carried live
     // here now, next to the fields they govern.
     case 'brand':
-      return '- brand.tagline: short, memorable. Write the brand name, phone, email, address and license only when they appear in the facts or the website notes; otherwise leave them out.';
+      return '- brand.tagline: short, memorable.';
     case 'announcement':
       return '- announcement.text: one short promotional or seasonal line taken from the facts, or a general welcome if the facts give none.';
     case 'trust':

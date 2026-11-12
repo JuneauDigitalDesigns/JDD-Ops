@@ -75,13 +75,14 @@ test('copy generation carries no canonical into generated', () => {
   const base = { ...presetFor('hvac'), seo: { ...presetFor('hvac').seo, canonical: 'https://yourhvaccompany.com' } };
   const copy = { seo: { title: TRACEWELL_GENERATED_SEO.title, description: TRACEWELL_GENERATED_SEO.description } };
   const generated = withoutCarriedCanonical(applyGeneratedCopy(base, copy, new Set(['brand', 'seo'])));
-  assert.equal(generated.seo.canonical, '');
+  // Empty or, since the generated seo holds only what the model wrote (no-generated-identity), absent.
+  assert.equal(generated.seo.canonical ?? '', '');
   assert.equal(generated.seo.title, TRACEWELL_GENERATED_SEO.title);
   // A real canonical in the base isn't copied up either: generated sits above imported, so a
   // carried value would shadow the client's own one if that changed later.
   const real = withoutCarriedCanonical(applyGeneratedCopy({ ...base, seo: { ...base.seo, canonical: 'https://tracewellair.com' } }, copy, new Set(['brand', 'seo'])));
-  assert.equal(real.seo.canonical, '');
-  assert.match(src('app/api/build/generate-copy/route.ts'), /withoutCarriedCanonical\(applyGeneratedCopy\(/, 'the route sends generated copy without the strip');
+  assert.equal(real.seo.canonical ?? '', '');
+  assert.match(src('app/api/build/generate-copy/route.ts'), /withoutCarriedCanonical\(\s*applyGeneratedCopy\(/, 'the route sends generated copy without the strip');
 });
 
 test('export output for a client with no website names no placeholder anywhere', () => {
