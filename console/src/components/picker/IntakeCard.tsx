@@ -24,7 +24,7 @@ import type { IntakeSummary } from '@/lib/useIntakeQueue';
  *     panel surface. It reads as lit up / incoming.
  *   • An accent top band. Client cards use that band for the client's own brand colour, so
  *     the same band in the app's accent says "this one has no brand of its own yet".
- *   • It says what it is ("New signup") and what to do ("Import"), because the whole card is
+ *   • It says what it is ("Ready for build") and what to do ("Import"), because the whole card is
  *     one action rather than a link into three tools.
  *
  * It is deliberately NOT a dashed treatment. Dashed means "nothing is here yet"; a signup is
@@ -59,7 +59,7 @@ export default function IntakeCard({
         <div className="flex items-center gap-2">
           <CloudArrowDown size={14} weight="fill" style={{ color: 'var(--accent)' }} />
           <span className="kicker" style={{ color: 'var(--accent)' }}>
-            New signup
+            Ready for build
           </span>
           <span className="meta ml-auto shrink-0">{relativeTime(intake.receivedAt)}</span>
         </div>

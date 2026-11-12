@@ -280,7 +280,7 @@ export default function ClientIndex() {
    * Claim a signup and reload the roster so its card converts in place.
    *
    * Deliberately does NOT jump to Build. The import is the moment a signup becomes a client,
-   * and the card turning from a teal "New signup" tile into a real ClientCard — in the same
+   * and the card turning from a teal "Ready for build" tile into a real ClientCard — in the same
    * grid cell — is what shows that. Navigating away means you never see the transition and
    * land in a builder you may not have wanted yet; the new card's own Build link is one
    * click, and now it's a decision rather than a redirect.
