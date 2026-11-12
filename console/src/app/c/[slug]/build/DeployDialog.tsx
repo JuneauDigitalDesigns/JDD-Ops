@@ -9,6 +9,7 @@ import type { SiteContent } from '@/data/site';
 import { defaultSkin, type SkinId } from '@/lib/skins';
 import type { Selections, SkinSelections, StudioReverts } from './page-order';
 import type { SiteComposition } from '@/lib/pages';
+import type { ServicePicks } from '@/lib/copyRisks';
 import {
   buildCommitMessage, describeComposition, diffComposition, diffContent, resolveRevert,
   type CompositionChange, type ContentChange, type DeployDiff,
@@ -107,11 +108,13 @@ const GROUP_ORDER: ContentChange['kind'][] = ['copy', 'color', 'image', 'number'
 const IDLE_TIMEOUT_MS = 90_000;
 
 export default function DeployDialog({
-  slug, brandName, selections, skins, order, composition, effective, exportEntries, vertical, reverts, onClose, briefFacts = '',
+  slug, brandName, selections, skins, order, composition, effective, exportEntries, vertical, reverts, onClose, briefFacts = '', servicePicks,
 }: {
   /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts): shown in the SEO
    *  check and posted with the export, so both score against the same text. */
   briefFacts?: string;
+  /** The service names and tags the intake picked (copyRisks.ts), posted and checked the same way. */
+  servicePicks?: ServicePicks;
   slug: string;
   brandName: string;
   selections: Selections;
@@ -272,6 +275,7 @@ export default function DeployDialog({
             vertical,
             content: effective,
             briefFacts,
+            servicePicks,
             deploy: true,
             commitMessage,
             uiUpgrade: upgradeConfirmation(libs.plan, libsConfirmed),
@@ -407,7 +411,7 @@ export default function DeployDialog({
 
           {status.kind === 'ready' && (
             <div className="mt-5">
-              <SeoCheckPanel content={effective} composition={composition} vertical={vertical} briefFacts={briefFacts} />
+              <SeoCheckPanel content={effective} composition={composition} vertical={vertical} briefFacts={briefFacts} servicePicks={servicePicks} />
             </div>
           )}
 

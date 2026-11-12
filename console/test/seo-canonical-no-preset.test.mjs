@@ -100,7 +100,7 @@ test('export output for a client with no website names no placeholder anywhere',
 
 test('the export strips a placeholder canonical on every branch, before site.ts is written', () => {
   const s = src('app/api/build/export/route.ts');
-  assert.equal((s.match(/const shipped = withoutSampleReviews\(withRealCanonical\(/g) ?? []).length, 3, 'a branch builds site.ts without the canonical gate');
+  assert.equal((s.match(/const shipped = withoutSampleReviews\(withoutSampleProjects\(withRealCanonical\(/g) ?? []).length, 3, 'a branch builds site.ts without the canonical gate');
   assert.match(s, /stripPlaceholderCanonical\(c\)/);
   assert.match(s, /applyIntakeCanonical\(stripped, intakeCanonical\)/);
 });

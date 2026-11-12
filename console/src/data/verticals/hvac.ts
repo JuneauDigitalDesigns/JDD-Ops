@@ -118,13 +118,11 @@ export const CONTENT: SiteContent = {
     eyebrow: "Recent work",
     title:   "Jobs we finished this month.",
     sub:     "Real installs and repairs across the towns we serve.",
-    hidden:  false,
-    // Template sample jobs (replaced at onboarding with the client's own).
-    projects: [
-      { t: "Full system replacement",   loc: "Clermont, FL",     yr: "2026", scope: "3-ton high-efficiency heat pump, one day turnaround.", size: "", caption: "Photo: install",     image: null },
-      { t: "Ductless mini-split install", loc: "Winter Garden, FL", yr: "2026", scope: "Two-zone system for a converted garage suite.",       size: "", caption: "Photo: mini-split", image: null },
-      { t: "Emergency AC repair",         loc: "Groveland, FL",     yr: "2026", scope: "Same-night compressor fix, family cooling again by 9 p.m.", size: "", caption: "Photo: repair",      image: null },
-    ],
+    hidden:  true,
+    // No sample jobs: hidden and empty, as every other preset ships it, until the client's own
+    // are added (operator decision, 2026-11-12). The three this carried are in
+    // lib/sampleProjects.ts, which strips them from any content that still holds them.
+    projects: [],
   },
 
   testimonials: {

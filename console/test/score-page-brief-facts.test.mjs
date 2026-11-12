@@ -64,7 +64,7 @@ test("a model-written field repeating a review's number is still refused", () =>
 
 test('the export scores with the brief facts the Studio posts', () => {
   const route = readFileSync(fileURLToPath(new URL('../src/app/api/build/export/route.ts', import.meta.url)), 'utf8');
-  assert.match(route, /scoreSite\(c, seoPages, pages, \{.*\bbriefFacts \}\)/);
+  assert.match(route, /scoreSite\(c, seoPages, pages, \{.*\bbriefFacts\b.*\}\)/);
   for (const dialog of ['LaunchDialog', 'DeployDialog']) {
     const src = readFileSync(fileURLToPath(new URL(`../src/app/c/[slug]/build/${dialog}.tsx`, import.meta.url)), 'utf8');
     assert.match(src, /content: effective,\s*briefFacts,/, `${dialog} posts briefFacts with the export`);

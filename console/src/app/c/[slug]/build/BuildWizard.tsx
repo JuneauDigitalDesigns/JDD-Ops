@@ -12,6 +12,7 @@ import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import type { CopyBrief } from '@jdd/schema';
 import { emptyCopyBrief, normalizeVerdicts } from '@/lib/copy-brief/mutations';
 import { studioBriefFacts } from '@/lib/copy-brief/brief-facts';
+import { intakeServicePicks } from '@/lib/copyRisks';
 import { DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import {
   reconcileOrder,
@@ -304,6 +305,9 @@ export default function BuildWizard({
     () => studioBriefFacts({ vertical, effective, imported, edits, brief }),
     [vertical, effective, imported, edits, brief],
   );
+  // The service names and tags the intake picked are the client's, not the preset's sample copy,
+  // though they match it (picked from the industry's menu). The same check skips them (copyRisks.ts).
+  const servicePicks = useMemo(() => intakeServicePicks(imported, edits), [imported, edits]);
   // Fill empty/preset image slots with per-vertical topical stock so the build catalog
   // renders. The export route runs the same transform on the server, so what's previewed
   // here is what ships — except `includeWork`, whose fabricated sample projects are
@@ -966,6 +970,7 @@ export default function BuildWizard({
                   brandName={effective.brand?.name}
                   reverts={reverts}
                   briefFacts={briefFacts}
+                  servicePicks={servicePicks}
                 />
               </div>
             )}

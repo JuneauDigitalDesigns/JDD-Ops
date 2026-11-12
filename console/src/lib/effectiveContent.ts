@@ -10,6 +10,7 @@ import type { SiteContent } from '@/data/site';
 import { presetFor, type VerticalId } from '@/lib/verticals';
 import { deepMerge, applyEdits } from '@/lib/merge';
 import { stripSampleReviews } from '@/lib/sampleReviews';
+import { stripSampleProjects } from '@/lib/sampleProjects';
 import { stripPlaceholderCanonical } from '@/lib/placeholderCanonical';
 import { stripPresetIdentity } from '@/lib/presetIdentity';
 import { withCopywriterBrandOnly } from '@/lib/copy-schema';
@@ -30,14 +31,16 @@ export function effectiveContent(
   // withDisplayPhone, outermost: the phone as the site shows it, (407) 555-0177 with an E.164 tel:,
   // the same as the export writes (lib/displayPhone.ts). Content imported before @jdd/schema
   // 1.33.3 holds bare digits, and an operator may type them.
+  // Sample jobs the same way (lib/sampleProjects.ts): an old preset's Clermont, Winter Garden and
+  // Groveland jobs sit in imported, generated and edited content alike.
   const merged = withDisplayPhone(stripPresetIdentity(stripPlaceholderCanonical(
-    stripSampleReviews(applyEdits(
+    stripSampleProjects(stripSampleReviews(applyEdits(
       // The generated layer's brand is cut to the tagline, the one brand field the copywriter
       // writes: a draft generated before 2026-11-11 holds a copy of the whole brand there, which
       // would hide every later correction to the client's name, phone or address (copy-schema.ts).
       deepMerge(deepMerge(presetFor(vertical), imported ?? {}), withCopywriterBrandOnly(generated ?? {})),
       edits,
-    )).content,
+    )).content).content,
   ).content).content);
   // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
   // drawer, AI copy, or a seed) the section must show — in the preview AND the exported

@@ -16,9 +16,11 @@
  * Reads content structurally, so it works on the full SiteContent and on the intake's partial one.
  */
 import { withoutPreset } from '@/lib/copy-brief/grounded';
+import { applyEdits } from '@/lib/merge';
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {});
+const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 /** Top-level keys that hold visible marketing copy. brand, nav, images, extensions, _meta, seo
  *  canonical/ids and overrides are facts, links or settings, never claims. */
@@ -127,16 +129,38 @@ export function factsText(content: unknown): string {
   return values.join('\n');
 }
 
-export function copyRisks(content: unknown, preset: unknown): CopyRisks {
+/** The service names and tags the intake picked: the client's own layers (imported, then the
+ *  operator's edits), never the preset's or the copywriter's. The intake picks services from the
+ *  industry's menu (ServicesStep, menuFor), so a picked name equals the preset's by design and is
+ *  the client's choice, not sample copy (operator decision, 2026-11-12). Plain strings, so the
+ *  Studio can post them to the export beside briefFacts. */
+export interface ServicePicks { names: string[]; tags: string[] }
+
+export function intakeServicePicks(imported: unknown, edits: Record<string, unknown> | null | undefined): ServicePicks {
+  const intake = applyEdits(obj(imported), edits ?? {});
+  const items = arr(obj(obj(intake).services).items).map(obj);
+  const strs = (k: string) => items.map((s) => s[k]).filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+  return { names: strs('t'), tags: strs('tag') };
+}
+
+/** `picks` excuses `services.items.N.t` when its name was picked and `.tag` when its tag was;
+ *  nothing else. A preset service the intake didn't list (its list fell through) is still flagged. */
+export function copyRisks(content: unknown, preset: unknown, picks?: ServicePicks): CopyRisks {
   const strings: Array<[string, string]> = [];
   const c = obj(content);
   for (const root of COPY_ROOTS) walkStrings(c[root], root, strings);
   for (const path of SEO_COPY) walkStrings(getPath(c, path), path, strings);
 
+  const picked = (path: string, text: string): boolean => {
+    const m = /^services\.items\.\d+\.(t|tag)$/.exec(path);
+    if (!m || !picks) return false;
+    const list = m[1] === 't' ? picks.names : picks.tags;
+    return list.some((v) => v.trim() === text.trim());
+  };
   const presetCopy: CopyRisk[] = [];
   for (const [path, text] of strings) {
     const p = getPath(preset, path);
-    if (typeof p === 'string' && p.trim() === text.trim()) presetCopy.push({ path, text });
+    if (typeof p === 'string' && p.trim() === text.trim() && !picked(path, text)) presetCopy.push({ path, text });
   }
 
   // The client's facts, without the preset's: `content` is the merged content, so a client with

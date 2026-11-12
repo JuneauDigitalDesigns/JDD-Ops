@@ -24,6 +24,7 @@ import PreviewFrame from './PreviewFrame';
 import StickyCallBar from '@template/lib/StickyCallBar';
 import LaunchDialog from './LaunchDialog';
 import DeployDialog from './DeployDialog';
+import type { ServicePicks } from '@/lib/copyRisks';
 
 /**
  * PageStudio — the multi-page build surface. A template card over a live preview that snaps
@@ -40,10 +41,12 @@ export default function PageStudio({
   onSetChrome, onSetSectionSkin, onSetSectionVariant,
   onResetEdits, onResetStyles, setField,
   onUndo, onRedo, canUndo, canRedo,
-  alreadyDeployed = false, onExported, brandName, reverts, briefFacts = '',
+  alreadyDeployed = false, onExported, brandName, reverts, briefFacts = '', servicePicks,
 }: {
   /** The facts the copy brief gave the copywriter, for the SEO check (copy-brief/brief-facts.ts). */
   briefFacts?: string;
+  /** The service names and tags the intake picked, for the SEO check (copyRisks.ts). */
+  servicePicks?: ServicePicks;
   stepNav?: React.ReactNode;
   composition: SiteComposition;
   effective: SiteContent;
@@ -347,6 +350,7 @@ export default function PageStudio({
             // Offered after any successful export: the repo exists by then, even on a first Launch.
             onDeploy={() => { setLaunchOpen(false); setDeployOpen(true); }}
             briefFacts={briefFacts}
+            servicePicks={servicePicks}
           />
         )}
       </AnimatePresence>
@@ -364,6 +368,7 @@ export default function PageStudio({
           vertical={vertical}
           reverts={reverts}
           briefFacts={briefFacts}
+          servicePicks={servicePicks}
           onClose={() => setDeployOpen(false)}
         />
       )}

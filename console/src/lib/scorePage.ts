@@ -22,7 +22,7 @@
  * page without proof, duplicate descriptions, no canonical at all, and D2's preset copy and
  * unsupported claims.
  */
-import { copyRisks, factsText, getPath, visibleCopy } from '@/lib/copyRisks';
+import { copyRisks, factsText, getPath, visibleCopy, type ServicePicks } from '@/lib/copyRisks';
 import { findDashes } from '@/lib/copy-brief/dash-guard';
 import { toE164 } from '@jdd/schema';
 import { primaryCity, qualifiesForServicePage, serviceSlugs } from '@/lib/servicePages';
@@ -129,6 +129,9 @@ export function scoreSite(
     /** The facts the copywriter was given (copy-brief/brief-facts.ts). The Studio computes it and
      *  posts it with the export, so the panel and the export score against the same text. */
     briefFacts?: string;
+    /** The service names and tags the intake picked (copyRisks.ts intakeServicePicks), posted the
+     *  same way. The preset-copy warning skips them and nothing else. */
+    servicePicks?: ServicePicks;
   } = {},
 ): SiteScore {
   const hard: string[] = [];
@@ -236,7 +239,7 @@ export function scoreSite(
   }
 
   // ── D2: preset copy and unsupported claims (warn, never refuse) ──
-  const risks = copyRisks(content, preset);
+  const risks = copyRisks(content, preset, opts.servicePicks);
   if (risks.presetCopy.length) soft.push(`${risks.presetCopy.length} field(s) still show the industry preset's sample copy: ${risks.presetCopy.slice(0, 5).map((r) => r.path).join(', ')}${risks.presetCopy.length > 5 ? ', ...' : ''}`);
   for (const r of risks.unsupportedClaims) soft.push(`Claim "${r.claim}" in ${r.path} is not in the client's facts`);
 

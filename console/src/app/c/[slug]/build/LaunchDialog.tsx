@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { CategoryEntry } from './categories';
 import type { Selections, SkinSelections } from './page-order';
 import type { SiteComposition } from '@/lib/pages';
+import type { ServicePicks } from '@/lib/copyRisks';
 import type { VerticalId } from '@/lib/verticals';
 import type { SiteContent } from '@/data/site';
 import { defaultSkin, supportsSkin } from '@/lib/skins';
@@ -26,11 +27,13 @@ type Status =
   | { kind: 'error'; message: string; detail?: string; next?: string; steps: string[] };
 
 export default function LaunchDialog({
-  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy, onExported, hasRepo = false, briefFacts = '',
+  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy, onExported, hasRepo = false, briefFacts = '', servicePicks,
 }: {
   /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts): shown in the SEO
    *  check and posted with the export, so both score against the same text. */
   briefFacts?: string;
+  /** The service names and tags the intake picked (copyRisks.ts), posted and checked the same way. */
+  servicePicks?: ServicePicks;
   categories: CategoryEntry[];
   selections: Selections;
   skins: SkinSelections;
@@ -126,6 +129,7 @@ export default function LaunchDialog({
           vertical,
           content: effective,
           briefFacts,
+          servicePicks,
         }),
       });
     } catch {
@@ -266,7 +270,7 @@ export default function LaunchDialog({
           )}
 
           <div className="mt-4">
-            <SeoCheckPanel content={effective} composition={composition} vertical={vertical} briefFacts={briefFacts} />
+            <SeoCheckPanel content={effective} composition={composition} vertical={vertical} briefFacts={briefFacts} servicePicks={servicePicks} />
           </div>
 
           {slugHasRepo && libs.plan && (
