@@ -35,16 +35,21 @@ test("the model's output schema does not offer brand.long", () => {
   }
 });
 
+// Since F-E6 (no-generated-identity.test.mjs) the generated brand holds only the tagline, so the
+// legal name is not passed through either: it is simply absent, and the merge keeps the intake's.
 test("applyGeneratedCopy keeps the intake's signed legal name when the model returns another", () => {
-  const generated = applyGeneratedCopy(baseSite(), hostile, new Set(['brand']));
-  assert.equal(generated.brand.long, SIGNED);
+  const imported = baseSite();
+  const generated = applyGeneratedCopy(imported, hostile, new Set(['brand']));
+  assert.ok(!('long' in generated.brand), 'generated.brand.long was written');
+  assert.equal(deepMerge(imported, generated).brand.long, SIGNED);
   // The rest of the brand section still lands.
   assert.equal(generated.brand.tagline, 'Comfort, on time.');
 });
 
 test('applyGeneratedCopy leaves an empty legal name empty rather than filling it from the model', () => {
-  const generated = applyGeneratedCopy(baseSite(''), hostile, new Set(['brand']));
-  assert.equal(generated.brand.long, '');
+  const imported = baseSite('');
+  const generated = applyGeneratedCopy(imported, hostile, new Set(['brand']));
+  assert.equal(deepMerge(imported, generated).brand.long, '');
 });
 
 test("an operator's edit to brand.long still wins over the generated layer", () => {
