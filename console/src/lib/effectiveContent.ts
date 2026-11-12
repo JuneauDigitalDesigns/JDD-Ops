@@ -15,6 +15,7 @@ import { stripPlaceholderCanonical } from '@/lib/placeholderCanonical';
 import { stripPresetIdentity } from '@/lib/presetIdentity';
 import { withCopywriterBrandOnly } from '@/lib/copy-schema';
 import { withDisplayPhone } from '@/lib/displayPhone';
+import { hydrateServiceItems } from '@/lib/service-structure';
 
 export function effectiveContent(
   vertical: VerticalId,
@@ -33,13 +34,16 @@ export function effectiveContent(
   // 1.33.3 holds bare digits, and an operator may type them.
   // Sample jobs the same way (lib/sampleProjects.ts): an old preset's Clermont, Winter Garden and
   // Groveland jobs sit in imported, generated and edited content alike.
+  // The generated layer's brand is cut to the tagline, the one brand field the copywriter
+  // writes: a draft generated before 2026-11-11 holds a copy of the whole brand there, which
+  // would hide every later correction to the client's name, phone or address (copy-schema.ts).
+  const beneath = deepMerge(deepMerge(presetFor(vertical), imported ?? {}), withCopywriterBrandOnly(generated ?? {}));
   const merged = withDisplayPhone(stripPresetIdentity(stripPlaceholderCanonical(
     stripSampleProjects(stripSampleReviews(applyEdits(
-      // The generated layer's brand is cut to the tagline, the one brand field the copywriter
-      // writes: a draft generated before 2026-11-11 holds a copy of the whole brand there, which
-      // would hide every later correction to the client's name, phone or address (copy-schema.ts).
-      deepMerge(deepMerge(presetFor(vertical), imported ?? {}), withCopywriterBrandOnly(generated ?? {})),
-      edits,
+      beneath,
+      // A services list saved by add or remove holds structure, not card copy: each service's copy
+      // comes from the layers beneath, so a later run's text shows (lib/service-structure.ts).
+      hydrateServiceItems(edits, beneath),
     )).content).content,
   ).content).content);
   // Work ships hidden+empty in every preset. Once it has projects (added via the Brand

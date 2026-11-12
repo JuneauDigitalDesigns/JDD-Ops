@@ -16,6 +16,7 @@
 import { serviceSlugs } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import { seededByClose } from './intake-sources';
+import { structuralAfterRemove, type StructureContext } from './service-structure';
 
 type Tagged = { service?: string };
 type Item = SiteContent['services']['items'][number] & { slug?: string; page?: unknown };
@@ -81,11 +82,16 @@ const untag = <T extends Tagged>(list: T[], slug: string): T[] | null => {
 };
 
 /** The writes that remove service `index`: the list, and each tagged list that changed. */
-export function removeService(content: SiteContent, index: number): Record<string, unknown> {
-  const items = (content.services?.items ?? []) as Item[];
+export function removeService(
+  content: SiteContent,
+  index: number,
+  ctx: StructureContext = { edits: {} },
+): Record<string, unknown> {
   const before = serviceSlugs(content);
   const slug = before[index] ?? '';
-  const rest = items.filter((_, i) => i !== index);
+  // Structure only (lib/service-structure.ts): the remaining services without their card copy, so
+  // a later copy run's text still shows; copy the operator typed by hand is kept and still wins.
+  const rest = structuralAfterRemove(content, index, ctx) as unknown as Item[];
   const after = serviceSlugs({ ...content, services: { ...content.services, items: rest } } as SiteContent);
   const keep = before.filter((_, i) => i !== index);
   const next = rest.map((it, i) => (after[i] === keep[i] ? it : { ...it, slug: keep[i] }));

@@ -130,7 +130,11 @@ export function applyParts(
   for (const p of paths) {
     const v = getPath(fresh, p);
     if (typeof v !== 'string' || !v.trim()) { missing.push(p); continue; }
-    if (Object.keys(edits).some((k) => k === p || p.startsWith(`${k}.`))) { editWrites[p] = v; continue; }
+    // Edited means an edit actually holds this part: a whole services list saved by add or remove
+    // sits above every card but carries no card copy (lib/service-structure.ts).
+    const editedHere = Object.keys(edits).some((k) =>
+      k === p || (p.startsWith(`${k}.`) && getPath(edits[k], p.slice(k.length + 1)) !== undefined));
+    if (editedHere) { editWrites[p] = v; continue; }
     const [top, ...rest] = p.split('.');
     const current = top in sections ? sections[top] : getPath(generated, top);
     sections[top] = setPath(current ?? {}, rest.join('.'), v);

@@ -28,6 +28,7 @@ import {
 } from '@/lib/service-parts';
 import { Card, ChipListEditor, ToggleChips, Tag, INPUT, SourceChip } from './ui';
 import { removalPlan, removalRows, removeService, serviceFromClient } from '@/lib/service-remove';
+import { addServiceItems } from '@/lib/service-structure';
 import type { SourceContext } from '@/lib/intake-sources';
 
 type Item = SiteContent['services']['items'][number];
@@ -39,12 +40,14 @@ const PAGE_SIZE = 8;
 const BIG_INPUT = 'h-11 w-full rounded-[10px] border border-ruleStrong bg-panel px-3 text-[15px] text-fg outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]';
 
 export default function ServicesStep({
-  content, setField, focusService, vertical, onDone, sources,
+  content, setField, focusService, vertical, onDone, sources, generated,
 }: {
   content: SiteContent;
   setField: SetField;
   /** Where values came from: a service the client's form listed asks for a tick before removal. */
   sources?: SourceContext;
+  /** The generated layer, so add and remove can tell copy a run wrote from copy typed by hand. */
+  generated?: Partial<SiteContent> | null;
   /** A service Still to do jumped to: it opens on its Summary. */
   focusService?: number;
   /** The vertical, for its own service categories. */
@@ -75,16 +78,18 @@ export default function ServicesStep({
     setPage(Math.floor(idx / PAGE_SIZE));
   }
 
+  // Add and remove store the services' structure, not their card copy, so a later copy run's text
+  // still shows (lib/service-structure.ts). What the layers below supplied is worked out from these.
+  const structure = { edits: sources?.edits ?? {}, generated, imported: sources?.imported, preset: sources?.preset };
   function addService() {
-    const next: Item = { n: String(items.length + 1).padStart(2, '0'), t: 'New service', d: '', tag: '' };
-    setField('services.items', [...items, next]);
+    setField('services.items', addServiceItems(content, structure));
     open(items.length);
   }
 
   // Removing asks first (Xander, 2026-11-12), and more firmly for a service the client listed.
   const [removing, setRemoving] = useState<number | null>(null);
   function confirmRemove(idx: number) {
-    for (const [p, v] of Object.entries(removeService(content, idx))) setField(p, v);
+    for (const [p, v] of Object.entries(removeService(content, idx, structure))) setField(p, v);
     setRemoving(null);
     const nextSel = Math.max(0, Math.min(idx === i ? idx : i > idx ? i - 1 : i, items.length - 2));
     setSel(nextSel);
