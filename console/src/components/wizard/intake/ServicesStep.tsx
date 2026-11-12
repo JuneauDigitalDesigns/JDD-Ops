@@ -682,15 +682,18 @@ function JobPhotos({
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  // The upload route's own refusal ("Unsupported image type.", "Max 8 MB."), shown here, not dropped.
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function upload(file: File) {
     setBusy(true);
+    setUploadError(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
       const r = await fetch('/api/build/upload', { method: 'POST', body: fd });
-      const d = (await r.json()) as { ref?: string };
-      if (!d.ref) return;
+      const d = (await r.json()) as { ref?: string; error?: string };
+      if (!d.ref) { setUploadError(d.error ?? 'Unsupported image type.'); return; }
       // A caption is required: it is the photo's alt text. The service name until one is typed.
       const caption = name?.trim() || 'Job photo';
       onAdd({ t: name, loc: '', yr: null, scope: name, size: '', caption, image: { url: d.ref, alt: caption } });
@@ -734,6 +737,7 @@ function JobPhotos({
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }}
       />
+      {uploadError && <p role="alert" className="mt-1.5 text-2xs text-danger">{uploadError}</p>}
       <p className="mt-1.5 text-2xs text-uiFg3">Real jobs only.</p>
     </div>
   );

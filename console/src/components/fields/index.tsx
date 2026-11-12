@@ -198,16 +198,21 @@ export function ImageSlot({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  // The upload route's own refusal ("Unsupported image type.", "Max 8 MB."), shown here, not dropped.
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const val = str(content, path);
 
   async function onFile(file: File) {
     setBusy(true);
+    setUploadError(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('path', path); // SVG is accepted for the logo field only
       const r = await fetch('/api/build/upload', { method: 'POST', body: fd });
-      const d = (await r.json()) as { ref?: string };
+      const d = (await r.json()) as { ref?: string; error?: string };
       if (d.ref) setField(path, d.ref);
+      else setUploadError(d.error ?? 'Unsupported image type.');
     } finally {
       setBusy(false);
     }
@@ -252,6 +257,7 @@ export function ImageSlot({
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
       />
+      {uploadError && <p role="alert" className="text-xs text-danger">{uploadError}</p>}
 
       <input
         type="text"
