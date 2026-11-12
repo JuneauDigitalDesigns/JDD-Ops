@@ -234,6 +234,9 @@ const PAGE_META: Record<PageTypeId, { route: string; label: string }> = {
   gallery:  { route: 'gallery',  label: 'Gallery' },
   areas:    { route: 'areas',    label: 'Service Areas' },
   service:  { route: '',         label: 'Service' },
+  // Local SEO: per-instance, like service. A town page's label is the town; a spoke's, the service.
+  area:     { route: '',         label: 'Town' },
+  spoke:    { route: '',         label: 'Town and service' },
 };
 
 export function pageMetaFor(pageType: PageTypeId): { route: string; label: string } {

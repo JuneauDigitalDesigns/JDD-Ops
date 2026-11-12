@@ -15,14 +15,14 @@
 import type { SiteContent } from '@/data/site';
 import type { VerticalId } from '@/lib/verticals';
 import type { Section } from '@/lib/copy-schema';
-import { MAX_PAGES } from '@/lib/pages';
+import { PAGE_CAPS } from '@jdd/schema';
 import { pickServicePages, primaryCity, serviceSlugs } from '@/lib/servicePages';
 import { townPageFacts, townServicePageFacts } from '@/lib/townPages';
 
 /** The services the copywriter writes page copy for: exactly the ones the gate gives a page
  *  (service-page-spec.md §1), so a thin service never gets copy for a page it will never have. */
 export function servicePageIndices(content: unknown): number[] {
-  return pickServicePages(content, MAX_PAGES);
+  return pickServicePages(content, PAGE_CAPS.service);
 }
 
 /**

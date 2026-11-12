@@ -15,6 +15,7 @@
  */
 import { imageAt } from '@/lib/localImage';
 import { primaryCity, serviceSlugs } from '@/lib/servicePages';
+import { canonicalTown, townSlugs } from '@jdd/schema';
 import { profileLinks } from '@/lib/serviceLinks';
 
 type Json = Record<string, unknown>;
@@ -75,7 +76,7 @@ const join = (parts: string[], sep: string) => parts.filter(Boolean).join(sep);
 
 // ── Titles (D7, approved patterns) ──────────────────────────────────────────
 
-function titleFor(content: unknown, page: SeoPageRef, trade: string, service: Json | null): string {
+function titleFor(content: unknown, page: SeoPageRef, trade: string, service: Json | null, town = ''): string {
   const c = obj(content);
   const brand = str(obj(c.brand).name);
   const city = primaryCity(content);
@@ -89,7 +90,15 @@ function titleFor(content: unknown, page: SeoPageRef, trade: string, service: Js
       return ok ? generated : join([trade ? inCity(trade) : city, brand], ' | ') || brand;
     }
     case 'services':
-      return join([inCity(join([trade, 'Services'], ' ')), brand], ' | ');
+      // L5 (Xander, 2026-11-12, approved word for word): no city, so the Services page stops
+      // aiming at home's "{Trade} in {City}".
+      return join([join(['All', trade, 'Services'], ' '), brand], ' | ');
+    case 'area':
+      // L2/L6, approved word for word: "{Trade} in {Town} | {Brand}".
+      return join([trade && town ? `${trade} in ${town}` : town || page.label, brand], ' | ');
+    case 'spoke':
+      // Approved word for word: "{Service} in {Town} | {Brand}".
+      return join([join([str(service?.t) || page.label, town && `in ${town}`], ' '), brand], ' | ');
     case 'about':
       return join([join(['About', brand], ' '), trade ? inCity(trade) : city], ' | ');
     case 'contact':
@@ -233,28 +242,65 @@ export function buildPageSeo(content: unknown, pages: SeoPageRef[], vertical: st
   const businessId = base ? { '@id': `${base}#business` } : undefined;
   const out: Record<string, PageSeo> = {};
 
+  // Local SEO (L2): a town page is areas/<townSlug>, a spoke areas/<townSlug>/<serviceSlug>.
+  const area = arr(obj(c.extensions).serviceArea).map(str).filter(Boolean);
+  const tSlugs = townSlugs(content);
+  const hasAreasIndex = pages.some((p) => p.route === 'areas');
+  const areaCopy = obj(c.areaCopy);
+
   for (const page of pages) {
-    const idx = page.pageType === 'service' ? slugs.findIndex((s) => `services/${s}` === page.route) : -1;
+    const parts = page.route.split('/');
+    const isArea = page.pageType === 'area' && parts.length === 2;
+    const isSpoke = page.pageType === 'spoke' && parts.length === 3;
+    const townSlug = isArea || isSpoke ? parts[1] : '';
+    const town = townSlug && tSlugs.includes(townSlug) ? area[tSlugs.indexOf(townSlug)] : '';
+    const serviceSlug = page.pageType === 'service' ? parts.slice(1).join('/') : isSpoke ? parts[2] : '';
+    const idx = serviceSlug ? slugs.indexOf(serviceSlug) : -1;
     const service = idx >= 0 ? items[idx] : null;
     const url = base ? (page.route ? `${base}/${page.route}` : base) : '';
     const sub = obj(obj(obj(c.subpages)[page.route]).seo);
+    const townCopy = obj(areaCopy[townSlug]);
+    const localIntro = isArea ? str(townCopy.intro) : isSpoke ? str(obj(obj(townCopy.spokes)[serviceSlug]).intro) : '';
     const description =
       (page.route === '' ? str(obj(c.seo).description) : str(sub.description)) ||
+      firstSentence(localIntro) ||
       (service ? str(service.d) : '') ||
       str(obj(c.brand).tagline);
-    const image = service ? str(obj(service.image).url) : '';
+    // A town page's social image is its own first job in that town (a spoke's, of that service).
+    const townJob = town
+      ? arr(obj(c.work).projects).map(obj).find((p) => canonicalTown(content, p.town) === town && str(obj(p.image).url) && (!isSpoke || str(p.service) === serviceSlug))
+      : undefined;
+    const image = isArea || isSpoke ? str(obj(townJob?.image).url) : service ? str(obj(service.image).url) : '';
 
     const jsonLd: Json[] = [];
     if (page.route !== '') {
       const crumbs: Array<[string, string]> = [['Home', base]];
       if (page.pageType === 'service') crumbs.push(['Services', base ? `${base}/services` : '']);
-      crumbs.push([service ? str(service.t) || page.label : page.label, url]);
+      // Approved breadcrumb "Home › Areas › {Town} › {Service}"; "Areas" only when the index exists.
+      if ((isArea || isSpoke) && hasAreasIndex) crumbs.push(['Areas', base ? `${base}/areas` : '']);
+      if (isSpoke) crumbs.push([town || page.label, base ? `${base}/areas/${townSlug}` : '']);
+      crumbs.push([isArea ? town || page.label : service ? str(service.t) || page.label : page.label, url]);
       jsonLd.push({
         '@type': 'BreadcrumbList',
         itemListElement: crumbs.map(([name, item], i) => compact({ '@type': 'ListItem', position: i + 1, name, item: item || undefined })),
       });
     }
-    if (service) {
+    if (isSpoke && service) {
+      // A spoke: this service in this one town. No price and no FAQ, because the spoke shows
+      // neither (they stay on the service page), and markup must match the visible page.
+      jsonLd.push(compact({
+        '@type': 'Service',
+        name: str(service.t),
+        serviceType: str(service.t),
+        description: firstSentence(localIntro) || str(service.d),
+        url: url || undefined,
+        provider: businessId ?? { '@type': BUSINESS_TYPES[vertical ?? ''] ?? 'LocalBusiness', name: brandName },
+        areaServed: places(town ? [town] : []),
+      }));
+    } else if (isArea) {
+      // A town page carries its breadcrumb only. The business node already lists every town in
+      // areaServed, and no town gets a LocalBusiness or an address of its own.
+    } else if (service) {
       const pageCopy = obj(service.page);
       const price = priceNumber(str(service.priceFrom));
       jsonLd.push(compact({
@@ -279,7 +325,7 @@ export function buildPageSeo(content: unknown, pages: SeoPageRef[], vertical: st
     }
 
     out[page.route] = {
-      title: titleFor(content, page, trade, service),
+      title: titleFor(content, page, trade, service, town),
       description,
       canonical: url,
       ogImage: image || heroImage ? imageAt(image || heroImage, 1536) : null,

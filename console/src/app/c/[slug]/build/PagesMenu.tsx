@@ -6,7 +6,8 @@ import { motion, useReducedMotion } from 'framer-motion';
 import type { SiteContent } from '@/data/site';
 import type { CategoryEntry } from './categories';
 import type { PageTypeId, SiteComposition } from '@/lib/pages';
-import { MAX_PAGES } from '@/lib/pages';
+import { OTHER_PAGES_MAX, pagesInGroup } from '@/lib/pages';
+import { PAGE_CAPS } from '@jdd/schema';
 import { composePage } from './compose-page';
 import { pageMetaFor, OPTIONAL_PAGE_TYPES, CORE_ADD_PAGE_TYPES } from './page-templates';
 import PreviewFrame from './PreviewFrame';
@@ -40,7 +41,9 @@ export default function PagesMenu({
   const [addOpen, setAddOpen] = useState(false);
 
   const hasPage = (pt: PageTypeId) => composition.pages.some((p) => p.pageType === pt);
-  const atCap = composition.pages.length >= MAX_PAGES;
+  // L14: core and optional pages have their own cap; service pages have theirs.
+  const atCap = pagesInGroup(composition, 'home') >= OTHER_PAGES_MAX;
+  const servicesAtCap = pagesInGroup(composition, 'service') >= PAGE_CAPS.service;
   const availableOptional = OPTIONAL_PAGE_TYPES.filter((pt) => !hasPage(pt));
   const canAddOptional = availableOptional.length > 0 && !atCap;
 
@@ -159,7 +162,7 @@ export default function PagesMenu({
                     type="button"
                     disabled={disabled}
                     onClick={() => onAddPage(pt)}
-                    title={present ? 'Already on this site' : atCap ? `Sites are capped at ${MAX_PAGES} pages` : `Add ${pageMetaFor(pt).label}`}
+                    title={present ? 'Already on this site' : atCap ? `Sites are capped at ${OTHER_PAGES_MAX} pages besides service and town pages` : `Add ${pageMetaFor(pt).label}`}
                     className={[
                       'flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors',
                       disabled
@@ -176,12 +179,12 @@ export default function PagesMenu({
 
             <button
               type="button"
-              disabled={atCap}
+              disabled={servicesAtCap}
               onClick={onGenerateServicePages}
-              title={atCap ? `Sites are capped at ${MAX_PAGES} pages` : 'Add one page per service (decision 20)'}
+              title={servicesAtCap ? `Sites are capped at ${PAGE_CAPS.service} service pages` : 'Add one page per service (decision 20)'}
               className={[
                 'mt-2 flex items-center justify-between rounded-lg border border-dashed px-3 py-2 text-left text-sm transition-colors',
-                atCap ? 'cursor-not-allowed border-rule/50 text-fg3/50' : 'border-rule text-fg2 hover:border-accent hover:text-accent',
+                servicesAtCap ? 'cursor-not-allowed border-rule/50 text-fg3/50' : 'border-rule text-fg2 hover:border-accent hover:text-accent',
               ].join(' ')}
             >
               Generate a page for each service

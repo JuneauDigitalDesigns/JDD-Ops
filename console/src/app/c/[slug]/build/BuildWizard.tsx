@@ -25,8 +25,9 @@ import { buildCategories } from './categories';
 import { fillImagePlaceholders } from '@/data/image-placeholders';
 import PageStudio from './PageStudio';
 import { defaultCompositionFor } from './page-templates';
-import { applyVerticalTemplate, servicePageSlugs, syncServicePages } from './vertical-templates';
+import { applyVerticalTemplate, areaPageRoutes, servicePageSlugs, syncAreaPages, syncServicePages } from './vertical-templates';
 import { chosenServicePages } from './service-page-sync';
+import { areaPageRefs, chosenAreaPages, chosenSpokePages } from './area-page-sync';
 import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import { landingStepId } from '@/lib/intake-steps';
@@ -327,6 +328,8 @@ export default function BuildWizard({
     () => withStagedPreviews({
       ...fillImagePlaceholders(effective, vertical, { includeWork: true }).content,
       servicePages: servicePageSlugs(siteComposition),
+      // Routing too: the town pages that exist, so the preview links no town page that won't ship.
+      areaPages: areaPageRefs(siteComposition, effective),
     }) as SiteContent,
     [effective, vertical, siteComposition],
   );
@@ -376,6 +379,16 @@ export default function BuildWizard({
     if (!hydrated) return;
     const next = syncServicePages(siteComposition, chosenServicePages(effective, siteComposition));
     if (servicePageSlugs(next).join('|') !== servicePageSlugs(siteComposition).join('|')) setSiteComposition(next);
+  }, [hydrated, effective, siteComposition]);
+
+  // Town pages and spokes follow the same way (local SEO L6, Xander 2026-11-12): the schema's gate
+  // decides, syncAreaPages adds and removes, and it is a no-op until a vertical has town pages.
+  // No spoke is approved yet: approvals arrive with the Search Console proposals (Phase 3), so the
+  // approved list is empty until then and no spoke is ever built on facts alone.
+  useEffect(() => {
+    if (!hydrated) return;
+    const next = syncAreaPages(siteComposition, chosenAreaPages(effective), chosenSpokePages(effective, []));
+    if (areaPageRoutes(next).join('|') !== areaPageRoutes(siteComposition).join('|')) setSiteComposition(next);
   }, [hydrated, effective, siteComposition]);
 
   // Persist the per-client bundle on any change — but never before hydration has run, or

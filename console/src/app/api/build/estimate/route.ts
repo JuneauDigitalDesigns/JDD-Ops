@@ -12,8 +12,8 @@ import { presetFor } from '@/lib/verticals';
 import { isValidModelId, modelOption, estimateCost, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import { planRunSections, type CopyPage } from '@/lib/copy-brief/run-sections';
 import { pickServicePages } from '@/lib/servicePages';
+import { PAGE_CAPS } from '@jdd/schema';
 import { pickTownPages, pickTownServicePages } from '@/lib/townPages';
-import { MAX_PAGES } from '@/lib/pages';
 
 export const runtime = 'nodejs';
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   // The same plan generate-copy runs, so the estimate prices the chunks Generate will send.
   const subpages = Array.isArray(body.subpages) ? body.subpages : [];
   const { sections } = planRunSections({
-    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, MAX_PAGES).length > 0,
+    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, PAGE_CAPS.service).length > 0,
     hasTownPages: pickTownPages(base).length > 0, hasTownServicePages: pickTownServicePages(base).length > 0,
   });
   const chunks = chunkSections(sections);

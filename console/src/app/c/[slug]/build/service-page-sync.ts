@@ -7,19 +7,20 @@
  * writes servicePageSlugs(composition) into content.servicePages and stores each paged service's
  * slug with withStoredSlugs, so a later rename of the service keeps its published URL.
  */
-import { MAX_PAGES, type SiteComposition } from '@/lib/pages';
+import { type SiteComposition } from '@/lib/pages';
+import { PAGE_CAPS } from '@jdd/schema';
 import { pickServicePages, serviceSlugs } from '@/lib/servicePages';
 
 type Json = Record<string, unknown>;
 
-/** The services that earn a page, within the page cap, as { slug, label } in service order. The
- *  cap counts the composition's other pages only: existing service pages are re-chosen, not
- *  extra. */
-export function chosenServicePages(content: unknown, comp: Pick<SiteComposition, 'pages'>): { slug: string; label: string }[] {
-  const others = comp.pages.filter((p) => p.pageType !== 'service').length;
+/** The services that earn a page, within the service-page cap, as { slug, label } in service
+ *  order. Since L14 (Xander, 2026-11-12) service pages have a cap of their own, PAGE_CAPS.service
+ *  (11), and no longer share one with the site's other pages, so `comp` no longer changes the
+ *  answer; the parameter stays for the callers. */
+export function chosenServicePages(content: unknown, _comp?: Pick<SiteComposition, 'pages'>): { slug: string; label: string }[] {
   const items = ((content as { services?: { items?: Json[] } })?.services?.items ?? []) as Json[];
   const slugs = serviceSlugs(content);
-  return pickServicePages(content, MAX_PAGES - others).map((i) => ({
+  return pickServicePages(content, PAGE_CAPS.service).map((i) => ({
     slug: slugs[i],
     label: typeof items[i]?.t === 'string' ? (items[i].t as string) : slugs[i],
   }));
