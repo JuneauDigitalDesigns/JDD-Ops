@@ -117,14 +117,15 @@ test("the Studio's effective content gives a client with no email, SEO copy, tag
   }
   // A phone with no tel: link: the call buttons dial the client, not the preset's number.
   const noHref = effectiveContent('hvac', { ...BARE, brand: { ...BARE.brand, phoneHref: null } }, null, {});
-  assert.equal(noHref.brand.phoneHref, 'tel:4075550177');
+  // Digits only: #76 formats the phone as the site shows it, (407) 555-0177 with an E.164 tel:.
+  assert.match(noHref.brand.phoneHref, /^tel:\+?1?4075550177$/);
 });
 
 test("the client's own identity survives every layer, 555-01xx phone included", () => {
   const out = effectiveContent('hvac', { ...TRACEWELL, brand: { ...TRACEWELL.brand, email: 'xanderjuneau+jddtest-e2e1@gmail.com', tagline: 'We will Trace down those issues!' } }, null, {});
   assert.equal(out.brand.email, 'xanderjuneau+jddtest-e2e1@gmail.com');
   assert.equal(out.brand.tagline, 'We will Trace down those issues!');
-  assert.equal(out.brand.phone, '4075550177');
+  assert.equal(out.brand.phone.replace(/\D/g, '').replace(/^1/, ''), '4075550177');
   assert.equal(out.brand.license, 'CAC1800177');
   assert.equal(out.brand.address, TRACEWELL.brand.address);
   assert.deepEqual(out.extensions.trustBadges, ['TW Test Award 2025']);
