@@ -86,6 +86,44 @@ export function linkedServices(content: unknown): ServiceRef[] {
   return serviceRefs(content).filter((s) => s.href !== null);
 }
 
+/**
+ * The anchor id of one services.items entry (its slug), for a list that iterates the items itself.
+ * The footer links a service without its own page to `/services#<slug>` (footerColumns).
+ */
+export function serviceAnchor(content: unknown, item: unknown): string {
+  const i = arr(obj(obj(content).services).items).indexOf(item);
+  return i < 0 ? '' : serviceSlugs(content)[i];
+}
+
+/** One footer link. `path` is where its label lives, for the Studio's inline edit. */
+export type FooterLink = { label: string; href: string; path: string };
+export type FooterColumn = { h: string; links: FooterLink[] };
+
+/**
+ * The footer's link columns, built from what the site actually has (Xander, 2026-11-11):
+ * - Services: every service, linking to its own page when it has one, else to the Services page
+ *   scrolled to its card (each services list gives each card id="<slug>").
+ * - Company: the top menu's pages except Home (Services, About, Contact), named as the menu names
+ *   them. The menu is generated from the composition, so it only ever lists pages that exist.
+ * An empty column is left out. `footer.cols` is not read: the presets' sample columns ("Our Work",
+ * "Reviews", sample services) shipped on Tracewell's test site and linked pages that don't exist.
+ */
+export function footerColumns(content: unknown): FooterColumn[] {
+  const nav = arr(obj(content).nav).map((n, i) => ({ label: str(obj(n).label), href: str(obj(n).href), path: `nav.${i}.label` }));
+  // The Services page; on a one-page site (no /services in the menu) the cards are on this page.
+  const servicesPage = nav.some((n) => n.href === '/services') ? '/services' : '';
+  const services = serviceRefs(content).map((s) => ({
+    label: s.t,
+    href: s.href ?? `${servicesPage}#${s.slug}`,
+    path: `services.items.${s.index}.t`,
+  }));
+  const company = nav.filter((n) => n.label && n.href && n.href !== '/' && n.href !== '#' && n.href !== '#top');
+  return [
+    { h: 'Services', links: services },
+    { h: 'Company', links: company },
+  ].filter((c) => c.links.length > 0);
+}
+
 /** The service a service page is for, or null (unknown slug: the section renders nothing). */
 export function serviceBySlug(content: unknown, slug: string | undefined): ServiceRef | null {
   if (!slug) return null;

@@ -38,6 +38,8 @@ import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pa
 import { servicePageSlugs } from '@/app/c/[slug]/build/vertical-templates';
 import { withStoredSlugs } from '@/app/c/[slug]/build/service-page-sync';
 import { remapFooterCols } from '@/app/c/[slug]/build/nav-targets';
+import { footerColumns } from '@/lib/serviceLinks';
+import { withDisplayPhone } from '@/lib/displayPhone';
 import { CONTENT as SEED_CONTENT, type SiteContent } from '@/data/site';
 import { buildPageSeo, businessNode, type PageSeo, type SeoPageRef } from '@/lib/pageSeo';
 import { scoreSite } from '@/lib/scorePage';
@@ -152,7 +154,9 @@ export async function POST(req: Request) {
   const vertical = typeof body.vertical === 'string' && VALID_VERTICALS.has(body.vertical)
     ? (body.vertical as VerticalId)
     : null;
-  const content = isValidSiteContent(body.content) ? body.content : null;
+  // The phone as the site shows it, (407) 555-0177 with an E.164 tel: (lib/displayPhone.ts). The
+  // Studio previews the same; this covers a payload built before it did.
+  const content = isValidSiteContent(body.content) ? withDisplayPhone(body.content) : null;
   const deploy = Boolean(body.deploy);
   // The message is operator-authored now (the deploy dialog exposes it as an editable field), so
   // normalise it before it reaches git. Defence in depth only — the real protection is that
@@ -232,6 +236,12 @@ export async function POST(req: Request) {
           // (§2), so renaming the service later keeps its published URL.
           content.servicePages = servicePageSlugs(composition);
           content.services = withStoredSlugs(content, content.servicePages).services;
+
+          // The footer's link columns are built from the client's own services and pages, which is
+          // what every catalog footer renders (serviceLinks.ts footerColumns; Xander 2026-11-11). Write
+          // the same into site.ts, so it carries no preset sample links ("Our Work", "Reviews") that
+          // the remap below would otherwise refuse the export over, though no footer shows them.
+          content.footer = { ...content.footer, cols: footerColumns(content).map((c) => ({ h: c.h, links: c.links.map(({ label, href }) => ({ label, href })) })) };
 
           // The rest of the site chrome carries single-page anchors too. On a multi-page site a
           // footer `#services`/`#about`/… link scrolls to nothing from every page that doesn't

@@ -60,7 +60,7 @@ export const FIELD_INDEX: FieldEntry[] = [
   // ── Images ───────────────────────────────────────────────────────────────
   { path: 'images.hero.slides', label: 'Hero slides', tab: 'images', kind: 'list', keywords: 'photo banner carousel' },
   { path: 'images.about.feature', label: 'About image', tab: 'images', keywords: 'photo picture' },
-  { path: 'images.footer.logoImage', label: 'Footer logo', tab: 'images', keywords: 'mark brandmark' },
+  { path: 'images.footer.logoImage', label: 'Logo', tab: 'images', keywords: 'mark brandmark footer nav' },
 
   // ── Content lists ────────────────────────────────────────────────────────
   { path: 'services.items', label: 'Services', tab: 'services', kind: 'list', keywords: 'offerings work types' },

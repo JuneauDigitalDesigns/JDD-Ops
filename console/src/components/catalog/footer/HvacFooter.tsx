@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // HvacFooter — Northstar "Home — Standard" footer, premium pass (2026-11-09, approved mockup).
 // A deep-navy footer: brand column (accent-bar mark + blurb + credential badges), the client's
-// link columns (from footer.cols — no hardcoded section anchors), a derived Contact column, and a
+// link columns (footerColumns: the client's services and pages, never footer.cols), a derived Contact column, and a
 // legal bottom bar with the license line. Reads brand.* + footer.* + extensions.trustBadges.
 // Every colour is a palette token (ink-panel, on-ink, rule-ink, accent), so the Studio reaches it.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,7 +13,8 @@ import {
 import type { Icon } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
-import { displayAddress, profileLinks, type ProfileKind } from '@/lib/serviceLinks';
+import { BrandBox, AgencyCredit, Copyright } from '@/lib/BrandBox';
+import { displayAddress, profileLinks, footerColumns, type ProfileKind } from '@/lib/serviceLinks';
 
 /** D11 heading, approved word for word by Xander on 2026-11-10. */
 const FIND_US_ON = 'Find us on';
@@ -26,8 +27,8 @@ export const meta = {
   id: 'hvac-footer',
   category: 'footer',
   label: 'HVAC / Footer',
-  consumes: ['brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'footer.blurb', 'footer.cols', 'footer.legal', 'extensions.trustBadges', 'extensions.profiles', 'extensions.serviceAreaBusiness', 'extensions.hours'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
+  consumes: ['images.footer.logoImage', 'brand.name', 'brand.tagline', 'brand.phone', 'brand.phoneHref', 'brand.email', 'brand.address', 'footer.blurb', 'extensions.trustBadges', 'extensions.profiles', 'extensions.serviceAreaBusiness', 'extensions.hours', 'brand.long', 'services.items', 'servicePages', 'nav'],
+  sharedDeps: ['@/lib/BrandBox', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -53,7 +54,13 @@ export default function HvacFooter({ content = CONTENT }: { content?: SiteConten
           {/* Brand */}
           <div className="md:col-span-2 lg:col-span-1">
             <a href="/" className="flex items-center gap-[11px] text-onInk">
-              <span className="accent-bar !h-9 !w-9 !rounded-[10px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" aria-hidden="true" />
+              <BrandBox
+                content={content}
+                radius="rounded-[10px]"
+                fallback={
+                  <span className="accent-bar !h-9 !w-9 !rounded-[10px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" aria-hidden="true" />
+                }
+              />
               <span className="font-heading text-[22px] font-semibold leading-none tracking-[-0.01em]">
                 <E p="brand.name">{brand.name}</E>
                 {brand.tagline && <small className="mt-0.5 block font-sans text-[11px] font-medium text-onInkSoft"><E p="brand.tagline">{brand.tagline}</E></small>}
@@ -95,11 +102,11 @@ export default function HvacFooter({ content = CONTENT }: { content?: SiteConten
           </div>
 
           {/* Client link columns */}
-          {footer.cols.map((c, ci) => (
+          {footerColumns(content).map((c, ci) => (
             <div key={c.h || ci}>
-              <h4 className="mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-onInkSoft"><E p={`footer.cols.${ci}.h`}>{c.h}</E></h4>
+              <h4 className="mb-3.5 font-sans text-[12.5px] font-bold uppercase tracking-[0.12em] text-onInkSoft">{c.h}</h4>
               {c.links.map((l, li) => (
-                <a key={l.href + li} href={l.href} className={col}><E p={`footer.cols.${ci}.links.${li}.label`}>{l.label}</E></a>
+                <a key={l.href + li} href={l.href} className={col}><E p={l.path}>{l.label}</E></a>
               ))}
             </div>
           ))}
@@ -138,7 +145,8 @@ export default function HvacFooter({ content = CONTENT }: { content?: SiteConten
         </div>
 
         <div className="mt-11 flex flex-wrap justify-between gap-4 border-t border-ruleInk pt-[22px] text-[13px] text-onInkSoft">
-          <span><E p="footer.legal">{footer.legal}</E></span>
+          <span><Copyright content={content} /></span>
+          <AgencyCredit />
           {brand.license && <span>Licensed &amp; insured · {brand.license}</span>}
         </div>
       </div>

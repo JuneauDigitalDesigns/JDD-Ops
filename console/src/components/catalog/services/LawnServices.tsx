@@ -77,7 +77,7 @@ export default function LawnServices({ content = CONTENT }: { content?: SiteCont
                 key={ref.slug}
                 id={ref.slug}
                 {...(ref.href ? { href: ref.href } : {})}
-                className="group hover-lift shadow-brand-1 flex flex-col overflow-hidden rounded-[22px] border border-rule bg-bg hover:shadow-brand-3"
+                className="group scroll-mt-24 hover-lift shadow-brand-1 flex flex-col overflow-hidden rounded-[22px] border border-rule bg-bg hover:shadow-brand-3"
               >
                 {photo && (
                   <div

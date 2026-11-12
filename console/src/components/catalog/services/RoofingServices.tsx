@@ -67,7 +67,7 @@ export default function RoofingServices({ content = CONTENT }: { content?: SiteC
                 key={ref.slug}
                 id={ref.slug}
                 {...(ref.href ? { href: ref.href } : {})}
-                className={`group grid grid-cols-[56px_1fr] items-start [--rf-stroke:color-mix(in_srgb,var(--ink-soft)_70%,var(--bg))] hover:[--rf-stroke:var(--accent)] gap-x-4 border-b border-rule px-1 py-[22px] transition-[background-color,padding] duration-300 hover:bg-bgSoft md:gap-6 md:px-3 md:py-[30px] md:hover:pl-5 ${
+                className={`group scroll-mt-24 grid grid-cols-[56px_1fr] items-start [--rf-stroke:color-mix(in_srgb,var(--ink-soft)_70%,var(--bg))] hover:[--rf-stroke:var(--accent)] gap-x-4 border-b border-rule px-1 py-[22px] transition-[background-color,padding] duration-300 hover:bg-bgSoft md:gap-6 md:px-3 md:py-[30px] md:hover:pl-5 ${
                   ref.href ? 'md:grid-cols-[96px_1fr_1.25fr_auto]' : 'md:grid-cols-[96px_1fr_1.25fr_40px]'
                 }`}
               >

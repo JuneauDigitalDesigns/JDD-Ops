@@ -110,9 +110,9 @@ export default function ImagesPane({
         </div>
       </Group>
 
-      <Group title="Footer">
+      <Group title="Nav and footer">
         <div className="grid grid-cols-2 gap-2">
-          <ImageTile content={content} setField={setField} path="images.footer.logoImage" label="Footer logo" />
+          <ImageTile content={content} setField={setField} path="images.footer.logoImage" label="Logo" />
         </div>
       </Group>
 

@@ -13,6 +13,7 @@ import { stripSampleReviews } from '@/lib/sampleReviews';
 import { stripPlaceholderCanonical } from '@/lib/placeholderCanonical';
 import { stripPresetIdentity } from '@/lib/presetIdentity';
 import { withCopywriterBrandOnly } from '@/lib/copy-schema';
+import { withDisplayPhone } from '@/lib/displayPhone';
 
 export function effectiveContent(
   vertical: VerticalId,
@@ -26,7 +27,10 @@ export function effectiveContent(
   // the merge (so the emptied value can't fall through to a preset), here so the preview shows
   // what the export will ship and the copy run's base carries none of them
   // (lib/sampleReviews.ts, lib/placeholderCanonical.ts, lib/presetIdentity.ts).
-  const merged = stripPresetIdentity(stripPlaceholderCanonical(
+  // withDisplayPhone, outermost: the phone as the site shows it, (407) 555-0177 with an E.164 tel:,
+  // the same as the export writes (lib/displayPhone.ts). Content imported before @jdd/schema
+  // 1.33.3 holds bare digits, and an operator may type them.
+  const merged = withDisplayPhone(stripPresetIdentity(stripPlaceholderCanonical(
     stripSampleReviews(applyEdits(
       // The generated layer's brand is cut to the tagline, the one brand field the copywriter
       // writes: a draft generated before 2026-11-11 holds a copy of the whole brand there, which
@@ -34,7 +38,7 @@ export function effectiveContent(
       deepMerge(deepMerge(presetFor(vertical), imported ?? {}), withCopywriterBrandOnly(generated ?? {})),
       edits,
     )).content,
-  ).content).content;
+  ).content).content);
   // Work ships hidden+empty in every preset. Once it has projects (added via the Brand
   // drawer, AI copy, or a seed) the section must show — in the preview AND the exported
   // content. Left hidden while empty, so an untouched Work section stays off (and the

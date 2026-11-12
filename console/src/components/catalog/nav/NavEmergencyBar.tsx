@@ -2,14 +2,15 @@
 import { Phone, Warning } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
+import { BrandBox } from '@/lib/BrandBox';
 import { skinClasses, type SkinId } from '@/lib/skins';
 
 export const meta = {
   id: 'nav-emergency-bar',
   category: 'nav',
   label: 'Nav / Emergency 24-7 Bar',
-  consumes: ['announcement', 'brand.phone', 'brand.phoneHref', 'brand.name', 'nav'],
-  sharedDeps: ['@phosphor-icons/react', '@/lib/skins'],
+  consumes: ['images.footer.logoImage', 'announcement', 'brand.phone', 'brand.phoneHref', 'brand.name', 'nav'],
+  sharedDeps: ['@/lib/BrandBox', '@phosphor-icons/react', '@/lib/skins'],
   skins: ['inverted', 'default'],
   /** Structural archetype, from src/lib/archetypes.ts. Unique within the category. */
   archetype: 'stacked-bars',
@@ -54,7 +55,10 @@ export default function NavEmergencyBar({
         </div>
       )}
       <nav className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b ${s.rule} ${s.section} px-6 py-4`} aria-label="Main navigation">
-        <span className={`font-heading text-lg font-bold ${s.heading}`}><E p="brand.name">{brand.name}</E></span>
+        <span className={`flex min-w-0 items-center gap-2.5 font-heading text-lg font-bold ${s.heading}`}>
+          <BrandBox content={content} radius="rounded-md" ring fallback={null} />
+          <E p="brand.name">{brand.name}</E>
+        </span>
         {showLinks && (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
             {nav.map((item, i) => (

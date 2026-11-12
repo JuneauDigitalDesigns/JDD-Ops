@@ -58,7 +58,7 @@ import { ensureSiteLayout, LAYOUT_FILE } from './lib/site-layout.js';
 // already diverged on the E.164 regex, and nothing compared them. lib/site-routes/*.ts keep
 // their own inline copy deliberately — those files are written verbatim into client repos,
 // which have no @jdd/schema dependency.
-import { buildPortalSiteEntries, isWebOnly, toE164 } from '@jdd/schema';
+import { buildPortalSiteEntries, formatPhoneDisplay, isWebOnly, toE164 } from '@jdd/schema';
 import {
   attachSiteToAccount,
   detachSiteFromAccount,
@@ -828,8 +828,8 @@ function applyTwilioNumberToSite(repoDir, content, twilioNumber) {
  * copies of that regex in the tree.
  */
 function formatPhoneForDisplay(e164) {
-  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
-  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : e164;
+  // @jdd/schema 1.33.3 holds the one formatter; the site's own phone uses it too (buildScaffold).
+  return formatPhoneDisplay(e164);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
