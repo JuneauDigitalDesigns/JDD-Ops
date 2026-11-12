@@ -12,7 +12,7 @@
 // Speed: only photo 1 is in the server HTML, and it alone is `priority` (the LCP). The other hero
 // photos mount after the page has loaded and are lazy; track photos are lazy. One photo: no control.
 //
-// The control's words are heard, not seen (aria labels). Listed for Xander's word-for-word OK.
+// The control's words are heard, not seen (aria labels). Approved word for word by Xander, 2026-11-11.
 //
 // BYTE-IDENTICAL in console/src/lib and template/src/lib (console/test/photo-carousel.test.mjs).
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
