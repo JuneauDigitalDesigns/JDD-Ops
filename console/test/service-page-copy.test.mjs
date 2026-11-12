@@ -29,8 +29,10 @@ test('servicePages is a generable section with a fixed shape', () => {
   assert.ok(ALL_SECTIONS.includes('servicePages'));
   const s = buildCopySchema(['servicePages'], false).properties.servicePages;
   const item = s.properties.items.items;
-  assert.deepEqual(Object.keys(item.properties).sort(), ['expect', 'faq', 'intro', 'slug']);
-  assert.deepEqual(item.required.sort(), ['expect', 'faq', 'intro', 'slug']);
+  // 2026-11-11 (service page upgrade): the About paragraphs and one line per inclusion and per sign.
+  const keys = ['body', 'expect', 'faq', 'includedNotes', 'intro', 'signNotes', 'slug'];
+  assert.deepEqual(Object.keys(item.properties).sort(), keys);
+  assert.deepEqual(item.required.sort(), keys);
 });
 
 test('the instruction lists only services that earn a page, with their own facts and the city', () => {
@@ -57,7 +59,8 @@ test('generated page copy lands on the matching service by slug, and nowhere els
     { slug: 'gas-lines', intro: 'Invented', expect: [], faq: [] },
     { slug: 'no-such-service', intro: 'x', expect: [], faq: [] },
   ] } }, new Set(['servicePages']));
-  assert.deepEqual(out.services.items[0].page, page);
+  // A run that returned no body or notes stores empty lists, which render nothing.
+  assert.deepEqual(out.services.items[0].page, { ...page, body: [], includedNotes: [], signNotes: [] });
   assert.equal(out.services.items[0].priceFrom, '$129', 'the client facts survive');
   assert.equal(out.services.items[1].page, undefined, 'a thin service never gets page copy, even if the model returns some');
 });

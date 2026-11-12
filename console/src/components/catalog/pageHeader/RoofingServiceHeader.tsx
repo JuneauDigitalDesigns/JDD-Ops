@@ -8,8 +8,10 @@
 // On a phone it is one top-to-bottom wash. A visible breadcrumb that matches client-seo's
 // BreadcrumbList, the service's tag as the amber kicker (the frosted panel with the emphasis-colour
 // bar), "{service} in {city}" as the page's only H1 with the city in the emphasis colour, the
-// generated answer-first intro, the square accent phone button and jump links to the price and
-// the questions (each shown only when that block exists below).
+// generated answer-first intro, the square accent phone button and a jump link to the questions
+// (shown only when that block exists below). Since 2026-11-11 (Xander, "be upfront with pricing")
+// the starting price sits here, beside the heading, with "Ask for a quote" taking the visitor to
+// the closing form already filled with the service.
 //
 // No form here: a service page's only form is the closing call to action (Xander 2026-11-10).
 // wirePages and the Studio pass `serviceSlug`; an unknown slug renders nothing. Every word below
@@ -23,13 +25,14 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { CoverImage } from '@/lib/CoverImage';
 import { primaryCity, serviceBySlug, servicePhoto, serviceQuestions } from '@/lib/serviceLinks';
+import { SERVICE_UPGRADE_WORDS, goToQuoteForm, servicePrice } from '@/lib/servicePage';
 
 export const meta = {
   id: 'roofing-service-header',
   category: 'pageHeader',
   label: 'Roofing / Service page header',
   consumes: ['services.items', 'brand.address', 'brand.phone', 'brand.phoneHref', 'extensions.serviceArea', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -45,7 +48,8 @@ export default function RoofingServiceHeader({ content = CONTENT, serviceSlug }:
   const city = primaryCity(content);
   const photo = servicePhoto(content, s);
   const intro = typeof (s.item.page as { intro?: unknown } | undefined)?.intro === 'string' ? ((s.item.page as { intro: string }).intro.trim()) : '';
-  const hasPrice = typeof s.item.priceFrom === 'string' && s.item.priceFrom.trim() !== '';
+  const U = SERVICE_UPGRADE_WORDS;
+  const price = servicePrice(s);
   const hasQuestions = serviceQuestions(content, s).length > 0;
   const jumpCls =
     'border-b border-ruleInk pb-[3px] text-[14px] font-semibold text-onInk transition-colors hover:border-accent hover:text-accent';
@@ -76,7 +80,7 @@ export default function RoofingServiceHeader({ content = CONTENT, serviceSlug }:
         }}
       />
 
-      <div className="relative mx-auto w-full max-w-[1120px] px-5 pb-12 pt-10 sm:px-6 lg:pb-[72px] lg:pt-[112px]">
+      <div className={`relative mx-auto w-full max-w-[1120px] px-5 pb-12 pt-10 sm:px-6 lg:pb-[72px] lg:pt-[112px] ${price ? 'lg:grid lg:grid-cols-[1fr_280px] lg:items-end lg:gap-12' : ''}`}>
         <div className="min-w-0 max-w-[720px]">
           <nav aria-label="Breadcrumb" className="mb-5 lg:mb-[26px]">
             <ol className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-onInkSoft">
@@ -123,13 +127,36 @@ export default function RoofingServiceHeader({ content = CONTENT, serviceSlug }:
             </a>
           </div>
 
-          {(hasPrice || hasQuestions) && (
+          {hasQuestions && (
             <ul aria-label="On this page" className="mt-[26px] flex max-w-[50ch] flex-wrap gap-x-[22px] gap-y-2 border-t border-ruleInk pt-5">
-              {hasPrice && <li><a href="#pricing" className={jumpCls}>{W.pricing}</a></li>}
-              {hasQuestions && <li><a href="#questions" className={jumpCls}>{W.questions}</a></li>}
+              <li><a href="#questions" className={jumpCls}>{W.questions}</a></li>
             </ul>
           )}
         </div>
+
+        {/* Upfront pricing (Xander 2026-11-11): the price the client gave, in view from the start,
+            on the frosted ink-panel of the tag kicker. No price given: no box, and nothing about
+            price anywhere on the page. */}
+        {price && (
+          <aside
+            className="relative mt-8 overflow-hidden rounded-[6px] border border-ruleInk p-6 backdrop-blur-[6px] lg:mt-0"
+            style={{ background: 'color-mix(in srgb, var(--ink-panel) 72%, transparent)' }}
+          >
+            <span className="accent-bar absolute inset-x-0 top-0 !h-1 !w-auto !rounded-none" aria-hidden="true" />
+            <span className="block text-[12px] font-bold uppercase tracking-[0.14em] text-[color:var(--accent-2)]">{U.startingAt}</span>
+            <b className="mt-2 block font-heading text-[44px] font-extrabold leading-none tracking-[-0.03em] text-onInk lg:text-[50px]">
+              <E p={`services.items.${s.index}.priceFrom`}>{price}</E>
+            </b>
+            <a
+              href="#cta"
+              onClick={goToQuoteForm}
+              className="mt-5 flex w-full items-center justify-center rounded-[4px] bg-accent px-[22px] py-[14px] text-[16px] font-extrabold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98]"
+              style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
+            >
+              {U.askForQuote}
+            </a>
+          </aside>
+        )}
       </div>
     </section>
   );

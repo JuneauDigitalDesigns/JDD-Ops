@@ -5,39 +5,47 @@
 // Xander 2026-11-10): square and structural, roofing's 4px/6px corners throughout. Every block
 // renders ONE service's own content and is omitted when its data is absent (D5); no block is a
 // site-wide section, so no two service pages share a body.
-//   4  What's included        services.items[i].included        square, accent-filled ticks
-//   5  Signs it's time to call services.items[i].typicalJobs     outlined (stroked) numerals
-//   6  What to expect          services.items[i].page.expect     square numbered steps
-//   7  Starting at             services.items[i].priceFrom       dark panel, "Ask for a quote" → the form
-//   8  Areas we serve          services.items[i].areas           the hairline town index (own towns only)
-//   9  Brands we work with     services.items[i].brands
-//   10 Common questions        tagged customer questions, then page.faq (3–5), two-column rows
-//   11 Proof                   the pull quote beside the job photo (never the main photo twice)
-//   12 Related services        2–3 sibling services that have pages, as the home's numbered rows
+// Upgraded 2026-11-11 (Xander approved the mockup "HVAC Service Page Upgrade", drawn here in the
+// Roofing language): the price moved into the header, the job photos lead, and the page carries
+// generated explanation for search.
+//   Our work                  job photos tagged to this service (client photos only, never stock)
+//   About {service}           services.items[i].page.body       (generated: facts + general trade knowledge)
+//   Know before you book      duration, areas, brands (service's own, else site-wide); only rows given
+//   What's included           included[] + page.includedNotes   (square-ticked cards, staggered reveal: motion 1)
+//   Signs it's time to call   typicalJobs[] + page.signNotes    (ink-panel-2 band, ring per sign: motion 2)
+//   What to expect            services.items[i].page.expect     square numbered steps
+//   Areas we serve            services.items[i].areas           the hairline town index (own towns only)
+//   Common questions          tagged customer questions, then page.faq (3–5), two-column rows
+//   Proof                     the pull quote of a review tagged to this service
+//   Related services          2–3 sibling services that have pages, as the home's numbered rows
+// "Starting at" and "Ask for a quote" are in RoofingServiceHeader now.
 // Block 13 is RoofingFinalCta, which wirePages gives the same serviceSlug.
 //
 // Each block carries its own `rv` scroll reveal, so this component is in SELF_ANIMATED
 // (revealPolicy.ts): a reveal on the whole body would fade a page-tall block. Edit paths use the
 // ORIGINAL services.items index. Headings were approved word for word on 2026-11-10.
 //
-// Colours are palette tokens: the emphasis colour (signs bar, price label, stars) is
-// var(--accent-2), the editable accent2 slot; ticks, steps and numerals are accent; the resting
-// numeral stroke is the same ink-soft/bg mix RoofingServices uses.
+// Colours are palette tokens: the emphasis colour (facts bar, stars) is var(--accent-2), the
+// editable accent2 slot; ticks, sign markers and steps are accent; the resting numeral stroke is
+// the same ink-soft/bg mix RoofingServices uses.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Check, Plus } from '@phosphor-icons/react';
+import { Check, Plus, Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { CoverImage } from '@/lib/CoverImage';
 import {
-  relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions, serviceRefs,
+  primaryCity, relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions, serviceRefs,
 } from '@/lib/serviceLinks';
+import {
+  SERVICE_UPGRADE_WORDS, aboutParagraphs, listWithNotes, ourWorkPhotos, serviceFacts,
+} from '@/lib/servicePage';
 
 export const meta = {
   id: 'roofing-service-detail',
   category: 'services',
   label: 'Roofing / Service page body',
-  consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
+  consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -61,26 +69,34 @@ const Cap = () => <span className="accent-bar mb-[18px] block !h-1 !w-11 !rounde
 
 const H2_LG = 'font-heading text-[clamp(34px,4vw,46px)] font-extrabold leading-[1.02] tracking-[-0.024em] text-ink';
 const H2_MD = 'font-heading text-[clamp(30px,3.2vw,36px)] font-extrabold leading-[1.02] tracking-[-0.024em] text-ink';
+/** H2_MD on the dark ink-panel-2 band. */
+const H2_MD_DARK = 'font-heading text-[clamp(30px,3.2vw,36px)] font-extrabold leading-[1.02] tracking-[-0.024em] text-onInk';
 const pad2 = (k: number) => String(k + 1).padStart(2, '0');
 
 export default function RoofingServiceDetail({ content = CONTENT, serviceSlug }: { content?: SiteContent; serviceSlug?: string }) {
   const s = serviceBySlug(content, serviceSlug);
   if (!s) return null;
   const W = SERVICE_PAGE_WORDS;
+  const U = SERVICE_UPGRADE_WORDS;
+  const { brand } = content;
   const n = s.index;
-  const included = serviceList(s, 'included');
-  const jobs = serviceList(s, 'typicalJobs');
+  const city = primaryCity(content);
+  // The photos' alt is the page's own heading, "{service} in {city}": facts, never a guess.
+  const headline = city ? `${s.t} in ${city}` : s.t;
+  const work = ourWorkPhotos(content, s);
+  const about = aboutParagraphs(s);
+  const facts = serviceFacts(content, s, { howLong: U.howLong, areas: W.areas, brands: W.brands });
+  const included = listWithNotes(s, 'included');
+  const signs = listWithNotes(s, 'typicalJobs');
   const expect = (Array.isArray((s.item.page as { expect?: unknown } | undefined)?.expect)
     ? ((s.item.page as { expect: unknown[] }).expect)
     : []
   )
     .map((v, i) => ({ text: typeof v === 'string' ? v.trim() : '', i }))
     .filter((x) => x.text);
-  const price = typeof s.item.priceFrom === 'string' ? s.item.priceFrom.trim() : '';
   const areas = serviceList(s, 'areas');
-  const brands = serviceList(s, 'brands');
   const questions = serviceQuestions(content, s);
-  const { reviews, photos } = serviceProof(content, s);
+  const { reviews } = serviceProof(content, s);
   const related = relatedServices(content, s);
   const review = reviews[0];
   // A related row shows the same numeral its service has on the home's ruled rows.
@@ -92,85 +108,132 @@ export default function RoofingServiceDetail({ content = CONTENT, serviceSlug }:
 
   return (
     <>
-      {(included.length > 0 || jobs.length > 0) && (
-        <section className="rv bg-bg py-16 lg:py-[92px]">
-          <div className={`mx-auto grid max-w-[1120px] items-start gap-10 px-5 sm:px-6 lg:gap-14 ${included.length && jobs.length ? 'lg:grid-cols-2' : ''}`}>
-            {included.length > 0 && (
+      {work.length > 0 && (
+        <section className="rv bg-bg pb-4 pt-14 lg:pt-[88px]">
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2_MD}>{U.ourWork}</h2>
+            <div className={`mt-[26px] grid gap-3.5 ${work.length > 1 ? 'sm:grid-cols-[1.3fr_1fr]' : ''}`}>
+              {work.map((ph, k) => (
+                <figure
+                  key={ph.path}
+                  className={`shadow-brand-1 relative isolate aspect-[3/2] overflow-hidden rounded-[6px] bg-bgSoft ${work.length === 3 && k === 0 ? 'sm:row-span-2 sm:aspect-auto' : ''}`}
+                >
+                  <CoverImage url={ph.url} alt={headline} sizes={work.length > 1 ? '(min-width: 640px) 50vw, 100vw' : '100vw'} />
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {(about.length > 0 || facts.length > 0) && (
+        <section className="rv bg-bg py-14 lg:py-[88px]">
+          <div className={`mx-auto grid max-w-[1120px] items-start gap-10 px-5 sm:px-6 lg:gap-14 ${about.length && facts.length ? 'lg:grid-cols-[1.6fr_1fr]' : ''}`}>
+            {about.length > 0 && (
               <div>
                 <Cap />
-                <h2 className={H2_LG}>{W.included}</h2>
-                <ul className="mt-[26px] border-t border-rule">
-                  {included.map((x) => (
-                    <li key={x.i} className="flex items-start gap-3.5 border-b border-rule py-4 text-[16px] font-semibold leading-[1.45] text-ink">
-                      <span className="grid h-[26px] w-[26px] shrink-0 place-items-center bg-accent text-accentFg">
-                        <Check size={15} weight="bold" aria-hidden="true" />
-                      </span>
-                      <E p={`services.items.${n}.included.${x.i}`}>{x.text}</E>
-                    </li>
-                  ))}
-                </ul>
+                <h2 className={H2_LG}>
+                  {U.about} <E p={`services.items.${n}.t`}>{s.t}</E>
+                </h2>
+                {about.map((p) => (
+                  <p key={p.path} className="mt-5 max-w-[62ch] text-[17px] leading-[1.7] text-ink">
+                    <E p={p.path}>{p.text}</E>
+                  </p>
+                ))}
               </div>
             )}
-            {jobs.length > 0 && (
-              <div className="relative rounded-[6px] bg-bgSoft px-[22px] pb-[18px] pt-[26px] shadow-[inset_0_0_0_1px_var(--rule)] lg:mt-[22px] lg:px-8 lg:pb-[22px] lg:pt-8">
+            {facts.length > 0 && (
+              <aside className="relative rounded-[6px] bg-bgSoft px-[22px] pb-[22px] pt-[26px] shadow-[inset_0_0_0_1px_var(--rule)] lg:mt-[22px] lg:px-8 lg:pb-7 lg:pt-8">
                 <span className="absolute bottom-8 left-0 top-8 w-1 bg-[color:var(--accent-2)]" aria-hidden="true" />
-                <h2 className={H2_MD}>{W.signs}</h2>
-                <ol className="mt-[18px]">
-                  {jobs.map((x, k) => (
-                    <li key={x.i} className={`flex items-baseline gap-4 py-[13px] text-[16px] leading-[1.5] text-ink ${k ? 'border-t border-rule' : ''}`}>
-                      <span
-                        className="w-[34px] shrink-0 font-heading text-[24px] font-extrabold leading-none tracking-[-0.02em] text-transparent"
-                        style={{ WebkitTextStrokeWidth: '1.2px', WebkitTextStrokeColor: 'var(--accent)' }}
-                        aria-hidden="true"
-                      >
-                        {pad2(k)}
-                      </span>
-                      <E p={`services.items.${n}.typicalJobs.${x.i}`}>{x.text}</E>
-                    </li>
+                <h2 className="font-heading text-[21px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink">{U.facts}</h2>
+                <dl className="mt-1">
+                  {facts.map((f, k) => (
+                    <div key={f.label} className={k ? 'mt-3.5 border-t border-rule pt-3.5' : 'mt-3.5'}>
+                      <dt className="text-[11.5px] font-bold uppercase tracking-[0.12em] text-inkSoft">{f.label}</dt>
+                      <dd className="mt-1 font-heading text-[18px] font-extrabold leading-[1.3] tracking-[-0.01em] text-ink">
+                        {f.values.map((v, j) => (
+                          <span key={v.path}>{j > 0 && ', '}<E p={v.path}>{v.text}</E></span>
+                        ))}
+                      </dd>
+                    </div>
                   ))}
-                </ol>
-              </div>
+                </dl>
+              </aside>
             )}
           </div>
         </section>
       )}
 
-      {(expect.length > 0 || price) && (
+      {included.length > 0 && (
+        <section className="rv bg-bgSoft py-14 lg:py-[88px]">
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2_MD}>{W.included}</h2>
+            <ul className="rv-stagger mt-8 grid gap-3.5 sm:grid-cols-2">
+              {included.map((x) => (
+                <li key={x.path} className="shadow-brand-1 flex items-start gap-3.5 rounded-[6px] border border-rule bg-bg p-5">
+                  <span className="grid h-[26px] w-[26px] shrink-0 place-items-center bg-accent text-accentFg" aria-hidden="true">
+                    <Check size={15} weight="bold" />
+                  </span>
+                  <span className="min-w-0">
+                    <b className="block text-[16px] font-semibold leading-[1.45] text-ink"><E p={x.path}>{x.text}</E></b>
+                    {x.note && <span className="mt-1 block text-[14.5px] leading-[1.55] text-inkSoft"><E p={x.notePath}>{x.note}</E></span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {signs.length > 0 && (
+        <section className="rv bg-inkPanel2 py-14 text-onInk lg:py-[88px]">
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2_MD_DARK}>{W.signs}</h2>
+            <ul className="mt-8 grid gap-3.5 sm:grid-cols-2">
+              {signs.map((x) => (
+                <li key={x.path} className="flex items-start gap-4 rounded-[6px] border border-ruleInk bg-[color:color-mix(in_srgb,var(--on-ink)_4%,transparent)] p-5">
+                  {/* Roofing's square marker; its ring is squared to match. */}
+                  <span className="sign-ring mt-[7px] h-3 w-3 shrink-0 bg-accent text-accent after:!rounded-none" aria-hidden="true" />
+                  <span className="min-w-0">
+                    <b className="block text-[16px] font-semibold leading-[1.45] text-onInk"><E p={x.path}>{x.text}</E></b>
+                    {x.note && <span className="mt-1 block text-[14.5px] leading-[1.55] text-onInkSoft"><E p={x.notePath}>{x.note}</E></span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {brand.phoneHref && (
+              <a
+                href={brand.phoneHref}
+                className="mt-7 inline-flex items-center gap-[10px] rounded-[4px] bg-accent px-[22px] py-[14px] font-heading text-[18px] font-extrabold tracking-[-0.01em] text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98]"
+                style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
+              >
+                <Phone size={20} weight="fill" aria-hidden="true" />
+                <E p="brand.phone">{brand.phone}</E>
+              </a>
+            )}
+          </div>
+        </section>
+      )}
+
+      {expect.length > 0 && (
         <section className="rv bg-bgSoft py-16 lg:py-[88px]">
-          <div className={`mx-auto grid max-w-[1120px] items-start gap-10 px-5 sm:px-6 lg:gap-14 ${expect.length && price ? 'lg:grid-cols-[1.25fr_0.75fr]' : ''}`}>
-            {expect.length > 0 && (
-              <div>
-                <Cap />
-                <h2 className={H2_MD}>{W.expect}</h2>
-                <ol className="mt-7">
-                  {expect.map((x, k) => (
-                    <li key={x.i} className="relative pb-[26px] pl-[60px] text-[16.5px] leading-[1.55] text-ink last:pb-0">
-                      <span className="absolute left-0 top-[-6px] grid h-10 w-10 place-items-center rounded-[4px] bg-accent font-heading text-[17px] font-extrabold text-accentFg" aria-hidden="true">
-                        {k + 1}
-                      </span>
-                      {k < expect.length - 1 && <span className="absolute bottom-0.5 left-[19px] top-[42px] w-0.5 bg-rule" aria-hidden="true" />}
-                      <E p={`services.items.${n}.page.expect.${x.i}`}>{x.text}</E>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-            {price && (
-              <aside id="pricing" className="shadow-brand-3 relative scroll-mt-24 overflow-hidden rounded-[6px] bg-inkPanel2 p-8 text-onInk">
-                <span className="accent-bar absolute inset-x-0 top-0 !h-1 !w-auto !rounded-none" aria-hidden="true" />
-                <span className="block text-[12px] font-bold uppercase tracking-[0.14em] text-[color:var(--accent-2)]">{W.startingAt}</span>
-                <b className="mt-3 block font-heading text-[44px] font-extrabold leading-none tracking-[-0.03em] lg:text-[54px]">
-                  <E p={`services.items.${n}.priceFrom`}>{price}</E>
-                </b>
-                <a
-                  href="#cta"
-                  className="mt-6 flex w-full items-center justify-center rounded-[4px] bg-accent px-[22px] py-[14px] text-[16px] font-extrabold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98]"
-                  style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
-                >
-                  {W.askForQuote}
-                </a>
-              </aside>
-            )}
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2_MD}>{W.expect}</h2>
+            <ol className="mt-7">
+              {expect.map((x, k) => (
+                <li key={x.i} className="relative pb-[26px] pl-[60px] text-[16.5px] leading-[1.55] text-ink last:pb-0">
+                  <span className="absolute left-0 top-[-6px] grid h-10 w-10 place-items-center rounded-[4px] bg-accent font-heading text-[17px] font-extrabold text-accentFg" aria-hidden="true">
+                    {k + 1}
+                  </span>
+                  {k < expect.length - 1 && <span className="absolute bottom-0.5 left-[19px] top-[42px] w-0.5 bg-rule" aria-hidden="true" />}
+                  <E p={`services.items.${n}.page.expect.${x.i}`}>{x.text}</E>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
       )}
@@ -192,21 +255,6 @@ export default function RoofingServiceDetail({ content = CONTENT, serviceSlug }:
                 <li key={x.i} className="flex min-w-0 items-center gap-2.5 border-b border-rule py-[13px] text-[15.5px] font-semibold leading-[1.2] text-ink transition-colors hover:text-accent">
                   <span className="h-1.5 w-1.5 shrink-0 bg-accent" aria-hidden="true" />
                   <E p={`services.items.${n}.areas.${x.i}`}>{x.text}</E>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
-
-      {brands.length > 0 && (
-        <section className="border-b border-rule bg-bg">
-          <div className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-7 gap-y-3.5 px-5 py-[30px] sm:px-6">
-            <h2 className="text-[12px] font-bold uppercase tracking-[0.14em] text-inkSoft">{W.brands}</h2>
-            <ul className="flex flex-wrap gap-2.5">
-              {brands.map((x) => (
-                <li key={x.i} className="rounded-[4px] border border-rule bg-bg px-[18px] py-[11px] font-heading text-[16px] font-extrabold leading-none tracking-[-0.01em] text-ink">
-                  <E p={`services.items.${n}.brands.${x.i}`}>{x.text}</E>
                 </li>
               ))}
             </ul>
@@ -238,9 +286,9 @@ export default function RoofingServiceDetail({ content = CONTENT, serviceSlug }:
         </section>
       )}
 
-      {(review || photos.length > 0) && (
+      {review && (
         <section className="rv bg-bgSoft py-16 lg:py-[88px]">
-          <div className={`mx-auto grid max-w-[1120px] items-stretch gap-[22px] px-5 sm:px-6 ${review && photos.length ? 'lg:grid-cols-[1.35fr_1fr] lg:gap-10' : photos.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+          <div className="mx-auto grid max-w-[1120px] items-stretch gap-[22px] px-5 sm:px-6">
             {review && (
               <figure className="max-w-[60ch] self-center border-l-[3px] border-accent py-1 pl-[26px]">
                 <div className="text-[14px] tracking-[2px] text-[color:var(--accent-2)]" aria-hidden="true">★★★★★</div>
@@ -256,19 +304,6 @@ export default function RoofingServiceDetail({ content = CONTENT, serviceSlug }:
                 )}
               </figure>
             )}
-            {photos.slice(0, review ? 1 : 3).map((ph) => (
-              <figure key={ph.path} className="shadow-brand-1 flex flex-col overflow-hidden rounded-[6px] border border-rule bg-bg">
-                <div className="relative min-h-[220px] flex-1 isolate overflow-hidden">
-                  <CoverImage url={ph.url} alt={ph.alt} sizes="(min-width: 1024px) 50vw, 100vw" />
-                </div>
-                {(ph.title || ph.meta) && (
-                  <figcaption className="px-[22px] py-[18px]">
-                    {ph.title && <b className="block font-heading text-[18px] font-extrabold leading-[1.2] tracking-[-0.01em] text-ink"><E p={`${ph.path}.t`}>{ph.title}</E></b>}
-                    {ph.meta && <small className="mt-1 block text-[13.5px] text-inkSoft">{ph.meta}</small>}
-                  </figcaption>
-                )}
-              </figure>
-            ))}
           </div>
         </section>
       )}

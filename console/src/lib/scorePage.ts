@@ -170,7 +170,7 @@ export function scoreSite(
     if (faqs.length < 3) soft.push(`Service page /${p.route} has ${faqs.length} questions (aim for 3 to 5)`);
     const tagged = (list: unknown[]) => list.map(obj).some((x) => str(x.service) === slugs[idx]);
     if (!tagged(arr(obj(c.testimonials).items)) && !tagged(arr(obj(c.work).projects))) soft.push(`Service page /${p.route} has no proof (a real review or job photo tagged to it)`);
-    const body = [str(page.intro), ...arr(page.expect).map(str), ...faqs.map((f) => `${str(f.q)} ${str(f.a)}`), str(item.detail)].join(' ');
+    const body = [str(page.intro), ...arr(page.body).map(str), ...arr(page.includedNotes).map(str), ...arr(page.signNotes).map(str), ...arr(page.expect).map(str), ...faqs.map((f) => `${str(f.q)} ${str(f.a)}`), str(item.detail)].join(' ');
     texts.push([p.route, shingles(body)]);
   }
   for (let i = 0; i < texts.length; i++) {

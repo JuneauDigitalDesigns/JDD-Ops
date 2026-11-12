@@ -54,11 +54,17 @@ export function servicePagesInstruction(content: unknown): string {
   const city = primaryCity(content);
   const where = city ? ` in ${city}` : '';
   return [
-    `- servicePages: one item per service below, each { slug, intro, expect, faq }, for that service's own page.`,
+    `- servicePages: one item per service below, each { slug, intro, body, includedNotes, signNotes, expect, faq }, for that service's own page.`,
     `intro: 2 to 3 sentences; the first says plainly that the business does this service${where} and how to book it${city ? `, and names ${city} once` : ''}.`,
+    // body, includedNotes, signNotes and the general trade knowledge rule: Xander approved the
+    // layout and the rule on 2026-11-11 (service page upgrade); these lines await his word-for-word
+    // sign-off (S5) before this ships.
+    'body: 2 to 3 short paragraphs that explain this service to a homeowner, the plain answer first, without repeating the intro. Anything about this business comes only from the facts below. You may add general trade knowledge any technician in this trade would agree with, such as what a problem usually means or why a step matters, but never as this business\'s promise, and never a price, time, warranty, guarantee, licence or brand the facts do not give. No town lists. Fewer facts means fewer paragraphs; an empty list when there is nothing to add to the intro.',
+    'includedNotes: one line for each item in included, in the same order, saying plainly what the customer gets from it; an empty string for an item you cannot explain from its name and general trade knowledge.',
+    'signNotes: one line for each item in typicalJobs, in the same order, saying what it usually means and what to do; an empty string when you cannot tell.',
     'expect: up to 4 short lines on booking, timing and estimates, only what the facts below state; an empty list when they state nothing.',
     'faq: 3 to 5 questions about this service only, phrased the way a customer asks. Use the customer\'s own questions listed below first, as they were asked. Answer each in at most 2 sentences, the plain answer first, only from the facts. Never repeat a question from the site\'s main FAQ or from another service.',
-    `Use only these facts for each service, and write for no service that is not listed:\n${JSON.stringify(facts, null, 2)}`,
+    `Use only these facts for anything about each service and this business, and write for no service that is not listed:\n${JSON.stringify(facts, null, 2)}`,
   ].join(' ');
 }
 

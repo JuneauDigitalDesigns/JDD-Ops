@@ -78,6 +78,11 @@ export interface CopyResult {
     items: {
       slug: string;
       intro: string;
+      /** 2026-11-11: the "About {service}" paragraphs, and one line per inclusion and per sign
+       *  (same order as `included` / `typicalJobs`; '' where the model can't explain one). */
+      body: string[];
+      includedNotes: string[];
+      signNotes: string[];
       expect: string[];
       faq: { q: string; a: string }[];
     }[];
@@ -173,8 +178,8 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
   servicePages: obj(
     {
       items: arr(obj(
-        { slug: str, intro: str, expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
-        ['slug', 'intro', 'expect', 'faq'],
+        { slug: str, intro: str, body: arr(str), includedNotes: arr(str), signNotes: arr(str), expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
+        ['slug', 'intro', 'body', 'includedNotes', 'signNotes', 'expect', 'faq'],
       )),
     },
     ['items'],

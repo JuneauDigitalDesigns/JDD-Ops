@@ -204,7 +204,17 @@ export function applyGeneratedCopy(
           const it = bySlug.get(slugs[i]);
           if (!it) return item;
           // `page` arrives with @jdd/schema v1.32.0; typed structurally until the console pins it.
-          return { ...item, page: { intro: it.intro, expect: it.expect ?? [], faq: (it.faq ?? []).map((f) => ({ q: f.q, a: f.a })) } } as typeof item;
+          return {
+            ...item,
+            page: {
+              intro: it.intro,
+              body: it.body ?? [],
+              includedNotes: it.includedNotes ?? [],
+              signNotes: it.signNotes ?? [],
+              expect: it.expect ?? [],
+              faq: (it.faq ?? []).map((f) => ({ q: f.q, a: f.a })),
+            },
+          } as typeof item;
         }),
       };
     }
