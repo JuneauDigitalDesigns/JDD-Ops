@@ -74,7 +74,10 @@ test('the run box uses switches, the approved wording, and no checkboxes', () =>
   assert.match(box, /role="switch"/);
   assert.match(box, /Next: Summary/);
   for (const term of ['"Sections"', '"Off"', '"Model"', '"Estimated cost"']) assert.ok(box.includes(`term=${term}`), term);
-  assert.match(box, /generateLabel\(tickedSections\.length, hasGenerated\)/);
+  // Switched-on sections, not tickedSections.length: tickedSections also holds per-page review
+  // keys ("about:subpages") that a run never writes (subpages-copy.test.mjs).
+  assert.match(box, /generateLabel\(summary\.on, hasGenerated\)/);
+  assert.match(box, /disabled=\{busy \|\| summary\.on === 0\}/);
   // Removed with the sidebar (approved): the All / None toggle and the two explanatory lines.
   assert.doesNotMatch(box, /Only what&apos;s ticked is written/);
   assert.doesNotMatch(box, /Input is exact; output is a working guess/);

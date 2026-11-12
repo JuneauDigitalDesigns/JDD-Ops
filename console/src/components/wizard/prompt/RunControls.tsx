@@ -16,11 +16,13 @@ import { labelFor } from '@/lib/section-labels';
 import { setTickedSections } from '@/lib/copy-brief/mutations';
 import { relativeTime } from '@/lib/relativeTime';
 import { MODEL_OPTIONS, modelOption } from '@/lib/model-pricing';
-import { RUN_STEPS, runSummary, switchSection, generateLabel } from '@/lib/run-steps';
+import { RUN_STEPS, SWITCHABLE, runSummary, switchSection, generateLabel } from '@/lib/run-steps';
+import { copyRequestBody, unreportedSections, SKIP_REASONS, type CopyPage } from '@/lib/copy-brief/run-sections';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
-type SectionStatus = 'idle' | 'writing' | 'done' | 'failed';
+/** `skipped`: the run did not write it, or not all of it, and says why. Never shown as done. */
+type SectionStatus = 'idle' | 'writing' | 'done' | 'failed' | 'skipped';
 type RunState =
   | { kind: 'idle' }
   | { kind: 'running' }
@@ -33,7 +35,7 @@ const IDLE_TIMEOUT_MS = 90_000;
 
 export default function RunControls({
   vertical, base, imported, edits, brief, tickedSections, onBriefChange, model, onModelChange,
-  onGenerated, onClearGenerated, hasGenerated,
+  onGenerated, onClearGenerated, hasGenerated, pages,
 }: {
   vertical: string;
   base: SiteContent;
@@ -49,10 +51,14 @@ export default function RunControls({
   onGenerated: (p: Partial<SiteContent>) => void;
   onClearGenerated: () => void;
   hasGenerated: boolean;
+  /** The live composition's pages besides Home. Posted as `subpages`, without which the route
+   *  writes no page headers or page SEO at all (copy-brief/run-sections.ts). */
+  pages: CopyPage[];
 }) {
   const [stepAt, setStepAt] = useState(0);
   const [statuses, setStatuses] = useState<Record<string, SectionStatus>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [skips, setSkips] = useState<Record<string, string>>({});
   const [run, setRun] = useState<RunState>({ kind: 'idle' });
   const [estimate, setEstimate] = useState<{ estInputTokens: number; estOutputTokens: number; estCostUsd: number } | null>(null);
   const [estimating, setEstimating] = useState(false);
@@ -71,7 +77,7 @@ export default function RunControls({
       fetch('/api/build/estimate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ vertical, base, imported, edits, brief, sections: tickedSections, model }),
+        body: JSON.stringify(copyRequestBody({ vertical, base, imported, edits, brief, sections: tickedSections, model, pages })),
       })
         .then((r) => r.json())
         .then((data) => setEstimate(data.error ? null : data))
@@ -80,11 +86,12 @@ export default function RunControls({
     }, 500);
     return () => { if (estimateTimer.current) clearTimeout(estimateTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- base/imported/brief are large objects; re-running on every keystroke elsewhere is the point, JSON.stringify above is what actually changes.
-  }, [vertical, base, imported, edits, brief, tickedSections, model]);
+  }, [vertical, base, imported, edits, brief, tickedSections, model, pages]);
 
   async function generate() {
     setRun({ kind: 'running' });
     setErrors({});
+    setSkips({});
     const initial: Record<string, SectionStatus> = {};
     for (const s of tickedSections) initial[s] = 'idle';
     setStatuses(initial);
@@ -94,7 +101,7 @@ export default function RunControls({
       res = await fetch('/api/build/generate-copy', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ vertical, base, imported, edits, brief, sections: tickedSections, model }),
+        body: JSON.stringify(copyRequestBody({ vertical, base, imported, edits, brief, sections: tickedSections, model, pages })),
       });
     } catch {
       setRun({ kind: 'error', message: 'Could not reach the copy service.' });
@@ -109,6 +116,9 @@ export default function RunControls({
     const decoder = new TextDecoder();
     let buf = '';
     let sawDone = false;
+    // What the stream said about each section, kept here as well as in state so the end of the run
+    // can tell which switched-on sections it never mentioned.
+    const reported: Record<string, string> = {};
     let idle: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     const armWatchdog = () => {
@@ -136,9 +146,13 @@ export default function RunControls({
           }
           if (msg.type === 'section') {
             const section = String(msg.section);
+            reported[section] = String(msg.status);
             setStatuses((prev) => ({ ...prev, [section]: msg.status as SectionStatus }));
             if (msg.status === 'failed' && msg.error) {
               setErrors((prev) => ({ ...prev, [section]: String(msg.error) }));
+            }
+            if (msg.status === 'skipped') {
+              setSkips((prev) => ({ ...prev, [section]: String(msg.error ?? SKIP_REASONS.unreported) }));
             }
           } else if (msg.type === 'done') {
             onGenerated(msg.generated as Partial<SiteContent>);
@@ -152,6 +166,16 @@ export default function RunControls({
       /* reader cancelled by the watchdog, or the connection dropped */
     } finally {
       clearTimeout(idle);
+    }
+
+    // A switched-on section the finished run never mentioned was not written. Left blank it would
+    // read as written, which is how the page headers went unnoticed (copy-brief/run-sections.ts).
+    if (sawDone) {
+      const unreported = unreportedSections(tickedSections, reported, SWITCHABLE);
+      if (unreported.length) {
+        setStatuses((prev) => ({ ...prev, ...Object.fromEntries(unreported.map((s) => [s, 'skipped' as const])) }));
+        setSkips((prev) => ({ ...prev, ...Object.fromEntries(unreported.map((s) => [s, SKIP_REASONS.unreported])) }));
+      }
     }
 
     if (timedOut) {
@@ -168,6 +192,7 @@ export default function RunControls({
   const summary = runSummary(tickedSections);
   const cost = estimating ? 'estimating…' : estimate ? `~$${estimate.estCostUsd.toFixed(2)}` : '—';
   const failures = Object.entries(errors);
+  const skipped = Object.entries(skips);
 
   return (
     <div
@@ -284,6 +309,9 @@ export default function RunControls({
               {run.kind !== 'idle' && failures.map(([s, msg]) => (
                 <p key={s} className="truncate text-2xs text-danger">{labelFor(s as Section)}: {msg}</p>
               ))}
+              {run.kind !== 'idle' && skipped.map(([s, msg]) => (
+                <p key={s} className="truncate text-2xs text-warn" title={msg}>{labelFor(s as Section)}: {msg}</p>
+              ))}
               {/* `lastRunAt` is stamped on approve, not on generate, so this reads "last
                   approved" rather than "last generated". */}
               {!busy && (brief.lastRunAt || hasGenerated) && (
@@ -302,11 +330,14 @@ export default function RunControls({
             <button
               type="button"
               onClick={generate}
-              disabled={busy || tickedSections.length === 0}
+              disabled={busy || summary.on === 0}
               className="btn btn-primary mt-auto h-[42px] w-full shrink-0 justify-center"
             >
               {busy ? <CircleNotch size={15} className="animate-spin" /> : <Sparkle size={15} weight="fill" />}
-              {busy ? 'Generating…' : generateLabel(tickedSections.length, hasGenerated)}
+              {/* Switched-on sections only: tickedSections also holds the per-page review keys
+                  ("about:subpages"), which the route does not run, so its length overstated the run
+                  and, with no section on, enabled a button that would have written every section. */}
+              {busy ? 'Generating…' : generateLabel(summary.on, hasGenerated)}
             </button>
           </>
         )}
@@ -328,5 +359,6 @@ function StatusIcon({ status }: { status: SectionStatus }) {
   if (status === 'writing') return <CircleNotch size={13} className="shrink-0 animate-spin text-uiInkSoft" />;
   if (status === 'done') return <Check size={13} weight="bold" className="shrink-0 text-ok" />;
   if (status === 'failed') return <X size={13} weight="bold" className="shrink-0 text-danger" />;
+  if (status === 'skipped') return <Warning size={13} weight="bold" className="shrink-0 text-warn" aria-label="Not written" />;
   return null;
 }

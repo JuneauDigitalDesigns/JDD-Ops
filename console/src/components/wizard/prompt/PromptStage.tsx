@@ -8,12 +8,13 @@ import type { ResolvedBlock } from '@/lib/copy-brief/types';
 import { compileBriefSegments } from '@/lib/copy-brief/compile-brief';
 import PromptPlainView from './PromptPlainView';
 import RunControls from './RunControls';
+import { copyPages, type CopyPage } from '@/lib/copy-brief/run-sections';
 
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
 export default function PromptStage({
   vertical, verticalDef, base, imported, preset, edits, brief, tickedSections, blocks, onBriefChange,
-  model, onModelChange, onGenerated, onClearGenerated, hasGenerated,
+  model, onModelChange, onGenerated, onClearGenerated, hasGenerated, pages,
 }: {
   vertical: string;
   verticalDef: import('@jdd/schema').VerticalDef;
@@ -32,13 +33,15 @@ export default function PromptStage({
   onGenerated: (p: Partial<SiteContent>) => void;
   onClearGenerated: () => void;
   hasGenerated: boolean;
+  /** The live composition's pages besides Home: the run's `subpages`, and the prompt's page list. */
+  pages: CopyPage[];
 }) {
   // Joined here rather than calling compileBriefPrompt separately, so the text on screen is
   // provably the same assembly the run uses — one compile, two consumers. The '\n\n' join
   // matches compileBriefPrompt exactly; if that ever changes, this must change with it.
   const prompt = useMemo(() => {
     const segments = compileBriefSegments(
-      { vertical: verticalDef, effective: base, imported, preset, edits, brief, tickedSections },
+      { vertical: verticalDef, effective: base, imported, preset, edits, brief, tickedSections, subpages: copyPages(pages) },
       blocks,
       tickedSections,
     );
@@ -46,7 +49,7 @@ export default function PromptStage({
       system: segments.system.map((s) => s.text).join('\n\n'),
       user: segments.user.map((s) => s.text).join('\n\n'),
     };
-  }, [verticalDef, base, imported, preset, edits, brief, tickedSections, blocks]);
+  }, [verticalDef, base, imported, preset, edits, brief, tickedSections, blocks, pages]);
 
   return (
     // The prompt takes the full width and reads sideways; the run box floats over its bottom-right
@@ -66,6 +69,7 @@ export default function PromptStage({
           onGenerated={onGenerated}
           onClearGenerated={onClearGenerated}
           hasGenerated={hasGenerated}
+          pages={pages}
         />
     </div>
   );
