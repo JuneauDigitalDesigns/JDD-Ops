@@ -14,6 +14,7 @@ import {
   repoExists,
   resolveRepoRoot,
   resolveUploads,
+  stagedRefsIn,
   validateEntries,
   wirePage,
   wirePages,
@@ -527,14 +528,23 @@ export async function POST(req: Request) {
         // resolveUploads so a staged upload that has since vanished — which collapses to
         // "" — lands on a placeholder instead of shipping an empty <img> to a live site.
         if (content) {
-          step('Copying uploaded images into the site…');
-          const { content: resolved, missing } = resolveUploads(repoRoot, slug, content);
+          // Uploaded photos stay staged refs here; materialize() encodes them like every other
+          // photo (WebP/AVIF widths, orientation, no metadata). See resolveUploads.
+          const { content: resolved, missing } = resolveUploads(content);
           if (missing.length > 0) {
             step(
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
           const shipped = withoutSampleReviews(withoutSampleProjects(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step)))))));
+          // A staged photo the pipeline couldn't encode is never copied in raw (Xander 2026-11-12).
+          const unprocessed = stagedRefsIn(shipped);
+          if (unprocessed.length > 0) {
+            throw new Error(
+              `${unprocessed.length} uploaded photo(s) could not be prepared for the web (${unprocessed.slice(0, 3).join(', ')}). ` +
+                'Replace them with a JPEG, PNG or WebP under 25 MB in the intake or the Brand drawer, then export again.',
+            );
+          }
           if (!passesSeo(shipped)) return;
           writeSiteContent(repoRoot, slug, shipped);
         } else if (vertical) {

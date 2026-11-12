@@ -1,6 +1,7 @@
 import 'server-only';
-import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { stagedFileName } from '@/lib/stagedUploads';
 import type { SiteContent } from '@/data/site';
 import { repoDirFor } from '@/lib/export';
 import { MAX_INPUT_BYTES, writeImage } from '@/lib/image-encode';
@@ -87,12 +88,28 @@ function collectSlots(c: SiteContent): Slot[] {
   return slots;
 }
 
-/** Fetch one URL, emit its widths/formats under outDir, and return the `/img/<hash>` base. */
-async function processOne(url: string, slot: Slot, outDir: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`fetch ${res.status}`);
-  if (Number(res.headers.get('content-length') ?? 0) > MAX_INPUT_BYTES) throw new Error('image too large');
-  return writeImage(Buffer.from(await res.arrayBuffer()), outDir, {
+/**
+ * Read one image (a URL, or a photo staged in console/.uploads as `upload://<file>`), emit its
+ * widths/formats under outDir, and return the `/img/<hash>` base.
+ *
+ * Staged photos (the intake's service photos, the Brand drawer's uploads) go through the same
+ * encoder as everything else (Xander 2026-11-12). They used to be copied into public/images as
+ * the raw original: full size, EXIF and GPS intact, no WebP widths, no orientation fix.
+ */
+async function processOne(url: string, slot: Slot, outDir: string, stageDir: string): Promise<string> {
+  const staged = stagedFileName(url);
+  let buf: Buffer;
+  if (staged) {
+    const path = resolve(stageDir, staged);
+    if ((await stat(path)).size > MAX_INPUT_BYTES) throw new Error('image too large');
+    buf = await readFile(path);
+  } else {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    if (Number(res.headers.get('content-length') ?? 0) > MAX_INPUT_BYTES) throw new Error('image too large');
+    buf = Buffer.from(await res.arrayBuffer());
+  }
+  return writeImage(buf, outDir, {
     ratio: RATIOS[slot.ratioKey],
     avif: AVIF_RATIO_KEYS.includes(slot.ratioKey) && !slot.isLogo,
     logo: Boolean(slot.isLogo),
@@ -113,6 +130,8 @@ export async function materializeImages(
   slug: string,
   content: SiteContent,
   step: (m: string) => void,
+  /** Where staged uploads live (console/.uploads). A parameter so the tests can point it elsewhere. */
+  stageDir: string = resolve(process.cwd(), '.uploads'),
 ): Promise<{ content: SiteContent; localized: string[]; failed: string[] }> {
   const c: SiteContent = structuredClone(content);
   const outDir = join(repoDirFor(repoRoot, slug), 'public', 'img');
@@ -125,11 +144,12 @@ export async function materializeImages(
 
   for (const slot of collectSlots(c)) {
     const url = slot.get();
-    if (!url || !/^https?:\/\//i.test(url)) continue; // already local, relative, or empty
+    // A URL, or a staged upload. Anything else is already local, relative, or empty.
+    if (!url || !(/^https?:\/\//i.test(url) || stagedFileName(url))) continue;
     const cached = done.get(url);
     if (cached) { slot.set(cached); continue; }
     try {
-      const localBase = await processOne(url, slot, outDir);
+      const localBase = await processOne(url, slot, outDir, stageDir);
       slot.set(localBase);
       mapping[url] = localBase;
       done.set(url, localBase);

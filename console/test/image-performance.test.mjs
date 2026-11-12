@@ -100,7 +100,9 @@ test('a logo keeps its transparency; a plain SVG logo ships as the SVG, an activ
 
 test('the pipeline hands every slot to the encoder with the export\'s own widths and ratios', () => {
   const src = read(path.join(CONSOLE, 'src/lib/image-pipeline.ts'));
-  assert.match(src, /return writeImage\(Buffer\.from\(await res\.arrayBuffer\(\)\), outDir, \{\n\s+ratio: RATIOS\[slot\.ratioKey\],\n\s+avif: AVIF_RATIO_KEYS\.includes\(slot\.ratioKey\) && !slot\.isLogo,\n\s+logo: Boolean\(slot\.isLogo\),\n\s+widths: WIDTHS,/);
+  assert.match(src, /return writeImage\(buf, outDir, \{\n\s+ratio: RATIOS\[slot\.ratioKey\],\n\s+avif: AVIF_RATIO_KEYS\.includes\(slot\.ratioKey\) && !slot\.isLogo,\n\s+logo: Boolean\(slot\.isLogo\),\n\s+widths: WIDTHS,/);
+  // Both sources reach that one call: a fetched URL, and a photo staged in console/.uploads (2026-11-12).
+  assert.match(src, /buf = await readFile\(path\);[\s\S]*buf = Buffer\.from\(await res\.arrayBuffer\(\)\);/);
   assert.match(src, /content-length/, 'a declared size past the cap is refused before download');
   assert.doesNotMatch(src, /from 'sharp'/, 'one encoder, in image-encode.ts');
   assert.match(read(path.join(CONSOLE, 'src/lib/image-encode.ts')), /\.rotate\(\)/);
