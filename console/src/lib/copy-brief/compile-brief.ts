@@ -318,6 +318,30 @@ export function userSegments(ctx: BriefContext, blocks: ResolvedBlock[], section
   return segments.filter((s): s is PromptSegment => s !== null);
 }
 
+/**
+ * The paragraphs of the user prompt that hand the copywriter FACTS: the business facts, the
+ * scanned website, the owner's words, the positioning chips, the offers (the promotion among
+ * them) and the client's own FAQ answers. Built by the same functions userSegments uses, so the
+ * SEO check (scorePage) reads exactly what the model was told. Instruction paragraphs are left
+ * out on purpose: "Keep these exact counts" and "2 to 3 sentences" carry numbers that are
+ * layout, not facts, and would let a model's invented "3" through.
+ *
+ * Why (2026-11-11): the operator's "$50 off your first service" promo reached the model, which
+ * put it in 11 fields, and the SEO check refused all 11 as "not in the client's facts", because
+ * it only read the site content and the promotion lives in the brief.
+ */
+export function briefFactSegments(ctx: BriefContext, blocks: ResolvedBlock[]): PromptSegment[] {
+  const segments: Array<PromptSegment | null> = [
+    factsSegment(ctx, blocks),
+    websiteSegment(blocks),
+    clientWordsSegment(blocks),
+    positioningSegment(blocks),
+    offersSegment(blocks),
+    fixedFaqSegment(ctx, ['faq']),
+  ];
+  return segments.filter((s): s is PromptSegment => s !== null);
+}
+
 export function compileBriefSegments(
   ctx: BriefContext,
   blocks: ResolvedBlock[],

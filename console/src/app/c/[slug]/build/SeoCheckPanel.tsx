@@ -15,12 +15,15 @@ export default function SeoCheckPanel({
   content,
   composition,
   vertical,
+  briefFacts = '',
 }: {
   content: unknown;
   composition?: SiteComposition;
   vertical: string | null;
+  /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts). */
+  briefFacts?: string;
 }) {
-  const score = useMemo(() => seoFindings(content, composition, vertical), [content, composition, vertical]);
+  const score = useMemo(() => seoFindings(content, composition, vertical, briefFacts), [content, composition, vertical, briefFacts]);
   const [showSoft, setShowSoft] = useState(false);
   const blocking = score.hard.length > 0;
 

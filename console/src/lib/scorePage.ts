@@ -9,8 +9,9 @@
  * "near me" and service-page rules):
  *   - an em- or en-dash in visible copy, a title or a description
  *   - "near me" anywhere visible
- *   - a number in visible copy that is not in the client's facts (invented facts). Unchanged
- *     preset text is exempt: Xander's D2 makes preset copy a warning, never a refusal
+ *   - a number in visible copy that is not in the client's facts (invented facts). The facts
+ *     include what the copy brief gave the copywriter (opts.briefFacts). Unchanged preset text is
+ *     exempt (Xander's D2 makes preset copy a warning, never a refusal), and so are reviews
  *   - a missing or duplicate page title
  *   - a site canonical that is not an absolute URL
  *   - a service page whose service doesn't earn a page (servicePages.ts), or that shares an
@@ -59,7 +60,7 @@ const PHONE = /(?<![\d+])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\
 
 /** Every phone the client stated, as E.164: brand.phone, brand.phoneHref, and any phone written
  *  in the facts. SiteContent has no other phone field. */
-function factPhones(content: unknown): Set<string> {
+function factPhones(content: unknown, briefFacts = ''): Set<string> {
   const brand = obj(obj(content).brand);
   const out = new Set<string>();
   const add = (raw: string) => {
@@ -68,7 +69,7 @@ function factPhones(content: unknown): Set<string> {
   };
   add(str(brand.phone));
   add(str(brand.phoneHref));
-  for (const m of factsText(content).matchAll(PHONE)) add(m[0]);
+  for (const m of [factsText(content), briefFacts].join('\n').matchAll(PHONE)) add(m[0]);
   return out;
 }
 
@@ -85,11 +86,12 @@ function maskCopyrightYear(text: string, year: number): string {
 }
 
 /** Every number the client stated: facts plus contact details (a street number, a ZIP, the
- *  phone) and the service-area towns. */
-function factNumbers(content: unknown): Set<string> {
+ *  phone) and the service-area towns, plus whatever the brief handed the copywriter as a fact
+ *  (briefFacts: the operator's promotion, custom facts, the owner's own words). */
+function factNumbers(content: unknown, briefFacts = ''): Set<string> {
   const c = obj(content);
   const brand = obj(c.brand);
-  const text = [factsText(content), str(brand.phone), str(brand.address), str(brand.email)].join('\n');
+  const text = [factsText(content), str(brand.phone), str(brand.address), str(brand.email), briefFacts].join('\n');
   const out = new Set<string>();
   for (const m of text.matchAll(NUMBER)) out.add(digitsOf(m[0]));
   // "24/7" stated in hours is two numbers, both stated.
@@ -121,7 +123,13 @@ export function scoreSite(
   content: unknown,
   pages: SeoPageRef[],
   pageSeo: Record<string, PageSeo>,
-  opts: { preset?: unknown; now?: Date } = {},
+  opts: {
+    preset?: unknown;
+    now?: Date;
+    /** The facts the copywriter was given (copy-brief/brief-facts.ts). The Studio computes it and
+     *  posts it with the export, so the panel and the export score against the same text. */
+    briefFacts?: string;
+  } = {},
 ): SiteScore {
   const hard: string[] = [];
   const soft: string[] = [];
@@ -148,11 +156,17 @@ export function scoreSite(
   }
 
   // ── Invented facts: numbers the client never stated ──
-  const known = factNumbers(content);
-  const phones = factPhones(content);
+  const known = factNumbers(content, opts.briefFacts);
+  const phones = factPhones(content, opts.briefFacts);
   const year = (opts.now ?? new Date()).getFullYear();
   for (const [path, text] of copy) {
     if (isPreset(path, text)) continue; // D2: preset copy warns, below
+    // A review is a customer's own words and date, never the model's: copy generation keeps
+    // base.testimonials.items whatever the model returns (apply-generated.ts). So its date
+    // ("2026-09-14" was four findings) and its numbers are not claims to check. A review's
+    // numbers are NOT added to the facts: a model-written field that repeats one is still
+    // flagged (2026-11-11).
+    if (/^testimonials\.items\.\d+\./.test(path)) continue;
     for (const m of maskCopyrightYear(maskKnownPhones(text, phones), year).matchAll(NUMBER)) {
       const token = m[0];
       const digits = digitsOf(token);

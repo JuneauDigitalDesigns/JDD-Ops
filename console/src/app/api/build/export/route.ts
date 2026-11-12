@@ -125,6 +125,10 @@ type Body = {
    * it. Applied only when it names the update that is due right now; see confirmsUpgrade.
    */
   uiUpgrade?: { from?: string; to?: string };
+  /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts), which the SEO check
+   *  counts as the client's. Posted by the Studio, which shows the same check from the same text.
+   *  Like `content`, it is the operator's own input: it can only loosen the operator's own check. */
+  briefFacts?: string;
 };
 
 export async function POST(req: Request) {
@@ -157,6 +161,7 @@ export async function POST(req: Request) {
   // The phone as the site shows it, (407) 555-0177 with an E.164 tel: (lib/displayPhone.ts). The
   // Studio previews the same; this covers a payload built before it did.
   const content = isValidSiteContent(body.content) ? withDisplayPhone(body.content) : null;
+  const briefFacts = typeof body.briefFacts === 'string' ? body.briefFacts.slice(0, 200_000) : '';
   const deploy = Boolean(body.deploy);
   // The message is operator-authored now (the deploy dialog exposes it as an editable field), so
   // normalise it before it reaches git. Defence in depth only — the real protection is that
@@ -383,7 +388,7 @@ export async function POST(req: Request) {
         let shippedSeo: { pages: Record<string, PageSeo>; business: Record<string, unknown> } | null = null;
         const passesSeo = (c: SiteContent): boolean => {
           const pages = buildPageSeo(c, seoPages, vertical);
-          const score = scoreSite(c, seoPages, pages, { preset: vertical ? presetFor(vertical) : {} });
+          const score = scoreSite(c, seoPages, pages, { preset: vertical ? presetFor(vertical) : {}, briefFacts });
           if (score.soft.length) step(`SEO check: ${score.soft.length} finding(s) to look at, none blocking. First: ${score.soft[0]}`);
           if (!score.ok) {
             send({

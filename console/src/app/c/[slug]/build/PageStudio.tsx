@@ -40,8 +40,10 @@ export default function PageStudio({
   onSetChrome, onSetSectionSkin, onSetSectionVariant,
   onResetEdits, onResetStyles, setField,
   onUndo, onRedo, canUndo, canRedo,
-  alreadyDeployed = false, onExported, brandName, reverts,
+  alreadyDeployed = false, onExported, brandName, reverts, briefFacts = '',
 }: {
+  /** The facts the copy brief gave the copywriter, for the SEO check (copy-brief/brief-facts.ts). */
+  briefFacts?: string;
   stepNav?: React.ReactNode;
   composition: SiteComposition;
   effective: SiteContent;
@@ -344,6 +346,7 @@ export default function PageStudio({
             hasRepo={alreadyDeployed}
             // Offered after any successful export: the repo exists by then, even on a first Launch.
             onDeploy={() => { setLaunchOpen(false); setDeployOpen(true); }}
+            briefFacts={briefFacts}
           />
         )}
       </AnimatePresence>
@@ -360,6 +363,7 @@ export default function PageStudio({
           exportEntries={exportEntries}
           vertical={vertical}
           reverts={reverts}
+          briefFacts={briefFacts}
           onClose={() => setDeployOpen(false)}
         />
       )}

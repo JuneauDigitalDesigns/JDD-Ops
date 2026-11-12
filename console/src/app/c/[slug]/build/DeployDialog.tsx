@@ -107,8 +107,11 @@ const GROUP_ORDER: ContentChange['kind'][] = ['copy', 'color', 'image', 'number'
 const IDLE_TIMEOUT_MS = 90_000;
 
 export default function DeployDialog({
-  slug, brandName, selections, skins, order, composition, effective, exportEntries, vertical, reverts, onClose,
+  slug, brandName, selections, skins, order, composition, effective, exportEntries, vertical, reverts, onClose, briefFacts = '',
 }: {
+  /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts): shown in the SEO
+   *  check and posted with the export, so both score against the same text. */
+  briefFacts?: string;
   slug: string;
   brandName: string;
   selections: Selections;
@@ -268,6 +271,7 @@ export default function DeployDialog({
             composition,
             vertical,
             content: effective,
+            briefFacts,
             deploy: true,
             commitMessage,
             uiUpgrade: upgradeConfirmation(libs.plan, libsConfirmed),
@@ -403,7 +407,7 @@ export default function DeployDialog({
 
           {status.kind === 'ready' && (
             <div className="mt-5">
-              <SeoCheckPanel content={effective} composition={composition} vertical={vertical} />
+              <SeoCheckPanel content={effective} composition={composition} vertical={vertical} briefFacts={briefFacts} />
             </div>
           )}
 

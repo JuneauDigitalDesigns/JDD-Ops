@@ -26,8 +26,11 @@ type Status =
   | { kind: 'error'; message: string; detail?: string; next?: string; steps: string[] };
 
 export default function LaunchDialog({
-  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy, onExported, hasRepo = false,
+  categories, selections, skins, order, composition, vertical, effective, lockedSlug, onClose, onDeploy, onExported, hasRepo = false, briefFacts = '',
 }: {
+  /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts): shown in the SEO
+   *  check and posted with the export, so both score against the same text. */
+  briefFacts?: string;
   categories: CategoryEntry[];
   selections: Selections;
   skins: SkinSelections;
@@ -122,6 +125,7 @@ export default function LaunchDialog({
           composition,
           vertical,
           content: effective,
+          briefFacts,
         }),
       });
     } catch {
@@ -262,7 +266,7 @@ export default function LaunchDialog({
           )}
 
           <div className="mt-4">
-            <SeoCheckPanel content={effective} composition={composition} vertical={vertical} />
+            <SeoCheckPanel content={effective} composition={composition} vertical={vertical} briefFacts={briefFacts} />
           </div>
 
           {slugHasRepo && libs.plan && (
