@@ -53,6 +53,7 @@ import { deleteDraft } from '@/lib/draft';
 import { lockedReason } from '@/lib/onboardingGate';
 import { loadProvisionedFields } from '@/lib/provisionedFields';
 import { stripSampleReviews } from '@/lib/sampleReviews';
+import { stripSampleProjects } from '@/lib/sampleProjects';
 import { stripPlaceholderCanonical, applyIntakeCanonical } from '@/lib/placeholderCanonical';
 import { stripPresetIdentity } from '@/lib/presetIdentity';
 import { resolve } from 'node:path';
@@ -129,6 +130,9 @@ type Body = {
    *  counts as the client's. Posted by the Studio, which shows the same check from the same text.
    *  Like `content`, it is the operator's own input: it can only loosen the operator's own check. */
   briefFacts?: string;
+  /** The service names and tags the intake picked (copyRisks.ts intakeServicePicks), which the
+   *  preset-copy warning skips. Posted by the Studio, like briefFacts; a warning only, never a gate. */
+  servicePicks?: { names?: unknown; tags?: unknown };
 };
 
 export async function POST(req: Request) {
@@ -162,6 +166,8 @@ export async function POST(req: Request) {
   // Studio previews the same; this covers a payload built before it did.
   const content = isValidSiteContent(body.content) ? withDisplayPhone(body.content) : null;
   const briefFacts = typeof body.briefFacts === 'string' ? body.briefFacts.slice(0, 200_000) : '';
+  const pickList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string').slice(0, 200) : []);
+  const servicePicks = { names: pickList(body.servicePicks?.names), tags: pickList(body.servicePicks?.tags) };
   const deploy = Boolean(body.deploy);
   // The message is operator-authored now (the deploy dialog exposes it as an editable field), so
   // normalise it before it reaches git. Defence in depth only — the real protection is that
@@ -345,6 +351,16 @@ export async function POST(req: Request) {
           return cleaned;
         };
 
+        /** Drop any sample job a preset or the seed left in this client's work section
+         *  (lib/sampleProjects.ts). The same gate as withoutSampleReviews, for the same reason. */
+        const withoutSampleProjects = (c: SiteContent): SiteContent => {
+          const { content: cleaned, removed } = stripSampleProjects(c);
+          if (removed > 0) {
+            step(`Removed ${removed} sample job${removed === 1 ? '' : 's'} left over from an industry preset. The client's own jobs are kept.`);
+          }
+          return cleaned;
+        };
+
         /** No business-identity or SEO value from a preset, the seed or the template ships: the
          *  name, legal line, phone, email, address, license, tagline, SEO title and description
          *  are the client's or empty (lib/presetIdentity.ts). Same gate as withoutSampleReviews.
@@ -388,7 +404,7 @@ export async function POST(req: Request) {
         let shippedSeo: { pages: Record<string, PageSeo>; business: Record<string, unknown> } | null = null;
         const passesSeo = (c: SiteContent): boolean => {
           const pages = buildPageSeo(c, seoPages, vertical);
-          const score = scoreSite(c, seoPages, pages, { preset: vertical ? presetFor(vertical) : {}, briefFacts });
+          const score = scoreSite(c, seoPages, pages, { preset: vertical ? presetFor(vertical) : {}, briefFacts, servicePicks });
           if (score.soft.length) step(`SEO check: ${score.soft.length} finding(s) to look at, none blocking. First: ${score.soft[0]}`);
           if (!score.ok) {
             send({
@@ -518,7 +534,7 @@ export async function POST(req: Request) {
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
-          const shipped = withoutSampleReviews(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))))));
+          const shipped = withoutSampleReviews(withoutSampleProjects(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step)))))));
           if (!passesSeo(shipped)) return;
           writeSiteContent(repoRoot, slug, shipped);
         } else if (vertical) {
@@ -537,14 +553,14 @@ export async function POST(req: Request) {
            * `content` — so no shipped client site carried this. It is reachable by any direct
            * API call, which is exactly how the vertical-templates-v1 R6 acceptances drove it.
            */
-          const shipped = withoutSampleReviews(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step))))));
+          const shipped = withoutSampleReviews(withoutSampleProjects(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step)))))));
           if (!passesSeo(shipped)) return;
           writeSiteContent(repoRoot, slug, shipped);
         } else {
           // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
           // other two branches — a preset's placeholder phone would otherwise overwrite a
           // provisioned one just as readily as an edited payload's.
-          const shipped = withoutSampleReviews(withRealCanonical(withoutPresetIdentity(preserveProvisioned(SEED_CONTENT))));
+          const shipped = withoutSampleReviews(withoutSampleProjects(withRealCanonical(withoutPresetIdentity(preserveProvisioned(SEED_CONTENT)))));
           if (!passesSeo(shipped)) return;
           copySiteData(repoRoot, slug, () => shipped);
         }

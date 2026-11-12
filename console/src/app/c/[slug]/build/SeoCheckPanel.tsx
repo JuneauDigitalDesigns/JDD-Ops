@@ -9,6 +9,7 @@
  */
 import { useMemo, useState } from 'react';
 import type { SiteComposition } from '@/lib/pages';
+import type { ServicePicks } from '@/lib/copyRisks';
 import { seoFindings } from './seo-findings';
 
 export default function SeoCheckPanel({
@@ -16,14 +17,17 @@ export default function SeoCheckPanel({
   composition,
   vertical,
   briefFacts = '',
+  servicePicks,
 }: {
   content: unknown;
   composition?: SiteComposition;
   vertical: string | null;
   /** The facts the copy brief gave the copywriter (copy-brief/brief-facts.ts). */
   briefFacts?: string;
+  /** The service names and tags the intake picked: not preset copy (copyRisks.ts). */
+  servicePicks?: ServicePicks;
 }) {
-  const score = useMemo(() => seoFindings(content, composition, vertical, briefFacts), [content, composition, vertical, briefFacts]);
+  const score = useMemo(() => seoFindings(content, composition, vertical, briefFacts, servicePicks), [content, composition, vertical, briefFacts, servicePicks]);
   const [showSoft, setShowSoft] = useState(false);
   const blocking = score.hard.length > 0;
 

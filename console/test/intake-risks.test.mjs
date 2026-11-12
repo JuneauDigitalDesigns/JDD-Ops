@@ -56,5 +56,5 @@ test('the warning is loud and never blocks Approve', () => {
   assert.match(approve, /disabled=\{blocked\}/);
   assert.doesNotMatch(approve, /risk/i);
   const step = readFileSync(path.join(ROOT, 'src/components/wizard/IntakeStep.tsx'), 'utf8');
-  assert.match(step, /copyRisks\(effective, presetFor\(vertical\)\)/);
+  assert.match(step, /copyRisks\(effective, presetFor\(vertical\), servicePicks\)/);
 });

@@ -8,12 +8,14 @@ import { buildPageSeo, type SeoPageRef } from '@/lib/pageSeo';
 import { scoreSite, type SiteScore } from '@/lib/scorePage';
 import { presetFor, type VerticalId } from '@/lib/verticals';
 import type { SiteComposition } from '@/lib/pages';
+import type { ServicePicks } from '@/lib/copyRisks';
 
-/** `briefFacts` is copy-brief/brief-facts.ts's text, the same string the export is posted. */
-export function seoFindings(content: unknown, composition: SiteComposition | undefined, vertical: string | null, briefFacts = ''): SiteScore {
+/** `briefFacts` is copy-brief/brief-facts.ts's text, the same string the export is posted;
+ *  `servicePicks` the intake's service names and tags (copyRisks.ts intakeServicePicks), likewise. */
+export function seoFindings(content: unknown, composition: SiteComposition | undefined, vertical: string | null, briefFacts = '', servicePicks?: ServicePicks): SiteScore {
   const pages: SeoPageRef[] = composition
     ? composition.pages.map((p) => ({ route: p.route, pageType: p.pageType, label: p.label, sections: p.sections }))
     : [{ route: '', pageType: 'home', label: 'Home', sections: [] }];
   const preset = vertical ? presetFor(vertical as VerticalId) : {};
-  return scoreSite(content, pages, buildPageSeo(content, pages, vertical), { preset, briefFacts });
+  return scoreSite(content, pages, buildPageSeo(content, pages, vertical), { preset, briefFacts, servicePicks });
 }

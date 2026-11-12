@@ -177,46 +177,10 @@ export const CONTENT: SiteContent = {
     eyebrow: "Our Work",
     title:   "Recent Projects",
     sub:     "A sample of installations and repairs we're proud to put our name on.",
-    hidden:  false,
-
-    projects: [
-      {
-        t:       "Bergmann Apartment Complex: Full HVAC Retrofit",
-        loc:     "Downtown Juneau, AK",
-        yr:      "2025",
-        scope:   "Commercial retrofit",
-        size:    "18-unit building",
-        caption: "Replaced aging baseboard heat with a multi-zone mini-split system across all 18 units.",
-        image: {
-          url: "https://picsum.photos/seed/peak-work-1/800/600",
-          alt: "Bergmann apartment HVAC retrofit",
-        },
-      },
-      {
-        t:       "Single-Family Plumbing Repipe",
-        loc:     "Mendenhall Valley, AK",
-        yr:      "2024",
-        scope:   "Residential plumbing",
-        size:    "2,100 sq ft",
-        caption: "Full copper-to-PEX repipe completed in two days with zero drywall damage.",
-        image: {
-          url: "https://picsum.photos/seed/peak-work-2/800/600",
-          alt: "Residential plumbing repipe project",
-        },
-      },
-      {
-        t:       "Juneau School District: Boiler Replacement",
-        loc:     "Juneau, AK",
-        yr:      "2024",
-        scope:   "Commercial mechanical",
-        size:    "3 buildings",
-        caption: "Coordinated off-season boiler replacement across three district facilities with zero classroom disruption.",
-        image: {
-          url: "https://picsum.photos/seed/peak-work-3/800/600",
-          alt: "School district boiler replacement",
-        },
-      },
-    ],
+    hidden:  true,
+    // No sample jobs (operator decision, 2026-11-12). The three this carried, in Juneau, AK, are in
+    // lib/sampleProjects.ts, which strips them from any content that still holds them.
+    projects: [],
   },
 
   // ── Testimonials ──────────────────────────────────────────────────────────
