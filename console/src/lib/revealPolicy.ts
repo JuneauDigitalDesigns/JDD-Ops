@@ -37,6 +37,12 @@ export const SELF_ANIMATED: ReadonlySet<string> = new Set([
   'LawnServiceDetail',
   'PlumbingServiceDetail',
   'RoofingServiceDetail',
+  // A town page's body, the same way: each of its blocks carries its own `rv` (lib/TownPage.tsx).
+  'HvacTownBody',
+  'DetailTownBody',
+  'LawnTownBody',
+  'PlumbingTownBody',
+  'RoofingTownBody',
   'NavMinimal',
   'RecentJobsGrid',
   'ServicesAccordion',

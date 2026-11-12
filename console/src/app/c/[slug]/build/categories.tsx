@@ -132,6 +132,18 @@ import DetailFooter, { meta as detailFooterMeta } from '@/components/catalog/foo
 import DetailPageHeader, { meta as detailPageHeaderMeta } from '@/components/catalog/pageHeader/DetailPageHeader';
 import DetailAbout, { meta as detailAboutMeta } from '@/components/catalog/about/DetailAbout';
 import DetailContact, { meta as detailContactMeta } from '@/components/catalog/contact/DetailContact';
+// Town pages, town + service pages and the /areas index (local SEO, Xander 2026-11-12). Shown here
+// without a town, which is the /areas index; compose-page.tsx gives them their slugs on a town page.
+import HvacTownHeader, { meta as hvacTownHeaderMeta } from '@/components/catalog/pageHeader/HvacTownHeader';
+import HvacTownBody, { meta as hvacTownBodyMeta } from '@/components/catalog/trust/HvacTownBody';
+import RoofingTownHeader, { meta as roofingTownHeaderMeta } from '@/components/catalog/pageHeader/RoofingTownHeader';
+import RoofingTownBody, { meta as roofingTownBodyMeta } from '@/components/catalog/trust/RoofingTownBody';
+import LawnTownHeader, { meta as lawnTownHeaderMeta } from '@/components/catalog/pageHeader/LawnTownHeader';
+import LawnTownBody, { meta as lawnTownBodyMeta } from '@/components/catalog/trust/LawnTownBody';
+import PlumbingTownHeader, { meta as plumbingTownHeaderMeta } from '@/components/catalog/pageHeader/PlumbingTownHeader';
+import PlumbingTownBody, { meta as plumbingTownBodyMeta } from '@/components/catalog/trust/PlumbingTownBody';
+import DetailTownHeader, { meta as detailTownHeaderMeta } from '@/components/catalog/pageHeader/DetailTownHeader';
+import DetailTownBody, { meta as detailTownBodyMeta } from '@/components/catalog/trust/DetailTownBody';
 
 import SeoPreviewBody from './SeoPreviewBody';
 import type { SiteContent } from '@/data/site';
@@ -217,6 +229,11 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'LawnPageHeader', id: lawnPageHeaderMeta.id, label: lawnPageHeaderMeta.label, skins: skinsFor('LawnPageHeader'), render: () => <LawnPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'PlumbingPageHeader', id: plumbingPageHeaderMeta.id, label: plumbingPageHeaderMeta.label, skins: skinsFor('PlumbingPageHeader'), render: () => <PlumbingPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
         { name: 'DetailPageHeader', id: detailPageHeaderMeta.id, label: detailPageHeaderMeta.label, skins: skinsFor('DetailPageHeader'), render: () => <DetailPageHeader data={{ eyebrow: 'Page', title: 'Page title', sub: 'A lightweight header that opens a page.', cta: null }} /> },
+        { name: 'HvacTownHeader', id: hvacTownHeaderMeta.id, label: hvacTownHeaderMeta.label, skins: skinsFor('HvacTownHeader'), render: () => <HvacTownHeader content={effective} /> },
+        { name: 'RoofingTownHeader', id: roofingTownHeaderMeta.id, label: roofingTownHeaderMeta.label, skins: skinsFor('RoofingTownHeader'), render: () => <RoofingTownHeader content={effective} /> },
+        { name: 'LawnTownHeader', id: lawnTownHeaderMeta.id, label: lawnTownHeaderMeta.label, skins: skinsFor('LawnTownHeader'), render: () => <LawnTownHeader content={effective} /> },
+        { name: 'PlumbingTownHeader', id: plumbingTownHeaderMeta.id, label: plumbingTownHeaderMeta.label, skins: skinsFor('PlumbingTownHeader'), render: () => <PlumbingTownHeader content={effective} /> },
+        { name: 'DetailTownHeader', id: detailTownHeaderMeta.id, label: detailTownHeaderMeta.label, skins: skinsFor('DetailTownHeader'), render: () => <DetailTownHeader content={effective} /> },
       ],
     },
     {
@@ -247,6 +264,11 @@ export function buildCategories(effective: SiteContent): CategoryEntry[] {
         { name: 'LawnTrust', id: lawnTrustMeta.id, label: lawnTrustMeta.label, skins: skinsFor('LawnTrust'), render: () => <LawnTrust content={effective} /> },
         { name: 'PlumbingTrust', id: plumbingTrustMeta.id, label: plumbingTrustMeta.label, skins: skinsFor('PlumbingTrust'), render: () => <PlumbingTrust content={effective} /> },
         { name: 'DetailTrust', id: detailTrustMeta.id, label: detailTrustMeta.label, skins: skinsFor('DetailTrust'), render: () => <DetailTrust content={effective} /> },
+        { name: 'HvacTownBody', id: hvacTownBodyMeta.id, label: hvacTownBodyMeta.label, skins: skinsFor('HvacTownBody'), render: () => <HvacTownBody content={effective} /> },
+        { name: 'RoofingTownBody', id: roofingTownBodyMeta.id, label: roofingTownBodyMeta.label, skins: skinsFor('RoofingTownBody'), render: () => <RoofingTownBody content={effective} /> },
+        { name: 'LawnTownBody', id: lawnTownBodyMeta.id, label: lawnTownBodyMeta.label, skins: skinsFor('LawnTownBody'), render: () => <LawnTownBody content={effective} /> },
+        { name: 'PlumbingTownBody', id: plumbingTownBodyMeta.id, label: plumbingTownBodyMeta.label, skins: skinsFor('PlumbingTownBody'), render: () => <PlumbingTownBody content={effective} /> },
+        { name: 'DetailTownBody', id: detailTownBodyMeta.id, label: detailTownBodyMeta.label, skins: skinsFor('DetailTownBody'), render: () => <DetailTownBody content={effective} /> },
       ],
     },
     {

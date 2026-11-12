@@ -88,9 +88,13 @@ export const CATALOG: Record<string, readonly string[]> = {
   // SiteContent.subpages[route].header, not a global CONTENT import.
   pageHeader:   ['PageHeaderSimple', 'PageHeaderEditorial', 'PageHeaderOverlap', 'PageHeaderMinimal', 'HvacPageHeader', 'RoofingPageHeader', 'LawnPageHeader', 'PlumbingPageHeader', 'DetailPageHeader',
                  // Per-service pages (service-page-spec.md, Xander 2026-11-10): one header per vertical.
-                 'HvacServiceHeader', 'DetailServiceHeader', 'LawnServiceHeader', 'PlumbingServiceHeader', 'RoofingServiceHeader'],
+                 'HvacServiceHeader', 'DetailServiceHeader', 'LawnServiceHeader', 'PlumbingServiceHeader', 'RoofingServiceHeader',
+                 // Town pages, town + service pages and the /areas index (local SEO, Xander 2026-11-12).
+                 'HvacTownHeader', 'DetailTownHeader', 'LawnTownHeader', 'PlumbingTownHeader', 'RoofingTownHeader'],
   hero:         ['HeroSplit', 'HeroFormFocus', 'HeroOverlap', 'HvacHero', 'RoofingHero', 'LawnHero', 'PlumbingHero', 'DetailHero'],
-  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust', 'LawnTrust', 'PlumbingTrust', 'DetailTrust'],
+  trust:        ['TrustBadges', 'TrustReviewsAggregate', 'ServiceArea', 'HvacServiceArea', 'RoofingTrust', 'LawnTrust', 'PlumbingTrust', 'DetailTrust',
+                 // The body of a town page, a town + service page and the /areas index, one per vertical.
+                 'HvacTownBody', 'DetailTownBody', 'LawnTownBody', 'PlumbingTownBody', 'RoofingTownBody'],
   // New section category (decision 18). Reads about.pillars; no new schema field.
   differentiators: ['DifferentiatorsIndex', 'DifferentiatorsPanels', 'DifferentiatorsRail'],
   about:        ['AboutFeature', 'AboutStory', 'AboutSticky', 'HvacAbout', 'RoofingAbout', 'LawnAbout', 'PlumbingAbout', 'DetailAbout'],

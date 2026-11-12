@@ -6,10 +6,16 @@ import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
  * Studio hand each of them `townSlug`, and on a spoke `serviceSlug` too, the way service pages hand
  * SERVICE_PAGE_SECTIONS their `serviceSlug`.
  *
- * Empty until Templates builds the town pages, which wait on Xander's approval of the mockups.
- * Templates adds each component's name here when it adds it to the catalog.
+ * Each trade's town header and body (lib/TownPage.tsx draws them; Xander approved the mockups
+ * "HVAC Town Pages" on 2026-11-12). Without a townSlug they draw the /areas index instead.
  */
-export const AREA_PAGE_SECTIONS: ReadonlySet<string> = new Set<string>([]);
+export const AREA_PAGE_SECTIONS: ReadonlySet<string> = new Set<string>([
+  'HvacTownHeader', 'HvacTownBody',
+  'DetailTownHeader', 'DetailTownBody',
+  'LawnTownHeader', 'LawnTownBody',
+  'PlumbingTownHeader', 'PlumbingTownBody',
+  'RoofingTownHeader', 'RoofingTownBody',
+]);
 
 /**
  * The slug props a section gets on its page, as JSX attribute text (' serviceSlug="ac-repair"'),

@@ -30,8 +30,9 @@ test('the self-animated list is exactly the components that bring their own moti
       if (!f.endsWith('.tsx')) continue;
       const src = read(path.join(CATALOG, cat.name, f));
       // Its own motion: framer-motion / @jdd/ui presets, or its own scroll reveal on each block
-      // (a per-service page body: one reveal on the whole page-tall body would half-fade it).
-      if (/from 'framer-motion'|from '@\/lib\/motion'|className="rv /.test(src)) scanned.push(f.replace(/\.tsx$/, ''));
+      // (a per-service page body: one reveal on the whole page-tall body would half-fade it). A
+      // town page body draws through lib/TownPage.tsx's TownBody, whose every block carries `rv`.
+      if (/from 'framer-motion'|from '@\/lib\/motion'|className="rv |<TownBody\b/.test(src)) scanned.push(f.replace(/\.tsx$/, ''));
     }
   }
   assert.deepEqual([...SELF_ANIMATED].sort(), scanned.sort());

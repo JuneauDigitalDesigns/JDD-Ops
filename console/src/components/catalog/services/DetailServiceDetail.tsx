@@ -32,6 +32,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Check, Plus, Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
+import { ServiceNearbyTowns, ServicePriceFactors, type ServiceBlockLook } from '@/lib/TownPage';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { WorkCarousel } from '@/lib/PhotoCarousel';
@@ -46,8 +47,8 @@ export const meta = {
   id: 'detail-service-detail',
   category: 'services',
   label: 'Car Detailing / Service page body',
-  consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
+  consumes: ['services.items', 'servicePages', 'areaPages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['@/lib/TownPage', '@/lib/townLinks', '@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -79,6 +80,15 @@ const Cap = ({ center = false }: { center?: boolean }) => (
 );
 const H2 = 'font-heading text-[30px] font-extrabold leading-[1.04] tracking-[-0.016em] text-ink lg:text-[36px]';
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+
+/** How this trade draws the two town-era blocks (lib/TownPage.tsx; approved 2026-11-12). */
+const blockLook = (band: string): ServiceBlockLook => ({
+  cap: <Cap />,
+  h2: H2,
+  band,
+  card: 'rounded-[12px] border border-[color:color-mix(in_srgb,var(--ink)_9%,transparent)] bg-[color:color-mix(in_srgb,var(--ink)_4%,transparent)]',
+  link: 'text-accent',
+});
 
 export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: { content?: SiteContent; serviceSlug?: string }) {
   const s = serviceBySlug(content, serviceSlug);
@@ -185,6 +195,9 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
         </section>
       )}
 
+      {/* What changes the price: the client's own answer to Q5, hidden when they gave none. */}
+      <ServicePriceFactors s={s} look={blockLook('bg-bg')} />
+
       {signs.length > 0 && (
         <section className="rv bg-inkPanel py-16 text-onInk lg:py-[88px]">
           <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
@@ -272,6 +285,9 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
           </div>
         </section>
       )}
+
+      {/* {Service} in nearby towns: the town + service pages the site has, hidden until one exists. */}
+      <ServiceNearbyTowns content={content} s={s} look={blockLook('bg-bgSoft')} />
 
       {questions.length > 0 && (
         <section

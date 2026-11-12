@@ -31,7 +31,18 @@ import PlumbingFinalCta from '@/components/catalog/finalCta/PlumbingFinalCta';
 import RoofingServiceHeader from '@/components/catalog/pageHeader/RoofingServiceHeader';
 import RoofingServiceDetail from '@/components/catalog/services/RoofingServiceDetail';
 import RoofingFinalCta from '@/components/catalog/finalCta/RoofingFinalCta';
+import HvacTownHeader from '@/components/catalog/pageHeader/HvacTownHeader';
+import HvacTownBody from '@/components/catalog/trust/HvacTownBody';
+import DetailTownHeader from '@/components/catalog/pageHeader/DetailTownHeader';
+import DetailTownBody from '@/components/catalog/trust/DetailTownBody';
+import LawnTownHeader from '@/components/catalog/pageHeader/LawnTownHeader';
+import LawnTownBody from '@/components/catalog/trust/LawnTownBody';
+import PlumbingTownHeader from '@/components/catalog/pageHeader/PlumbingTownHeader';
+import PlumbingTownBody from '@/components/catalog/trust/PlumbingTownBody';
+import RoofingTownHeader from '@/components/catalog/pageHeader/RoofingTownHeader';
+import RoofingTownBody from '@/components/catalog/trust/RoofingTownBody';
 import { SERVICE_PAGE_SECTIONS } from '@/lib/servicePageSections';
+import { AREA_PAGE_SECTIONS } from '@/lib/areaPageSections';
 import type { CategoryEntry } from './categories';
 import { navHref, type PageInstance, type SectionRef, type SiteComposition } from '@/lib/pages';
 
@@ -57,6 +68,30 @@ const SERVICE_RENDER: Record<string, (p: { content: SiteContent; serviceSlug: st
   RoofingFinalCta: (p) => <RoofingFinalCta {...p} />,
 };
 
+/** The town page sections, by name. Kept in step with AREA_PAGE_SECTIONS (lib/areaPageSections.ts),
+ *  which the export uses for the same job. With no townSlug they draw the /areas index. */
+type AreaProps = { content: SiteContent; townSlug?: string; serviceSlug?: string };
+const AREA_RENDER: Record<string, (p: AreaProps) => ReactNode> = {
+  HvacTownHeader: (p) => <HvacTownHeader {...p} />,
+  HvacTownBody: (p) => <HvacTownBody {...p} />,
+  DetailTownHeader: (p) => <DetailTownHeader {...p} />,
+  DetailTownBody: (p) => <DetailTownBody {...p} />,
+  LawnTownHeader: (p) => <LawnTownHeader {...p} />,
+  LawnTownBody: (p) => <LawnTownBody {...p} />,
+  PlumbingTownHeader: (p) => <PlumbingTownHeader {...p} />,
+  PlumbingTownBody: (p) => <PlumbingTownBody {...p} />,
+  RoofingTownHeader: (p) => <RoofingTownHeader {...p} />,
+  RoofingTownBody: (p) => <RoofingTownBody {...p} />,
+};
+
+/** The slugs a town page section gets on its page: exactly what sectionSlugAttrs gives it at export. */
+function areaSlugs(page: PageInstance): { townSlug?: string; serviceSlug?: string } {
+  const parts = page.route.split('/');
+  if (page.pageType === 'area' && parts[0] === 'areas' && parts.length === 2) return { townSlug: parts[1] };
+  if (page.pageType === 'spoke' && parts[0] === 'areas' && parts.length === 3) return { townSlug: parts[1], serviceSlug: parts[2] };
+  return {};
+}
+
 /** A neutral header used when a subpage has no generated header copy yet. */
 function placeholderHeader(label: string): PageHeaderContent {
   return { eyebrow: '', title: label, sub: '', cta: null };
@@ -80,6 +115,15 @@ export function renderSection(
   // slug), so the Studio previews exactly the page that ships.
   if (page.pageType === 'service' && SERVICE_PAGE_SECTIONS.has(ref.name) && SERVICE_RENDER[ref.name]) {
     return SERVICE_RENDER[ref.name]({ content: effective, serviceSlug: page.route.slice('services/'.length) });
+  }
+  // A town page, a town + service page or the /areas index: its town sections render that town
+  // (and that service), or the index when the page names no town, as the export wires them.
+  if (AREA_PAGE_SECTIONS.has(ref.name) && AREA_RENDER[ref.name]) {
+    return AREA_RENDER[ref.name]({ content: effective, ...areaSlugs(page) });
+  }
+  // A spoke's final CTA opens its form with the service already chosen, as on a service page.
+  if (page.pageType === 'spoke' && SERVICE_PAGE_SECTIONS.has(ref.name) && SERVICE_RENDER[ref.name]) {
+    return SERVICE_RENDER[ref.name]({ content: effective, serviceSlug: areaSlugs(page).serviceSlug ?? '' });
   }
   if (ref.categoryId === 'pageHeader') {
     const data = effective.subpages?.[page.route]?.header ?? placeholderHeader(page.label);
