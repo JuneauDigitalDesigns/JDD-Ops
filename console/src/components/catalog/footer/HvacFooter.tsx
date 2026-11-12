@@ -110,9 +110,11 @@ export default function HvacFooter({ content = CONTENT }: { content?: SiteConten
             <a href={brand.phoneHref} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk">
               <Phone size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.phone">{brand.phone}</E>
             </a>
-            <a href={`mailto:${brand.email}`} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk">
-              <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
-            </a>
+            {brand.email && (
+              <a href={`mailto:${brand.email}`} className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft transition-colors hover:text-onInk">
+                <EnvelopeSimple size={16} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" /><E p="brand.email">{brand.email}</E>
+              </a>
+            )}
             {address && (
               <span className="flex items-start gap-[9px] py-[5px] text-[14.5px] text-onInkSoft">
                 <MapPin size={16} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />

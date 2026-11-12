@@ -5,12 +5,24 @@
  * duplicate or risk this already-correct, already-tested merge behavior.
  *
  * `want` gates which top-level SiteContent keys get built — only the requested sections (plus
- * brand, always) so an overlay never touches content the operator didn't ask to regenerate.
+ * brand, always) so an overlay never touches content the operator didn't ask to regenerate. A
+ * section the model returned nothing for is left out entirely.
  */
 import type { SiteContent } from '@/data/site';
 import type { CopyResult, Section } from '@/lib/copy-schema';
 import { serviceSlugs } from '@/lib/servicePages';
 import { servicePageIndices } from '@/lib/copy-brief/compile';
+import { clientFaq, pinFixed, withoutRepeats } from '@/lib/copy-brief/client-faq';
+import { normalizeRoute } from '@/lib/copy-brief/run-sections';
+import { isPresent } from '@/lib/merge';
+
+/** The fields of `fields` that carry a value, or null when none does. "Carry a value" is the merge's
+ *  own test (isPresent: not null, undefined, blank or an empty list), so leaving a field out here is
+ *  exactly what the merge would have done with it, minus the frozen copy of the base. */
+function written<T extends Record<string, unknown>>(fields: T): Partial<T> | null {
+  const out = Object.fromEntries(Object.entries(fields).filter(([, v]) => isPresent(v))) as Partial<T>;
+  return Object.keys(out).length ? out : null;
+}
 
 function mergeArray<B, C>(base: B[], copy: C[] | undefined, apply: (b: B, c: C) => B): B[] {
   if (!Array.isArray(base)) return base;
@@ -21,24 +33,26 @@ export function applyGeneratedCopy(
   base: SiteContent,
   copy: Partial<CopyResult>,
   want: Set<Section>,
+  /** `subpageRoutes`: the pages this run asked headers for. Given, a reply item for any other
+   *  route is dropped, and "/about" lands on "about": an item stored under a key no page reads
+   *  looks generated and is never shown. */
+  opts: { subpageRoutes?: string[] } = {},
 ): Partial<SiteContent> {
   const generated: Partial<SiteContent> = {};
 
-  if (want.has('brand')) {
-    const cb = copy.brand;
-    const brand = { ...base.brand };
-    if (cb) {
-      if (cb.tagline) brand.tagline = cb.tagline;
-      if (cb.name) { brand.name = cb.name; brand.short = cb.short ?? cb.name; }
-      else if (cb.short) brand.short = cb.short;
-      if (cb.long) brand.long = cb.long;
-      if (cb.established) brand.established = cb.established;
-      if (cb.phone) { brand.phone = cb.phone; brand.phoneHref = `tel:${cb.phone.replace(/[^0-9+]/g, '')}`; }
-      if (cb.email) brand.email = cb.email;
-      if (cb.address) brand.address = cb.address;
-      if (cb.license) brand.license = cb.license;
-    }
-    generated.brand = brand;
+  // brand, trust, hero, finalCta, footer and seo hold ONLY the fields the model wrote (F-E6,
+  // 2026-11-11). They used to spread `base.<section>`, the Studio's whole effective section, and
+  // the generated layer outranks the intake in the Studio's merge (effectiveContent.ts), so every
+  // field the model never touched was frozen at its generation-time value: a later correction to
+  // clients/{slug}/site.ts stayed hidden unless an operator edit sat on top. A field left out here
+  // falls through to the intake (or the preset) at merge time instead.
+  if (want.has('brand') && copy.brand) {
+    // The tagline only. The business identity (name, short, long, established, phone and
+    // phoneHref, email, address, license) is never read from model output and is not in its
+    // output schema (copy-schema.ts): it is the client's, and the phone must stay the JDD Twilio
+    // number the site advertises. The model sees it as read-only facts.
+    const brand = written({ tagline: copy.brand.tagline });
+    if (brand) generated.brand = brand as SiteContent['brand'];
   }
 
   if (want.has('announcement') && copy.announcement?.text) {
@@ -46,29 +60,18 @@ export function applyGeneratedCopy(
   }
 
   if (want.has('trust') && copy.trust) {
-    generated.trust = {
-      ...base.trust,
-      ...(copy.trust.label ? { label: copy.trust.label } : {}),
-      ...(copy.trust.logos?.length ? { logos: copy.trust.logos } : {}),
-    };
+    const trust = written({ label: copy.trust.label, logos: copy.trust.logos });
+    if (trust) generated.trust = trust as SiteContent['trust'];
   }
 
-  if (want.has('hero')) {
-    const h: Partial<NonNullable<CopyResult['hero']>> = copy.hero ?? {};
-    generated.hero = {
-      ...base.hero,
-      eyebrow: h.eyebrow ?? base.hero.eyebrow,
-      headline: h.headline ?? base.hero.headline,
-      headlineEmphasis: h.headlineEmphasis ?? base.hero.headlineEmphasis,
-      sub: h.sub ?? base.hero.sub,
-      cta: h.cta ?? base.hero.cta,
-      secondaryCta: h.secondaryCta ?? base.hero.secondaryCta,
-      formLabel: h.formLabel ?? base.hero.formLabel,
-      trust: h.trust ?? base.hero.trust,
-      badge: h.badge ?? base.hero.badge,
-      frictionReducers: h.frictionReducers?.length ? h.frictionReducers : base.hero.frictionReducers,
-      heroBullets: h.heroBullets?.length ? h.heroBullets : base.hero.heroBullets,
-    };
+  if (want.has('hero') && copy.hero) {
+    const h = copy.hero;
+    const hero = written({
+      eyebrow: h.eyebrow, headline: h.headline, headlineEmphasis: h.headlineEmphasis, sub: h.sub,
+      cta: h.cta, secondaryCta: h.secondaryCta, formLabel: h.formLabel, trust: h.trust, badge: h.badge,
+      frictionReducers: h.frictionReducers, heroBullets: h.heroBullets,
+    });
+    if (hero) generated.hero = hero as SiteContent['hero'];
   }
 
   if (want.has('about')) {
@@ -132,40 +135,37 @@ export function applyGeneratedCopy(
 
   if (want.has('faq')) {
     const f: Partial<NonNullable<CopyResult['faq']>> = copy.faq ?? {};
+    // The client's own untagged Q&As (and any tagged to a service with no page) go first, word
+    // for word; the model's pairs follow, minus any that ask one of them again (client-faq.ts).
+    const fixed = clientFaq(base).home;
+    const model = f.items?.length ? f.items.map((c) => ({ q: c.q, a: c.a })) : [];
     generated.faq = {
       ...base.faq,
       eyebrow: f.eyebrow ?? base.faq.eyebrow,
       title: f.title ?? base.faq.title,
       sub: f.sub ?? base.faq.sub,
-      items: f.items?.length ? f.items.map((c) => ({ q: c.q, a: c.a })) : base.faq.items,
+      items: fixed.length || model.length ? pinFixed(fixed, model, model.length) : base.faq.items,
     };
   }
 
-  if (want.has('finalCta')) {
-    const f: Partial<NonNullable<CopyResult['finalCta']>> = copy.finalCta ?? {};
-    generated.finalCta = {
-      ...base.finalCta,
-      eyebrow: f.eyebrow ?? base.finalCta.eyebrow,
-      headline: f.headline ?? base.finalCta.headline,
-      headlineEmphasis: f.headlineEmphasis ?? base.finalCta.headlineEmphasis,
-      sub: f.sub ?? base.finalCta.sub,
-      cta: f.cta ?? base.finalCta.cta,
-      secondary: f.secondary ?? base.finalCta.secondary,
-      frictionReducers: f.frictionReducers?.length ? f.frictionReducers : base.finalCta.frictionReducers,
-    };
+  if (want.has('finalCta') && copy.finalCta) {
+    const f = copy.finalCta;
+    const finalCta = written({
+      eyebrow: f.eyebrow, headline: f.headline, headlineEmphasis: f.headlineEmphasis, sub: f.sub,
+      cta: f.cta, secondary: f.secondary, frictionReducers: f.frictionReducers,
+    });
+    if (finalCta) generated.finalCta = finalCta as SiteContent['finalCta'];
   }
 
   if (want.has('footer') && copy.footer?.blurb) {
-    generated.footer = { ...base.footer, blurb: copy.footer.blurb };
+    generated.footer = { blurb: copy.footer.blurb } as SiteContent['footer'];
   }
 
-  if (want.has('seo')) {
-    const s: Partial<NonNullable<CopyResult['seo']>> = copy.seo ?? {};
-    generated.seo = {
-      ...base.seo,
-      title: s.title ?? base.seo.title,
-      description: s.description ?? base.seo.description,
-    };
+  if (want.has('seo') && copy.seo) {
+    // No canonical, analytics or pixel id: never the copywriter's, and no longer copied up from
+    // base (withoutCarriedCanonical in the route still guards the canonical).
+    const seo = written({ title: copy.seo.title, description: copy.seo.description });
+    if (seo) generated.seo = seo as SiteContent['seo'];
   }
 
   if (want.has('subpages') && copy.subpages?.items?.length) {
@@ -173,9 +173,11 @@ export function applyGeneratedCopy(
     // page's copy never drops the others. Each item folds header + per-page SEO into the
     // SiteContent.subpages[route] shape; a cta only survives when BOTH label and href are given.
     const map = { ...(base.subpages ?? {}) };
+    const allowed = opts.subpageRoutes ? new Set(opts.subpageRoutes.map(normalizeRoute)) : null;
     for (const it of copy.subpages.items) {
-      if (!it.route) continue;
-      map[it.route] = {
+      const route = it.route ? normalizeRoute(it.route) : '';
+      if (!route || (allowed && !allowed.has(route))) continue;
+      map[route] = {
         header: {
           eyebrow: it.eyebrow,
           title: it.title,
@@ -196,6 +198,11 @@ export function applyGeneratedCopy(
     const slugs = serviceSlugs(base);
     const allowed = new Set(servicePageIndices(base).map((i) => slugs[i]));
     const bySlug = new Map(copy.servicePages.items.filter((it) => it.slug && allowed.has(it.slug)).map((it) => [it.slug, it]));
+    // The page lists the client's own tagged Q&As first, straight from customerQuestions
+    // (serviceLinks.ts serviceQuestions), so page.faq only loses the model's repeats of them: on
+    // 2026-11-11 "Can you come Saturdays?" came back without the client's "TW:" and with an
+    // invented 24/7 answer, shown under the client's own.
+    const fixedBySlug = clientFaq(base).bySlug;
     if (bySlug.size) {
       const services = generated.services ?? base.services;
       generated.services = {
@@ -204,6 +211,7 @@ export function applyGeneratedCopy(
           const it = bySlug.get(slugs[i]);
           if (!it) return item;
           // `page` arrives with @jdd/schema v1.32.0; typed structurally until the console pins it.
+          const faq = withoutRepeats((it.faq ?? []).map((f) => ({ q: f.q, a: f.a })), fixedBySlug.get(slugs[i]) ?? []);
           return {
             ...item,
             page: {
@@ -212,7 +220,7 @@ export function applyGeneratedCopy(
               includedNotes: it.includedNotes ?? [],
               signNotes: it.signNotes ?? [],
               expect: it.expect ?? [],
-              faq: (it.faq ?? []).map((f) => ({ q: f.q, a: f.a })),
+              faq,
             },
           } as typeof item;
         }),

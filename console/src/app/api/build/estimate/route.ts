@@ -7,7 +7,12 @@ import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { CHUNK_SIZE, chunkSections } from '@/lib/copy-brief/chunking';
+import { editsFrom } from '@/lib/copy-brief/grounded';
+import { presetFor } from '@/lib/verticals';
 import { isValidModelId, modelOption, estimateCost, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
+import { planRunSections, type CopyPage } from '@/lib/copy-brief/run-sections';
+import { pickServicePages } from '@/lib/servicePages';
+import { MAX_PAGES } from '@/lib/pages';
 
 export const runtime = 'nodejs';
 
@@ -15,9 +20,13 @@ interface Body {
   vertical?: string;
   base?: SiteContent;
   imported?: SiteContent | null;
+  /** The operator's edits by path. With `imported`, the only source of the brief's facts. */
+  edits?: Record<string, unknown>;
   brief?: CopyBrief;
   sections?: Section[];
   model?: string;
+  /** The pages besides Home that the `subpages` section writes for (copy-brief/run-sections.ts). */
+  subpages?: CopyPage[];
 }
 
 /**
@@ -43,13 +52,19 @@ export async function POST(req: Request) {
   const model = modelOption(modelId);
 
   const requested = Array.isArray(body.sections) ? body.sections.filter((s): s is Section => ALL_SECTIONS.includes(s)) : [];
-  const sections = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
+  // The same plan generate-copy runs, so the estimate prices the chunks Generate will send.
+  const subpages = Array.isArray(body.subpages) ? body.subpages : [];
+  const { sections } = planRunSections({
+    requested, all: ALL_SECTIONS, subpages, hasServicePages: pickServicePages(base, MAX_PAGES).length > 0,
+  });
   const chunks = chunkSections(sections);
 
-  const blocks = resolveBrief({
-    vertical, effective: base, imported: body.imported ?? null, brief,
-    tickedSections: sections,
-  });
+  const ctx = {
+    vertical, effective: base, imported: body.imported ?? null,
+    preset: presetFor(vertical.id), edits: editsFrom(body.edits), brief,
+    tickedSections: sections, subpages,
+  };
+  const blocks = resolveBrief(ctx);
 
   let key: string;
   try {
@@ -62,7 +77,7 @@ export async function POST(req: Request) {
   try {
     const counts = await Promise.all(
       chunks.map(async (chunk) => {
-        const { system, user } = compileBriefPrompt({ vertical, effective: base, imported: body.imported ?? null, brief, tickedSections: sections }, blocks, chunk);
+        const { system, user } = compileBriefPrompt(ctx, blocks, chunk);
         const res = await client.messages.countTokens({
           model: modelId,
           system,

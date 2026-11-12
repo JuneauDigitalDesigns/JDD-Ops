@@ -1,15 +1,13 @@
 export interface CopyResult {
+  // The tagline only. NO identity field (F-E6, approved 2026-11-11): the name, short name, legal
+  // name, established year, phone, email, address and license are the client's, from the intake,
+  // never the copywriter's. The phone matters most: a client's site advertises the JDD Twilio
+  // number, and a model-written one would replace it. Removed from the output schema rather than
+  // ignored after the fact, as PLAN D4 did for about.stats. The model still SEES them, as read-only
+  // facts (copy-brief/facts.ts COPY_FACT_PATHS), so copy can name the business or the number.
+  // See test/no-generated-identity.test.mjs and no-generated-legal-name.test.mjs.
   brand: {
     tagline: string;
-    // Facts — only ever populated when grounded in website notes or operator details.
-    name?: string;
-    short?: string;
-    long?: string;
-    established?: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-    license?: string;
   };
   announcement: { text: string };
   trust: { label?: string; logos?: string[] };
@@ -91,6 +89,29 @@ export interface CopyResult {
 
 export type Section = keyof CopyResult;
 
+/** The brand fields the copywriter writes: CopyResult.brand's keys. Everything else in `brand` is
+ *  the client's (identity, palette, typography) and is never in the generated layer. */
+export const COPYWRITER_BRAND_FIELDS = ['tagline'] as const satisfies readonly (keyof CopyResult['brand'])[];
+
+/**
+ * A generated layer's `brand` cut down to COPYWRITER_BRAND_FIELDS. A draft generated before
+ * 2026-11-11 stored a copy of the whole brand there (the old applyGeneratedCopy spread
+ * `base.brand`), which outranks the intake in the Studio's merge: it froze the name, phone,
+ * address and the rest at generation time, and could carry a model-written phone or legal name.
+ * effectiveContent runs every generated layer through this, so a stored draft heals without a rerun.
+ */
+export function withCopywriterBrandOnly<T>(generated: T): T {
+  const brand = (generated as { brand?: Record<string, unknown> } | null)?.brand;
+  if (!brand || typeof brand !== 'object') return generated;
+  const keys = Object.keys(brand);
+  if (keys.every((k) => (COPYWRITER_BRAND_FIELDS as readonly string[]).includes(k))) return generated;
+  const kept = Object.fromEntries(COPYWRITER_BRAND_FIELDS.filter((k) => k in brand).map((k) => [k, brand[k]]));
+  const out: Record<string, unknown> = { ...(generated as Record<string, unknown>) };
+  if (Object.keys(kept).length) out.brand = kept;
+  else delete out.brand;
+  return out as T;
+}
+
 /** A review verdict addresses ONE section on ONE page instance (decision 50). Home sections and
  *  site-wide content use the bare section id; anything that exists per route is prefixed with that
  *  route. A section placed on two pages is approved independently, the way SiteContent.sectionStyles
@@ -121,10 +142,8 @@ const obj = (properties: Record<string, unknown>, required: string[]) =>
 const arr = (items: unknown) => ({ type: 'array', items });
 
 const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
-  brand: obj(
-    { tagline: str, name: str, short: str, long: str, established: str, phone: str, email: str, address: str, license: str },
-    ['tagline'],
-  ),
+  // Identity fields intentionally absent: see CopyResult.brand above.
+  brand: obj({ tagline: str }, ['tagline']),
   announcement: obj({ text: str }, ['text']),
   trust: obj({ label: str, logos: arr(str) }, []),
   hero: obj(

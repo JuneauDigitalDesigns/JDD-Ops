@@ -6,7 +6,8 @@ import type { CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, parseVerdictKey, type Section, type VerdictKey } from '@/lib/copy-schema';
-import { buildReviewGroups, reviewKeys, type ReviewPage } from '@/lib/copy-review-groups';
+import { buildReviewGroups, reviewKeys, rewrittenPageKeys, type ReviewPage } from '@/lib/copy-review-groups';
+import { copyPages } from '@/lib/copy-brief/run-sections';
 import { labelFor } from '@/lib/section-labels';
 import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { sourceOf, isSupplied, type SourceContext } from '@/lib/intake-sources';
@@ -112,9 +113,11 @@ export default function IntakeStep({
     [brief.tickedSections],
   );
 
+  // `subpages` is the page list the run sends, so the brief on screen carries the same page-header
+  // instruction and page list that generate-copy compiles (copy-brief/run-sections.ts).
   const blocks = useMemo(
-    () => resolveBrief({ vertical: verticalDef, effective, imported, brief, tickedSections }),
-    [verticalDef, effective, imported, brief, tickedSections],
+    () => resolveBrief({ vertical: verticalDef, effective, imported, preset: presetFor(vertical), edits, brief, tickedSections, subpages: copyPages(pages) }),
+    [verticalDef, effective, imported, vertical, edits, brief, tickedSections, pages],
   );
 
   /** Where each value came from: the form, the close, the console, or nowhere yet. */
@@ -142,7 +145,12 @@ export default function IntakeStep({
   const handleGenerated = useCallback((p: Partial<SiteContent>) => {
     setPreRunGenerated(generated);
     onGenerated(p);
-  }, [generated, onGenerated]);
+    // Each page whose header the run rewrote waits for review on its own page, like a home section.
+    const pageKeys = rewrittenPageKeys(generated, p);
+    if (pageKeys.length) {
+      onBriefChange((b) => setTickedSections(b, [...new Set([...(b.tickedSections ?? tickedKeys), ...pageKeys])]));
+    }
+  }, [generated, onGenerated, onBriefChange, tickedKeys]);
 
   const verdictFor = useCallback((key: VerdictKey): SectionVerdict => {
     // The revert machinery keys off the generated overlay's TOP-LEVEL section key (what

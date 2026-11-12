@@ -156,9 +156,11 @@ export default function HeroSplit({
           </h1>
 
           {/* THE LCP SUB. Nothing may gate its paint. */}
-          <p className="mt-5 max-w-[48ch] text-[18px] leading-relaxed text-onInkSoft sm:text-[19px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-5 max-w-[48ch] text-[18px] leading-relaxed text-onInkSoft sm:text-[19px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           <div className="hero-rise mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch" style={{ animationDelay: '0.18s' }}>
             <a

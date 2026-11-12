@@ -1,0 +1,896 @@
+{
+  "_source": "clients/tracewell-heating-air/.draft.json from the 2026-11-11 front-to-back test (e2e-onboarding-test worktree). imported = the client, generated = the bad claude-opus-5 run, edits = operator edits. Copied unchanged; the email is a test address.",
+  "vertical": "hvac",
+  "imported": {
+    "brand": {
+      "name": "Tracewell Heating & Air",
+      "short": "Tracewell Heating & Air",
+      "long": "Tracewell Heating & Air",
+      "established": "2011",
+      "tagline": null,
+      "phone": "4075550177",
+      "phoneHref": "tel:4075550177",
+      "email": "xanderjuneau+jddtest-e2e1@gmail.com",
+      "address": "1200 Tracer Ridge Rd, Winter Park, FL 32789",
+      "license": "CAC1800177",
+      "palette": {
+        "accent": "#D97706",
+        "accentFg": "#0F172A",
+        "accent2": "#43547C",
+        "bg": "#FFFFFF",
+        "bgSoft": "#FEF0E6",
+        "ink": "#0F172A",
+        "inkSoft": "#5C667A",
+        "rule": "#E4D8CF"
+      },
+      "typography": {
+        "fontSans": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontHeading": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "headingWeight": 700,
+        "bodyWeight": 400,
+        "headingTracking": "-0.01em",
+        "headingLineHeight": 1.2
+      }
+    },
+    "nav": [
+      {
+        "label": "About",
+        "href": "#about"
+      },
+      {
+        "label": "Services",
+        "href": "#services"
+      },
+      {
+        "label": "Work",
+        "href": "#work"
+      },
+      {
+        "label": "Reviews",
+        "href": "#testimonials"
+      },
+      {
+        "label": "FAQ",
+        "href": "#faq"
+      },
+      {
+        "label": "Book",
+        "href": "#cta"
+      }
+    ],
+    "announcement": null,
+    "trust": {
+      "label": "Trusted by",
+      "logos": [
+        "Carrier",
+        "Trane"
+      ]
+    },
+    "hero": {
+      "eyebrow": null,
+      "headline": null,
+      "headlineEmphasis": null,
+      "sub": null,
+      "formLabel": "Tell us what you need.",
+      "placeholder": "Your email address",
+      "cta": null,
+      "secondaryCta": null,
+      "trust": null,
+      "badge": null,
+      "frictionReducers": [
+        null,
+        null,
+        null
+      ],
+      "heroBullets": [
+        {
+          "value": null,
+          "label": null
+        },
+        {
+          "value": null,
+          "label": null
+        },
+        {
+          "value": null,
+          "label": null
+        }
+      ]
+    },
+    "about": {
+      "eyebrow": null,
+      "title": null,
+      "body": null,
+      "pillars": [
+        {
+          "k": null,
+          "t": null,
+          "d": null
+        },
+        {
+          "k": null,
+          "t": null,
+          "d": null
+        },
+        {
+          "k": null,
+          "t": null,
+          "d": null
+        }
+      ],
+      "stats": [
+        {
+          "n": "15+",
+          "l": "Years in business"
+        },
+        {
+          "n": "4.8★ from 57 reviews",
+          "l": "Average rating"
+        },
+        {
+          "n": "3",
+          "l": "Towns covered"
+        }
+      ],
+      "seasons": null
+    },
+    "services": {
+      "eyebrow": null,
+      "title": null,
+      "sub": null,
+      "items": [
+        {
+          "n": "01",
+          "t": "AC Installation & Service",
+          "d": null,
+          "tag": "Cooling",
+          "image": {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-svc-ac-ZjAyumqb608j4WAtlIMtiImJe3m27W.jpg",
+            "alt": "AC Installation & Service"
+          },
+          "priceFrom": "$149",
+          "included": [
+            "Sizing for your home",
+            "Removal of the old unit",
+            "Permit and inspection",
+            "TW coil rinse"
+          ],
+          "typicalJobs": [
+            "AC blowing warm air",
+            "Ice on the lines"
+          ],
+          "areas": [
+            "Winter Park",
+            "Maitland"
+          ],
+          "brands": [
+            "Carrier"
+          ],
+          "duration": "Half a day",
+          "slug": "ac-installation-service"
+        },
+        {
+          "n": "02",
+          "t": "Furnace Repair & Replacement",
+          "d": null,
+          "tag": "Heating",
+          "image": null,
+          "priceFrom": "$89",
+          "included": [
+            "Safety inspection"
+          ]
+        },
+        {
+          "n": "03",
+          "t": "TW Attic Fan Check",
+          "d": null,
+          "tag": null,
+          "image": null,
+          "priceFrom": null
+        }
+      ]
+    },
+    "work": {
+      "eyebrow": null,
+      "title": null,
+      "sub": null,
+      "projects": [
+        {
+          "t": "AC Installation & Service",
+          "loc": null,
+          "yr": null,
+          "scope": "AC Installation & Service",
+          "size": null,
+          "caption": "AC Installation & Service",
+          "image": {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-svc-ac-ZjAyumqb608j4WAtlIMtiImJe3m27W.jpg",
+            "alt": "AC Installation & Service"
+          },
+          "service": "ac-installation-service"
+        },
+        {
+          "t": "AC Installation & Service",
+          "loc": null,
+          "yr": null,
+          "scope": "AC Installation & Service",
+          "size": null,
+          "caption": "AC Installation & Service",
+          "image": {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-svc-ac-2-ruU1eDwXzMGtTs4N6ph4r5SGgchhZF.webp",
+            "alt": "AC Installation & Service"
+          },
+          "service": "ac-installation-service"
+        }
+      ],
+      "hidden": true
+    },
+    "testimonials": {
+      "eyebrow": null,
+      "title": null,
+      "items": [
+        {
+          "q": null,
+          "a": null,
+          "r": null,
+          "company": null,
+          "stars": 5
+        },
+        {
+          "q": null,
+          "a": null,
+          "r": null,
+          "company": null,
+          "stars": 5
+        },
+        {
+          "q": null,
+          "a": null,
+          "r": null,
+          "company": null,
+          "stars": 5
+        }
+      ]
+    },
+    "faq": {
+      "eyebrow": null,
+      "title": null,
+      "sub": null,
+      "items": [
+        {
+          "q": null,
+          "a": null
+        },
+        {
+          "q": null,
+          "a": null
+        },
+        {
+          "q": null,
+          "a": null
+        },
+        {
+          "q": null,
+          "a": null
+        },
+        {
+          "q": null,
+          "a": null
+        },
+        {
+          "q": null,
+          "a": null
+        }
+      ]
+    },
+    "finalCta": {
+      "eyebrow": null,
+      "headline": null,
+      "headlineEmphasis": null,
+      "sub": null,
+      "cta": null,
+      "secondary": null,
+      "frictionReducers": [
+        null,
+        null,
+        null
+      ]
+    },
+    "footer": {
+      "blurb": null,
+      "cols": [
+        {
+          "h": "Services",
+          "links": [
+            {
+              "label": "AC Installation & Service",
+              "href": "#services"
+            },
+            {
+              "label": "Furnace Repair & Replacement",
+              "href": "#services"
+            },
+            {
+              "label": "TW Attic Fan Check",
+              "href": "#services"
+            }
+          ]
+        },
+        {
+          "h": "Company",
+          "links": [
+            {
+              "label": "About Us",
+              "href": "#about"
+            },
+            {
+              "label": "Our Work",
+              "href": "#work"
+            },
+            {
+              "label": "Reviews",
+              "href": "#testimonials"
+            },
+            {
+              "label": "FAQ",
+              "href": "#faq"
+            },
+            {
+              "label": "Contact Us",
+              "href": "#cta"
+            }
+          ]
+        }
+      ],
+      "social": [],
+      "legalLinks": [],
+      "legal": null
+    },
+    "seo": {
+      "title": null,
+      "description": null,
+      "canonical": null,
+      "googleAnalyticsId": null,
+      "facebookPixelId": null
+    },
+    "extensions": {
+      "trustBadges": [
+        "TW Test Award 2025"
+      ],
+      "reviewBadge": {
+        "rating": 4.8,
+        "count": 57,
+        "url": "https://maps.app.goo.gl/TwTestE2E0001"
+      },
+      "contactDetails": {
+        "address": "1200 Tracer Ridge Rd, Winter Park, FL 32789",
+        "mapsUrl": null
+      },
+      "hours": {
+        "all": "Mon to Fri, 8am to 5pm"
+      },
+      "bookingUrl": null,
+      "portalUrl": null,
+      "agentName": "Sam",
+      "serviceArea": [
+        "Winter Park",
+        "Maitland",
+        "Oviedo"
+      ],
+      "ownerName": "Tess Tracewell",
+      "brandsCarried": [
+        "Carrier",
+        "Trane"
+      ],
+      "responseTime": "Within 2 hours",
+      "offerBadge": null,
+      "serviceRadiusMiles": null,
+      "serviceAreaBusiness": true,
+      "customerQuestions": [
+        {
+          "q": "Do you service all brands?",
+          "a": "Yes, every major brand.",
+          "service": "ac-installation-service"
+        },
+        {
+          "q": "TW: Can you come Saturdays?",
+          "a": "Yes, we can come out to you on Saturday mornings.",
+          "service": "ac-installation-service"
+        }
+      ],
+      "profiles": [
+        {
+          "kind": "google",
+          "url": "https://maps.app.goo.gl/TwTestE2E0001"
+        },
+        {
+          "kind": "facebook",
+          "url": "https://www.facebook.com/tracewell-e2e-test"
+        }
+      ]
+    },
+    "images": {
+      "hero": {
+        "portrait": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-work-1-I0YOhrXNP1X6qFu3StValZqrbhPdq1.jpg",
+        "slides": [
+          {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-work-1-I0YOhrXNP1X6qFu3StValZqrbhPdq1.jpg",
+            "alt": null
+          },
+          {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-work-2-v268eBj4lFNFOsQdDeybzvBCLIVs71.jpg",
+            "alt": null
+          }
+        ]
+      },
+      "about": {
+        "feature": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-team-omhtjgBHx8MGmnJjJ6cNwpyb0qMHYr.jpg"
+      },
+      "testimonials": {},
+      "footer": {
+        "logoImage": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-logo-phMkmKLOzxVmQMaT9dDJPOekdEiEEI.png"
+      }
+    },
+    "_meta": {
+      "schema_version": "2.1",
+      "generated_at": "2026-11-11T20:08:24.801Z",
+      "variation": "D",
+      "is_placeholder": false,
+      "missing_fields": [
+        "existingWebsiteUrl",
+        "about.seasons",
+        "extensions.offerBadge",
+        "extensions.serviceRadiusMiles",
+        "work.projects.0.caption",
+        "work.projects.1.caption",
+        "services.items.1.typicalJobs",
+        "services.items.2.included",
+        "services.items.2.typicalJobs",
+        "brand.palette"
+      ],
+      "selectedPlan": "starter",
+      "brandDirection": {
+        "differentiators": "Upfront pricing no surprises. Locally Owned. TW: We will text before we arrive",
+        "targetCustomer": "Homeowners. Property managers",
+        "vibe": [],
+        "tone": [
+          "Friendly",
+          "Straight-talking"
+        ],
+        "adjectives": [],
+        "references": null,
+        "forbidden": "cheap"
+      },
+      "industry": "hvac",
+      "siteIndex": 1,
+      "siteCount": 1,
+      "siblingSlugs": [],
+      "copyBrief": {
+        "blocks": {},
+        "customFields": []
+      }
+    }
+  },
+  "generated": {
+    "brand": {
+      "name": "Tracewell Heating & Air",
+      "short": "Tracewell Heating & Air",
+      "long": "Tracewell Heating & Air LLC",
+      "established": "2011",
+      "tagline": "We will Trace down those issues!",
+      "phone": "4075550177",
+      "phoneHref": "tel:4075550177",
+      "email": "xanderjuneau+jddtest-e2e1@gmail.com",
+      "address": "1200 Tracer Ridge Rd, Winter Park, FL 32789",
+      "license": "CAC1800177",
+      "palette": {
+        "accent": "#E0602C",
+        "accent2": "#1E3A5F",
+        "accentFg": "#FFFFFF",
+        "bg": "#FFFFFF",
+        "bgSoft": "#F4F6F8",
+        "ink": "#13293F",
+        "inkSoft": "#4C5E74",
+        "rule": "#E2E8F0"
+      },
+      "typography": {
+        "fontSans": "var(--font-inter), system-ui, sans-serif",
+        "fontHeading": "var(--font-oswald), system-ui, sans-serif",
+        "headingWeight": 600,
+        "bodyWeight": 400,
+        "headingTracking": "0.005em",
+        "headingLineHeight": 1
+      }
+    },
+    "announcement": "24/7 emergency HVAC service in Winter Park. Call us any time, day or night.",
+    "trust": {
+      "label": "Licensed, locally owned, and backed by the brands we install",
+      "logos": [
+        "License CAC1800177",
+        "TW Test Award 2025",
+        "Carrier",
+        "Trane"
+      ]
+    },
+    "hero": {
+      "eyebrow": "Locally owned, licensed",
+      "headline": "Heating and air repair in Winter Park, day or night",
+      "headlineEmphasis": "day or night",
+      "sub": "We handle AC installation and service, furnace repair and replacement, and attic fan checks for homeowners and property managers around Winter Park.",
+      "formLabel": "Tell us what the system is doing",
+      "placeholder": "Your email address",
+      "cta": "Call for service",
+      "secondaryCta": "Ask us a question",
+      "trust": "Tess Tracewell has run this shop since 2011, licensed in Florida under CAC1800177.",
+      "badge": "24/7 emergency service",
+      "frictionReducers": [
+        "Upfront pricing, no surprises",
+        "We text before we arrive",
+        "Emergency calls any time"
+      ],
+      "heroBullets": [
+        {
+          "value": "2011",
+          "label": "Fixing systems here since"
+        },
+        {
+          "value": "2 hours",
+          "label": "Response time"
+        },
+        {
+          "value": "24/7",
+          "label": "Emergency HVAC service"
+        }
+      ]
+    },
+    "about": {
+      "eyebrow": "About us",
+      "title": "Your local heating and air team in Winter Park",
+      "body": "We are Tracewell Heating & Air, a locally owned heating and cooling company working out of Winter Park and covering Maitland and Oviedo too. Tess Tracewell has run the business since 2011, and we handle AC installation and service, furnace repair and replacement, and our TW Attic Fan Check. You get the price before the work starts, and a text before we pull up.",
+      "pillars": [
+        {
+          "k": null,
+          "t": "Price up front",
+          "d": "You hear the number before we start, so there is nothing unexpected on the bill."
+        },
+        {
+          "k": null,
+          "t": "A text before we arrive",
+          "d": "We message you when we are on the way so you know exactly when to expect us."
+        },
+        {
+          "k": null,
+          "t": "Locally owned",
+          "d": "Tess Tracewell has run this business out of Winter Park since 2011."
+        }
+      ],
+      "stats": [
+        {
+          "n": "15+",
+          "l": "Years in business"
+        },
+        {
+          "n": "4.8★ from 57 reviews",
+          "l": "Average rating"
+        },
+        {
+          "n": "3",
+          "l": "Towns covered"
+        }
+      ],
+      "story": [
+        "Tracewell Heating & Air has been fixing and fitting heating and cooling systems since 2011. We are based at 1200 Tracer Ridge Rd in Winter Park, and we work for homeowners and property managers across Winter Park, Maitland and Oviedo.",
+        "Tess Tracewell owns the company. That means the person whose name is on the truck is the person you can talk to. We are licensed under CAC1800177, and we were given the TW Test Award 2025.",
+        "The way we work is simple. You tell us what the system is doing, we come out and trace the problem back to its cause, and we tell you what it costs before we touch anything. No surprise line items at the end. We will text you before we arrive so you are not sitting by the window all morning.",
+        "Our office hours are Monday to Friday, 8am to 5pm. We also run 24/7 emergency HVAC service, so if the air quits on a Saturday night you can still call. We install and service Carrier and Trane equipment."
+      ]
+    },
+    "services": {
+      "eyebrow": "What we do",
+      "title": "Heating and cooling work across Winter Park",
+      "sub": "Three things we do, for homeowners and property managers in Winter Park, Maitland and Oviedo. Call us and we will trace down the issue.",
+      "items": [
+        {
+          "n": "01",
+          "t": "AC Installation & Service",
+          "d": "Cool air back in the house, whether that means a repair, a tune up, or a brand new system fitted.",
+          "tag": "Cooling",
+          "image": {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-svc-ac-ZjAyumqb608j4WAtlIMtiImJe3m27W.jpg",
+            "alt": "AC Installation & Service"
+          },
+          "priceFrom": "$149",
+          "included": [
+            "Sizing for your home",
+            "Removal of the old unit",
+            "Permit and inspection",
+            "TW coil rinse"
+          ],
+          "typicalJobs": [
+            "AC blowing warm air",
+            "Ice on the lines"
+          ],
+          "areas": [
+            "Winter Park",
+            "Maitland"
+          ],
+          "brands": [
+            "Carrier"
+          ],
+          "duration": "Half a day",
+          "slug": "ac-installation-service",
+          "detail": "If your air conditioning has stopped, slowed down, or started making a noise you do not like, we will find out why and tell you what it costs to put right. When a unit is past saving, we size and install a replacement rather than selling you more system than the house needs. We fit Carrier and Trane.",
+          "page": {
+            "intro": "We install and service air conditioning in Winter Park homes, and booking is a phone call to Tracewell Heating & Air. Tell us what the system is doing, warm air, ice on the lines, odd noises, and we will trace it down. New installs include sizing for your home, removal of the old unit, the permit and inspection, and our TW coil rinse.",
+            "expect": [
+              "Call us to book. We answer Mon to Fri, 8am to 5pm.",
+              "We text before we arrive, so you are not guessing.",
+              "Service calls start at $149, priced upfront before work starts.",
+              "A full install usually takes about half a day."
+            ],
+            "faq": [
+              {
+                "q": "Do you service all brands?",
+                "a": "We carry Carrier and Trane, and new installs we put in are Carrier. Call and tell us what you have so we can sort it out before we come."
+              },
+              {
+                "q": "Can you come Saturdays?",
+                "a": "Our regular hours are Mon to Fri, 8am to 5pm. We also run 24/7 emergency service, so if the AC quits on a Saturday, call us any time, day or night."
+              },
+              {
+                "q": "My AC is blowing warm air. Is that a repair or a new unit?",
+                "a": "Often it is a repair, and we will tell you which it is after we look. You get the price upfront either way, no surprises later."
+              },
+              {
+                "q": "There is ice on the lines. Should I shut it off?",
+                "a": "Yes, shut the system off and call us. Running it iced up can make the problem worse before we get there."
+              },
+              {
+                "q": "Do you handle the permit for a new system?",
+                "a": "Yes. The permit and inspection are part of the install, along with sizing the unit for your home and hauling off the old one."
+              }
+            ]
+          }
+        },
+        {
+          "n": "02",
+          "t": "Furnace Repair & Replacement",
+          "d": "Heat that comes on when you ask for it, with a straight answer on whether to fix the furnace or swap it.",
+          "tag": "Heating",
+          "image": null,
+          "priceFrom": "$89",
+          "included": [
+            "Safety inspection"
+          ],
+          "duration": "A full day",
+          "detail": "Cold mornings in Central Florida are short but they still catch people out. We check the furnace, trace the fault, and give you the price before we begin. If replacing it makes more sense than repairing it, we will say so and explain why."
+        },
+        {
+          "n": "03",
+          "t": "TW Attic Fan Check",
+          "d": "A look at the attic fan so hot air is moving out of the roof instead of pushing back into your rooms.",
+          "tag": "Attic",
+          "image": null,
+          "priceFrom": null,
+          "detail": "An attic fan that has quietly stopped working makes the whole house harder to cool and the AC work longer than it should. We test the fan, check it is pulling the way it should, and report back on what we found. Handy to book alongside AC service."
+        }
+      ]
+    },
+    "work": {
+      "eyebrow": "Our work",
+      "title": "The jobs we do around Winter Park",
+      "sub": "We install and service AC systems, repair and replace furnaces, and run our TW Attic Fan Check. Homeowners and property managers both call us. Pricing is upfront, so you know the number before we start, and we text before we arrive. Call 407-555-0177 and tell us what the system is doing.",
+      "hidden": false,
+      "projects": [
+        {
+          "t": "AC Installation & Service",
+          "loc": null,
+          "yr": null,
+          "scope": "AC Installation & Service",
+          "size": null,
+          "caption": "AC Installation & Service",
+          "image": {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-svc-ac-ZjAyumqb608j4WAtlIMtiImJe3m27W.jpg",
+            "alt": "AC Installation & Service"
+          },
+          "service": "ac-installation-service"
+        },
+        {
+          "t": "AC Installation & Service",
+          "loc": null,
+          "yr": null,
+          "scope": "AC Installation & Service",
+          "size": null,
+          "caption": "AC Installation & Service",
+          "image": {
+            "url": "https://2jnv0zbpchm0mo8m.public.blob.vercel-storage.com/tw-svc-ac-2-ruU1eDwXzMGtTs4N6ph4r5SGgchhZF.webp",
+            "alt": "AC Installation & Service"
+          },
+          "service": "ac-installation-service"
+        }
+      ]
+    },
+    "testimonials": {
+      "eyebrow": "Reviews",
+      "title": "What homeowners say after we trace down the problem",
+      "items": [
+        {
+          "q": null,
+          "a": null,
+          "r": null,
+          "company": null,
+          "stars": 5
+        },
+        {
+          "q": null,
+          "a": null,
+          "r": null,
+          "company": null,
+          "stars": 5
+        },
+        {
+          "q": null,
+          "a": null,
+          "r": null,
+          "company": null,
+          "stars": 5
+        }
+      ]
+    },
+    "faq": {
+      "eyebrow": "Questions, answered",
+      "title": "What Winter Park homeowners ask us",
+      "sub": "Straight answers about how we work, what we fix, and how to reach us. If your question isn't here, give Tracewell Heating & Air a call.",
+      "items": [
+        {
+          "q": "Do you work in my area?",
+          "a": "We're a locally owned shop based in Winter Park and we've been at it since 2011. Our service area also takes in Maitland and Oviedo."
+        },
+        {
+          "q": "Can I call you at night or on the weekend?",
+          "a": "Yes. We run 24/7 emergency HVAC service, so call any time, day or night. The office is open Mon to Fri, 8am to 5pm."
+        },
+        {
+          "q": "How soon can someone get here?",
+          "a": "We aim to be there within 2 hours. Call 407-555-0177 and we'll get you on the board."
+        },
+        {
+          "q": "Will I know the cost before work starts?",
+          "a": "Yes. Upfront pricing, no surprises, so you hear the number before we pick up a tool."
+        },
+        {
+          "q": "What equipment do you work on?",
+          "a": "We carry Carrier and Trane, and we handle AC installation and service plus furnace repair and replacement."
+        },
+        {
+          "q": "What is the TW Attic Fan Check?",
+          "a": "It's our look at your attic fan to see how it's running. Ask for it when you book and we'll take care of it on the visit."
+        }
+      ]
+    },
+    "finalCta": {
+      "eyebrow": "Licensed CAC1800177 · TW Test Award 2025",
+      "headline": "AC or heat acting up in Winter Park? Call any time.",
+      "headlineEmphasis": "Call any time",
+      "sub": "Tell us what's going on at your Winter Park home or rental and we'll get a tech headed your way. AC installation and service, furnace repair and replacement, and the TW Attic Fan Check.",
+      "cta": "Book a visit",
+      "secondary": "Or call 407-555-0177, day or night.",
+      "frictionReducers": [
+        "Upfront pricing, no surprises",
+        "We text before we arrive",
+        "Winter Park · Maitland · Oviedo"
+      ]
+    },
+    "footer": {
+      "blurb": "Tracewell Heating & Air is a locally owned HVAC company based in Winter Park, handling AC installation and service, furnace repair and replacement, and attic fan checks. Upfront pricing, no surprises, and we text before we arrive.",
+      "cols": [
+        {
+          "h": "Services",
+          "links": [
+            {
+              "label": "AC Installation & Service",
+              "href": "#services"
+            },
+            {
+              "label": "Furnace Repair & Replacement",
+              "href": "#services"
+            },
+            {
+              "label": "TW Attic Fan Check",
+              "href": "#services"
+            }
+          ]
+        },
+        {
+          "h": "Company",
+          "links": [
+            {
+              "label": "About Us",
+              "href": "#about"
+            },
+            {
+              "label": "Our Work",
+              "href": "#work"
+            },
+            {
+              "label": "Reviews",
+              "href": "#testimonials"
+            },
+            {
+              "label": "FAQ",
+              "href": "#faq"
+            },
+            {
+              "label": "Contact Us",
+              "href": "#cta"
+            }
+          ]
+        }
+      ],
+      "social": [],
+      "legalLinks": [
+        {
+          "label": "Privacy Policy",
+          "href": "#"
+        },
+        {
+          "label": "Terms of Service",
+          "href": "#"
+        }
+      ],
+      "legal": "© 2026 Your HVAC Company LLC. All rights reserved."
+    },
+    "seo": {
+      "title": "Heating & Air in Winter Park | Tracewell Heating & Air",
+      "description": "AC installation and service, furnace repair and replacement and attic fan checks across Winter Park and nearby areas. Emergency help day or night, so call now.",
+      "canonical": "https://yourhvaccompany.com",
+      "googleAnalyticsId": null,
+      "facebookPixelId": null
+    }
+  },
+  "edits": {
+    "brand.palette": {
+      "accent": "#E0602C",
+      "accent2": "#1E3A5F",
+      "accentFg": "#FFFFFF",
+      "bg": "#FFFFFF",
+      "bgSoft": "#F4F6F8",
+      "ink": "#13293F",
+      "inkSoft": "#4C5E74",
+      "rule": "#E2E8F0"
+    },
+    "brand.typography": {
+      "fontSans": "var(--font-inter), system-ui, sans-serif",
+      "fontHeading": "var(--font-oswald), system-ui, sans-serif",
+      "headingWeight": 600,
+      "bodyWeight": 400,
+      "headingTracking": "0.005em",
+      "headingLineHeight": 1
+    },
+    "brand.tagline": "We will Trace down those issues!",
+    "brand.long": "Tracewell Heating & Air LLC",
+    "services.items.1.duration": "A full day",
+    "announcement": "We respond withing 2 hours! Give us a call any time, day or night!",
+    "about.body": "We are Tracewell Heating & Air, a locally owned heating and cooling company working out of Winter Park and covering Maitland and Oviedo too. Tess Tracewell has run the business since 2011, and we handle AC installation and service, furnace repair and replacement, and our TW Attic Fan Check. You get the price before the work starts, and a text before we pull up.",
+    "about.pillars.0.t": "Price up front",
+    "about.pillars.0.d": "You hear the number before we start, so there is nothing unexpected on the bill.",
+    "hero.heroBullets.2.value": "Trusted By Major Brands",
+    "hero.heroBullets.2.label": "Carrier, Trane",
+    "faq.items.1.q": "Can I call you at night or on the weekend?",
+    "faq.items.1.a": "Yes. We pick up the phone any time of the day, and the office is open Mon to Fri, 8am to 5pm.",
+    "faq.items.4.a": "We carry Carrier and Trane, but we work on more than just that. Let us know what brand your system is on the call if you know it, that information helps us prepare and get the job done quicker.",
+    "faq.items.5.q": "What is the TW Attic Fan Check?",
+    "footer.legal": "© 2026 Tracewell Heating & Air LLC. All rights reserved.",
+    "footer.cols.0.links.2.label": "TW Attic Fan Check",
+    "footer.cols.1.links.4.label": "Contact Us",
+    "extensions.hours.all": "Mon to Fri, 8am to 5pm"
+  },
+  "brief": {
+    "blocks": {},
+    "customFields": [],
+    "lastRunAt": "2026-11-11T22:16:33.824Z",
+    "tickedSections": [
+      "subpages",
+      "servicePages"
+    ]
+  }
+}

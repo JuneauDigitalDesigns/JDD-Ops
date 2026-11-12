@@ -47,7 +47,9 @@ export default function WorkSpotlight({
     <section id="work" className={`py-24 ${s.section}`}>
       <div className="mx-auto max-w-6xl px-6">
         <h2 className={`max-w-xl font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="work.title">{work.title}</E></h2>
-        <p className={`mt-3 max-w-xl ${s.body}`}><E p="work.sub">{work.sub}</E></p>
+        {work.sub && (
+          <p className={`mt-3 max-w-xl ${s.body}`}><E p="work.sub">{work.sub}</E></p>
+        )}
 
         <div className="mt-10 grid gap-6 lg:grid-cols-[62%_minmax(0,1fr)] lg:items-start">
           {/* Feature panel */}
