@@ -29,7 +29,7 @@ import { useState } from 'react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { LeadForm } from '@/lib/LeadForm';
-import { CoverImage } from '@/lib/CoverImage';
+import { HeroPhotos, heroPhotos } from '@/lib/PhotoCarousel';
 import { primaryCity } from '@/lib/serviceLinks';
 
 /** A client photo's alt when it came with none: facts only, "{business} in {city}" (never a guess at what it shows). */
@@ -43,7 +43,7 @@ export const meta = {
     'hero.headline', 'hero.headlineEmphasis', 'hero.sub', 'hero.formLabel', 'hero.cta',
     'extensions.reviewBadge', 'services.items', 'images.hero.slides',
   ],
-  sharedDeps: ['@/lib/CoverImage', '@/lib/editable', '@/lib/LeadForm'],
+  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@/lib/editable', '@/lib/LeadForm'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -78,6 +78,8 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
   const formLabel = hero.formLabel?.trim();
   const plan = FREQUENCIES.find((f) => f.key === selected) ?? FREQUENCIES[0];
   const slide = images.hero?.slides?.[0]?.url ?? images.hero?.portrait;
+  // Every general work photo, photo 1 first (Xander 2026-11-11: more than one goes in a carousel).
+  const photos = heroPhotos(content, placeAlt(content));
   const review = extensions.reviewBadge;
   // items[0], not a find() over all items: the <E> edit path below has to name a FIXED index,
   // and a find() that lands on item 2 while the edit path says item 0 writes the operator's
@@ -88,11 +90,7 @@ export default function LawnHero({ content = CONTENT }: { content?: SiteContent 
   return (
     <section className="relative isolate flex items-center overflow-hidden bg-inkPanel2 text-onInk lg:min-h-[660px]">
       {slide && (
-        <div
-          className="absolute inset-0 isolate overflow-hidden"
-        >
-          <CoverImage url={slide} alt={images.hero?.slides?.[0]?.alt?.trim() || placeAlt(content)} sizes="100vw" priority avif />
-        </div>
+        <HeroPhotos photos={photos} controlsClassName="bottom-3 left-5 sm:left-6 lg:bottom-6" />
       )}
       {/* Forest wash: one grade for any client photo (colour blend of the forest panel). */}
       <div className="absolute inset-0 bg-inkPanel2 opacity-35 mix-blend-color" aria-hidden="true" />

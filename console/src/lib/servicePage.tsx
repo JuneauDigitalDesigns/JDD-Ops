@@ -59,7 +59,7 @@ export function listWithNotes(s: ServiceRef, key: 'included' | 'typicalJobs'): {
  * and stock under "Our work" would claim someone else's job. (Onboarding files photo 1 as a tagged
  * job photo too, so the client's main photo is here when it is theirs.)
  */
-export function ourWorkPhotos(content: unknown, s: ServiceRef, max = 3): { url: string; alt: string; path: string }[] {
+export function ourWorkPhotos(content: unknown, s: ServiceRef, max = 10): { url: string; alt: string; path: string }[] {
   const seen = new Set<string>();
   return arr(obj(obj(content).work).projects)
     .map((raw, i) => ({ x: obj(raw), i }))

@@ -27,6 +27,7 @@ import { Check, MapPin, Plus, ArrowRight, Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { CoverImage } from '@/lib/CoverImage';
+import { WorkCarousel } from '@/lib/PhotoCarousel';
 import {
   primaryCity, relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions,
 } from '@/lib/serviceLinks';
@@ -39,7 +40,7 @@ export const meta = {
   category: 'services',
   label: 'HVAC / Service page body',
   consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks', '@/lib/servicePage'],
+  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -96,15 +97,12 @@ export default function HvacServiceDetail({ content = CONTENT, serviceSlug }: { 
           <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
             <Cap />
             <h2 className="font-heading text-[30px] font-semibold leading-[1.04] text-ink lg:text-[36px]">{U.ourWork}</h2>
-            <div className={`mt-7 grid gap-4 ${work.length > 1 ? 'sm:grid-cols-[1.3fr_1fr]' : ''}`}>
-              {work.map((ph, k) => (
-                <figure
-                  key={ph.path}
-                  className={`shadow-brand-2 relative isolate aspect-[3/2] overflow-hidden rounded-[16px] bg-bgSoft ${work.length === 3 && k === 0 ? 'sm:row-span-2 sm:aspect-auto' : ''}`}
-                >
-                  <CoverImage url={ph.url} alt={headline} sizes={work.length > 1 ? '(min-width: 640px) 50vw, 100vw' : '100vw'} />
-                </figure>
-              ))}
+            <div className="mt-7">
+              <WorkCarousel
+                photos={work.map((ph) => ({ url: ph.url, alt: headline }))}
+                frame={`shadow-brand-2 rounded-[16px] bg-bgSoft`}
+                aspect="aspect-[3/2] lg:aspect-[16/9]"
+              />
             </div>
           </div>
         </section>

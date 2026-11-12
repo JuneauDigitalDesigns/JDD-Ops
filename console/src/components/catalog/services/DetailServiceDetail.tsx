@@ -34,7 +34,7 @@ import { Check, Plus, Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
-import { CoverImage } from '@/lib/CoverImage';
+import { WorkCarousel } from '@/lib/PhotoCarousel';
 import {
   primaryCity, relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions,
 } from '@/lib/serviceLinks';
@@ -47,7 +47,7 @@ export const meta = {
   category: 'services',
   label: 'Car Detailing / Service page body',
   consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
+  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -114,15 +114,12 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
           <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
             <Cap />
             <h2 className={H2}>{U.ourWork}</h2>
-            <div className={`mt-7 grid gap-4 lg:gap-[22px] ${work.length > 1 ? 'sm:grid-cols-[1.3fr_1fr]' : ''}`}>
-              {work.map((ph, k) => (
-                <figure
-                  key={ph.path}
-                  className={`relative isolate aspect-[3/2] overflow-hidden rounded-[12px] ${GLASS} ${work.length === 3 && k === 0 ? 'sm:row-span-2 sm:aspect-auto' : ''}`}
-                >
-                  <CoverImage url={ph.url} alt={headline} sizes={work.length > 1 ? '(min-width: 640px) 50vw, 100vw' : '100vw'} />
-                </figure>
-              ))}
+            <div className="mt-7">
+              <WorkCarousel
+                photos={work.map((ph) => ({ url: ph.url, alt: headline }))}
+                frame={`rounded-[12px] ${GLASS}`}
+                aspect="aspect-[3/2] lg:aspect-[16/9]"
+              />
             </div>
           </div>
         </section>
