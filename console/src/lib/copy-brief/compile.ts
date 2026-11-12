@@ -69,9 +69,9 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
   return [
     `- servicePages: one item per service below, each { slug, intro, body, includedNotes, signNotes, expect, faq }, for that service's own page.`,
     `intro: 2 to 3 sentences; the first says plainly that the business does this service${where} and how to book it${city ? `, and names ${city} once` : ''}.`,
-    // body, includedNotes, signNotes and the general trade knowledge rule: Xander approved the
-    // layout and the rule on 2026-11-11 (service page upgrade); these lines await his word-for-word
-    // sign-off (S5) before this ships.
+    // body, includedNotes, signNotes and the general trade knowledge rule (service page upgrade):
+    // the layout, the rule and these three lines word for word (S5), plus the facts line below,
+    // approved by Xander on 2026-11-11. Don't reword them without his sign-off.
     'body: 2 to 3 short paragraphs that explain this service to a homeowner, the plain answer first, without repeating the intro. Anything about this business comes only from the facts below. You may add general trade knowledge any technician in this trade would agree with, such as what a problem usually means or why a step matters, but never as this business\'s promise, and never a price, time, warranty, guarantee, licence or brand the facts do not give. No town lists. Fewer facts means fewer paragraphs; an empty list when there is nothing to add to the intro.',
     'includedNotes: one line for each item in included, in the same order, saying plainly what the customer gets from it; an empty string for an item you cannot explain from its name and general trade knowledge.',
     'signNotes: one line for each item in typicalJobs, in the same order, saying what it usually means and what to do; an empty string when you cannot tell.',
