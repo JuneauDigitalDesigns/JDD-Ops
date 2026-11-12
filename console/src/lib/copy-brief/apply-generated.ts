@@ -212,7 +212,17 @@ export function applyGeneratedCopy(
           if (!it) return item;
           // `page` arrives with @jdd/schema v1.32.0; typed structurally until the console pins it.
           const faq = withoutRepeats((it.faq ?? []).map((f) => ({ q: f.q, a: f.a })), fixedBySlug.get(slugs[i]) ?? []);
-          return { ...item, page: { intro: it.intro, expect: it.expect ?? [], faq } } as typeof item;
+          return {
+            ...item,
+            page: {
+              intro: it.intro,
+              body: it.body ?? [],
+              includedNotes: it.includedNotes ?? [],
+              signNotes: it.signNotes ?? [],
+              expect: it.expect ?? [],
+              faq,
+            },
+          } as typeof item;
         }),
       };
     }

@@ -5,7 +5,9 @@
 // 2026-11-10): the service's own photo under the home hero's navy wash and scrim, a visible
 // breadcrumb that matches client-seo's BreadcrumbList, "{service} in {city}" as the page's only
 // H1, the generated answer-first intro, the phone button and jump links to the price and the
-// questions (each shown only when that block exists below).
+// questions (shown only when that block exists below). Since 2026-11-11 (Xander, "be upfront with
+// pricing") the starting price sits here, beside the heading, with "Ask for a quote" taking the
+// visitor to the closing form already filled with the service.
 //
 // No form here: a service page's only form is the closing call to action (Xander 2026-11-10).
 // wirePages and the Studio pass `serviceSlug`; an unknown slug renders nothing. Every word below
@@ -16,13 +18,14 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { CoverImage } from '@/lib/CoverImage';
 import { primaryCity, serviceBySlug, servicePhoto, serviceQuestions } from '@/lib/serviceLinks';
+import { SERVICE_UPGRADE_WORDS, goToQuoteForm, servicePrice } from '@/lib/servicePage';
 
 export const meta = {
   id: 'hvac-service-header',
   category: 'pageHeader',
   label: 'HVAC / Service page header',
   consumes: ['services.items', 'brand.address', 'brand.phone', 'brand.phoneHref', 'extensions.serviceArea', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -38,7 +41,8 @@ export default function HvacServiceHeader({ content = CONTENT, serviceSlug }: { 
   const city = primaryCity(content);
   const photo = servicePhoto(content, s);
   const intro = typeof (s.item.page as { intro?: unknown } | undefined)?.intro === 'string' ? ((s.item.page as { intro: string }).intro.trim()) : '';
-  const hasPrice = typeof s.item.priceFrom === 'string' && s.item.priceFrom.trim() !== '';
+  const U = SERVICE_UPGRADE_WORDS;
+  const price = servicePrice(s);
   const hasQuestions = serviceQuestions(content, s).length > 0;
 
   return (
@@ -65,7 +69,7 @@ export default function HvacServiceHeader({ content = CONTENT, serviceSlug }: { 
         }}
       />
 
-      <div className="relative mx-auto max-w-[1120px] px-5 pb-12 pt-7 sm:px-6 lg:pb-24 lg:pt-14">
+      <div className={`relative mx-auto max-w-[1120px] px-5 pb-12 pt-7 sm:px-6 lg:pb-24 lg:pt-14 ${price ? 'lg:grid lg:grid-cols-[1fr_280px] lg:items-end lg:gap-12' : ''}`}>
         <div className="max-w-[720px]">
           <nav aria-label="Breadcrumb" className="mb-[22px] lg:mb-[34px]">
             <ol className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-onInkSoft">
@@ -110,17 +114,31 @@ export default function HvacServiceHeader({ content = CONTENT, serviceSlug }: { 
             </a>
           </div>
 
-          {(hasPrice || hasQuestions) && (
+          {hasQuestions && (
             <ul aria-label="On this page" className="mt-7 flex max-w-[50ch] flex-wrap gap-x-[22px] gap-y-2 border-t border-ruleInk pt-5">
-              {hasPrice && (
-                <li><a href="#pricing" className="border-b border-ruleInk pb-[3px] text-[14px] font-semibold text-onInk transition-colors hover:border-accent hover:text-accent">{W.pricing}</a></li>
-              )}
-              {hasQuestions && (
-                <li><a href="#questions" className="border-b border-ruleInk pb-[3px] text-[14px] font-semibold text-onInk transition-colors hover:border-accent hover:text-accent">{W.questions}</a></li>
-              )}
+              <li><a href="#questions" className="border-b border-ruleInk pb-[3px] text-[14px] font-semibold text-onInk transition-colors hover:border-accent hover:text-accent">{W.questions}</a></li>
             </ul>
           )}
         </div>
+
+        {/* Upfront pricing (Xander 2026-11-11): the price the client gave, in view from the start.
+            No price given: no box, and nothing about price anywhere on the page. */}
+        {price && (
+          <aside className="relative mt-8 overflow-hidden rounded-[16px] border border-ruleInk bg-[color:color-mix(in_srgb,var(--ink-panel)_84%,transparent)] p-6 backdrop-blur-sm lg:mt-0">
+            <span className="accent-bar absolute inset-x-0 top-0 !h-1 !w-auto !rounded-none" aria-hidden="true" />
+            <span className="block text-[12px] font-bold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,var(--accent-2)_45%,var(--on-ink))]">{U.startingAt}</span>
+            <b className="mt-2 block font-heading text-[46px] font-semibold leading-none text-onInk lg:text-[52px]">
+              <E p={`services.items.${s.index}.priceFrom`}>{price}</E>
+            </b>
+            <a
+              href="#cta"
+              onClick={goToQuoteForm}
+              className="mt-5 flex w-full items-center justify-center rounded-[10px] bg-accent px-[22px] py-[14px] text-[16px] font-bold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105"
+            >
+              {U.askForQuote}
+            </a>
+          </aside>
+        )}
       </div>
     </section>
   );

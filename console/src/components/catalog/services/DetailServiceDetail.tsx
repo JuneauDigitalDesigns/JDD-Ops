@@ -2,17 +2,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // DetailServiceDetail — the body of one per-service page (/services/<slug>), blocks 4–12 of
 // service-page-spec.md §3, in the approved Car Detailing language (service-pages mockup, `.v-detail`
-// overrides, Xander 2026-11-10): dark glass panels, gold for the ticks, the steps and the price.
+// overrides, Xander 2026-11-10): dark glass panels, gold for the ticks, the steps and the rings.
 // Same data, omission rules and edit paths as HvacServiceDetail; only the idiom differs.
-//   4  What's included        services.items[i].included        (client)       hairline list, gold-ringed ticks
-//   5  Signs it's time to call services.items[i].typicalJobs     (client)       glass panel, gold bar, 01 02 03
-//   6  What to expect          services.items[i].page.expect     (generated)    gold numbered steps
-//   7  Starting at             services.items[i].priceFrom       ("Ask for a quote" → the form)  glass price card
-//   8  Areas we serve          services.items[i].areas           (own towns only)  ringed band, gold-dotted towns
-//   9  Brands we work with     services.items[i].brands          outlined chips
-//   10 Common questions        tagged customer questions, then page.faq (3–5)    hairline rows on the slate band
-//   11 Proof                   reviews + job photos tagged to this service      glass quote card beside the job photo
-//   12 Related services        2–3 sibling services that have pages, same tag first   glass package cards
+// Upgraded 2026-11-11 (Xander approved the mockup "HVAC Service Page Upgrade"): the price moved
+// into the header, the job photos lead, and the page carries generated explanation for search.
+//   Our work                  job photos tagged to this service (client photos only, never stock)   glass-framed photos, no grade
+//   About {service}           services.items[i].page.body       (generated: facts + general trade knowledge)
+//   Know before you book      duration, areas, brands (service's own, else site-wide); only rows given   glass box, gold top bar
+//   What's included           included[] + page.includedNotes   (glass cards, gold-ringed ticks, staggered reveal: motion 1)
+//   Signs it's time to call   typicalJobs[] + page.signNotes    (ink-panel band, gold ring per sign: motion 2)
+//   What to expect            services.items[i].page.expect     (generated)    gold numbered steps
+//   Areas we serve            services.items[i].areas           (own towns only)  ringed band, gold-dotted towns
+//   Common questions          tagged customer questions, then page.faq (3–5)    hairline rows on the slate band
+//   Proof                     a review tagged to this service                   glass quote card
+//   Related services          2–3 sibling services that have pages, same tag first   glass package cards
+// "Starting at" and "Ask for a quote" are in DetailServiceHeader now.
 // Block 13 is DetailFinalCta, the template's one light band, which wirePages gives the same
 // serviceSlug.
 //
@@ -22,24 +26,28 @@
 // area" and "starting at" are the words DetailTrust and DetailServices already use.
 //
 // Every colour is a palette token: glass is ink at 4% / 9% over the ground (DetailServices'
-// cards), the gold bar and mark are the accent pulled toward black, and the questions band is bg
-// mixed toward ink (DetailFaq: this palette's --ink-panel-2 is accent-tinted and hides the rules).
+// cards), the gold bar and mark are the accent pulled toward black, the signs band is ink-panel
+// (one step darker than the ground, as DetailFooter), and the questions band is bg mixed toward
+// ink (DetailFaq: this palette's --ink-panel-2 is accent-tinted and hides the rules).
 // ─────────────────────────────────────────────────────────────────────────────
-import { Check, Plus } from '@phosphor-icons/react';
+import { Check, Plus, Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { CoverImage } from '@/lib/CoverImage';
 import {
-  relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions,
+  primaryCity, relatedServices, serviceBySlug, serviceList, serviceProof, serviceQuestions,
 } from '@/lib/serviceLinks';
+import {
+  SERVICE_UPGRADE_WORDS, aboutParagraphs, listWithNotes, ourWorkPhotos, serviceFacts,
+} from '@/lib/servicePage';
 
 export const meta = {
   id: 'detail-service-detail',
   category: 'services',
   label: 'Car Detailing / Service page body',
-  consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks'],
+  consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -76,103 +84,159 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
   const s = serviceBySlug(content, serviceSlug);
   if (!s) return null;
   const W = SERVICE_PAGE_WORDS;
+  const { brand } = content;
   const n = s.index;
-  const included = serviceList(s, 'included');
-  const jobs = serviceList(s, 'typicalJobs');
+  const U = SERVICE_UPGRADE_WORDS;
+  const city = primaryCity(content);
+  // The photos' alt is the page's own heading, "{service} in {city}": facts, never a guess.
+  const headline = city ? `${s.t} in ${city}` : s.t;
+  const work = ourWorkPhotos(content, s);
+  const about = aboutParagraphs(s);
+  const facts = serviceFacts(content, s, { howLong: U.howLong, areas: W.areas, brands: W.brands });
+  const included = listWithNotes(s, 'included');
+  const signs = listWithNotes(s, 'typicalJobs');
   const expect = (Array.isArray((s.item.page as { expect?: unknown } | undefined)?.expect)
     ? ((s.item.page as { expect: unknown[] }).expect)
     : []
   )
     .map((v, i) => ({ text: typeof v === 'string' ? v.trim() : '', i }))
     .filter((x) => x.text);
-  const price = typeof s.item.priceFrom === 'string' ? s.item.priceFrom.trim() : '';
   const areas = serviceList(s, 'areas');
-  const brands = serviceList(s, 'brands');
   const questions = serviceQuestions(content, s);
-  const { reviews, photos } = serviceProof(content, s);
+  const { reviews } = serviceProof(content, s);
   const related = relatedServices(content, s);
   const review = reviews[0];
 
   return (
     <>
-      {(included.length > 0 || jobs.length > 0) && (
-        <section className="rv bg-bg py-16 lg:py-[92px]">
-          <div className={`mx-auto grid max-w-[1120px] items-start gap-10 px-5 sm:px-6 lg:gap-14 ${included.length && jobs.length ? 'lg:grid-cols-2' : ''}`}>
-            {included.length > 0 && (
+      {work.length > 0 && (
+        <section className="rv bg-bg pb-4 pt-14 lg:pt-[92px]">
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2}>{U.ourWork}</h2>
+            <div className={`mt-7 grid gap-4 lg:gap-[22px] ${work.length > 1 ? 'sm:grid-cols-[1.3fr_1fr]' : ''}`}>
+              {work.map((ph, k) => (
+                <figure
+                  key={ph.path}
+                  className={`relative isolate aspect-[3/2] overflow-hidden rounded-[12px] ${GLASS} ${work.length === 3 && k === 0 ? 'sm:row-span-2 sm:aspect-auto' : ''}`}
+                >
+                  <CoverImage url={ph.url} alt={headline} sizes={work.length > 1 ? '(min-width: 640px) 50vw, 100vw' : '100vw'} />
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {(about.length > 0 || facts.length > 0) && (
+        <section className="rv bg-bg py-14 lg:py-[88px]">
+          <div className={`mx-auto grid max-w-[1120px] items-start gap-10 px-5 sm:px-6 lg:gap-14 ${about.length && facts.length ? 'lg:grid-cols-[1.6fr_1fr]' : ''}`}>
+            {about.length > 0 && (
               <div>
                 <Cap />
-                <h2 className="font-heading text-[34px] font-extrabold leading-[1.04] tracking-[-0.016em] text-ink lg:text-[46px]">{W.included}</h2>
-                <ul className="mt-[26px] border-t border-rule">
-                  {included.map((x) => (
-                    <li key={x.i} className="flex items-start gap-3.5 border-b border-rule py-4 text-[16px] font-semibold leading-[1.45] text-ink">
-                      <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent)]">
-                        <Check size={15} weight="bold" aria-hidden="true" />
-                      </span>
-                      <E p={`services.items.${n}.included.${x.i}`}>{x.text}</E>
-                    </li>
-                  ))}
-                </ul>
+                <h2 className={H2}>
+                  {U.about} <E p={`services.items.${n}.t`}>{s.t}</E>
+                </h2>
+                {about.map((p) => (
+                  <p key={p.path} className="mt-5 max-w-[62ch] text-[16.5px] leading-[1.75] text-inkSoft">
+                    <E p={p.path}>{p.text}</E>
+                  </p>
+                ))}
               </div>
             )}
-            {jobs.length > 0 && (
-              <div className="relative rounded-[12px] bg-[color:color-mix(in_srgb,var(--ink)_3.5%,transparent)] px-[22px] pb-[18px] pt-[26px] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_8.5%,transparent)] sm:px-8 sm:pb-[22px] sm:pt-8 lg:mt-[22px]">
-                <span className="absolute bottom-8 left-0 top-8 w-1 rounded-r-[4px] bg-accent" aria-hidden="true" />
-                <h2 className={H2}>{W.signs}</h2>
-                <ol className="mt-[18px]">
-                  {jobs.map((x, k) => (
-                    <li key={x.i} className={`flex items-baseline gap-4 py-[13px] text-[16px] leading-[1.5] text-ink ${k ? 'border-t border-rule' : ''}`}>
-                      <span className="shrink-0 font-heading text-[14px] font-extrabold leading-none text-accent tabular-nums" aria-hidden="true">
-                        {String(k + 1).padStart(2, '0')}
-                      </span>
-                      <E p={`services.items.${n}.typicalJobs.${x.i}`}>{x.text}</E>
-                    </li>
+            {facts.length > 0 && (
+              <aside className={`relative overflow-hidden rounded-[12px] p-6 sm:p-7 lg:mt-[22px] ${GLASS}`}>
+                <span className="absolute inset-x-0 top-0 h-1" style={{ background: GOLD_BAR }} aria-hidden="true" />
+                <h2 className="font-heading text-[20px] font-extrabold leading-[1.15] tracking-[-0.016em] text-ink">{U.facts}</h2>
+                <dl className="mt-1">
+                  {facts.map((f, k) => (
+                    <div key={f.label} className={k ? `mt-4 border-t pt-4 ${HAIR}` : 'mt-4'}>
+                      <dt className="text-[11px] font-bold uppercase leading-none tracking-[0.14em] text-accent">{f.label}</dt>
+                      <dd className="mt-2 font-heading text-[17px] font-extrabold leading-[1.3] tracking-[-0.01em] text-ink">
+                        {f.values.map((v, j) => (
+                          <span key={v.path}>{j > 0 && ', '}<E p={v.path}>{v.text}</E></span>
+                        ))}
+                      </dd>
+                    </div>
                   ))}
-                </ol>
-              </div>
+                </dl>
+              </aside>
             )}
           </div>
         </section>
       )}
 
-      {(expect.length > 0 || price) && (
+      {included.length > 0 && (
         <section className="rv bg-bgSoft py-16 lg:py-[88px]">
-          <div className={`mx-auto grid max-w-[1120px] items-start gap-10 px-5 sm:px-6 lg:gap-14 ${expect.length && price ? 'lg:grid-cols-[1.25fr_0.75fr]' : ''}`}>
-            {expect.length > 0 && (
-              <div>
-                <Cap />
-                <h2 className={H2}>{W.expect}</h2>
-                <ol className="mt-7">
-                  {expect.map((x, k) => (
-                    <li key={x.i} className="relative pb-[26px] pl-[60px] text-[16.5px] leading-[1.55] text-ink last:pb-0">
-                      <span className="absolute left-0 top-[-6px] grid h-10 w-10 place-items-center rounded-[8px] bg-accent font-heading text-[17px] font-extrabold text-accentFg" aria-hidden="true">
-                        {k + 1}
-                      </span>
-                      {k < expect.length - 1 && <span className="absolute bottom-0.5 left-[19px] top-[42px] w-0.5 bg-rule" aria-hidden="true" />}
-                      <E p={`services.items.${n}.page.expect.${x.i}`}>{x.text}</E>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-            {price && (
-              <aside
-                id="pricing"
-                className="relative scroll-mt-24 overflow-hidden rounded-[12px] bg-[color:color-mix(in_srgb,var(--ink)_3.5%,transparent)] p-7 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_35%,transparent)] sm:p-8"
-              >
-                <span className="absolute inset-x-0 top-0 h-1" style={{ background: GOLD_BAR }} aria-hidden="true" />
-                <span className="block text-[12px] font-bold uppercase leading-none tracking-[0.14em] text-accent">{W.startingAt}</span>
-                <b className="mt-3 block font-heading text-[44px] font-extrabold leading-none tracking-[-0.03em] text-ink lg:text-[54px]">
-                  <E p={`services.items.${n}.priceFrom`}>{price}</E>
-                </b>
-                <a
-                  href="#cta"
-                  className="mt-6 flex w-full items-center justify-center rounded-[8px] bg-accent px-[22px] py-[14px] font-heading text-[16px] font-extrabold text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98]"
-                  style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2}>{W.included}</h2>
+            <ul className="rv-stagger mt-8 grid gap-4 sm:grid-cols-2 lg:gap-[18px]">
+              {included.map((x) => (
+                <li key={x.path} className={`flex items-start gap-4 rounded-[12px] p-5 sm:p-6 ${GLASS}`}>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent)]" aria-hidden="true">
+                    <Check size={17} weight="bold" />
+                  </span>
+                  <span className="min-w-0">
+                    <b className="block text-[16px] font-semibold leading-[1.4] text-ink"><E p={x.path}>{x.text}</E></b>
+                    {x.note && <span className="mt-1.5 block text-[14.5px] leading-[1.6] text-inkSoft"><E p={x.notePath}>{x.note}</E></span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {signs.length > 0 && (
+        <section className="rv bg-inkPanel py-16 text-onInk lg:py-[88px]">
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className="font-heading text-[30px] font-extrabold leading-[1.04] tracking-[-0.016em] text-onInk lg:text-[36px]">{W.signs}</h2>
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:gap-[18px]">
+              {signs.map((x) => (
+                <li
+                  key={x.path}
+                  className="flex items-start gap-4 rounded-[12px] border border-ruleInk bg-[color:color-mix(in_srgb,var(--on-ink)_4%,transparent)] p-5 sm:p-6"
                 >
-                  {W.askForQuote}
-                </a>
-              </aside>
+                  <span className="sign-ring mt-1.5 h-3 w-3 shrink-0 rounded-full bg-accent text-accent" aria-hidden="true" />
+                  <span className="min-w-0">
+                    <b className="block text-[16px] font-semibold leading-[1.4] text-onInk"><E p={x.path}>{x.text}</E></b>
+                    {x.note && <span className="mt-1.5 block text-[14.5px] leading-[1.6] text-onInkSoft"><E p={x.notePath}>{x.note}</E></span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {brand.phoneHref && (
+              <a
+                href={brand.phoneHref}
+                className="mt-8 inline-flex w-full items-center justify-center gap-[10px] rounded-[8px] bg-accent px-[22px] py-[14px] font-heading text-[19px] font-extrabold tracking-[-0.01em] text-accentFg transition-[transform,filter] hover:-translate-y-0.5 hover:brightness-105 active:scale-[0.98] sm:w-auto"
+                style={{ boxShadow: '0 10px 24px -8px color-mix(in srgb, var(--accent) 55%, transparent)' }}
+              >
+                <Phone size={18} weight="fill" aria-hidden="true" />
+                <E p="brand.phone">{brand.phone}</E>
+              </a>
             )}
+          </div>
+        </section>
+      )}
+
+      {expect.length > 0 && (
+        <section className="rv bg-bg py-16 lg:py-[88px]">
+          <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
+            <Cap />
+            <h2 className={H2}>{W.expect}</h2>
+            <ol className="mt-7 max-w-[760px]">
+              {expect.map((x, k) => (
+                <li key={x.i} className="relative pb-[26px] pl-[60px] text-[16.5px] leading-[1.55] text-ink last:pb-0">
+                  <span className="absolute left-0 top-[-6px] grid h-10 w-10 place-items-center rounded-[8px] bg-accent font-heading text-[17px] font-extrabold text-accentFg" aria-hidden="true">
+                    {k + 1}
+                  </span>
+                  {k < expect.length - 1 && <span className="absolute bottom-0.5 left-[19px] top-[42px] w-0.5 bg-rule" aria-hidden="true" />}
+                  <E p={`services.items.${n}.page.expect.${x.i}`}>{x.text}</E>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
       )}
@@ -212,21 +276,6 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
         </section>
       )}
 
-      {brands.length > 0 && (
-        <section className="border-b border-rule bg-bg">
-          <div className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-7 gap-y-3.5 px-5 py-[30px] sm:px-6">
-            <h2 className="text-[12px] font-bold uppercase tracking-[0.14em] text-inkSoft">{W.brands}</h2>
-            <ul className="flex flex-wrap gap-2.5">
-              {brands.map((x) => (
-                <li key={x.i} className="rounded-[8px] border border-rule px-[18px] py-[11px] font-heading text-[16px] font-extrabold leading-none tracking-[-0.01em] text-ink">
-                  <E p={`services.items.${n}.brands.${x.i}`}>{x.text}</E>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
-
       {questions.length > 0 && (
         <section
           id="questions"
@@ -255,11 +304,11 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
         </section>
       )}
 
-      {(review || photos.length > 0) && (
+      {review && (
         <section className="rv bg-bgSoft py-16 lg:py-[88px]">
           <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
             <Cap />
-            <div className={`grid items-stretch gap-[22px] ${review && photos.length ? 'lg:grid-cols-[1.35fr_1fr]' : photos.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+            <div className="grid items-stretch gap-[22px]">
               {review && (
                 <figure className={`flex flex-col rounded-[12px] p-6 sm:p-7 lg:p-10 ${GLASS}`}>
                   <div className="text-[17px] tracking-[3px] text-accent" aria-hidden="true">★★★★★</div>
@@ -281,22 +330,6 @@ export default function DetailServiceDetail({ content = CONTENT, serviceSlug }: 
                   </figcaption>
                 </figure>
               )}
-              {photos.slice(0, review ? 1 : 3).map((ph) => (
-                <figure key={ph.path} className={`flex flex-col overflow-hidden rounded-[12px] ${GLASS}`}>
-                  <div
-                    className="relative min-h-[220px] flex-1 isolate overflow-hidden"
-                    style={{ filter: 'saturate(.82) contrast(1.06)' }}
-                  >
-                    <CoverImage url={ph.url} alt={ph.alt} sizes="(min-width: 1024px) 50vw, 100vw" />
-                  </div>
-                  {(ph.title || ph.meta) && (
-                    <figcaption className="px-[22px] py-[18px]">
-                      {ph.title && <b className="block font-heading text-[18px] font-extrabold leading-[1.2] tracking-[-0.016em] text-ink"><E p={`${ph.path}.t`}>{ph.title}</E></b>}
-                      {ph.meta && <small className="mt-1 block text-[13.5px] text-inkSoft">{ph.meta}</small>}
-                    </figcaption>
-                  )}
-                </figure>
-              ))}
             </div>
           </div>
         </section>

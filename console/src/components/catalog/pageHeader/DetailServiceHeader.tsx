@@ -6,8 +6,11 @@
 // desaturated photo, with a darker central scrim than the home hero's so the intro reads over a
 // busy photo; a centred breadcrumb that matches client-seo's BreadcrumbList; the tag as a
 // champagne eyebrow over the thin gold rule; "{service} in {city}" as the page's only H1 (city in
-// the accent); the generated answer-first intro; the phone button; and centred jump links to the
-// price and the questions (each shown only when that block exists below).
+// the accent); the generated answer-first intro; the phone button; and a centred jump link to the
+// questions (shown only when that block exists below). Since 2026-11-11 (Xander, "be upfront with
+// pricing") the starting price sits here too, with "Ask for a quote" taking the visitor to the
+// closing form already filled with the service. The header is centred, so on every screen the
+// price is a centred glass card under the heading content rather than a column beside it.
 //
 // No form here: a service page's only form is the closing call to action (Xander 2026-11-10).
 // wirePages and the Studio pass `serviceSlug`; an unknown slug renders nothing. Every word below
@@ -20,13 +23,14 @@ import { CONTENT, type SiteContent } from '@/data/site';
 import { E } from '@/lib/editable';
 import { CoverImage } from '@/lib/CoverImage';
 import { primaryCity, serviceBySlug, servicePhoto, serviceQuestions } from '@/lib/serviceLinks';
+import { SERVICE_UPGRADE_WORDS, goToQuoteForm, servicePrice } from '@/lib/servicePage';
 
 export const meta = {
   id: 'detail-service-header',
   category: 'pageHeader',
   label: 'Car Detailing / Service page header',
   consumes: ['services.items', 'brand.address', 'brand.phone', 'brand.phoneHref', 'extensions.serviceArea', 'work.projects', 'extensions.customerQuestions'],
-  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks'],
+  sharedDeps: ['@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -46,7 +50,8 @@ export default function DetailServiceHeader({ content = CONTENT, serviceSlug }: 
   const city = primaryCity(content);
   const photo = servicePhoto(content, s);
   const intro = typeof (s.item.page as { intro?: unknown } | undefined)?.intro === 'string' ? ((s.item.page as { intro: string }).intro.trim()) : '';
-  const hasPrice = typeof s.item.priceFrom === 'string' && s.item.priceFrom.trim() !== '';
+  const U = SERVICE_UPGRADE_WORDS;
+  const price = servicePrice(s);
   const hasQuestions = serviceQuestions(content, s).length > 0;
   const jump = 'border-b border-[color:color-mix(in_srgb,var(--on-ink)_30%,transparent)] pb-[3px] text-[14px] font-semibold text-onInk transition-colors hover:border-accent hover:text-accent';
 
@@ -111,14 +116,36 @@ export default function DetailServiceHeader({ content = CONTENT, serviceSlug }: 
           </a>
         </div>
 
-        {(hasPrice || hasQuestions) && (
+        {hasQuestions && (
           <ul
             aria-label="On this page"
             className="mx-auto mt-[26px] flex max-w-[50ch] flex-wrap justify-center gap-x-[22px] gap-y-2 border-t border-[color:color-mix(in_srgb,var(--on-ink)_16%,transparent)] pt-5"
           >
-            {hasPrice && <li><a href="#pricing" className={jump}>{W.pricing}</a></li>}
-            {hasQuestions && <li><a href="#questions" className={jump}>{W.questions}</a></li>}
+            <li><a href="#questions" className={jump}>{W.questions}</a></li>
           </ul>
+        )}
+
+        {/* Upfront pricing (Xander 2026-11-11): the price the client gave, in view from the start.
+            No price given: no box, and nothing about price anywhere on the page. The header is
+            centred, so the card sits centred under the heading content on every screen. */}
+        {price && (
+          <aside
+            className="relative mx-auto mt-8 w-full max-w-[300px] overflow-hidden rounded-[12px] p-6 backdrop-blur-sm shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_35%,transparent)] sm:mt-9"
+            style={{ background: panel(72) }}
+          >
+            <span className="absolute inset-x-0 top-0 h-1" style={{ background: GOLD_RULE }} aria-hidden="true" />
+            <span className="block text-[11.5px] font-semibold uppercase leading-none tracking-[0.26em] text-accent">{U.startingAt}</span>
+            <b className="mt-3 block font-heading text-[42px] font-extrabold leading-none tracking-[-0.03em] text-onInk sm:text-[48px]">
+              <E p={`services.items.${s.index}.priceFrom`}>{price}</E>
+            </b>
+            <a
+              href="#cta"
+              onClick={goToQuoteForm}
+              className="mt-5 flex w-full items-center justify-center rounded-[8px] border-2 border-[color:color-mix(in_srgb,var(--on-ink)_22%,transparent)] px-[22px] py-[12px] text-[16px] font-bold text-onInk transition-[color,border-color,transform] hover:-translate-y-0.5 hover:border-accent hover:text-accent active:scale-[0.98]"
+            >
+              {U.askForQuote}
+            </a>
+          </aside>
         )}
       </div>
     </section>
