@@ -35,24 +35,80 @@ const PAGE_TYPE_ORDER: Record<string, number> = {
  * Build the ordered review groups from the live composition's non-home pages. A client with four
  * services gets four service groups; a client with nine gets nine — nothing is hardcoded.
  */
+/** /areas/<town> and /areas/<town>/<service> (L2). Matched by route, which Xander fixed, so the
+ *  review never depends on what the composition calls these page types. `areas` alone is the
+ *  Service Areas page, reviewed like any other page. */
+const TOWN_ROUTE = /^areas\/[^/]+$/;
+const TOWN_SERVICE_ROUTE = /^areas\/[^/]+\/[^/]+$/;
+/** After the service pages; a town's own service pages follow it, since their routes sort after. */
+const TOWN_ORDER = 10;
+
+function orderOf(p: ReviewPage): number {
+  if (TOWN_ROUTE.test(p.route) || TOWN_SERVICE_ROUTE.test(p.route)) return TOWN_ORDER;
+  return PAGE_TYPE_ORDER[p.pageType] ?? 8;
+}
+
+function sectionsOf(p: ReviewPage): Section[] {
+  // A town page's H1, title and headings are approved fixed wording, so its only generated copy
+  // is the townPages section's (lib/townPages.ts); the same for a town + service page.
+  if (TOWN_ROUTE.test(p.route)) return ['townPages'];
+  if (TOWN_SERVICE_ROUTE.test(p.route)) return ['townServicePages'];
+  // The Services page additionally reviews services.items[].detail (the prose that actually
+  // appears on /services); every other non-home page is header + SEO only.
+  return p.pageType === 'services' ? ['subpages', 'services'] : p.pageType === 'service' ? ['subpages', 'servicePages'] : ['subpages'];
+}
+
 export function buildReviewGroups(pages: ReviewPage[]): ReviewGroup[] {
   const home: ReviewGroup = { route: '', label: 'Home', sections: HOME_SECTIONS };
   const nonHome = pages
     .filter((p) => p.route !== '')
     .slice()
     .sort((a, b) => {
-      const oa = PAGE_TYPE_ORDER[a.pageType] ?? 8;
-      const ob = PAGE_TYPE_ORDER[b.pageType] ?? 8;
+      const oa = orderOf(a);
+      const ob = orderOf(b);
       return oa !== ob ? oa - ob : a.route.localeCompare(b.route);
     })
-    .map<ReviewGroup>((p) => ({
-      route: p.route,
-      label: p.label,
-      // The Services page additionally reviews services.items[].detail (the prose that actually
-      // appears on /services); every other non-home page is header + SEO only.
-      sections: p.pageType === 'services' ? ['subpages', 'services'] : p.pageType === 'service' ? ['subpages', 'servicePages'] : ['subpages'],
-    }));
+    .map<ReviewGroup>((p) => ({ route: p.route, label: p.label, sections: sectionsOf(p) }));
   return [home, ...nonHome];
+}
+
+type TownMap = Record<string, { intro?: unknown; captions?: unknown; services?: Record<string, unknown> }>;
+
+/**
+ * The town review keys a run's new overlay puts copy behind: `areas/<town>:townPages` for each town
+ * page whose intro or captions changed, and `areas/<town>/<service>:townServicePages` for each town
+ * + service page whose copy changed. Like rewrittenPageKeys: nothing else ticks a per-page key, so
+ * without this a run's town copy would reach the site with no one reading it.
+ */
+export function rewrittenTownKeys(
+  before: { townPages?: unknown } | null | undefined,
+  after: { townPages?: unknown } | null | undefined,
+): VerdictKey[] {
+  const prev = (before?.townPages ?? {}) as TownMap;
+  const next = (after?.townPages ?? {}) as TownMap;
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const keys: VerdictKey[] = [];
+  for (const [town, page] of Object.entries(next)) {
+    const old = prev[town] ?? {};
+    if (!same([page.intro, page.captions], [old.intro, old.captions])) keys.push(verdictKey('townPages', `areas/${town}`));
+    for (const [service, copy] of Object.entries(page.services ?? {})) {
+      if (!same(copy, old.services?.[service])) keys.push(verdictKey('townServicePages', `areas/${town}/${service}`));
+    }
+  }
+  return keys;
+}
+
+/** Whether a review key has generated copy behind it in this overlay, for the keys whose copy
+ *  does not live at the overlay's top-level section key. Undefined for every other key. */
+export function townCopyBehind(key: VerdictKey, generated: { townPages?: unknown } | null | undefined): boolean | undefined {
+  const i = key.indexOf(':');
+  const route = i < 0 ? '' : key.slice(0, i);
+  const section = key.slice(i + 1);
+  if (section !== 'townPages' && section !== 'townServicePages') return undefined;
+  const [, town, service] = route.split('/');
+  const page = ((generated?.townPages ?? {}) as TownMap)[town ?? ''];
+  if (!page) return false;
+  return section === 'townPages' ? page.intro !== undefined : Boolean(service && page.services?.[service] !== undefined);
 }
 
 /** Every verdict key the review surface addresses, in render order — home sections bare, every

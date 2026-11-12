@@ -22,6 +22,7 @@ import type { Section } from '@/lib/copy-schema';
 import { COPY_FACT_PATHS, FACT_KEY_FOR_PATH } from './facts';
 import { groundedAt, groundedFor, groundedString } from './grounded';
 import { clientFaq } from './client-faq';
+import { townPageFacts, townServicePageFacts } from '@/lib/townPages';
 import { compileChipGroup } from './resolve';
 import type {
   BriefContext,
@@ -338,8 +339,21 @@ export function briefFactSegments(ctx: BriefContext, blocks: ResolvedBlock[]): P
     positioningSegment(blocks),
     offersSegment(blocks),
     fixedFaqSegment(ctx, ['faq']),
+    townFactsSegment(ctx),
   ];
   return segments.filter((s): s is PromptSegment => s !== null);
+}
+
+/**
+ * The facts the town instructions carry inline (a photo's "80 ft line", a visit's "2 hours"), for
+ * the SEO check only. The model gets them inside the townPages and townServicePages instructions,
+ * built by the same functions, so the check reads exactly what the model was told.
+ */
+function townFactsSegment(ctx: BriefContext): PromptSegment | null {
+  const towns = townPageFacts(ctx.effective, groundedFor(ctx));
+  const pairs = townServicePageFacts(ctx.effective, groundedFor(ctx));
+  if (!towns.length && !pairs.length) return null;
+  return { blockId: null, label: 'Town facts', text: `Town facts:\n${JSON.stringify({ towns, pairs }, null, 2)}` };
 }
 
 export function compileBriefSegments(

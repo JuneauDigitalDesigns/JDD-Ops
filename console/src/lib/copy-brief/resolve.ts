@@ -10,7 +10,7 @@ import type { SiteContent } from '@/data/site';
 import { getPath } from '@/lib/merge';
 import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { labelFor } from '@/lib/section-labels';
-import { countsFor, sectionInstructionLine, servicePageIndices, servicePagesInstruction, subpagesInstruction } from './compile';
+import { countsFor, sectionInstructionLine, servicePageIndices, servicePagesInstruction, subpagesInstruction, townPagesInstruction, townServicePagesInstruction } from './compile';
 import { groundedFor, groundedString, groundedStrings } from './grounded';
 import type {
   BriefContext,
@@ -230,16 +230,25 @@ function resolveSections(ctx: BriefContext): SectionsBlock {
   // `servicePages` likewise exists only when at least one service earns its own page
   // (lib/servicePages.ts); otherwise there is nothing to write and nowhere to show it.
   const hasServicePages = servicePageIndices(ctx.effective).length > 0;
+  // The town sections likewise exist only when a town, or an approved town + service pair, earns
+  // a page (lib/townPages.ts); their instruction is '' exactly when none does.
+  const townText = townPagesInstruction(ctx.effective, groundedFor(ctx));
+  const townServiceText = townServicePagesInstruction(ctx.effective, groundedFor(ctx));
   const sectionIds = ALL_SECTIONS.filter((s) =>
-    s !== 'brand' && (s !== 'subpages' || subpages.length > 0) && (s !== 'servicePages' || hasServicePages));
+    s !== 'brand' && (s !== 'subpages' || subpages.length > 0) && (s !== 'servicePages' || hasServicePages)
+    && (s !== 'townPages' || townText !== '') && (s !== 'townServicePages' || townServiceText !== ''));
   const ticked = new Set(ctx.tickedSections);
   const entries: SectionEntry[] = sectionIds.map((section) => {
-    // The subpages and servicePages instructions need the routes or the services, which
-    // sectionInstructionLine has no access to.
+    // The subpages, servicePages and town instructions need the routes, the services or the
+    // towns, which sectionInstructionLine has no access to.
     const defaultText = section === 'subpages'
       ? subpagesInstruction(subpages)
       : section === 'servicePages'
       ? servicePagesInstruction(ctx.effective, groundedFor(ctx))
+      : section === 'townPages'
+      ? townText
+      : section === 'townServicePages'
+      ? townServiceText
       : sectionInstructionLine(section, {
           pillars: counts.pillars, services: counts.services,
           faq: counts.faq, heroBullets: counts.heroBullets,

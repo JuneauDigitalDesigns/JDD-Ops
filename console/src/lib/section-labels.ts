@@ -14,6 +14,7 @@ export const SECTION_LABELS: Partial<Record<Section, string>> = {
   brand: 'Brand', announcement: 'Announcement', trust: 'Trust', hero: 'Hero', about: 'About',
   services: 'Services', work: 'Work', testimonials: 'Testimonials', faq: 'FAQ',
   finalCta: 'Final CTA', footer: 'Footer', seo: 'SEO', subpages: 'Page headers', servicePages: 'Service pages',
+  townPages: 'Town pages', townServicePages: 'Town and service pages',
 };
 
 export const labelFor = (s: Section) =>

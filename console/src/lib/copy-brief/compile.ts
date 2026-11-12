@@ -17,6 +17,7 @@ import type { VerticalId } from '@/lib/verticals';
 import type { Section } from '@/lib/copy-schema';
 import { MAX_PAGES } from '@/lib/pages';
 import { pickServicePages, primaryCity, serviceSlugs } from '@/lib/servicePages';
+import { townPageFacts, townServicePageFacts } from '@/lib/townPages';
 
 /** The services the copywriter writes page copy for: exactly the ones the gate gives a page
  *  (service-page-spec.md §1), so a thin service never gets copy for a page it will never have. */
@@ -81,7 +82,50 @@ export function servicePagesInstruction(content: unknown, factsFrom: unknown = c
   ].join(' ');
 }
 
-const HOME_SERVICE_SYSTEM = `You are the JDD Brand Copywriter, a senior conversion copywriter for local home-service businesses.
+/**
+ * The rules both local page types share (L7, L9 and the house rules). The notes and reviews are
+ * rendered on the page as written, with their sources, and are what makes a town page its own; a
+ * paraphrase of one would be a generated sentence carrying a local claim without its link.
+ */
+const TOWN_RULES = 'The reviews and notes are shown on the page as written, with their sources, so never quote, restate or add to them. Never state a local code, permit, rule or condition. No town lists, never write "near me", and use no number the facts do not give.';
+
+/**
+ * The instruction for the `townPages` section: one 2-sentence intro per town page and a one-line
+ * caption per town-tagged job photo (lib/townPages.ts decides which towns get a page). '' when no
+ * town earns one. Wording goes to Xander for word-for-word approval with the PR.
+ */
+export function townPagesInstruction(content: unknown, factsFrom: unknown = content): string {
+  const facts = townPageFacts(content, factsFrom);
+  if (!facts.length) return '';
+  return [
+    '- townPages: one item per town below, each { slug, intro, captions }, for that town\'s own page.',
+    'intro: exactly 2 sentences, the plain answer first: that the business works in the town, where it is based (basedIn), and how to book, from the business facts. Name the town once, and no other town but basedIn. Build both sentences on this town\'s own facts below, so that no run of 8 words is shared with another town\'s intro, even with the town names swapped.',
+    'captions: one line for each photo in that town\'s photos, in the same order, saying what the job was, only from that photo\'s own facts; an empty string for a photo whose facts say nothing about the job.',
+    TOWN_RULES,
+    `Use only these facts for each town, with the business facts above, and write for no town that is not listed:\n${JSON.stringify(facts, null, 2)}`,
+  ].join(' ');
+}
+
+/**
+ * The instruction for the `townServicePages` section: intro, what to expect and questions for each
+ * approved town + service page whose facts pass. '' when there is none. The service page's own
+ * facts (what's included, the jobs, the price) are not sent: they stay on the service page.
+ * Wording goes to Xander for word-for-word approval with the PR.
+ */
+export function townServicePagesInstruction(content: unknown, factsFrom: unknown = content): string {
+  const facts = townServicePageFacts(content, factsFrom);
+  if (!facts.length) return '';
+  return [
+    '- townServicePages: one item per page below, each { town, service, intro, expect, faq }, for that service\'s page in that town.',
+    'intro: exactly 2 sentences, the plain answer first: that the business does this service in the town, and how to book it, from the business facts. Name the town once. Build both sentences on the photos, reviews and notes below for this town and service, so that no run of 8 words is shared with another page or with the service\'s own page, even with the names swapped.',
+    'expect: up to 4 short lines on what to expect: what happens on a visit, how long it takes and what changes the price, only from typicalVisit, howLong and priceFactors, each tied to a photo, review or note below. Leave out any line you cannot tie to one; an empty list when none can be. Never state a price.',
+    'faq: up to 3 questions a customer in this town asks about this service, each answered in at most 2 sentences, the plain answer first, only from the facts below; an empty list when the facts answer none. Never repeat a question from the service\'s own page or from the site\'s main FAQ.',
+    TOWN_RULES,
+    `Use only these facts for each page, with the business facts above, and write for no page that is not listed:\n${JSON.stringify(facts, null, 2)}`,
+  ].join(' ');
+}
+
+const HOME_SERVICE_SYSTEM =`You are the JDD Brand Copywriter, a senior conversion copywriter for local home-service businesses.
 
 Write real, specific, benefit-led marketing copy grounded in the business facts and the industry vertical you are given. Rules:
 - Specific over vague; benefits over features; active voice; plain language a homeowner uses.

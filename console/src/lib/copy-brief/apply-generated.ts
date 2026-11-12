@@ -15,6 +15,7 @@ import { servicePageIndices } from '@/lib/copy-brief/compile';
 import { clientFaq, pinFixed, withoutRepeats } from '@/lib/copy-brief/client-faq';
 import { normalizeRoute } from '@/lib/copy-brief/run-sections';
 import { isPresent } from '@/lib/merge';
+import { pickTownPages, pickTownServicePages, type TownPagesCopy } from '@/lib/townPages';
 
 /** The fields of `fields` that carry a value, or null when none does. "Carry a value" is the merge's
  *  own test (isPresent: not null, undefined, blank or an empty list), so leaving a field out here is
@@ -226,6 +227,49 @@ export function applyGeneratedCopy(
         }),
       };
     }
+  }
+
+  // Town pages and town + service pages (lib/townPages.ts), slug-keyed into content.townPages and
+  // ONLY for pages the gate gives: copy for a town or a pair without a page is dropped, never
+  // stored for a page that will not exist. Each run merges onto what is there, so a town page run
+  // keeps that town's service pages and the other towns, and vice versa.
+  const wantTowns = want.has('townPages') && copy.townPages?.items?.length;
+  const wantPairs = want.has('townServicePages') && copy.townServicePages?.items?.length;
+  if (wantTowns || wantPairs) {
+    const map: TownPagesCopy = { ...((base as { townPages?: TownPagesCopy }).townPages ?? {}) };
+    if (wantTowns) {
+      const picks = new Map(pickTownPages(base).map((p) => [p.slug, p]));
+      for (const it of copy.townPages!.items) {
+        const pick = it?.slug ? picks.get(it.slug) : undefined;
+        if (!pick) continue;
+        const captions = pick.photos
+          .map((p, i) => ({ image: p.image, caption: typeof it.captions?.[i] === 'string' ? it.captions[i].trim() : '' }))
+          .filter((c) => c.caption);
+        map[pick.slug] = { ...(map[pick.slug] ?? {}), town: pick.town, intro: it.intro, captions };
+      }
+    }
+    if (wantPairs) {
+      const picks = new Map(pickTownServicePages(base).map((p) => [`${p.townSlug}/${p.service}`, p]));
+      const fixedBySlug = clientFaq(base).bySlug;
+      const items = (generated.services ?? base.services).items as Array<{ page?: { faq?: { q: string; a: string }[] } }>;
+      for (const it of copy.townServicePages!.items) {
+        const pick = it?.town && it?.service ? picks.get(`${it.town}/${it.service}`) : undefined;
+        if (!pick) continue;
+        // A question the service's own page or the main FAQ already asks is theirs, not this one's.
+        const hubQuestions = [
+          ...(fixedBySlug.get(pick.service) ?? []),
+          ...(items[pick.serviceIndex]?.page?.faq ?? []),
+          ...((generated.faq ?? base.faq)?.items ?? []),
+        ].filter((f) => typeof f?.q === 'string');
+        const faq = withoutRepeats((it.faq ?? []).map((f) => ({ q: f.q, a: f.a })), hubQuestions);
+        const town = map[pick.townSlug] ?? { town: pick.town };
+        map[pick.townSlug] = {
+          ...town,
+          services: { ...(town.services ?? {}), [pick.service]: { intro: it.intro, expect: it.expect ?? [], faq } },
+        };
+      }
+    }
+    (generated as { townPages?: TownPagesCopy }).townPages = map;
   }
 
   return generated;

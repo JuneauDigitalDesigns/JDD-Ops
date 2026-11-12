@@ -6,7 +6,7 @@ import type { CopyBrief } from '@jdd/schema';
 import type { SiteContent } from '@/data/site';
 import { VERTICALS, presetFor, type VerticalId } from '@/lib/verticals';
 import { ALL_SECTIONS, parseVerdictKey, type Section, type VerdictKey } from '@/lib/copy-schema';
-import { buildReviewGroups, reviewKeys, rewrittenPageKeys, type ReviewPage } from '@/lib/copy-review-groups';
+import { buildReviewGroups, reviewKeys, rewrittenPageKeys, rewrittenTownKeys, townCopyBehind, type ReviewPage } from '@/lib/copy-review-groups';
 import { copyPages } from '@/lib/copy-brief/run-sections';
 import { labelFor } from '@/lib/section-labels';
 import { resolveBrief } from '@/lib/copy-brief/resolve';
@@ -146,7 +146,11 @@ export default function IntakeStep({
     setPreRunGenerated(generated);
     onGenerated(p);
     // Each page whose header the run rewrote waits for review on its own page, like a home section.
-    const pageKeys = rewrittenPageKeys(generated, p);
+    // So does each town page and town + service page whose copy the run rewrote.
+    const pageKeys = [
+      ...rewrittenPageKeys(generated, p),
+      ...rewrittenTownKeys(generated as { townPages?: unknown } | null, p as { townPages?: unknown }),
+    ];
     if (pageKeys.length) {
       onBriefChange((b) => setTickedSections(b, [...new Set([...(b.tickedSections ?? tickedKeys), ...pageKeys])]));
     }
@@ -155,7 +159,9 @@ export default function IntakeStep({
   const verdictFor = useCallback((key: VerdictKey): SectionVerdict => {
     // The revert machinery keys off the generated overlay's TOP-LEVEL section key (what
     // onSetGeneratedSection writes); the route only distinguishes which review row this is.
-    const { section } = parseVerdictKey(key);
+    const { section: keySection } = parseVerdictKey(key);
+    // Both town sections are written into the overlay's `townPages` (lib/townPages.ts).
+    const section = keySection === 'townServicePages' ? 'townPages' : keySection;
     const ticked = tickedKeys.includes(key);
     const priorValue = preRunGenerated ? (preRunGenerated as Record<string, unknown>)[section] : undefined;
     const currentValue = generated ? (generated as Record<string, unknown>)[section] : undefined;
@@ -196,6 +202,9 @@ export default function IntakeStep({
       const map = (generated as { subpages?: Record<string, unknown> }).subpages;
       return Boolean(map && map[route] !== undefined);
     }
+    // A town page's copy lives in the town-keyed townPages overlay.
+    const town = townCopyBehind(key, generated as { townPages?: unknown });
+    if (town !== undefined) return town;
     return (generated as Record<string, unknown>)[section] !== undefined;
   }, [generated]);
   const unreviewed = useMemo<VerdictKey[]>(

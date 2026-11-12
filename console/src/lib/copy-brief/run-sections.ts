@@ -54,6 +54,8 @@ export function copyRequestBody(input: {
 export const SKIP_REASONS = {
   noPages: 'Not written: this site has no pages besides Home.',
   noServicePages: 'Not written: no service has its own page.',
+  noTownPages: 'Not written: no town has enough of its own facts for a page.',
+  noTownServicePages: 'Not written: no town and service page is approved with enough facts.',
   unreported: 'Not written: the copy service skipped it.',
   nothingToWrite: 'Nothing was written: no section switched on can be written for this site.',
   missingRoutes: (routes: string[]) => `Not written for ${routes.map((r) => `/${r}`).join(', ')}: missing from the reply.`,
@@ -68,6 +70,9 @@ export function planRunSections(input: {
   all: Section[];
   subpages: CopyPage[];
   hasServicePages: boolean;
+  /** lib/townPages.ts: a town earns /areas/<town>; an approved town + service page passes. */
+  hasTownPages?: boolean;
+  hasTownServicePages?: boolean;
 }): { sections: Section[]; skipped: SkippedSection[] } {
   const explicit = input.requested.length > 0;
   const asked = explicit ? input.requested : input.all.filter((s) => s !== 'brand');
@@ -79,6 +84,10 @@ export function planRunSections(input: {
       if (explicit) skipped.push({ section: s, reason: SKIP_REASONS.noPages });
     } else if (s === 'servicePages' && !input.hasServicePages) {
       if (explicit) skipped.push({ section: s, reason: SKIP_REASONS.noServicePages });
+    } else if (s === 'townPages' && !input.hasTownPages) {
+      if (explicit) skipped.push({ section: s, reason: SKIP_REASONS.noTownPages });
+    } else if (s === 'townServicePages' && !input.hasTownServicePages) {
+      if (explicit) skipped.push({ section: s, reason: SKIP_REASONS.noTownServicePages });
     } else {
       sections.push(s);
     }

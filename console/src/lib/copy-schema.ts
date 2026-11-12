@@ -85,6 +85,18 @@ export interface CopyResult {
       faq: { q: string; a: string }[];
     }[];
   };
+  /** Town page copy (local SEO, 2026-11-12): one item per town that earns /areas/<slug>
+   *  (lib/townPages.ts), merged into content.townPages[slug]. `captions` is one line per
+   *  town-tagged job photo, in the order the instruction lists them. Only requested when a town
+   *  qualifies. */
+  townPages?: {
+    items: { slug: string; intro: string; captions: string[] }[];
+  };
+  /** Town + service page copy: one item per approved /areas/<town>/<service> page whose facts
+   *  pass, merged into content.townPages[town].services[service]. */
+  townServicePages?: {
+    items: { town: string; service: string; intro: string; expect: string[]; faq: { q: string; a: string }[] }[];
+  };
 }
 
 export type Section = keyof CopyResult;
@@ -133,6 +145,7 @@ export function parseVerdictKey(k: VerdictKey): { route?: string; section: Secti
 export const ALL_SECTIONS: Section[] = [
   'brand', 'announcement', 'trust', 'hero', 'about', 'services',
   'work', 'testimonials', 'faq', 'finalCta', 'footer', 'seo', 'subpages', 'servicePages',
+  'townPages', 'townServicePages',
 ];
 
 const str = { type: 'string' } as const;
@@ -199,6 +212,21 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
       items: arr(obj(
         { slug: str, intro: str, body: arr(str), includedNotes: arr(str), signNotes: arr(str), expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
         ['slug', 'intro', 'body', 'includedNotes', 'signNotes', 'expect', 'faq'],
+      )),
+    },
+    ['items'],
+  ),
+  // Copy only: no town name, photo, review or note is written back (each is the client's or the
+  // operator's), and no identity field.
+  townPages: obj(
+    { items: arr(obj({ slug: str, intro: str, captions: arr(str) }, ['slug', 'intro', 'captions'])) },
+    ['items'],
+  ),
+  townServicePages: obj(
+    {
+      items: arr(obj(
+        { town: str, service: str, intro: str, expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
+        ['town', 'service', 'intro', 'expect', 'faq'],
       )),
     },
     ['items'],
