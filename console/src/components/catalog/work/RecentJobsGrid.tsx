@@ -47,7 +47,9 @@ export default function RecentJobsGrid({
           transition={{ duration: 0.5, ease: EASE }}
         >
           <h2 className={`mt-3 font-heading text-3xl font-bold tracking-[-0.01em] ${s.heading} md:text-4xl`}><E p="work.title">{work.title}</E></h2>
-          <p className={`mt-3 ${s.body}`}><E p="work.sub">{work.sub}</E></p>
+          {work.sub && (
+            <p className={`mt-3 ${s.body}`}><E p="work.sub">{work.sub}</E></p>
+          )}
         </motion.div>
 
         {/* hero-first-grid: the first cell spans 2 rows and 2 cols on sm+; the image fills the

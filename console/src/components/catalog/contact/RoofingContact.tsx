@@ -39,10 +39,12 @@ export default function RoofingContact({ content = CONTENT }: { content?: SiteCo
             <Phone size={20} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
             <E p="brand.phone">{brand.phone}</E>
           </a>
-          <a href={`mailto:${brand.email}`} className={`${row} break-all font-semibold text-inkSoft transition-colors hover:text-ink`}>
-            <Envelope size={18} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-            <E p="brand.email">{brand.email}</E>
-          </a>
+          {brand.email && (
+            <a href={`mailto:${brand.email}`} className={`${row} break-all font-semibold text-inkSoft transition-colors hover:text-ink`}>
+              <Envelope size={18} weight="bold" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+              <E p="brand.email">{brand.email}</E>
+            </a>
+          )}
           {mapsUrl ? (
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className={`${row} text-inkSoft transition-colors hover:text-ink`}>
               <MapPin size={18} weight="fill" className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />

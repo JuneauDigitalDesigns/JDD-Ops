@@ -99,9 +99,11 @@ export default function RoofingHero({ content = CONTENT }: { content?: SiteConte
             <Headline text={hero.headline} emphasis={hero.headlineEmphasis} />
           </h1>
 
-          <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[19px]">
-            <E p="hero.sub">{hero.sub}</E>
-          </p>
+          {hero.sub && (
+            <p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-onInkSoft sm:text-[19px]">
+              <E p="hero.sub">{hero.sub}</E>
+            </p>
+          )}
 
           <div className="hero-rise mt-[30px] flex flex-wrap gap-3">
             <a

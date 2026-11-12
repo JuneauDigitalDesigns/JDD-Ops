@@ -52,6 +52,7 @@ import { lockedReason } from '@/lib/onboardingGate';
 import { loadProvisionedFields } from '@/lib/provisionedFields';
 import { stripSampleReviews } from '@/lib/sampleReviews';
 import { stripPlaceholderCanonical, applyIntakeCanonical } from '@/lib/placeholderCanonical';
+import { stripPresetIdentity } from '@/lib/presetIdentity';
 import { resolve } from 'node:path';
 
 /** npm install and next build are both legitimately slow; past this they are stuck, not slow. */
@@ -329,6 +330,22 @@ export async function POST(req: Request) {
           return cleaned;
         };
 
+        /** No business-identity or SEO value from a preset, the seed or the template ships: the
+         *  name, legal line, phone, email, address, license, tagline, SEO title and description
+         *  are the client's or empty (lib/presetIdentity.ts). Same gate as withoutSampleReviews.
+         *  Runs after the provisioned overlay, so a sample phone left in an unprovisioned repo is
+         *  caught too. An empty SEO title or description is deliberate: lib/pageSeo.ts builds
+         *  each page's title from the client's name, trade and town, and the SEO check reports a
+         *  missing description. */
+        const withoutPresetIdentity = (c: SiteContent): SiteContent => {
+          const { content: cleaned, removed } = stripPresetIdentity(c);
+          if (removed.length) {
+            const paths = [...new Set(removed.map((r) => r.path))];
+            step(`Removed ${removed.length} sample value(s) from an industry preset or template (${paths.join(', ')}). They ship empty until the client's own are set.`);
+          }
+          return cleaned;
+        };
+
         /** The canonical is never a preset, seed or template placeholder, and the one set in
          *  clients/{slug}/site.ts (which /manage writes) wins over the Studio's. Same gate as
          *  withoutSampleReviews: every branch's site.ts goes through it (lib/placeholderCanonical.ts).
@@ -486,7 +503,7 @@ export async function POST(req: Request) {
               `Warning: ${missing.length} uploaded image(s) are no longer staged in console/.uploads (${missing.slice(0, 3).join(', ')}) — those slots fall back to placeholder photography.`,
             );
           }
-          const shipped = withoutSampleReviews(withRealCanonical(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step)))));
+          const shipped = withoutSampleReviews(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(resolved, vertical, step))))));
           if (!passesSeo(shipped)) return;
           writeSiteContent(repoRoot, slug, shipped);
         } else if (vertical) {
@@ -505,14 +522,14 @@ export async function POST(req: Request) {
            * `content` — so no shipped client site carried this. It is reachable by any direct
            * API call, which is exactly how the vertical-templates-v1 R6 acceptances drove it.
            */
-          const shipped = withoutSampleReviews(withRealCanonical(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step)))));
+          const shipped = withoutSampleReviews(withRealCanonical(withoutPresetIdentity(preserveProvisioned(await materialize(withPlaceholders(presetFor(vertical), vertical, step))))));
           if (!passesSeo(shipped)) return;
           writeSiteContent(repoRoot, slug, shipped);
         } else {
           // Seeds the repo from the studio's preview CONTENT. Takes the same overlay as the
           // other two branches — a preset's placeholder phone would otherwise overwrite a
           // provisioned one just as readily as an edited payload's.
-          const shipped = withoutSampleReviews(withRealCanonical(preserveProvisioned(SEED_CONTENT)));
+          const shipped = withoutSampleReviews(withRealCanonical(withoutPresetIdentity(preserveProvisioned(SEED_CONTENT))));
           if (!passesSeo(shipped)) return;
           copySiteData(repoRoot, slug, () => shipped);
         }
