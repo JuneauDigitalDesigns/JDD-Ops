@@ -72,7 +72,8 @@ test('the run box uses switches, the approved wording, and no checkboxes', () =>
   const box = read('src/components/wizard/prompt/RunControls.tsx');
   assert.doesNotMatch(box, /type="checkbox"/);
   assert.match(box, /role="switch"/);
-  assert.match(box, /Next: Summary/);
+  // "Next: Summary" went with the stepping box (2026-11-12, test/prompt-menu.test.mjs): the menu
+  // shows the summary beside the switches.
   for (const term of ['"Sections"', '"Off"', '"Model"', '"Estimated cost"']) assert.ok(box.includes(`term=${term}`), term);
   // Switched-on sections, not tickedSections.length: tickedSections also holds per-page review
   // keys ("about:subpages") that a run never writes (subpages-copy.test.mjs).

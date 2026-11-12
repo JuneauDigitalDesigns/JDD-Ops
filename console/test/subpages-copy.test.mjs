@@ -208,7 +208,9 @@ test('a requested section the route cannot write is reported with its reason', (
   assert.match(route, /const \{ sections, skipped \} = planRunSections\(/);
   assert.match(route, /for \(const s of skipped\) send\(\{ type: 'section', section: s\.section, status: 'skipped', error: s\.reason \}\)/);
   const box = read('src/components/wizard/prompt/RunControls.tsx');
-  assert.match(box, /if \(status === 'skipped'\) return <Warning/);
+  // The menu marks it "Not written" with a warning, never Done (test/prompt-menu.test.mjs).
+  assert.match(box, /on && status === 'skipped' && <Warning/);
+  assert.match(read('src/lib/run-steps.ts'), /case 'skipped': return 'Not written';/);
   assert.match(box, /msg\.status === 'skipped'/);
 });
 
