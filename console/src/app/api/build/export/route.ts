@@ -50,6 +50,7 @@ import { resolveVerticalIds } from '@/lib/verticals-registry';
 import { resolveDeployTarget, readSyncState, runGit, type GitResult } from '@/lib/git-state';
 import { loadGithubToken } from '@/lib/opsSecrets';
 import { deleteDraft } from '@/lib/draft';
+import { beginStagedExport, type StagedExport } from '@/lib/stagedExport';
 import { lockedReason } from '@/lib/onboardingGate';
 import { loadProvisionedFields } from '@/lib/provisionedFields';
 import { stripSampleReviews } from '@/lib/sampleReviews';
@@ -191,6 +192,9 @@ export async function POST(req: Request) {
       const step = (message: string) => send({ type: 'step', message });
       /** Set once a push succeeds, so `done` can report what actually reached the remote. */
       let pushed: { branch: string; sha: string | null; fullSha: string | null } | null = null;
+      /** The staged copy every write below lands in (lib/stagedExport.ts). Aborted in `finally`
+       *  unless committed, so no failure or early return ever leaves the repo half-written. */
+      let staging: StagedExport | null = null;
 
       try {
         if (!slug) throw new Error('Choose or name a client first.');
@@ -419,9 +423,15 @@ export async function POST(req: Request) {
           return true;
         };
 
+        // 0. Stage. From here until the swap after the checks, every write (template, components,
+        //    site.ts, images, the composition manifest, routes), the install and the build go to a
+        //    copy of the repo; repoDirFor points there (Xander 2026-11-12: a failed export must
+        //    never leave the repo half-written). Nothing above this line writes to the repo.
+        staging = beginStagedExport(repoRoot, slug);
+
         // 1. Copy (or reuse) the template repo. A confirmed update refreshes the template-owned
         //    files too: the new @jdd/ui is only half an update while src/lib is the old shims.
-        const existed = repoExists(repoRoot, slug);
+        const existed = staging.existed;
         const overwrite = overwriteRequested || upgrade !== null;
         if (existed && !overwrite) {
           step(`Found an existing repo at clients/${slug}/repo — reusing it and refreshing components…`);
@@ -471,7 +481,8 @@ export async function POST(req: Request) {
           step(`Added ${merged.added.length} new dependency/ies from the template: ${merged.added.join(', ')}.`);
         }
 
-        const repoDir = repoDirFor(repoRoot, slug);
+        // The staged copy until the swap at 5c, then the real repo (lib/stagedExport.ts).
+        let repoDir = repoDirFor(repoRoot, slug);
         const beat = () => send({ type: 'heartbeat', at: Date.now() });
 
         // 1a3. The confirmed @jdd/ui move, the way onboard.js's refreshUiPin makes it: the spec is
@@ -722,6 +733,12 @@ export async function POST(req: Request) {
         }
         step(`Checked the built pages: every local image they use exists (${images.pagesFound} page${images.pagesFound === 1 ? '' : 's'}).`);
 
+        // 5c. Install, build and every check passed on the staged copy: swap it in. Until now the
+        //     repo was exactly as it was before this export began.
+        staging.commit();
+        repoDir = repoDirFor(repoRoot, slug); // the real repo again, for git below
+        step(`Swapped the built site into clients/${slug}/repo.`);
+
         // 6. Commit + push, so Vercel's GitHub integration redeploys the live site.
         //    Deliberately AFTER the build above: pushing something that doesn't compile
         //    would hand the failure to Vercel, where it's slower to see and harder to undo.
@@ -931,6 +948,9 @@ export async function POST(req: Request) {
           next: 'Nothing was pushed. Fix what the message names and run this again.',
         });
       } finally {
+        // Any failure or early return before the swap: throw the staged copy away. The repo was
+        // never written, and the draft is kept (only a successful export deletes it).
+        staging?.abort();
         // The SINGLE place this stream is closed. The failure branches above only `return`
         // — they used to close here too, and closing twice throws ERR_INVALID_STATE
         // ("Controller is already closed"), which Next surfaces as "failed to pipe
