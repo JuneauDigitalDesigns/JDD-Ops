@@ -11,6 +11,7 @@ import { stepVariants, stepTransition } from '@/lib/step-motion';
 import { defaultSkin, isValidSkin, type SkinId } from '@/lib/skins';
 import type { CopyBrief } from '@jdd/schema';
 import { emptyCopyBrief, normalizeVerdicts } from '@/lib/copy-brief/mutations';
+import { studioBriefFacts } from '@/lib/copy-brief/brief-facts';
 import { DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 import {
   reconcileOrder,
@@ -296,6 +297,12 @@ export default function BuildWizard({
   const effective = useMemo(
     () => effectiveContent(vertical, imported, generated, edits),
     [vertical, imported, generated, edits],
+  );
+  // What the copy brief told the copywriter is fact (the operator's promotion among it), so the
+  // SEO check in the Export and Deploy dialogs, and the export itself, count it as the client's.
+  const briefFacts = useMemo(
+    () => studioBriefFacts({ vertical, effective, imported, edits, brief }),
+    [vertical, effective, imported, edits, brief],
   );
   // Fill empty/preset image slots with per-vertical topical stock so the build catalog
   // renders. The export route runs the same transform on the server, so what's previewed
@@ -958,6 +965,7 @@ export default function BuildWizard({
                   onExported={() => setRepoOnDisk(true)}
                   brandName={effective.brand?.name}
                   reverts={reverts}
+                  briefFacts={briefFacts}
                 />
               </div>
             )}
