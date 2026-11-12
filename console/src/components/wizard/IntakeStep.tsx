@@ -149,7 +149,7 @@ export default function IntakeStep({
     // So does each town page and town + service page whose copy the run rewrote.
     const pageKeys = [
       ...rewrittenPageKeys(generated, p),
-      ...rewrittenTownKeys(generated as { townPages?: unknown } | null, p as { townPages?: unknown }),
+      ...rewrittenTownKeys(generated, p),
     ];
     if (pageKeys.length) {
       onBriefChange((b) => setTickedSections(b, [...new Set([...(b.tickedSections ?? tickedKeys), ...pageKeys])]));
@@ -160,8 +160,8 @@ export default function IntakeStep({
     // The revert machinery keys off the generated overlay's TOP-LEVEL section key (what
     // onSetGeneratedSection writes); the route only distinguishes which review row this is.
     const { section: keySection } = parseVerdictKey(key);
-    // Both town sections are written into the overlay's `townPages` (lib/townPages.ts).
-    const section = keySection === 'townServicePages' ? 'townPages' : keySection;
+    // Both town sections are written into the overlay's `areaCopy` (@jdd/schema v1.34.0, lib/townPages.ts).
+    const section = keySection === 'townPages' || keySection === 'townServicePages' ? 'areaCopy' : keySection;
     const ticked = tickedKeys.includes(key);
     const priorValue = preRunGenerated ? (preRunGenerated as Record<string, unknown>)[section] : undefined;
     const currentValue = generated ? (generated as Record<string, unknown>)[section] : undefined;
@@ -202,8 +202,8 @@ export default function IntakeStep({
       const map = (generated as { subpages?: Record<string, unknown> }).subpages;
       return Boolean(map && map[route] !== undefined);
     }
-    // A town page's copy lives in the town-keyed townPages overlay.
-    const town = townCopyBehind(key, generated as { townPages?: unknown });
+    // A town page's copy lives in the town-keyed areaCopy overlay.
+    const town = townCopyBehind(key, generated);
     if (town !== undefined) return town;
     return (generated as Record<string, unknown>)[section] !== undefined;
   }, [generated]);

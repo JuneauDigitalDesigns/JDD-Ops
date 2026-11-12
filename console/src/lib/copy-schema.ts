@@ -85,17 +85,18 @@ export interface CopyResult {
       faq: { q: string; a: string }[];
     }[];
   };
-  /** Town page copy (local SEO, 2026-11-12): one item per town that earns /areas/<slug>
-   *  (lib/townPages.ts), merged into content.townPages[slug]. `captions` is one line per
-   *  town-tagged job photo, in the order the instruction lists them. Only requested when a town
-   *  qualifies. */
+  /** Town page copy (local SEO, 2026-11-12; @jdd/schema v1.34.0): one item per town that earns
+   *  /areas/<slug> (lib/townPages.ts). The intro lands in content.areaCopy[slug].intro and the meta
+   *  description in subpages['areas/<slug>'].seo.description. Only the intros and descriptions are
+   *  generated: the H1 and title are fixed patterns, and every other block renders from tagged
+   *  facts. Only requested when a town qualifies. */
   townPages?: {
-    items: { slug: string; intro: string; captions: string[] }[];
+    items: { slug: string; intro: string; seoDescription: string }[];
   };
-  /** Town + service page copy: one item per approved /areas/<town>/<service> page whose facts
-   *  pass, merged into content.townPages[town].services[service]. */
+  /** Town + service page copy: one item per town + service page the export lists, landing in
+   *  content.areaCopy[town].spokes[service].intro and subpages['areas/<town>/<service>']. */
   townServicePages?: {
-    items: { town: string; service: string; intro: string; expect: string[]; faq: { q: string; a: string }[] }[];
+    items: { town: string; service: string; intro: string; seoDescription: string }[];
   };
 }
 
@@ -219,14 +220,14 @@ const SECTION_SCHEMAS: Record<Section, ReturnType<typeof obj>> = {
   // Copy only: no town name, photo, review or note is written back (each is the client's or the
   // operator's), and no identity field.
   townPages: obj(
-    { items: arr(obj({ slug: str, intro: str, captions: arr(str) }, ['slug', 'intro', 'captions'])) },
+    { items: arr(obj({ slug: str, intro: str, seoDescription: str }, ['slug', 'intro', 'seoDescription'])) },
     ['items'],
   ),
   townServicePages: obj(
     {
       items: arr(obj(
-        { town: str, service: str, intro: str, expect: arr(str), faq: arr(obj({ q: str, a: str }, ['q', 'a'])) },
-        ['town', 'service', 'intro', 'expect', 'faq'],
+        { town: str, service: str, intro: str, seoDescription: str },
+        ['town', 'service', 'intro', 'seoDescription'],
       )),
     },
     ['items'],

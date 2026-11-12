@@ -72,44 +72,52 @@ export function buildReviewGroups(pages: ReviewPage[]): ReviewGroup[] {
   return [home, ...nonHome];
 }
 
-type TownMap = Record<string, { intro?: unknown; captions?: unknown; services?: Record<string, unknown> }>;
+type Copy = Record<string, { intro?: unknown; spokes?: Record<string, { intro?: unknown }> }>;
+type Overlay = { areaCopy?: unknown; subpages?: Record<string, unknown> } | null | undefined;
+
+const isTownRoute = (route: string) => TOWN_ROUTE.test(route) || TOWN_SERVICE_ROUTE.test(route);
+const descriptionOf = (o: Overlay, route: string) =>
+  ((o?.subpages?.[route] as { seo?: { description?: unknown } } | undefined)?.seo?.description);
 
 /**
  * The town review keys a run's new overlay puts copy behind: `areas/<town>:townPages` for each town
- * page whose intro or captions changed, and `areas/<town>/<service>:townServicePages` for each town
- * + service page whose copy changed. Like rewrittenPageKeys: nothing else ticks a per-page key, so
- * without this a run's town copy would reach the site with no one reading it.
+ * page whose intro or meta description changed, and `areas/<town>/<service>:townServicePages` for
+ * each town + service page whose intro or description changed. Like rewrittenPageKeys: nothing
+ * else ticks a per-page key, so without this a run's town copy would reach the site unread.
  */
-export function rewrittenTownKeys(
-  before: { townPages?: unknown } | null | undefined,
-  after: { townPages?: unknown } | null | undefined,
-): VerdictKey[] {
-  const prev = (before?.townPages ?? {}) as TownMap;
-  const next = (after?.townPages ?? {}) as TownMap;
-  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+export function rewrittenTownKeys(before: Overlay, after: Overlay): VerdictKey[] {
+  const prev = (before?.areaCopy ?? {}) as Copy;
+  const next = (after?.areaCopy ?? {}) as Copy;
+  const changed = (a: unknown, b: unknown) => JSON.stringify(a) !== JSON.stringify(b);
   const keys: VerdictKey[] = [];
   for (const [town, page] of Object.entries(next)) {
-    const old = prev[town] ?? {};
-    if (!same([page.intro, page.captions], [old.intro, old.captions])) keys.push(verdictKey('townPages', `areas/${town}`));
-    for (const [service, copy] of Object.entries(page.services ?? {})) {
-      if (!same(copy, old.services?.[service])) keys.push(verdictKey('townServicePages', `areas/${town}/${service}`));
+    const route = `areas/${town}`;
+    if (changed([page.intro, descriptionOf(after, route)], [prev[town]?.intro, descriptionOf(before, route)])) {
+      keys.push(verdictKey('townPages', route));
+    }
+    for (const [service, spoke] of Object.entries(page.spokes ?? {})) {
+      const r = `areas/${town}/${service}`;
+      if (changed([spoke?.intro, descriptionOf(after, r)], [prev[town]?.spokes?.[service]?.intro, descriptionOf(before, r)])) {
+        keys.push(verdictKey('townServicePages', r));
+      }
     }
   }
   return keys;
 }
 
-/** Whether a review key has generated copy behind it in this overlay, for the keys whose copy
- *  does not live at the overlay's top-level section key. Undefined for every other key. */
-export function townCopyBehind(key: VerdictKey, generated: { townPages?: unknown } | null | undefined): boolean | undefined {
+/** Whether a town key has generated copy behind it in this overlay (its intro, as the copy lives
+ *  in areaCopy, not at the overlay's top-level section key). Undefined for every other key. */
+export function townCopyBehind(key: VerdictKey, generated: Overlay): boolean | undefined {
   const i = key.indexOf(':');
   const route = i < 0 ? '' : key.slice(0, i);
   const section = key.slice(i + 1);
   if (section !== 'townPages' && section !== 'townServicePages') return undefined;
   const [, town, service] = route.split('/');
-  const page = ((generated?.townPages ?? {}) as TownMap)[town ?? ''];
+  const page = ((generated?.areaCopy ?? {}) as Copy)[town ?? ''];
   if (!page) return false;
-  return section === 'townPages' ? page.intro !== undefined : Boolean(service && page.services?.[service] !== undefined);
+  return section === 'townPages' ? typeof page.intro === 'string' && page.intro !== '' : Boolean(service && page.spokes?.[service]?.intro);
 }
+
 
 /** Every verdict key the review surface addresses, in render order — home sections bare, every
  *  non-home section prefixed with its route (decision 50). */
@@ -130,6 +138,7 @@ export function rewrittenPageKeys(
   const prev = before?.subpages ?? {};
   const next = after?.subpages ?? {};
   return Object.keys(next)
-    .filter((route) => route && JSON.stringify(next[route]) !== JSON.stringify(prev[route]))
+    // A town page's description is reviewed with its intro (rewrittenTownKeys), not as a header.
+    .filter((route) => route && !isTownRoute(route) && JSON.stringify(next[route]) !== JSON.stringify(prev[route]))
     .map((route) => verdictKey('subpages', route));
 }

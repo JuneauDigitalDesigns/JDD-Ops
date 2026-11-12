@@ -15,7 +15,8 @@ import { servicePageIndices } from '@/lib/copy-brief/compile';
 import { clientFaq, pinFixed, withoutRepeats } from '@/lib/copy-brief/client-faq';
 import { normalizeRoute } from '@/lib/copy-brief/run-sections';
 import { isPresent } from '@/lib/merge';
-import { pickTownPages, pickTownServicePages, type TownPagesCopy } from '@/lib/townPages';
+import type { AreaPageCopy } from '@jdd/schema';
+import { pickTownPages, pickTownServicePages, townRoute, townServiceRoute } from '@/lib/townPages';
 
 /** The fields of `fields` that carry a value, or null when none does. "Carry a value" is the merge's
  *  own test (isPresent: not null, undefined, blank or an empty list), so leaving a field out here is
@@ -229,47 +230,47 @@ export function applyGeneratedCopy(
     }
   }
 
-  // Town pages and town + service pages (lib/townPages.ts), slug-keyed into content.townPages and
-  // ONLY for pages the gate gives: copy for a town or a pair without a page is dropped, never
-  // stored for a page that will not exist. Each run merges onto what is there, so a town page run
-  // keeps that town's service pages and the other towns, and vice versa.
+  // Town pages and town + service pages (lib/townPages.ts): the intros land in content.areaCopy
+  // (@jdd/schema v1.34.0, keyed by town slug) and the meta descriptions in that page's
+  // subpages[route].seo.description, ONLY for pages that exist: copy for a town or a pair without
+  // a page is dropped, never stored for a page that will not exist. Each run merges onto what is
+  // there, so a town page run keeps that town's spokes and the other towns, and vice versa. The H1
+  // and title are never written here: pageSeo builds the approved patterns.
   const wantTowns = want.has('townPages') && copy.townPages?.items?.length;
   const wantPairs = want.has('townServicePages') && copy.townServicePages?.items?.length;
   if (wantTowns || wantPairs) {
-    const map: TownPagesCopy = { ...((base as { townPages?: TownPagesCopy }).townPages ?? {}) };
+    const areaCopy: Record<string, AreaPageCopy> = { ...((base as { areaCopy?: Record<string, AreaPageCopy> | null }).areaCopy ?? {}) };
+    const subpages: Record<string, unknown> = { ...(generated.subpages ?? base.subpages ?? {}) };
+    const describe = (route: string, description: unknown) => {
+      if (typeof description !== 'string' || !description.trim()) return;
+      const page = (subpages[route] ?? {}) as { seo?: Record<string, unknown> };
+      subpages[route] = { ...page, seo: { ...(page.seo ?? {}), description: description.trim() } };
+    };
     if (wantTowns) {
       const picks = new Map(pickTownPages(base).map((p) => [p.slug, p]));
       for (const it of copy.townPages!.items) {
         const pick = it?.slug ? picks.get(it.slug) : undefined;
         if (!pick) continue;
-        const captions = pick.photos
-          .map((p, i) => ({ image: p.image, caption: typeof it.captions?.[i] === 'string' ? it.captions[i].trim() : '' }))
-          .filter((c) => c.caption);
-        map[pick.slug] = { ...(map[pick.slug] ?? {}), town: pick.town, intro: it.intro, captions };
+        if (typeof it.intro === 'string' && it.intro.trim()) areaCopy[pick.slug] = { ...(areaCopy[pick.slug] ?? {}), intro: it.intro.trim() };
+        describe(townRoute(pick.slug), it.seoDescription);
       }
     }
     if (wantPairs) {
-      const picks = new Map(pickTownServicePages(base).map((p) => [`${p.townSlug}/${p.service}`, p]));
-      const fixedBySlug = clientFaq(base).bySlug;
-      const items = (generated.services ?? base.services).items as Array<{ page?: { faq?: { q: string; a: string }[] } }>;
+      const picks = new Map(pickTownServicePages(base).map((p) => [townServiceRoute(p.townSlug, p.service), p]));
       for (const it of copy.townServicePages!.items) {
-        const pick = it?.town && it?.service ? picks.get(`${it.town}/${it.service}`) : undefined;
+        const route = it?.town && it?.service ? townServiceRoute(it.town, it.service) : '';
+        const pick = route ? picks.get(route) : undefined;
         if (!pick) continue;
-        // A question the service's own page or the main FAQ already asks is theirs, not this one's.
-        const hubQuestions = [
-          ...(fixedBySlug.get(pick.service) ?? []),
-          ...(items[pick.serviceIndex]?.page?.faq ?? []),
-          ...((generated.faq ?? base.faq)?.items ?? []),
-        ].filter((f) => typeof f?.q === 'string');
-        const faq = withoutRepeats((it.faq ?? []).map((f) => ({ q: f.q, a: f.a })), hubQuestions);
-        const town = map[pick.townSlug] ?? { town: pick.town };
-        map[pick.townSlug] = {
-          ...town,
-          services: { ...(town.services ?? {}), [pick.service]: { intro: it.intro, expect: it.expect ?? [], faq } },
-        };
+        if (typeof it.intro === 'string' && it.intro.trim()) {
+          // A spoke can be written before its town's intro is; that intro then stays empty (not written).
+          const town = areaCopy[pick.townSlug] ?? { intro: '' };
+          areaCopy[pick.townSlug] = { ...town, spokes: { ...(town.spokes ?? {}), [pick.service]: { intro: it.intro.trim() } } };
+        }
+        describe(route, it.seoDescription);
       }
     }
-    (generated as { townPages?: TownPagesCopy }).townPages = map;
+    (generated as { areaCopy?: Record<string, AreaPageCopy> }).areaCopy = areaCopy;
+    generated.subpages = subpages as SiteContent['subpages'];
   }
 
   return generated;

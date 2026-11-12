@@ -54,19 +54,21 @@ function walk(value: unknown, schema: Schema | undefined, rel: string, out: stri
   }
 }
 
-const TEXT: Schema = { type: 'string' };
-const TOWN_PAGE_PARTS: Schema = {
-  type: 'object',
-  properties: { intro: TEXT, captions: { type: 'array', items: { type: 'object', properties: { caption: TEXT } } } },
-};
-const TOWN_SERVICE_PAGE_PARTS: Schema = {
-  type: 'object',
-  properties: {
-    intro: TEXT,
-    expect: { type: 'array', items: TEXT },
-    faq: { type: 'array', items: { type: 'object', properties: { q: TEXT, a: TEXT } } },
-  },
-};
+/**
+ * The parts of a town page (`areas/<town>:townPages`) or a town + service page
+ * (`areas/<town>/<service>:townServicePages`): its intro in content.areaCopy (@jdd/schema v1.34.0)
+ * and its meta description in subpages[route].seo.description. Those are the only generated lines
+ * on these pages: the H1 and title are fixed patterns, and every other block is the client's facts.
+ * Null for every other key.
+ */
+function townParts(key: VerdictKey): string[] | null {
+  const { route, section } = parseVerdictKey(key);
+  if (section !== 'townPages' && section !== 'townServicePages') return null;
+  const [areas, town, service, extra] = (route ?? '').split('/');
+  if (areas !== 'areas' || !town || extra !== undefined) return [];
+  if (section === 'townPages') return service ? [] : [`areaCopy.${town}.intro`, `subpages.${route}.seo.description`];
+  return service ? [`areaCopy.${town}.spokes.${service}.intro`, `subpages.${route}.seo.description`] : [];
+}
 
 /** Where a review key's generated copy lives, as a content path ('' when it has none). */
 function rootFor(key: VerdictKey, content?: unknown): { root: string; schema?: Schema } {
@@ -76,15 +78,6 @@ function rootFor(key: VerdictKey, content?: unknown): { root: string; schema?: S
     const slug = route?.startsWith('services/') ? route.slice('services/'.length) : '';
     const i = slug && content ? serviceSlugs(content).indexOf(slug) : -1;
     return i >= 0 ? { root: `services.items.${i}.page` } : { root: '' };
-  }
-  // A town page's copy and a town + service page's copy both live in content.townPages
-  // (lib/townPages.ts). Only the generated lines are parts: never the town, a photo's image, or
-  // (from a town page) its service pages, which are reviewed on their own pages.
-  if (section === 'townPages' || section === 'townServicePages') {
-    const [areas, town, service] = (route ?? '').split('/');
-    if (areas !== 'areas' || !town) return { root: '' };
-    if (section === 'townPages') return service ? { root: '' } : { root: `townPages.${town}`, schema: TOWN_PAGE_PARTS };
-    return service ? { root: `townPages.${town}.services.${service}`, schema: TOWN_SERVICE_PAGE_PARTS } : { root: '' };
   }
   const schema = sectionSchema(section);
   // The page-copy field is the servicePages section's, not the services card's.
@@ -97,6 +90,12 @@ function rootFor(key: VerdictKey, content?: unknown): { root: string; schema?: S
 
 /** The parts of one review key's section that can be ticked, in the order they read. */
 export function sectionParts(key: VerdictKey, generated: unknown, content?: unknown): Part[] {
+  const town = townParts(key);
+  if (town) {
+    return town
+      .filter((path) => { const v = getPath(generated, path); return typeof v === 'string' && v.trim() !== ''; })
+      .map((path) => ({ path, label: partLabel(path) }));
+  }
   const { root, schema } = rootFor(key, content);
   if (!root) return [];
   const out: string[] = [];
@@ -115,7 +114,6 @@ const KEY_LABEL: Record<string, string> = {
   t: 'Title', detail: 'Detail', q: 'Question', a: 'Answer', text: 'Text', label: 'Label', value: 'Value',
   blurb: 'Blurb', description: 'Description', tagline: 'Tagline', intro: 'Intro', includedNotes: 'Included',
   signNotes: 'Signs', expect: 'What to expect', faq: 'Question', logos: 'Logo', header: 'Header', seo: 'SEO',
-  captions: 'Photo', caption: 'Caption',
 };
 
 const humanize = (k: string) => KEY_LABEL[k] ?? k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
@@ -124,7 +122,7 @@ const humanize = (k: string) => KEY_LABEL[k] ?? k.replace(/([a-z])([A-Z])/g, '$1
 export function partLabel(path: string): string {
   let segs = path.split('.');
   if (segs[0] === 'subpages') segs = segs.slice(2);
-  else if (segs[0] === 'townPages') segs = segs.slice(segs[2] === 'services' ? 4 : 2);
+  else if (segs[0] === 'areaCopy') segs = segs.slice(segs[2] === 'spokes' ? 4 : 2);
   else if (segs.includes('page') && segs[0] === 'services') segs = segs.slice(segs.indexOf('page') + 1);
   else segs = segs.slice(1);
   const words: string[] = [];
