@@ -36,6 +36,7 @@ import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
 import { startingBundle } from '@/lib/wizardBundle';
+import { withStagedPreviews } from '@/lib/stagedUploads';
 import { useHydrationGate } from '@/lib/hydrationGate';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
@@ -320,8 +321,10 @@ export default function BuildWizard({
   // `servicePages` is routing, not copy: the slugs of the composition's per-service pages, which
   // the export writes the same way (beside `nav`). The Services menu, the cards, related services
   // and the footer link only to these, so the preview never links to a page that won't ship.
+  // Staged uploads (upload://) shown through the console, for the preview only: `effective`, which
+  // is saved and exported, keeps the refs (lib/stagedUploads.ts).
   const previewContent = useMemo(
-    () => ({
+    () => withStagedPreviews({
       ...fillImagePlaceholders(effective, vertical, { includeWork: true }).content,
       servicePages: servicePageSlugs(siteComposition),
     }) as SiteContent,

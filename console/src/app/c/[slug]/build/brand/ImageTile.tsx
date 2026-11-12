@@ -5,6 +5,7 @@ import { Trash, UploadSimple, LinkSimple, CircleNotch } from '@phosphor-icons/re
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { getPath } from '@/lib/merge';
+import { previewSrc } from '@/lib/stagedUploads';
 
 // Thumbnail-first image control. The tile IS the control — click to upload, hover to
 // replace/remove, URL entry demoted to a disclosure. Shared by ImagesPane and the
@@ -50,7 +51,9 @@ export default function ImageTile({
     }
   }
 
-  const shown = localPreview ?? (isRenderable(val) ? val : null);
+  // A staged ref shows through the console (lib/stagedUploads.ts), so the photo is still there after
+  // a reload, not only while this tile's objectURL lives.
+  const shown = localPreview ?? previewSrc(val);
 
   return (
     <div className="space-y-1">

@@ -35,6 +35,15 @@ export function newerBundle<T extends Stamped>(local: T | null | undefined, serv
  * So the repo wins only over work saved BEFORE it was last written (`exportedAt`, the time the
  * console's export or onboard.js last wrote it). A draft saved after that is newer work and opens
  * as saved. An unstamped draft can't show it is newer, and an unknown repo time keeps the repo.
+ *
+ * One more case wins for the draft (#90): a server draft that EXISTS. A successful export deletes
+ * clients/{slug}/.draft.json, so one that exists is work no export has shipped, the only copy of
+ * it. That holds even when the repo was written after it: an export writes the composition
+ * manifest while wiring the pages (reconcileRoutes), before `npm run build`, so an export that
+ * fails at the build moves `exportedAt` past the draft and would otherwise open the half-written
+ * repo and drop the draft. (On _e2e_test_growth the 2026-11-11 22:13 export failed earlier, after
+ * copying the template, so its photos were saved by the time rule alone; a build failure would not
+ * have been.) A copy only in this browser still needs the time rule: it may predate the export.
  */
 export function startingBundle<T extends Stamped>(o: {
   saved: T | null | undefined;
@@ -46,7 +55,10 @@ export function startingBundle<T extends Stamped>(o: {
 }): { from: 'draft' | 'disk' | 'fresh'; bundle: T | null } {
   const draft = newerBundle(o.saved, o.server);
   if (o.exported) {
+    // A server draft survives only an export that did not succeed, or none since: it is unshipped work.
+    const unshipped = Boolean(o.server);
     const newer = draft && o.exportedAt !== null && (draft.savedAt ?? 0) > o.exportedAt;
+    if (draft && unshipped) return { from: 'draft', bundle: draft };
     return newer ? { from: 'draft', bundle: draft } : { from: 'disk', bundle: null };
   }
   return draft ? { from: 'draft', bundle: draft } : { from: 'fresh', bundle: null };
