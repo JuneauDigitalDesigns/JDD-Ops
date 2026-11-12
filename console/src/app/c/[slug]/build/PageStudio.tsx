@@ -12,6 +12,7 @@ import type { VerticalId } from '@/lib/verticals';
 import type { StudioReverts } from './page-order';
 import type { CategoryEntry } from './categories';
 import type { PageInstance, SectionRef, SectionRhythm, SiteComposition } from '@/lib/pages';
+import { withStagedPreviews } from '@/lib/stagedUploads';
 import { homeLegacyView, navLinksFor, styleKeyFor, rhythmClass } from '@/lib/pages';
 import { REVEAL_CLASS, revealsOnScroll } from '@/lib/revealPolicy';
 import { defaultSkin, supportsSkin, type SkinId } from '@/lib/skins';
@@ -100,7 +101,8 @@ export default function PageStudio({
   // Export writes content.nav from the composition's routes. Preview the same links here so
   // the studio nav matches the site that ships, rather than the intake's hash anchors.
   const previewContent = useMemo(
-    () => ({ ...effective, nav: navLinksFor(composition) }),
+    // Staged uploads shown through the console (lib/stagedUploads.ts); the saved content keeps the refs.
+    () => withStagedPreviews({ ...effective, nav: navLinksFor(composition) }),
     [effective, composition],
   );
 

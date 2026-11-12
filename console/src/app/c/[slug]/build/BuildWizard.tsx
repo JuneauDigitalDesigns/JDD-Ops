@@ -35,7 +35,8 @@ import type { ReviewDraft } from '@/lib/review-draft';
 import NavSlot from '@/components/NavSlot';
 import { useHistory, type ContentSnapshot } from '@/lib/useContentHistory';
 import type { StudioReadBack } from '@/lib/studio-readback';
-import { newerBundle } from '@/lib/wizardBundle';
+import { exportedClientDraft, newerBundle } from '@/lib/wizardBundle';
+import { withStagedPreviews } from '@/lib/stagedUploads';
 import { useHydrationGate } from '@/lib/hydrationGate';
 
 const DEFAULT_VERTICAL: VerticalId = VERTICALS[0].id;
@@ -316,8 +317,10 @@ export default function BuildWizard({
   // `servicePages` is routing, not copy: the slugs of the composition's per-service pages, which
   // the export writes the same way (beside `nav`). The Services menu, the cards, related services
   // and the footer link only to these, so the preview never links to a page that won't ship.
+  // Staged uploads (upload://) shown through the console, for the preview only: `effective`, which
+  // is saved and exported, keeps the refs (lib/stagedUploads.ts).
   const previewContent = useMemo(
-    () => ({
+    () => withStagedPreviews({
       ...fillImagePlaceholders(effective, vertical, { includeWork: true }).content,
       servicePages: servicePageSlugs(siteComposition),
     }) as SiteContent,
@@ -759,8 +762,17 @@ export default function BuildWizard({
   useEffect(() => {
     const saved = readBundle(slug);
 
-    if (manifest || composition) {
-      // ── Already exported: DISK WINS, for CONTENT. ───────────────────────────────────
+    // An exported client with a server draft opens the draft: a successful export deletes it, so
+    // one that exists is the only copy of the work since (lib/wizardBundle.ts exportedClientDraft).
+    // Before this, every load of an exported client dropped it, intake photos included.
+    const unsaved = manifest || composition
+      ? exportedClientDraft(saved, draftBundle as Partial<WizardBundle> | null)
+      : null;
+
+    if (unsaved) {
+      applyBundle(unsaved);
+    } else if (manifest || composition) {
+      // ── Already exported, no draft since: DISK WINS, for CONTENT. ───────────────────
       // The repo is what the client's site actually is, so opening the studio shows that
       // and nothing else. A stale localStorage draft from some earlier session must not
       // quietly present itself as the live page — being wrong about what's deployed is far

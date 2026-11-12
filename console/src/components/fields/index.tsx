@@ -12,6 +12,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { SiteContent } from '@/data/site';
 import { getPath } from '@/lib/merge';
 import { FONT_PAIRINGS, pairingIdFromStack, typographyFor } from '@/lib/fonts';
+import { previewSrc } from '@/lib/stagedUploads';
 
 // Shared form primitives for the studio's structured editors (BrandDrawer + the wizard's
 // intake step). Every control writes through setField(path, value) into the same `edits`
@@ -212,7 +213,7 @@ export function ImageSlot({
     }
   }
 
-  const shown = val && !val.startsWith('upload://') && /^https?:|^\//.test(val) ? val : null;
+  const shown = previewSrc(val); // a staged upload shows through the console (lib/stagedUploads.ts)
 
   return (
     <div className="space-y-1.5">

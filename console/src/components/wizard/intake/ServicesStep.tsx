@@ -21,6 +21,7 @@ import type { SetField } from '@/components/fields';
 import { servicePageHint } from '@/lib/intake-todo';
 import { SERVICE_GATE } from '@/lib/service-gate';
 import { serviceAreasToStore } from '@/lib/service-areas';
+import { previewSrc } from '@/lib/stagedUploads';
 import {
   SERVICE_PARTS, BASICS_LABEL, DURATION_CHOICES, partsDone, partsProgress, nextPart, prevPart, categorySuggestions,
   type ServicePartId,
@@ -567,7 +568,9 @@ function JobPhotos({
       <ul className="space-y-1.5">
         {photos.map(({ p, k }) => {
           const url = p.image?.url ?? '';
-          const src = url && !url.startsWith('upload://') && /^https?:|^\//.test(url) ? url : null;
+          // A staged upload shows through the console (lib/stagedUploads.ts): a photo is seen the
+          // moment it's added, not hidden until export.
+          const src = previewSrc(url);
           return (
             <li key={k} className="flex items-center gap-2">
               <span className="flex h-10 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-uiSurface font-chromeMono text-[9px] text-uiFg3">
