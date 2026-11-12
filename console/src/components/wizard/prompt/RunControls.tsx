@@ -32,12 +32,15 @@ type RunState =
 const IDLE_TIMEOUT_MS = 90_000;
 
 export default function RunControls({
-  vertical, base, imported, brief, tickedSections, onBriefChange, model, onModelChange,
+  vertical, base, imported, edits, brief, tickedSections, onBriefChange, model, onModelChange,
   onGenerated, onClearGenerated, hasGenerated,
 }: {
   vertical: string;
   base: SiteContent;
   imported: SiteContent | null;
+  /** The operator's edits by path. Posted beside `base`, because the brief takes its facts from
+   *  `imported` + `edits` and reads `base` for layout only (copy-brief/grounded.ts). */
+  edits: Record<string, unknown>;
   brief: CopyBrief;
   tickedSections: Section[];
   onBriefChange: Update;
@@ -68,7 +71,7 @@ export default function RunControls({
       fetch('/api/build/estimate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ vertical, base, imported, brief, sections: tickedSections, model }),
+        body: JSON.stringify({ vertical, base, imported, edits, brief, sections: tickedSections, model }),
       })
         .then((r) => r.json())
         .then((data) => setEstimate(data.error ? null : data))
@@ -77,7 +80,7 @@ export default function RunControls({
     }, 500);
     return () => { if (estimateTimer.current) clearTimeout(estimateTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- base/imported/brief are large objects; re-running on every keystroke elsewhere is the point, JSON.stringify above is what actually changes.
-  }, [vertical, base, imported, brief, tickedSections, model]);
+  }, [vertical, base, imported, edits, brief, tickedSections, model]);
 
   async function generate() {
     setRun({ kind: 'running' });
@@ -91,7 +94,7 @@ export default function RunControls({
       res = await fetch('/api/build/generate-copy', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ vertical, base, imported, brief, sections: tickedSections, model }),
+        body: JSON.stringify({ vertical, base, imported, edits, brief, sections: tickedSections, model }),
       });
     } catch {
       setRun({ kind: 'error', message: 'Could not reach the copy service.' });

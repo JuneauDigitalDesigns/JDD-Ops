@@ -12,13 +12,17 @@ import RunControls from './RunControls';
 type Update = (mutate: (brief: CopyBrief) => CopyBrief) => void;
 
 export default function PromptStage({
-  vertical, verticalDef, base, imported, brief, tickedSections, blocks, onBriefChange,
+  vertical, verticalDef, base, imported, preset, edits, brief, tickedSections, blocks, onBriefChange,
   model, onModelChange, onGenerated, onClearGenerated, hasGenerated,
 }: {
   vertical: string;
   verticalDef: import('@jdd/schema').VerticalDef;
   base: SiteContent;
   imported: SiteContent | null;
+  /** The vertical preset, only so the brief can recognise and leave out a preset value. */
+  preset: SiteContent;
+  /** The operator's edits by path: with `imported`, the only source of the brief's facts. */
+  edits: Record<string, unknown>;
   brief: CopyBrief;
   tickedSections: Section[];
   blocks: ResolvedBlock[];
@@ -34,7 +38,7 @@ export default function PromptStage({
   // matches compileBriefPrompt exactly; if that ever changes, this must change with it.
   const prompt = useMemo(() => {
     const segments = compileBriefSegments(
-      { vertical: verticalDef, effective: base, imported, brief, tickedSections },
+      { vertical: verticalDef, effective: base, imported, preset, edits, brief, tickedSections },
       blocks,
       tickedSections,
     );
@@ -42,7 +46,7 @@ export default function PromptStage({
       system: segments.system.map((s) => s.text).join('\n\n'),
       user: segments.user.map((s) => s.text).join('\n\n'),
     };
-  }, [verticalDef, base, imported, brief, tickedSections, blocks]);
+  }, [verticalDef, base, imported, preset, edits, brief, tickedSections, blocks]);
 
   return (
     // The prompt takes the full width and reads sideways; the run box floats over its bottom-right
@@ -53,6 +57,7 @@ export default function PromptStage({
           vertical={vertical}
           base={base}
           imported={imported}
+          edits={edits}
           brief={brief}
           tickedSections={tickedSections}
           onBriefChange={onBriefChange}

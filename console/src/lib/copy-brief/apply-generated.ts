@@ -11,6 +11,7 @@ import type { SiteContent } from '@/data/site';
 import type { CopyResult, Section } from '@/lib/copy-schema';
 import { serviceSlugs } from '@/lib/servicePages';
 import { servicePageIndices } from '@/lib/copy-brief/compile';
+import { clientFaq, pinFixed, withoutRepeats } from '@/lib/copy-brief/client-faq';
 
 function mergeArray<B, C>(base: B[], copy: C[] | undefined, apply: (b: B, c: C) => B): B[] {
   if (!Array.isArray(base)) return base;
@@ -31,7 +32,9 @@ export function applyGeneratedCopy(
       if (cb.tagline) brand.tagline = cb.tagline;
       if (cb.name) { brand.name = cb.name; brand.short = cb.short ?? cb.name; }
       else if (cb.short) brand.short = cb.short;
-      if (cb.long) brand.long = cb.long;
+      // brand.long is never read from model output: it is the client's legal name exactly as
+      // signed on the agreement (agency PR #106), and it feeds the copyright line and the SEO
+      // local-business data. It passes through from base, so the intake or an operator edit holds.
       if (cb.established) brand.established = cb.established;
       if (cb.phone) { brand.phone = cb.phone; brand.phoneHref = `tel:${cb.phone.replace(/[^0-9+]/g, '')}`; }
       if (cb.email) brand.email = cb.email;
@@ -132,12 +135,16 @@ export function applyGeneratedCopy(
 
   if (want.has('faq')) {
     const f: Partial<NonNullable<CopyResult['faq']>> = copy.faq ?? {};
+    // The client's own untagged Q&As (and any tagged to a service with no page) go first, word
+    // for word; the model's pairs follow, minus any that ask one of them again (client-faq.ts).
+    const fixed = clientFaq(base).home;
+    const model = f.items?.length ? f.items.map((c) => ({ q: c.q, a: c.a })) : [];
     generated.faq = {
       ...base.faq,
       eyebrow: f.eyebrow ?? base.faq.eyebrow,
       title: f.title ?? base.faq.title,
       sub: f.sub ?? base.faq.sub,
-      items: f.items?.length ? f.items.map((c) => ({ q: c.q, a: c.a })) : base.faq.items,
+      items: fixed.length || model.length ? pinFixed(fixed, model, model.length) : base.faq.items,
     };
   }
 
@@ -196,6 +203,11 @@ export function applyGeneratedCopy(
     const slugs = serviceSlugs(base);
     const allowed = new Set(servicePageIndices(base).map((i) => slugs[i]));
     const bySlug = new Map(copy.servicePages.items.filter((it) => it.slug && allowed.has(it.slug)).map((it) => [it.slug, it]));
+    // The page lists the client's own tagged Q&As first, straight from customerQuestions
+    // (serviceLinks.ts serviceQuestions), so page.faq only loses the model's repeats of them: on
+    // 2026-11-11 "Can you come Saturdays?" came back without the client's "TW:" and with an
+    // invented 24/7 answer, shown under the client's own.
+    const fixedBySlug = clientFaq(base).bySlug;
     if (bySlug.size) {
       const services = generated.services ?? base.services;
       generated.services = {
@@ -204,7 +216,8 @@ export function applyGeneratedCopy(
           const it = bySlug.get(slugs[i]);
           if (!it) return item;
           // `page` arrives with @jdd/schema v1.32.0; typed structurally until the console pins it.
-          return { ...item, page: { intro: it.intro, expect: it.expect ?? [], faq: (it.faq ?? []).map((f) => ({ q: f.q, a: f.a })) } } as typeof item;
+          const faq = withoutRepeats((it.faq ?? []).map((f) => ({ q: f.q, a: f.a })), fixedBySlug.get(slugs[i]) ?? []);
+          return { ...item, page: { intro: it.intro, expect: it.expect ?? [], faq } } as typeof item;
         }),
       };
     }

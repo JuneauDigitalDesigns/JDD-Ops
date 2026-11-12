@@ -35,6 +35,8 @@ export function riskTarget(path: string): RiskTarget {
 const SECTION_LABEL: Record<string, string> = {
   announcement: 'Announcement', trust: 'Trust', hero: 'Hero', about: 'About', services: 'Services',
   work: 'Work', testimonials: 'Reviews', faq: 'FAQ', finalCta: 'Final CTA', footer: 'Footer', subpages: 'Page headers',
+  // copyRisks scans seo.title / seo.description since 2026-11-11.
+  seo: 'SEO',
 };
 
 /** Claims, one group per claim, biggest first. */

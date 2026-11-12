@@ -7,6 +7,8 @@ import { ALL_SECTIONS, type Section } from '@/lib/copy-schema';
 import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { CHUNK_SIZE, chunkSections } from '@/lib/copy-brief/chunking';
+import { editsFrom } from '@/lib/copy-brief/grounded';
+import { presetFor } from '@/lib/verticals';
 import { isValidModelId, modelOption, estimateCost, DEFAULT_MODEL_ID } from '@/lib/model-pricing';
 
 export const runtime = 'nodejs';
@@ -15,6 +17,8 @@ interface Body {
   vertical?: string;
   base?: SiteContent;
   imported?: SiteContent | null;
+  /** The operator's edits by path. With `imported`, the only source of the brief's facts. */
+  edits?: Record<string, unknown>;
   brief?: CopyBrief;
   sections?: Section[];
   model?: string;
@@ -46,10 +50,12 @@ export async function POST(req: Request) {
   const sections = requested.length ? requested : ALL_SECTIONS.filter((s) => s !== 'brand');
   const chunks = chunkSections(sections);
 
-  const blocks = resolveBrief({
-    vertical, effective: base, imported: body.imported ?? null, brief,
+  const ctx = {
+    vertical, effective: base, imported: body.imported ?? null,
+    preset: presetFor(vertical.id), edits: editsFrom(body.edits), brief,
     tickedSections: sections,
-  });
+  };
+  const blocks = resolveBrief(ctx);
 
   let key: string;
   try {
@@ -62,7 +68,7 @@ export async function POST(req: Request) {
   try {
     const counts = await Promise.all(
       chunks.map(async (chunk) => {
-        const { system, user } = compileBriefPrompt({ vertical, effective: base, imported: body.imported ?? null, brief, tickedSections: sections }, blocks, chunk);
+        const { system, user } = compileBriefPrompt(ctx, blocks, chunk);
         const res = await client.messages.countTokens({
           model: modelId,
           system,

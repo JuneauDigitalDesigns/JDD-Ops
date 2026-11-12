@@ -160,8 +160,10 @@ export type ResolvedBlock =
 /** Everything resolve.ts needs to compute every block for one render. */
 export interface BriefContext {
   vertical: VerticalDef;
-  /** The merged content (preset ← imported ← generated ← edits) — what "the current facts"
-   *  and "the current counts" mean right now. */
+  /** The merged content (preset ← imported ← generated ← edits). Read ONLY for layout: the
+   *  current counts and which services earn a page. Never for a fact, a promotion, a proof
+   *  point or a reference: wherever the client gave nothing this holds the preset's sample
+   *  text (Tracewell, 2026-11-11). Those come from grounded.ts. */
   effective: SiteContent;
   /** The client's own onboarding intake, when there is one — distinguishes a real client
    *  answer from a vertical-preset placeholder for the structure block's lock logic, and is
@@ -169,6 +171,12 @@ export interface BriefContext {
    *  not the compiled `brandDirectionToDetails` string — resolving per-line parts needs the
    *  fields separately, and re-parsing them back out of the compiled prose isn't reliable). */
   imported: SiteContent | null;
+  /** The vertical preset `effective` sits on. Never sent to the model: it is only how the brief
+   *  recognises a preset value in `imported` or `edits` and leaves it out (grounded.ts). */
+  preset: SiteContent;
+  /** The operator's edits, keyed by dotted path (BuildWizard's `edits`). With `imported`, the
+   *  only source of anything the brief states as a fact, promotion, proof point or reference. */
+  edits: Record<string, unknown>;
   brief: CopyBrief;
   /** Sections ticked for the next run — mirrors brief.tickedSections but kept as a live
    *  Section[] since Section (copy-schema.ts) is a console-only type the schema package

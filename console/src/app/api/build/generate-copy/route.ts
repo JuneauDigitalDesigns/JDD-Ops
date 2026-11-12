@@ -6,6 +6,8 @@ import { buildCopySchema, ALL_SECTIONS, type Section, type CopyResult } from '@/
 import { resolveBrief } from '@/lib/copy-brief/resolve';
 import { compileBriefPrompt } from '@/lib/copy-brief/compile-brief';
 import { chunkSections } from '@/lib/copy-brief/chunking';
+import { editsFrom } from '@/lib/copy-brief/grounded';
+import { presetFor } from '@/lib/verticals';
 import { applyGeneratedCopy } from '@/lib/copy-brief/apply-generated';
 import { withoutCarriedCanonical } from '@/lib/placeholderCanonical';
 import { guardDashes, dashRewriteMessage } from '@/lib/copy-brief/dash-guard';
@@ -34,6 +36,9 @@ interface Body {
   vertical?: string;
   base?: SiteContent;
   imported?: SiteContent | null;
+  /** The operator's edits by path. With `imported`, the only source of the brief's facts,
+   *  promotion, proof points and reference: `base` is read for layout only (grounded.ts). */
+  edits?: Record<string, unknown>;
   brief?: CopyBrief;
   sections?: Section[];
   model?: string;
@@ -85,7 +90,10 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey: key });
   const imported = body.imported ?? null;
 
-  const ctx = { vertical, effective: base, imported, brief, tickedSections: sections, subpages };
+  const ctx = {
+    vertical, effective: base, imported, preset: presetFor(vertical.id), edits: editsFrom(body.edits),
+    brief, tickedSections: sections, subpages,
+  };
   const blocks = resolveBrief(ctx);
 
   const encoder = new TextEncoder();

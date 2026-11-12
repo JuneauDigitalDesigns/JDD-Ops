@@ -194,6 +194,8 @@ export default function IntakeShell({
                   verticalDef={verticalDef}
                   base={content}
                   imported={imported}
+                  preset={sources.preset}
+                  edits={sources.edits}
                   brief={brief}
                   tickedSections={tickedSections}
                   blocks={blocks}
