@@ -12,6 +12,7 @@ import { deepMerge, applyEdits } from '@/lib/merge';
 import { stripSampleReviews } from '@/lib/sampleReviews';
 import { stripPlaceholderCanonical } from '@/lib/placeholderCanonical';
 import { stripPresetIdentity } from '@/lib/presetIdentity';
+import { withCopywriterBrandOnly } from '@/lib/copy-schema';
 
 export function effectiveContent(
   vertical: VerticalId,
@@ -27,7 +28,10 @@ export function effectiveContent(
   // (lib/sampleReviews.ts, lib/placeholderCanonical.ts, lib/presetIdentity.ts).
   const merged = stripPresetIdentity(stripPlaceholderCanonical(
     stripSampleReviews(applyEdits(
-      deepMerge(deepMerge(presetFor(vertical), imported ?? {}), generated ?? {}),
+      // The generated layer's brand is cut to the tagline, the one brand field the copywriter
+      // writes: a draft generated before 2026-11-11 holds a copy of the whole brand there, which
+      // would hide every later correction to the client's name, phone or address (copy-schema.ts).
+      deepMerge(deepMerge(presetFor(vertical), imported ?? {}), withCopywriterBrandOnly(generated ?? {})),
       edits,
     )).content,
   ).content).content;

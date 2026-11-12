@@ -136,16 +136,25 @@ test("the client's own identity survives every layer, 555-01xx phone included", 
 
 test('a sample already baked into generated copy is dropped, and the generated copy is kept', () => {
   // What the Studio sent as `base` before this fix: the merged content, preset identity and all.
-  // applyGeneratedCopy spreads base.brand and base.footer into generated.
   const base = deepMerge(HVAC, TRACEWELL);
   const copy = {
     brand: { tagline: 'Heating and cooling for Winter Park homes.' },
     footer: { blurb: 'Tracewell Heating & Air keeps Winter Park comfortable.' },
     seo: { title: 'Heating & Air in Winter Park | Tracewell Heating & Air', description: 'AC installation and service across Winter Park and nearby areas.' },
   };
-  const generated = applyGeneratedCopy(base, copy, new Set(['brand', 'footer', 'seo']));
-  assert.equal(generated.footer.legal, HVAC.footer.legal, 'precondition: the run carries the preset legal line up');
-  assert.equal(generated.brand.email, HVAC.brand.email, 'precondition: the run carries the preset email up');
+  // A run today writes only the fields it wrote (no-generated-identity.test.mjs), so it carries
+  // no sample up any more.
+  const fresh = applyGeneratedCopy(base, copy, new Set(['brand', 'footer', 'seo']));
+  assert.deepEqual(leaksIn(fresh), [], 'a run carries a preset sample up');
+  // A draft stored by a run before that spread base.brand and base.footer into generated, which is
+  // how Tracewell's .draft.json came to hold the preset legal line. That draft still has to clean.
+  const generated = {
+    brand: { ...base.brand, tagline: copy.brand.tagline },
+    footer: { ...base.footer, blurb: copy.footer.blurb },
+    seo: { ...base.seo, ...copy.seo },
+  };
+  assert.equal(generated.footer.legal, HVAC.footer.legal, 'precondition: the old run carried the preset legal line up');
+  assert.equal(generated.brand.email, HVAC.brand.email, 'precondition: the old run carried the preset email up');
   const out = effectiveContent('hvac', TRACEWELL, generated, {});
   assert.equal(out.brand.email, '');
   assert.equal(out.footer.legal, '');
