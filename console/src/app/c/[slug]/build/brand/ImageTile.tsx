@@ -36,16 +36,26 @@ export default function ImageTile({
 
   useEffect(() => () => { if (localPreview) URL.revokeObjectURL(localPreview); }, [localPreview]);
 
+  // The upload route's own refusal ("Unsupported image type.", "Max 8 MB."), shown here, not dropped.
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   async function onFile(file: File) {
     setBusy(true);
+    setUploadError(null);
     const preview = URL.createObjectURL(file);
     setLocalPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return preview; });
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('path', path); // SVG is accepted for the logo field only
       const r = await fetch('/api/build/upload', { method: 'POST', body: fd });
-      const d = (await r.json()) as { ref?: string };
+      const d = (await r.json()) as { ref?: string; error?: string };
       if (d.ref) setField(path, d.ref);
+      else {
+        // Refused: drop the local preview, so the tile never shows a file that wasn't kept.
+        setLocalPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+        setUploadError(d.error ?? 'Unsupported image type.');
+      }
     } finally {
       setBusy(false);
     }
@@ -132,6 +142,7 @@ export default function ImageTile({
       </div>
 
       <p className="truncate font-chromeMono text-2xs uppercase tracking-widest text-uiFg3">{label}</p>
+      {uploadError && <p role="alert" className="text-2xs text-danger">{uploadError}</p>}
 
       {(showUrl || (val && !staged && !isRenderable(val))) && (
         <input
