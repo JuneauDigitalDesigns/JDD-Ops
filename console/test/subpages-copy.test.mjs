@@ -54,7 +54,9 @@ const COMPOSITION = [
 ];
 const intakePages = COMPOSITION.filter((p) => p.route !== '').map((p) => ({ route: p.route, label: p.label, pageType: p.pageType }));
 
-const ticked = ALL_SECTIONS.filter((s) => s !== 'brand');
+// The town sections are left out: this draft predates town facts, so a run reports them "Not written"
+// (test/town-page-copy.test.mjs), which is not what these tests are about.
+const ticked = ALL_SECTIONS.filter((s) => s !== 'brand' && s !== 'townPages' && s !== 'townServicePages');
 const bodyFor = (sections = ticked) => copyRequestBody({
   vertical: 'hvac', base: effectiveOf(draft.generated), imported: draft.imported, edits: draft.edits ?? {},
   brief: draft.brief, sections, model: 'claude-sonnet-4-6', pages: intakePages,
