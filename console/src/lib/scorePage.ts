@@ -24,7 +24,7 @@
  */
 import { copyRisks, factsText, getPath, visibleCopy, type ServicePicks } from '@/lib/copyRisks';
 import { findDashes } from '@/lib/copy-brief/dash-guard';
-import { isMainCity, qualifiesForAreaPage, qualifiesForSpokePage, toE164, townSlugs } from '@jdd/schema';
+import { canonicalTown, isMainCity, qualifiesForAreaPage, qualifiesForSpokePage, toE164, townSlugs } from '@jdd/schema';
 import { primaryCity, qualifiesForServicePage, serviceSlugs } from '@/lib/servicePages';
 import type { PageSeo, SeoPageRef } from '@/lib/pageSeo';
 
@@ -107,6 +107,64 @@ function shingles(text: string, n = 8): Set<string> {
   const out = new Set<string>();
   for (let i = 0; i + n <= w.length; i++) out.add(w.slice(i, i + n).join(' '));
   return out;
+}
+
+// ── Town pages and spokes: the 40% rule and the swapped-city detector (local SEO L7) ──────────
+
+/** L7 (Xander, 2026-11-12): at least 40% of a town page's or spoke's body must come from facts
+ *  tagged to that place. BrightLocal's figure ("40% to 60%"), adopted as a house rule; Google
+ *  gives no percentage. */
+export const LOCAL_SHARE_MIN = 0.4;
+
+const HTTP_URL = /^https?:\/\/[^\s/]+\.[^\s]+$/i;
+
+/**
+ * What share of a town page's or spoke's body comes from facts tagged to that place, measured by
+ * SOURCE from content, in words:
+ *   local     = the town's job captions and its town line, its review quotes and its sourced notes
+ *               (a spoke: the jobs and reviews tagged to both the town and the service; no notes);
+ *   generated = the intro and the links to services (a town page lists the services with pages).
+ * Generated words never count as local, however well written, so more generated text can only
+ * lower the share. The header, breadcrumb, CTA and site chrome are not body and are not counted.
+ * Templates renders exactly these blocks (agreed 2026-11-12, local-seo-schema-v1.34.md).
+ */
+export function localShare(
+  content: unknown,
+  route: string,
+): { share: number; local: number; generated: number; localText: string; generatedText: string } {
+  const c = obj(content);
+  const parts = route.split('/');
+  const towns = arr(obj(c.extensions).serviceArea).map(str).filter(Boolean);
+  const town = towns[townSlugs(content).indexOf(parts[1] ?? '')] ?? '';
+  const service = parts.length === 3 ? parts[2] : '';
+  const here = (x: Json) => town !== '' && canonicalTown(content, x.town) === town && (!service || str(x.service) === service);
+  const jobs = arr(obj(c.work).projects).map(obj).filter((p) => here(p) && str(obj(p.image).url) !== '');
+  const reviews = arr(obj(c.testimonials).items).map(obj).filter((r) => here(r) && str(r.q) !== '');
+  const notes = service ? [] : arr(obj(c.extensions).townNotes).map(obj)
+    .filter((n) => town !== '' && canonicalTown(content, n.town) === town && str(n.text) !== '' && HTTP_URL.test(str(n.sourceUrl)));
+  const localText = [...jobs.flatMap((p) => [str(p.caption), town]), ...reviews.map((r) => str(r.q)), ...notes.map((n) => str(n.text))].join(' ');
+
+  const copy = obj(obj(c.areaCopy)[parts[1] ?? '']);
+  const intro = service ? str(obj(obj(copy.spokes)[service]).intro) : str(copy.intro);
+  const items = arr(obj(c.services).items).map(obj);
+  const paged = new Set(arr(c.servicePages).map(str));
+  const slugs = serviceSlugs(content);
+  const links = service ? [] : items.filter((_, i) => paged.has(slugs[i])).map((it) => str(it.t));
+  const generatedText = [intro, ...links].join(' ');
+
+  const local = words(localText).length;
+  const generated = words(generatedText).length;
+  return { share: local + generated ? local / (local + generated) : 0, local, generated, localText, generatedText };
+}
+
+/** Every town and service name replaced by one token, so "AC repair in Minneola" and "AC repair
+ *  in Groveland" read the same. Longest names first, so "Winter Garden" masks before "Garden". */
+function maskNames(text: string, names: string[]): string {
+  let out = ` ${words(text).join(' ')} `;
+  for (const n of [...new Set(names.map((x) => words(x).join(' ')).filter(Boolean))].sort((a, b) => b.length - a.length)) {
+    out = out.split(` ${n} `).join(' zname ');
+  }
+  return out.trim();
 }
 
 /** Flesch-Kincaid grade over prose. Approximate (vowel-group syllables), which is enough for a
@@ -215,6 +273,7 @@ export function scoreSite(
   const slugs = serviceSlugs(content);
   const servicePages = pages.filter((p) => p.pageType === 'service');
   const texts: Array<[string, Set<string>]> = [];
+  const serviceBodies = new Map<string, string>(); // service slug -> its page's generated body, for the spoke check
   for (const p of servicePages) {
     const idx = slugs.findIndex((s) => `services/${s}` === p.route);
     if (idx < 0) {
@@ -230,6 +289,7 @@ export function scoreSite(
     if (!tagged(arr(obj(c.testimonials).items)) && !tagged(arr(obj(c.work).projects))) soft.push(`Service page /${p.route} has no proof (a real review or job photo tagged to it)`);
     const body = [str(page.intro), ...arr(page.body).map(str), ...arr(page.includedNotes).map(str), ...arr(page.signNotes).map(str), ...arr(page.expect).map(str), ...faqs.map((f) => `${str(f.q)} ${str(f.a)}`), str(item.detail)].join(' ');
     texts.push([p.route, shingles(body)]);
+    serviceBodies.set(slugs[idx], body);
   }
   for (let i = 0; i < texts.length; i++) {
     for (let j = i + 1; j < texts.length; j++) {
@@ -265,6 +325,42 @@ export function scoreSite(
       else if (!routes.has(`areas/${parts[1]}`) || !qualifiesForSpokePage(content, town, idx, true)) {
         hard.push(`Town + service page /${p.route} needs its town page, its service page and 2 facts tagged to both`);
       }
+    }
+  }
+
+  // ── L7: 40% local by source, and no swapped-city boilerplate (local SEO 5b) ──
+  const localPages = pages.filter((x) => x.pageType === 'area' || x.pageType === 'spoke');
+  const names = [...towns, ...items.map((it) => str(it.t)), ...slugs.map((s) => s.replace(/-/g, ' '))];
+  const bodies: Array<{ route: string; kind: string; all: Set<string>; generated: Set<string>; service: string }> = [];
+  for (const p of localPages) {
+    const s = localShare(content, p.route);
+    if (s.share < LOCAL_SHARE_MIN) {
+      const what = p.pageType === 'area' ? 'Town page' : 'Town + service page';
+      hard.push(`${what} /${p.route} is ${Math.round(s.share * 100)}% local (needs 40%): ${s.local} words come from its own jobs, reviews and notes, ${s.generated} from the intro and links. Add real facts for this town, or shorten the intro`);
+    }
+    bodies.push({
+      route: p.route,
+      kind: p.pageType,
+      all: shingles(maskNames(`${s.generatedText} ${s.localText}`, names)),
+      generated: shingles(maskNames(s.generatedText, names)),
+      service: p.pageType === 'spoke' ? p.route.split('/')[2] ?? '' : '',
+    });
+  }
+  const swapped = (a: string, b: string, run: string) =>
+    hard.push(`/${a} shares an 8-word run with /${b} once town and service names are taken out (boilerplate with a swapped name): "${run}"`);
+  for (let i = 0; i < bodies.length; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      if (bodies[i].kind !== bodies[j].kind) continue; // a town page and its own spoke share their facts by design
+      const run = [...bodies[i].all].find((x) => bodies[j].all.has(x));
+      if (run) swapped(bodies[i].route, bodies[j].route, run);
+    }
+    // A spoke against its own service page: generated words only, since the service page shows
+    // the same tagged reviews and job photos as proof.
+    const svcBody = bodies[i].service ? serviceBodies.get(bodies[i].service) : undefined;
+    if (svcBody) {
+      const svc = shingles(maskNames(svcBody, names));
+      const run = [...bodies[i].generated].find((x) => svc.has(x));
+      if (run) swapped(bodies[i].route, `services/${bodies[i].service}`, run);
     }
   }
 

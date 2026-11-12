@@ -24,7 +24,8 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 /** Top-level keys that hold visible marketing copy. brand, nav, images, extensions, _meta, seo
  *  canonical/ids and overrides are facts, links or settings, never claims. */
-const COPY_ROOTS = ['announcement', 'trust', 'hero', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'footer', 'subpages'];
+// areaCopy (v1.34.0): the generated town-page and spoke intros, under the same house rules.
+const COPY_ROOTS = ['announcement', 'trust', 'hero', 'about', 'services', 'work', 'testimonials', 'faq', 'finalCta', 'footer', 'subpages', 'areaCopy'];
 /** The SEO fields a searcher reads in the results page. copyRisks scans them for claims and preset
  *  text (Tracewell's description promised "Emergency help day or night", 2026-11-11); canonical
  *  and the tracking ids are settings. Not part of visibleCopy, which scorePage's hard export
