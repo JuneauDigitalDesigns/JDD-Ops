@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { scoreSite, localShare, LOCAL_SHARE_MIN } from '../src/lib/scorePage.ts';
 import { buildPageSeo } from '../src/lib/pageSeo.ts';
 
+const words = (t) => t.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(Boolean);
 const photo = (town, caption, extra = {}) => ({ t: '', loc: town, yr: null, scope: '', size: '', caption, image: { url: `/img/${caption.replace(/\W+/g, '')}`, alt: caption }, town, ...extra });
 const review = (town, q, extra = {}) => ({ q, a: 'Dana P.', r: '', stars: 5, town, ...extra });
 
@@ -78,6 +79,17 @@ test('a spoke counts only what is tagged to both its town and its service', () =
   // One job and one review tagged to Minneola AND ac-repair; the untagged thermostat job is not.
   assert.ok(!s.localText.includes('thermostat'));
   assert.ok(s.localText.includes('Condenser swap'));
+});
+
+test("a spoke's two approved link lines count as not local, and never trip the swapped-city check", () => {
+  // Templates' spoke shows "More of our work in {Town}" and "About our {service} service" in its
+  // body (lib/townLinks.ts). Uncounted, every spoke's share read high by those words.
+  const s = localShare(base(), 'areas/minneola/ac-repair');
+  assert.equal(s.fixed, words('More of our work in Minneola About our AC repair service').length);
+  assert.equal(s.share, s.local / (s.local + s.generated + s.fixed));
+  // Every spoke shares that wording by design; it must not read as swapped-city boilerplate.
+  assert.deepEqual(hardFor(base()), []);
+  assert.equal(localShare(base(), 'areas/minneola').fixed, 0, 'a town page has no such lines');
 });
 
 test('swapped-city boilerplate is refused even when every town has its own facts', () => {

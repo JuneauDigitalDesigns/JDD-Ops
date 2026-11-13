@@ -22,7 +22,9 @@ import { planRedirects, fallbackFor, writeRedirects, ledgerPath } from '../src/l
 import { writeCompositionManifest } from '../src/lib/composition-manifest.ts';
 
 const photo = (town, extra = {}) => ({ t: '', loc: town, yr: null, scope: '', size: '', caption: `Job in ${town}`, image: { url: `/img/${town}-${Math.round(Math.random() * 1e9)}`, alt: town }, town, ...extra });
-const review = (town, extra = {}) => ({ q: 'Quick and tidy work.', a: 'Dana P.', r: '', stars: 5, town, ...extra });
+// A review of realistic length. A four-word one left the spoke below the 40% local share once its two
+// approved link lines were counted (2026-11-12), which is the share measuring honestly, not a gate.
+const review = (town, extra = {}) => ({ q: 'They found the frozen coil on our old unit and had the whole house cool again by dinner.', a: 'Dana P.', r: '', stars: 5, town, ...extra });
 
 // Clermont is the main city (the address). Minneola has 2 photos + 1 review (a page). Groveland
 // has 3 photos only (one kind: no page). The AC Repair spoke in Minneola has 2 shared facts.

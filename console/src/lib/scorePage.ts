@@ -27,6 +27,7 @@ import { findDashes } from '@/lib/copy-brief/dash-guard';
 import { canonicalTown, isMainCity, qualifiesForAreaPage, qualifiesForSpokePage, toE164, townSlugs } from '@jdd/schema';
 import { primaryCity, qualifiesForServicePage, serviceSlugs } from '@/lib/servicePages';
 import type { PageSeo, SeoPageRef } from '@/lib/pageSeo';
+import { AREA_WORDS, aboutOurService } from '@/lib/townLinks';
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {});
@@ -123,15 +124,19 @@ const HTTP_URL = /^https?:\/\/[^\s/]+\.[^\s]+$/i;
  * SOURCE from content, in words:
  *   local     = the town's job captions and its town line, its review quotes and its sourced notes
  *               (a spoke: the jobs and reviews tagged to both the town and the service; no notes);
- *   generated = the intro and the links to services (a town page lists the services with pages).
- * Generated words never count as local, however well written, so more generated text can only
- * lower the share. The header, breadcrumb, CTA and site chrome are not body and are not counted.
- * Templates renders exactly these blocks (agreed 2026-11-12, local-seo-schema-v1.34.md).
+ *   generated = the intro and the links to services (a town page lists the services with pages);
+ *   fixed     = a spoke's two approved link lines, "More of our work in {Town}" and "About our
+ *               {service} service" (lib/townLinks.ts). Shown on every spoke, so not local; kept
+ *               out of generatedText because the swapped-city detector would otherwise flag every
+ *               pair of spokes for the approved wording they are meant to share.
+ * Neither generated nor fixed words ever count as local, so more of them can only lower the share.
+ * The header, breadcrumb, CTA and site chrome are not body and are not counted. Templates renders
+ * exactly these blocks, and test/town-pages.test.mjs pins the rendered words to this count.
  */
 export function localShare(
   content: unknown,
   route: string,
-): { share: number; local: number; generated: number; localText: string; generatedText: string } {
+): { share: number; local: number; generated: number; fixed: number; localText: string; generatedText: string } {
   const c = obj(content);
   const parts = route.split('/');
   const towns = arr(obj(c.extensions).serviceArea).map(str).filter(Boolean);
@@ -151,10 +156,14 @@ export function localShare(
   const slugs = serviceSlugs(content);
   const links = service ? [] : items.filter((_, i) => paged.has(slugs[i])).map((it) => str(it.t));
   const generatedText = [intro, ...links].join(' ');
+  const serviceName = service ? str(items[slugs.indexOf(service)]?.t) : '';
+  const fixedText = service && town && serviceName ? [AREA_WORDS.moreWorkIn(town), aboutOurService(serviceName)].join(' ') : '';
 
   const local = words(localText).length;
   const generated = words(generatedText).length;
-  return { share: local + generated ? local / (local + generated) : 0, local, generated, localText, generatedText };
+  const fixed = words(fixedText).length;
+  const total = local + generated + fixed;
+  return { share: total ? local / total : 0, local, generated, fixed, localText, generatedText };
 }
 
 /** Every town and service name replaced by one token, so "AC repair in Minneola" and "AC repair
@@ -336,7 +345,7 @@ export function scoreSite(
     const s = localShare(content, p.route);
     if (s.share < LOCAL_SHARE_MIN) {
       const what = p.pageType === 'area' ? 'Town page' : 'Town + service page';
-      hard.push(`${what} /${p.route} is ${Math.round(s.share * 100)}% local (needs 40%): ${s.local} words come from its own jobs, reviews and notes, ${s.generated} from the intro and links. Add real facts for this town, or shorten the intro`);
+      hard.push(`${what} /${p.route} is ${Math.round(s.share * 100)}% local (needs 40%): ${s.local} words come from its own jobs, reviews and notes, ${s.generated + s.fixed} from the intro and links. Add real facts for this town, or shorten the intro`);
     }
     bodies.push({
       route: p.route,
