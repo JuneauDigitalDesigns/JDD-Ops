@@ -69,7 +69,9 @@ export type AuditAction =
   // A call recording attached to an agreement: the order id only, never the file name.
   | 'agreement.recording'
   // L11: JDD verified a site's Search Console property. The property URL only, never an email.
-  | 'search-console.verify';
+  | 'search-console.verify'
+  // Phase 3: a Search Console proposal decided. The proposal id and the decision only.
+  | 'search-console.decide';
 
 export interface AuditEntry {
   /** ISO timestamp. */

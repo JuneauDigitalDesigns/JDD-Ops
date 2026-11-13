@@ -27,7 +27,7 @@ import PageStudio from './PageStudio';
 import { defaultCompositionFor } from './page-templates';
 import { applyVerticalTemplate, areaPageRoutes, servicePageSlugs, syncAreaPages, syncServicePages } from './vertical-templates';
 import { chosenServicePages } from './service-page-sync';
-import { areaPageRefs, chosenAreaPages, chosenSpokePages } from './area-page-sync';
+import { areaPageRefs, chosenAreaPages, chosenSpokePages, type ApprovedSpoke } from './area-page-sync';
 import { compositionFromBundle, ensureSectionIds, type SiteComposition } from '@/lib/pages';
 import IntakeStep, { type IntakeStageId } from '@/components/wizard/IntakeStep';
 import { landingStepId } from '@/lib/intake-steps';
@@ -381,15 +381,36 @@ export default function BuildWizard({
     if (servicePageSlugs(next).join('|') !== servicePageSlugs(siteComposition).join('|')) setSiteComposition(next);
   }, [hydrated, effective, siteComposition]);
 
+  // The spokes Xander approved in Search (Phase 3, /manage › Search), from this client's
+  // approved-spokes.json. Null until loaded, and it STAYS null if the load fails: the town-page
+  // sync below removes every spoke not in the list, so syncing against [] before (or instead of)
+  // the real list would strip the client's live spokes and the next export would redirect them.
+  const [approvedSpokes, setApprovedSpokes] = useState<ApprovedSpoke[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setApprovedSpokes(null);
+    fetch(`/api/manage/search-console/approved?slug=${encodeURIComponent(slug)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<{ approved?: ApprovedSpoke[] }>) : null))
+      .then((j) => {
+        if (live && j && Array.isArray(j.approved)) setApprovedSpokes(j.approved);
+      })
+      .catch(() => {
+        /* keep null: the composition stays as it is */
+      });
+    return () => {
+      live = false;
+    };
+  }, [slug]);
+
   // Town pages and spokes follow the same way (local SEO L6, Xander 2026-11-12): the schema's gate
   // decides, syncAreaPages adds and removes, and it is a no-op until a vertical has town pages.
-  // No spoke is approved yet: approvals arrive with the Search Console proposals (Phase 3), so the
-  // approved list is empty until then and no spoke is ever built on facts alone.
+  // A spoke needs an approval as well as its facts, so this waits for the approved list.
   useEffect(() => {
     if (!hydrated) return;
-    const next = syncAreaPages(siteComposition, chosenAreaPages(effective), chosenSpokePages(effective, []));
+    if (approvedSpokes === null) return;
+    const next = syncAreaPages(siteComposition, chosenAreaPages(effective), chosenSpokePages(effective, approvedSpokes));
     if (areaPageRoutes(next).join('|') !== areaPageRoutes(siteComposition).join('|')) setSiteComposition(next);
-  }, [hydrated, effective, siteComposition]);
+  }, [hydrated, approvedSpokes, effective, siteComposition]);
 
   // Persist the per-client bundle on any change — but never before hydration has run, or
   // the first commit's empty state would clobber what's in storage. See `hydrated`.
