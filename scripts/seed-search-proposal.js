@@ -10,7 +10,7 @@
  * proposal during a test. This writes the record that job would write (lib/search-approvals.js
  * testFixtureProposal), marked `test: true` and with a "(test)" query, under the fixture's own
  * account scope, in the KV named by THIS checkout's .env (run it from the test worktree for the
- * test KV). Refuses any slug that doesn't name a test client. Prints key names, never the
+ * test KV). Refuses anything else. Prints key names, never the
  * account's email.
  */
 import dotenv from 'dotenv';
@@ -21,7 +21,7 @@ import { Redis } from '@upstash/redis';
 import { parseEnvLocal } from '../lib/teardown-ops.js';
 import { accountScope } from '../lib/account-store.js';
 import { townSlug } from '@jdd/schema';
-import { proposalKey, proposalIndexKey, testFixtureProposal, E2E_SLUG } from '../lib/search-approvals.js';
+import { proposalKey, proposalIndexKey, testFixtureProposal, isTestClient } from '../lib/search-approvals.js';
 
 const argv = process.argv.slice(2);
 const arg = (n) => {
@@ -38,7 +38,7 @@ const townArg = arg('town');
 const service = arg('service');
 const write = argv.includes('--write');
 if (!slug || !townArg || !service) die('usage: --slug <_e2e_ fixture> --town <town> --service <service slug> [--write]');
-if (!E2E_SLUG.test(slug)) die(`refusing: ${slug} is not an e2e test client`);
+if (!isTestClient(slug)) die(`refusing: ${slug} is not a test client (_e2e_, or named in SEARCH_SEED_TEST_SLUGS in this checkout's .env)`);
 
 const dir = resolve('clients', slug);
 if (!existsSync(resolve(dir, '.env.local'))) die(`no clients/${slug}/.env.local`);

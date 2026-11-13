@@ -49,15 +49,25 @@ test('the approved list round-trips through its file', () => {
   }
 });
 
-import { testFixtureProposal } from '../lib/search-approvals.js';
+import { testFixtureProposal, isTestClient } from '../lib/search-approvals.js';
 
 test('a seeded test proposal is for e2e test clients only, and is marked as a test', () => {
-  assert.throws(() => testFixtureProposal({ slug: 'acme-air', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair' }), /not an e2e test client/);
-  assert.equal(testFixtureProposal({ slug: 'copperline-e2e2', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', now: NOW }).id, 'spoke:minneola:ac-repair');
+  assert.throws(() => testFixtureProposal({ slug: 'acme-air', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', env: {} }), /not a test client/);
+  assert.equal(testFixtureProposal({ slug: 'copperline-e2e2', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', now: NOW, env: { SEARCH_SEED_TEST_SLUGS: 'copperline-e2e2' } }).id, 'spoke:minneola:ac-repair');
   const p = testFixtureProposal({ slug: '_e2e_test_starter', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', now: NOW });
   assert.equal(p.id, 'spoke:minneola:ac-repair');
   assert.equal(p.test, true);
   assert.match(p.evidence.queries[0].query, /^\(test\) /);
   // It is a proposal the real decide path accepts.
   assert.equal(applyDecision({ proposal: p, decision: 'approved', approved: [], now: NOW }).approved.length, 1);
+});
+
+test('the seed guard: _e2e_ fixtures, or a slug the test environment names; never a real client by accident', () => {
+  // "e2e" inside a word is not a test marker: free2eat is a plausible real business.
+  assert.equal(isTestClient('free2eat', {}), false);
+  assert.equal(isTestClient('copperline-e2e2', {}), false, 'not without the test environment naming it');
+  assert.equal(isTestClient('copperline-e2e2', { SEARCH_SEED_TEST_SLUGS: 'copperline-e2e2' }), true);
+  assert.equal(isTestClient('copperline-e2e', { SEARCH_SEED_TEST_SLUGS: 'copperline-e2e2' }), false, 'exact names only');
+  assert.equal(isTestClient('_e2e_test_starter', {}), true);
+  assert.throws(() => testFixtureProposal({ slug: 'free2eat', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', env: {} }), /not a test client/);
 });
