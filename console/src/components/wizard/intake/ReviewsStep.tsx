@@ -16,6 +16,7 @@
  */
 import { CheckCircle, PencilSimple, Star, Trash } from '@phosphor-icons/react';
 import { REVIEW_SOURCES, serviceSlugs, type ReviewSource } from '@jdd/schema';
+import { townChoices } from '@/lib/service-areas';
 import type { SiteContent } from '@/data/site';
 import type { SetField } from '@/components/fields';
 import { realReviews } from '@/lib/intake-todo';
@@ -44,6 +45,9 @@ export default function ReviewsStep({
   const saved = realReviews(content);
   const services = content.services?.items ?? [];
   const slugs = serviceSlugs(content);
+  // A review's town is one of the client's own (local SEO, 2026-11-12): that is what puts it on
+  // the town's page, and on the town + service page when its service matches too.
+  const towns = townChoices(content.extensions?.serviceArea);
   const badge = content.extensions?.reviewBadge ?? null;
   const ratingSource = sourceOf(sources, 'extensions.reviewBadge');
 
@@ -80,7 +84,7 @@ export default function ReviewsStep({
   }
 
   function edit(i: number) {
-    onReviewDraftChange(draftFromReview(items[i], i));
+    onReviewDraftChange(draftFromReview(items[i], i, content));
   }
 
   function remove(i: number) {
@@ -120,7 +124,7 @@ export default function ReviewsStep({
                     </span>
                   </div>
                   <p className="mt-1.5 line-clamp-3 text-[13px] leading-relaxed text-uiFg2">{t.q}</p>
-                  <p className="mt-1 text-xs text-uiFg3"><b className="text-uiFg2">{t.a}</b>{t.company ? ` · ${t.company}` : ''}{t.date ? ` · ${t.date}` : ''}</p>
+                  <p className="mt-1 text-xs text-uiFg3"><b className="text-uiFg2">{t.a}</b>{t.town ? ` · ${t.town}` : t.company ? ` · ${t.company}` : ''}{t.date ? ` · ${t.date}` : ''}</p>
                 </li>
               ))}
             </ul>
@@ -199,7 +203,10 @@ export default function ReviewsStep({
             </label>
             <label>
               <span className={FIELD_LABEL}>Town <Tag>Optional</Tag></span>
-              <input value={draft.company} onChange={(e) => set({ company: e.target.value })} className={INPUT} />
+              <select value={draft.town ?? ''} onChange={(e) => set({ town: e.target.value })} className={INPUT}>
+                <option value="">None</option>
+                {towns.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
             </label>
           </div>
           <label className="flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[13.5px]" style={{ borderColor: 'rgba(31,111,120,.45)', background: 'rgba(31,111,120,.06)' }}>
@@ -228,7 +235,7 @@ export default function ReviewsStep({
             <p className="text-sm leading-relaxed text-uiFg2">{draft.q.trim() || <span className="italic text-uiFg3">Review text</span>}</p>
             <p className="text-[13px]">
               <b>{draft.a.trim() || 'Name'}</b>
-              <span className="text-uiFg3">{draft.company.trim() ? ` · ${draft.company.trim()}` : ''}{draft.source ? ` · ${SOURCE_LABEL[draft.source]}` : ''}</span>
+              <span className="text-uiFg3">{draft.town ? ` · ${draft.town}` : draft.company.trim() ? ` · ${draft.company.trim()}` : ''}{draft.source ? ` · ${SOURCE_LABEL[draft.source]}` : ''}</span>
             </p>
           </div>
           <p className="text-2xs leading-relaxed text-uiFg3">
