@@ -202,7 +202,9 @@ test('the export gives the slug to exactly the service sections, and the Studio 
   }
   assert.equal(sectionSlugAttrs({ pageType: 'service', route: 'services/ac-repair' }, 'ServicesAccordion'), '');
   const compose = read(path.join(CONSOLE, 'src/app/c/[slug]/build/compose-page.tsx'));
-  const rendered = [...compose.matchAll(/^\s{2}(\w+): \(p\) => </gm)].map((m) => m[1]).sort();
+  // Only SERVICE_RENDER's entries: compose-page.tsx's AREA_RENDER (town pages) has its own test.
+  const serviceRender = /const SERVICE_RENDER[\s\S]*?\n\};/.exec(compose)[0];
+  const rendered = [...serviceRender.matchAll(/^\s{2}(\w+): \(p\) => </gm)].map((m) => m[1]).sort();
   assert.deepEqual(rendered, [...SERVICE_PAGE_SECTIONS].sort(), 'compose-page.tsx renders every service section with its slug');
   for (const name of SERVICE_PAGE_SECTIONS) {
     assert.match(exporter, new RegExp(`'${name}'`), `${name} is in the export allow-list`);

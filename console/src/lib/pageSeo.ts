@@ -76,7 +76,7 @@ const join = (parts: string[], sep: string) => parts.filter(Boolean).join(sep);
 
 // ── Titles (D7, approved patterns) ──────────────────────────────────────────
 
-function titleFor(content: unknown, page: SeoPageRef, trade: string, service: Json | null, town = ''): string {
+function titleFor(content: unknown, page: SeoPageRef, trade: string, service: Json | null, town = '', hasTownPages = false): string {
   const c = obj(content);
   const brand = str(obj(c.brand).name);
   const city = primaryCity(content);
@@ -96,6 +96,12 @@ function titleFor(content: unknown, page: SeoPageRef, trade: string, service: Js
     case 'area':
       // L2/L6, approved word for word: "{Trade} in {Town} | {Brand}".
       return join([trade && town ? `${trade} in ${town}` : town || page.label, brand], ' | ');
+    case 'areas':
+      // The /areas index of a site with town pages, approved word for word (T3, Xander
+      // 2026-11-12): "Areas we serve | {Brand}". An operator's own Service Areas page on a site
+      // without town pages keeps its own title.
+      if (hasTownPages) return join(['Areas we serve', brand], ' | ');
+      return str(obj(obj(obj(c.subpages)[page.route]).seo).title) || join([page.label, brand], ' | ');
     case 'spoke':
       // Approved word for word: "{Service} in {Town} | {Brand}".
       return join([join([str(service?.t) || page.label, town && `in ${town}`], ' '), brand], ' | ');
@@ -246,6 +252,7 @@ export function buildPageSeo(content: unknown, pages: SeoPageRef[], vertical: st
   const area = arr(obj(c.extensions).serviceArea).map(str).filter(Boolean);
   const tSlugs = townSlugs(content);
   const hasAreasIndex = pages.some((p) => p.route === 'areas');
+  const hasTownPages = pages.some((p) => p.pageType === 'area');
   const areaCopy = obj(c.areaCopy);
 
   for (const page of pages) {
@@ -325,7 +332,7 @@ export function buildPageSeo(content: unknown, pages: SeoPageRef[], vertical: st
     }
 
     out[page.route] = {
-      title: titleFor(content, page, trade, service, town),
+      title: titleFor(content, page, trade, service, town, hasTownPages),
       description,
       canonical: url,
       ogImage: image || heroImage ? imageAt(image || heroImage, 1536) : null,

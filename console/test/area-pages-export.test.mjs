@@ -83,36 +83,31 @@ test('content.areaPages lists the town pages that exist, with their spokes', () 
   assert.deepEqual(areaPageRefs(c, content()), [{ town: 'Minneola', slug: 'minneola', spokes: ['ac-repair'] }]);
 });
 
-test('syncAreaPages is a no-op until a vertical has town pages, then adds, keeps and removes them', () => {
-  const hvac = VERTICAL_TEMPLATES.hvac;
-  const hvacish = hvac.build(); // a real HVAC composition, so templateIdFor recognises it
-  // No vertical has town pages yet (Templates builds them after Xander approves the mockups).
-  assert.equal(syncAreaPages(hvacish, [{ town: 'Minneola', slug: 'minneola' }], []), hvacish);
-  hvac.areaSections = () => [S('pageHeader', 'HvacAreaHeader'), S('trust', 'HvacAreaBody')];
-  hvac.spokeSections = () => [S('pageHeader', 'HvacAreaHeader'), S('trust', 'HvacSpokeBody')];
-  hvac.areasIndexSections = () => [S('pageHeader', 'HvacAreasHeader'), S('trust', 'HvacAreasList')];
-  try {
-    const added = syncAreaPages(hvacish, [{ town: 'Minneola', slug: 'minneola' }], [{ townSlug: 'minneola', service: 'ac-repair', label: 'AC Repair' }, { townSlug: 'groveland', service: 'ac-repair', label: 'AC Repair' }]);
-    assert.notEqual(added, hvacish);
-    assert.deepEqual(areaPageRoutes(added), ['areas', 'areas/minneola', 'areas/minneola/ac-repair'], 'index, town page, and only the spoke under a live town page');
-    const town = added.pages.find((p) => p.route === 'areas/minneola');
-    assert.equal(town.pageType, 'area');
-    assert.equal(town.label, 'Minneola');
-    assert.equal(town.navVisible, false);
-    const again = syncAreaPages(added, [{ town: 'Minneola', slug: 'minneola' }], []);
-    assert.equal(again.pages.find((p) => p.route === 'areas/minneola'), town, 'an existing page is kept as it is');
-    assert.deepEqual(areaPageRoutes(again), ['areas', 'areas/minneola']);
-    const gone = syncAreaPages(again, [], []);
-    assert.deepEqual(areaPageRoutes(gone), [], 'the auto-added index leaves with the last town page');
-  } finally {
-    delete hvac.areaSections;
-    delete hvac.spokeSections;
-    delete hvac.areasIndexSections;
-  }
+test('syncAreaPages leaves a non-template site alone, and adds, keeps and removes a vertical\'s town pages', () => {
+  // A composition that isn't a vertical template has no town page sections to build from.
+  const custom = comp([]);
+  assert.equal(syncAreaPages(custom, [{ town: 'Minneola', slug: 'minneola' }], []), custom);
+  // Every vertical has its town pages since Templates built them (Xander approved the mockups
+  // "HVAC Town Pages", 2026-11-12; test/town-pages.test.mjs pins the sections themselves).
+  const hvacish = VERTICAL_TEMPLATES.hvac.build(); // a real HVAC composition, so templateIdFor recognises it
+  const added = syncAreaPages(hvacish, [{ town: 'Minneola', slug: 'minneola' }], [{ townSlug: 'minneola', service: 'ac-repair', label: 'AC Repair' }, { townSlug: 'groveland', service: 'ac-repair', label: 'AC Repair' }]);
+  assert.notEqual(added, hvacish);
+  assert.deepEqual(areaPageRoutes(added), ['areas', 'areas/minneola', 'areas/minneola/ac-repair'], 'index, town page, and only the spoke under a live town page');
+  const town = added.pages.find((p) => p.route === 'areas/minneola');
+  assert.equal(town.pageType, 'area');
+  assert.equal(town.label, 'Minneola');
+  assert.equal(town.navVisible, false);
+  const again = syncAreaPages(added, [{ town: 'Minneola', slug: 'minneola' }], []);
+  assert.equal(again.pages.find((p) => p.route === 'areas/minneola'), town, 'an existing page is kept as it is');
+  assert.deepEqual(areaPageRoutes(again), ['areas', 'areas/minneola']);
+  const gone = syncAreaPages(again, [], []);
+  assert.deepEqual(areaPageRoutes(gone), [], 'the auto-added index leaves with the last town page');
 });
 
 test('page files hand town sections their town, and a spoke\'s CTA its service', () => {
-  assert.equal(AREA_PAGE_SECTIONS.size, 0, 'empty until Templates adds its components');
+  assert.equal(sectionSlugAttrs({ pageType: 'area', route: 'areas/minneola' }, 'HvacTownBody'), ' townSlug="minneola"');
+  assert.equal(sectionSlugAttrs({ pageType: 'spoke', route: 'areas/minneola/ac-repair' }, 'HvacTownHeader'), ' townSlug="minneola" serviceSlug="ac-repair"');
+  assert.equal(sectionSlugAttrs({ pageType: 'areas', route: 'areas' }, 'HvacTownHeader'), '', 'the /areas index names no town');
   assert.equal(sectionSlugAttrs({ pageType: 'spoke', route: 'areas/minneola/ac-repair' }, 'HvacFinalCta'), ' serviceSlug="ac-repair"');
   assert.equal(sectionSlugAttrs({ pageType: 'area', route: 'areas/minneola' }, 'HvacFinalCta'), '');
   assert.equal(sectionSlugAttrs({ pageType: 'about', route: 'about' }, 'HvacFinalCta'), '');

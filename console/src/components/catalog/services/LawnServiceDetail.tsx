@@ -29,6 +29,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Check, MapPin, Plus, ArrowRight, Phone } from '@phosphor-icons/react';
 import { CONTENT, type SiteContent } from '@/data/site';
+import { ServiceNearbyTowns, ServicePriceFactors, type ServiceBlockLook } from '@/lib/TownPage';
 import { E, Ico } from '@/lib/editable';
 import { serviceIcon } from '@/lib/icons';
 import { CoverImage } from '@/lib/CoverImage';
@@ -44,8 +45,8 @@ export const meta = {
   id: 'lawn-service-detail',
   category: 'services',
   label: 'Lawn / Service page body',
-  consumes: ['services.items', 'servicePages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
-  sharedDeps: ['@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
+  consumes: ['services.items', 'servicePages', 'areaPages', 'testimonials.items', 'work.projects', 'extensions.customerQuestions', 'extensions.brandsCarried', 'brand.address', 'extensions.serviceArea', 'brand.phone', 'brand.phoneHref'],
+  sharedDeps: ['@/lib/TownPage', '@/lib/townLinks', '@/lib/PhotoCarousel', '@/lib/CoverImage', '@phosphor-icons/react', '@/lib/editable', '@/lib/icons', '@/lib/serviceLinks', '@/lib/servicePage'],
   signature: false,
   verticalTemplate: true, // bespoke vertical-template component; exempt from anti-slop heuristics
 } as const;
@@ -71,6 +72,15 @@ const Cap = ({ center = false }: { center?: boolean }) => (
 );
 
 const H2 = 'font-heading text-[30px] font-extrabold leading-[1.04] tracking-[-0.02em] text-ink lg:text-[36px]';
+
+/** How this trade draws the two town-era blocks (lib/TownPage.tsx; approved 2026-11-12). */
+const blockLook = (band: string): ServiceBlockLook => ({
+  cap: <Cap />,
+  h2: H2,
+  band,
+  card: 'shadow-brand-1 rounded-[22px] border border-rule bg-bg',
+  link: 'text-[color:var(--accent-2)]',
+});
 
 export default function LawnServiceDetail({ content = CONTENT, serviceSlug }: { content?: SiteContent; serviceSlug?: string }) {
   const s = serviceBySlug(content, serviceSlug);
@@ -177,6 +187,9 @@ export default function LawnServiceDetail({ content = CONTENT, serviceSlug }: { 
         </section>
       )}
 
+      {/* What affects the price: the client's own answer to Q5, hidden when they gave none. */}
+      <ServicePriceFactors s={s} look={blockLook('bg-bg')} />
+
       {signs.length > 0 && (
         <section className="rv bg-inkPanel2 py-14 text-onInk lg:py-[92px]">
           <div className="mx-auto max-w-[1120px] px-5 sm:px-6">
@@ -264,6 +277,9 @@ export default function LawnServiceDetail({ content = CONTENT, serviceSlug }: { 
           </div>
         </section>
       )}
+
+      {/* {Service} in nearby towns: the town + service pages the site has, hidden until one exists. */}
+      <ServiceNearbyTowns content={content} s={s} look={blockLook('bg-bgSoft')} />
 
       {questions.length > 0 && (
         <section id="questions" className="rv scroll-mt-20 bg-bg py-14 lg:py-[92px]">

@@ -19,7 +19,6 @@
  */
 import { newSectionId, type PageInstance, type PageTypeId, type SectionRef, type SiteComposition } from '@/lib/pages';
 import type { VerticalId } from '@/lib/verticals';
-import { pageMetaFor } from './page-templates';
 
 /** A section ref with a freshly minted stable id and no rhythm (see file header). */
 const S = (categoryId: string, name: string): SectionRef => ({ id: newSectionId(), categoryId, name });
@@ -343,12 +342,14 @@ export function syncServicePages(comp: SiteComposition, chosen: { slug: string; 
  *
  * The /areas index arrives with the first town page and leaves with the last one, but only an
  * index this function added (templateId `<vertical>:areas`): an operator's own Service Areas page
- * is never touched. Its label is the existing page-type label; the "Areas" nav wording waits on
- * Xander's approval and is Templates' change to make.
+ * is never touched. Its menu label is "Areas" (T2, approved by Xander 2026-11-12), so the menu
+ * item shows only while a town page exists.
  *
  * A composition that isn't a vertical template, or whose vertical has no town page yet, comes
  * back unchanged.
  */
+export const AREAS_NAV_LABEL = 'Areas';
+
 export function syncAreaPages(
   comp: SiteComposition,
   areas: { town: string; slug: string }[],
@@ -375,7 +376,7 @@ export function syncAreaPages(
   let rest = comp.pages.filter((p) => p.pageType !== 'area' && p.pageType !== 'spoke');
   if (!areaPages.length) rest = rest.filter((p) => !(p.pageType === 'areas' && p.templateId === ownIndex));
   else if (vt.areasIndexSections && !rest.some((p) => p.pageType === 'areas')) {
-    rest = [...rest, { route: 'areas', pageType: 'areas', label: pageMetaFor('areas').label, templateId: ownIndex, navVisible: true, sections: vt.areasIndexSections() }];
+    rest = [...rest, { route: 'areas', pageType: 'areas', label: AREAS_NAV_LABEL, templateId: ownIndex, navVisible: true, sections: vt.areasIndexSections() }];
   }
   return { ...comp, pages: [...rest, ...areaPages, ...spokePages] };
 }
@@ -393,31 +394,45 @@ export function servicePageSlugs(comp: SiteComposition): string[] {
   return comp.pages.filter((p) => p.pageType === 'service').map((p) => p.route.replace(/^services\//, ''));
 }
 
+/**
+ * A vertical's town page, town + service page and /areas index (Xander approved the mockups
+ * "HVAC Town Pages" on 2026-11-12). All three are the same three sections: the town header and
+ * body tell the pages apart by the slugs wirePages and the Studio give them (none on the index),
+ * and the vertical's final CTA gets a spoke's serviceSlug, so its form opens with the service.
+ */
+const townSections = (P: string) => () => [S('pageHeader', `${P}TownHeader`), S('trust', `${P}TownBody`), S('finalCta', `${P}FinalCta`)];
+const townPages = (P: string) => ({ areaSections: townSections(P), spokeSections: townSections(P), areasIndexSections: townSections(P) });
+
 export const VERTICAL_TEMPLATES: Partial<Record<VerticalId, VerticalTemplate>> = {
   hvac: {
     label: 'HVAC — Standard',
     build: hvacTemplate,
     serviceSections: () => [S('pageHeader', 'HvacServiceHeader'), S('services', 'HvacServiceDetail'), S('finalCta', 'HvacFinalCta')],
+    ...townPages('Hvac'),
   },
   roofing: {
     label: 'Roofing — Standard',
     build: roofingTemplate,
     serviceSections: () => [S('pageHeader', 'RoofingServiceHeader'), S('services', 'RoofingServiceDetail'), S('finalCta', 'RoofingFinalCta')],
+    ...townPages('Roofing'),
   },
   'lawn-care': {
     label: 'Lawn Care — Standard',
     build: lawnTemplate,
     serviceSections: () => [S('pageHeader', 'LawnServiceHeader'), S('services', 'LawnServiceDetail'), S('finalCta', 'LawnFinalCta')],
+    ...townPages('Lawn'),
   },
   plumbing: {
     label: 'Plumbing — Standard',
     build: plumbingTemplate,
     serviceSections: () => [S('pageHeader', 'PlumbingServiceHeader'), S('services', 'PlumbingServiceDetail'), S('finalCta', 'PlumbingFinalCta')],
+    ...townPages('Plumbing'),
   },
   'car-detailing': {
     label: 'Car Detailing — Standard',
     build: detailTemplate,
     serviceSections: () => [S('pageHeader', 'DetailServiceHeader'), S('services', 'DetailServiceDetail'), S('finalCta', 'DetailFinalCta')],
+    ...townPages('Detail'),
   },
 };
 
