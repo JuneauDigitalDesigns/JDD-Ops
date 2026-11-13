@@ -18,6 +18,8 @@ import RunLogDrawer from '@/components/RunLogDrawer';
 import { useTeardownRun } from '@/lib/useTeardownRun';
 import type { TeardownPlan } from '@/lib/teardownPlan';
 import type { ArchiveRecord } from '@/lib/archive';
+import { SC } from '@/lib/searchConsoleCopy';
+import DepartureNotes from './DepartureNotes';
 
 /**
  * Tear down every resource provisioned for this client — the most destructive action in
@@ -160,6 +162,7 @@ export default function DangerSection() {
           {running && <SpinnerGap size={13} className="mt-2 animate-spin self-center text-fg3" />}
         </section>
         <RunLogDrawer lines={run.lines} running={running} slug={ctx.slug} defaultOpen={!running && run.exitCode !== 0} />
+        {!running && <DepartureNotes steps={run.steps} />}
         {!running && run.status === 'partial' && (
           <div className="mt-4 flex items-center gap-2 text-xs" style={{ color: 'var(--warn)' }}>
             <Warning size={14} weight="fill" />
@@ -172,6 +175,10 @@ export default function DangerSection() {
   }
 
   // ── Preview ─────────────────────────────────────────────────────────────
+  // Custom-domain Search Console properties: the client keeps them only if they verify (W43).
+  const gscKept = plan.sites
+    .flatMap((s) => s.searchConsole?.properties ?? [])
+    .filter((p) => !/\.vercel\.app\/$/.test(p));
   return (
     <div className="mx-auto w-full max-w-[900px] px-8 py-8 lg:px-10">
       <SectionHeader
@@ -236,6 +243,12 @@ export default function DangerSection() {
               exists={s.portalData.records == null ? null : s.portalData.records > 0}
               detail={s.portalData.detail}
             />
+            {/* L11: JDD leaves each Search Console property it holds for this site (W42). */}
+            {(s.searchConsole?.properties ?? []).map((p) => (
+              <span key={p} className="text-xs text-fg2">
+                {SC.teardownLeaves(p)}
+              </span>
+            ))}
           </div>
         ))}
         {plan.airtable.baseId && (
@@ -288,9 +301,17 @@ export default function DangerSection() {
       </section>
 
       {/* ── Will be left behind ───────────────────────────────────────────── */}
-      {plan.leftBehind.length > 0 && (
+      {(plan.leftBehind.length > 0 || gscKept.length > 0) && (
         <section className="panel mb-4 flex flex-col gap-2 p-5">
           <h2 className="font-display text-lg font-semibold tracking-tightish text-fg">Will be left behind</h2>
+          {/* L11: the client stays a delegated owner of a custom domain's property until Google's
+              grace period ends (W43); the departure note after the run tells them what to do. */}
+          {gscKept.map((p) => (
+            <div key={p} className="flex items-start gap-2 text-xs">
+              <Circle size={6} weight="fill" className="mt-1.5 shrink-0 text-fg3" />
+              <span className="text-fg2">{SC.teardownLeftBehind(p)}</span>
+            </div>
+          ))}
           {plan.leftBehind.map((o, i) => (
             <div key={i} className="flex items-start gap-2 text-xs">
               <Circle size={6} weight="fill" className="mt-1.5 shrink-0 text-fg3" />

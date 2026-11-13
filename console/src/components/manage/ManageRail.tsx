@@ -3,6 +3,7 @@
 import { useSearchParams, useSelectedLayoutSegment } from 'next/navigation';
 import type { Icon } from '@phosphor-icons/react';
 import {
+  MagnifyingGlass,
   ArrowSquareOut,
   Gauge,
   Globe,
@@ -45,6 +46,7 @@ const ICONS: Record<ManageSection['icon'], Icon> = {
   agreement: FileText,
   warning: Warning,
   quotes: Quotes,
+  search: MagnifyingGlass,
 };
 
 export default function ManageRail({

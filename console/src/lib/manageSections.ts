@@ -16,6 +16,7 @@ export type SectionId =
   | 'deployments'
   | 'domain'
   | 'voice-agent'
+  | 'search'
   | 'messaging'
   | 'portal'
   | 'agreement'
@@ -28,7 +29,7 @@ export interface ManageSection {
   /** One line under the section title. */
   lede: string;
   /** Key into ManageRail's icon map. */
-  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'chat' | 'portal' | 'agreement' | 'warning' | 'quotes';
+  icon: 'gauge' | 'sliders' | 'rocket' | 'globe' | 'microphone' | 'chat' | 'portal' | 'agreement' | 'warning' | 'quotes' | 'search';
   /** Which plans get this section. */
   plans: Plan[];
   /** Rendered visually apart, after a spacer and rule, with a danger-toned icon. */
@@ -81,6 +82,15 @@ export const MANAGE_SECTIONS: ManageSection[] = [
     lede: 'The prompt the Retell agent answers with.',
     icon: 'microphone',
     plans: VOICE,
+  },
+  {
+    // L11/L12 (2026-11-13): Google Search Console setup and the nightly job's page proposals.
+    // Label W1, approved word for word; no lede of its own, so none is invented here.
+    id: 'search',
+    label: 'Search',
+    lede: '',
+    icon: 'search',
+    plans: ALL,
   },
   {
     id: 'messaging',

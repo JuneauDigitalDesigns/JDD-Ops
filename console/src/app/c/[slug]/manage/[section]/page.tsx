@@ -15,6 +15,7 @@ import PortalSection from '@/components/manage/PortalSection';
 import AgreementSection from '@/components/manage/AgreementSection';
 import FeaturedSection from '@/components/manage/FeaturedSection';
 import DangerSection from '@/components/manage/DangerSection';
+import SearchSection from '@/components/manage/SearchSection';
 import SectionPlaceholder from '@/components/manage/SectionPlaceholder';
 
 /**
@@ -97,6 +98,8 @@ export default async function ManageSectionPage({
       return <DomainSection />;
     case 'voice-agent':
       return <VoiceAgentSection />;
+    case 'search':
+      return <SearchSection />;
     case 'messaging':
       // The enums are loaded HERE, server-side, from the ops root and handed down as props —
       // a client component cannot import lib/a2p-identity.js, and a copy would drift.
