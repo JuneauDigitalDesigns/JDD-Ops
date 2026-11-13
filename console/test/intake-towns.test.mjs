@@ -85,3 +85,23 @@ test('the steps carry the approved controls', () => {
   assert.ok(reviews.includes("value={draft.town ?? ''}"), 'the Town select edits the review\'s town');
   assert.match(reviews, /<option value="">None<\/option>\s*\{towns\.map/);
 });
+
+test('a town that earns a page past the 10-town cap says so, in the approved words', async () => {
+  const { PAGE_CAPS, qualifiesForAreaPage, pickAreaPages } = await import('@jdd/schema');
+  // Twelve towns besides the main city, each with three facts of two kinds: all earn a page.
+  const towns = Array.from({ length: 12 }, (_, i) => `Town ${String.fromCharCode(65 + i)}`);
+  const big = {
+    brand: { address: '12 Main St, Winter Park, FL 32789' },
+    extensions: {
+      serviceArea: ['Winter Park', ...towns],
+      townNotes: towns.map((t) => ({ town: t, text: 'A real local fact.', sourceUrl: 'https://example.gov/x' })),
+    },
+    work: { projects: towns.flatMap((t) => [0, 1].map((k) => ({ t: `${t} ${k}`, loc: '', yr: null, scope: '', size: '', caption: 'c', image: img, town: t }))) },
+    testimonials: { items: [] },
+  };
+  assert.ok(towns.every((t) => qualifiesForAreaPage(big, t)));
+  assert.equal(pickAreaPages(big).length, PAGE_CAPS.area);
+  const rows = townPageRows(big);
+  assert.equal(rows.filter((r) => r.label === 'Own page').length, 10);
+  assert.deepEqual(rows.filter((r) => r.status === 'capped').map((r) => r.label), ['Over the 10-town limit', 'Over the 10-town limit']);
+});

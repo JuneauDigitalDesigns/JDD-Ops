@@ -30,8 +30,9 @@ export function townPageRows(content: unknown): Row[] {
     const f = areaPageFacts(content, town);
     if (f.count < AREA_FACTS_MIN) return { town, status: 'short', label: `${f.count} of ${AREA_FACTS_MIN} facts for its own page` };
     if (f.have.length < AREA_KINDS_MIN) return { town, status: 'kind', label: 'Needs a second kind of fact' };
-    // Earns a page but is over the cap of town pages: no approved words for this, so no label.
-    return { town, status: 'capped', label: '' };
+    // Earns a page, but pickAreaPages kept ten others (PAGE_CAPS.area). Wording chosen by Xander,
+    // 2026-11-13.
+    return { town, status: 'capped', label: 'Over the 10-town limit' };
   });
 }
 
