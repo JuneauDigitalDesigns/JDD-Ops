@@ -29,7 +29,8 @@ import {
 import { Card, ChipListEditor, ToggleChips, Tag, INPUT, SourceChip } from './ui';
 import { removalPlan, removalRows, removeService, serviceFromClient } from '@/lib/service-remove';
 import { addServiceItems } from '@/lib/service-structure';
-import type { SourceContext } from '@/lib/intake-sources';
+import { sourceOf, type SourceContext } from '@/lib/intake-sources';
+import { withPhotoTown } from '@/lib/service-towns';
 
 type Item = SiteContent['services']['items'][number];
 type Project = SiteContent['work']['projects'][number];
@@ -156,7 +157,7 @@ export default function ServicesStep({
                         {client && <SourceChip source="form" />}
                       </span>
                       <span className="flex gap-[3px]" aria-hidden>
-                        {(['basics', 'included', 'problems', 'towns', 'photos', 'questions'] as const).map((p) => (
+                        {(['basics', 'included', 'problems', 'price', 'visit', 'towns', 'photos', 'questions'] as const).map((p) => (
                           <i
                             key={p}
                             className="block h-1 w-4 rounded-sm"
@@ -190,6 +191,7 @@ export default function ServicesStep({
               part={part}
               onPart={setPart}
               vertical={vertical}
+              sources={sources}
               nextName={items[i + 1]?.t}
               onNextService={() => (i + 1 < items.length ? open(i + 1) : onDone())}
             />
@@ -299,9 +301,11 @@ function RemoveServiceDialog({
 }
 
 function GuidedService({
-  content, setField, index, item, slug, part, onPart, vertical, nextName, onNextService,
+  content, setField, index, item, slug, part, onPart, vertical, sources, nextName, onNextService,
 }: {
   content: SiteContent;
+  /** Where values came from: price factors are the client's own answer (Form). */
+  sources?: SourceContext;
   setField: SetField;
   index: number;
   item: Item;
@@ -442,6 +446,25 @@ function GuidedService({
           </>
         )}
 
+        {part === 'price' && (
+          <div className="max-w-3xl space-y-3">
+            {sources && <SourceChip source={sourceOf(sources, `${base}.priceFactors`)} />}
+            <ChipListEditor
+              values={item.priceFactors ?? []}
+              onChange={(v) => setField(`${base}.priceFactors`, v)}
+              inputId={`${base}.priceFactors`}
+            />
+          </div>
+        )}
+
+        {part === 'visit' && (
+          <StepsEditor
+            steps={item.typicalVisit ?? []}
+            onChange={(v) => setField(`${base}.typicalVisit`, v)}
+            inputId={`${base}.typicalVisit`}
+          />
+        )}
+
         {part === 'towns' && (
           <div className="grid gap-6 md:grid-cols-2">
             <div>
@@ -476,6 +499,8 @@ function GuidedService({
               if (!item.image?.url && p.image) setField(`${base}.image`, p.image);
             }}
             onCaption={(k, caption) => setField('work.projects', projects.map((p, j) => (j === k ? { ...p, caption, image: p.image ? { ...p.image, alt: caption } : p.image } : p)))}
+            towns={area}
+            onTown={(k, town) => setField('work.projects', projects.map((p, j) => (j === k ? withPhotoTown(content, p, town) : p)))}
             onRemove={(k) => setField('work.projects', projects.filter((_, j) => j !== k))}
           />
         )}
@@ -523,6 +548,8 @@ function GuidedService({
             ]} />
             <SummaryBox title="Included in the job" has={done.included} onEdit={() => onPart('included')} lines={item.included ?? []} />
             <SummaryBox title="Problems it fixes" has={done.problems} onEdit={() => onPart('problems')} lines={item.typicalJobs ?? []} />
+            <SummaryBox title="What affects the price" has={done.price} onEdit={() => onPart('price')} lines={item.priceFactors ?? []} />
+            <SummaryBox title="What happens on a typical visit" has={done.visit} onEdit={() => onPart('visit')} lines={(item.typicalVisit ?? []).map((v, n) => `${n + 1}. ${v}`)} />
             <SummaryBox title="Towns & brands" has={done.towns} onEdit={() => onPart('towns')} lines={[(item.areas ?? []).join(', '), (item.brands ?? []).join(', ')].filter(Boolean)} />
             <SummaryBox title="Photos" has={done.photos} onEdit={() => onPart('photos')} lines={myPhotos.map(({ p }) => p.caption)} />
             <SummaryBox title="Customer questions" has={done.questions} onEdit={() => onPart('questions')} lines={myQuestions.map(({ q }) => q.q).filter(Boolean)} />
@@ -644,6 +671,8 @@ function WhereItShows({ content, item, index, slug, part }: { content: SiteConte
             <span className="font-display text-[20px] font-bold leading-tight text-uiInk">{item.t?.trim() || 'Service name'}</span>
             <PreviewBlock on={part === 'included'} title="Included in the job" lines={item.included ?? []} hl={hl} cap={cap} />
             <PreviewBlock on={part === 'problems'} title="Problems it fixes" lines={item.typicalJobs ?? []} hl={hl} cap={cap} />
+            <PreviewBlock on={part === 'price'} title="What affects the price" lines={item.priceFactors ?? []} hl={hl} cap={cap} />
+            <PreviewBlock on={part === 'visit'} title="What happens on a typical visit" lines={item.typicalVisit ?? []} hl={hl} cap={cap} />
             <PreviewBlock on={part === 'towns'} title="Towns & brands" lines={[(item.areas ?? []).join(', '), (item.brands ?? []).join(', ')].filter(Boolean)} hl={hl} cap={cap} />
             <PreviewBlock on={part === 'photos'} title="Photos" lines={projects.map((p) => p.caption)} hl={hl} cap={cap} />
             <PreviewBlock on={part === 'questions'} title="Customer questions" lines={qs.map((q) => q.q)} hl={hl} cap={cap} />
@@ -672,13 +701,16 @@ function PreviewBlock({ on, title, lines, hl, cap }: { on: boolean; title: strin
 }
 
 function JobPhotos({
-  name, photos, onAdd, onCaption, onRemove,
+  name, photos, onAdd, onCaption, onRemove, towns, onTown,
 }: {
   name: string;
   photos: Array<{ p: Project; k: number }>;
   onAdd: (p: Project) => void;
   onCaption: (k: number, caption: string) => void;
   onRemove: (k: number) => void;
+  /** The client's own towns: a photo's town is one of them, or none ("Not sure"). */
+  towns: string[];
+  onTown: (k: number, town: string) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -722,6 +754,17 @@ function JobPhotos({
                 onChange={(e) => onCaption(k, e.target.value || name || 'Job photo')}
                 className={`${INPUT} h-7 text-xs`}
               />
+              <label className="flex shrink-0 items-center gap-1.5">
+                <span className="font-chromeMono text-[10.5px] uppercase tracking-[0.12em] text-uiFg2">Town</span>
+                <select
+                  value={(p as Project & { town?: string }).town ?? ''}
+                  onChange={(e) => onTown(k, e.target.value)}
+                  className={`${INPUT} h-7 w-44 text-xs`}
+                >
+                  <option value="">Not sure</option>
+                  {towns.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
               <button type="button" aria-label="Remove photo" onClick={() => onRemove(k)} className="shrink-0 rounded p-1 text-uiFg3 hover:text-uiInk"><Trash size={13} /></button>
             </li>
           );
@@ -739,6 +782,49 @@ function JobPhotos({
       />
       {uploadError && <p role="alert" className="mt-1.5 text-2xs text-danger">{uploadError}</p>}
       <p className="mt-1.5 text-2xs text-uiFg3">Real jobs only.</p>
+    </div>
+  );
+}
+
+/**
+ * "What happens on a typical visit" (Q6, operator only, approved 2026-11-12): numbered steps in the
+ * client's words, in order. Each step is edited in place; "Add a step" adds the next one.
+ */
+function StepsEditor({ steps, onChange, inputId }: { steps: string[]; onChange: (v: string[]) => void; inputId: string }) {
+  const [draft, setDraft] = useState('');
+  const add = () => {
+    const v = draft.trim();
+    if (!v) return;
+    onChange([...steps, v]);
+    setDraft('');
+  };
+  return (
+    <div className="max-w-3xl space-y-2">
+      <ol className="space-y-2">
+        {steps.map((st, n) => (
+          <li key={n} className="grid grid-cols-[28px_minmax(0,1fr)_28px] items-center gap-2.5 rounded-[10px] border border-uiCardRule bg-panel px-3 py-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-uiAccent font-chromeMono text-xs text-uiCanvas" style={{ background: 'var(--ui-accent)', color: 'var(--accent-ink, #f4ecd8)' }}>{n + 1}</span>
+            <input
+              aria-label={`Step ${n + 1}`}
+              value={st}
+              onChange={(e) => onChange(steps.map((x, j) => (j === n ? e.target.value : x)))}
+              className={`${INPUT} h-8 border-transparent bg-transparent text-[14.5px]`}
+            />
+            <button type="button" aria-label="Remove step" onClick={() => onChange(steps.filter((_, j) => j !== n))} className="rounded p-1 text-uiFg3 hover:text-uiInk"><Trash size={14} /></button>
+          </li>
+        ))}
+      </ol>
+      <div className="flex gap-2">
+        <input
+          id={inputId}
+          value={draft}
+          placeholder="Add a step"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          className={BIG_INPUT}
+        />
+        <button type="button" onClick={add} className="btn btn-sm h-11 shrink-0">Add</button>
+      </div>
     </div>
   );
 }

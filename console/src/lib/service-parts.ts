@@ -7,13 +7,17 @@
  */
 import type { SiteContent } from '@/data/site';
 
-export type ServicePartId = 'basics' | 'included' | 'problems' | 'towns' | 'photos' | 'questions' | 'summary';
+export type ServicePartId = 'basics' | 'included' | 'problems' | 'price' | 'visit' | 'towns' | 'photos' | 'questions' | 'summary';
 
 /** The parts in order, with their screen headers. */
 export const SERVICE_PARTS: ReadonlyArray<{ id: ServicePartId; label: string }> = [
   { id: 'basics', label: 'Basics' },
   { id: 'included', label: 'Included in the job' },
   { id: 'problems', label: 'Problems it fixes' },
+  // Local SEO (Xander, 2026-11-12, approved word for word): Q5, the client's own answer from the
+  // onboarding form, and Q6, which only the operator fills in. Both are facts, never generated.
+  { id: 'price', label: 'What affects the price' },
+  { id: 'visit', label: 'What happens on a typical visit' },
   { id: 'towns', label: 'Towns & brands' },
   { id: 'photos', label: 'Photos' },
   { id: 'questions', label: 'Customer questions' },
@@ -44,13 +48,15 @@ export function partsDone(content: SiteContent, index: number, slug: string): Re
     basics: filled(it?.t),
     included: filled(it?.included),
     problems: filled(it?.typicalJobs),
+    price: filled(it?.priceFactors),
+    visit: filled(it?.typicalVisit),
     towns: filled(it?.areas) || filled(it?.brands),
     photos: tagged(content.work?.projects),
     questions: tagged(content.extensions?.customerQuestions as Array<{ service?: string }> | null | undefined),
   };
 }
 
-/** "4 of 6": parts with something in them, out of the six content parts. */
+/** "4 of 8": parts with something in them, out of the eight content parts. */
 export function partsProgress(done: Record<string, boolean>): { done: number; of: number } {
   const vals = Object.values(done);
   return { done: vals.filter(Boolean).length, of: vals.length };
