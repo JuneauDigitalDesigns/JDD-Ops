@@ -36,6 +36,8 @@ import { loadUiPinRules } from '@/lib/uiPinRules';
 import { loadSiteLayout } from '@/lib/siteLayout';
 import { loadSearchConsole } from '@/lib/searchConsoleLib';
 import { refreshSearchProfileAfterExport } from '@/lib/searchProfileStore';
+import { readApprovedSpokesFor } from '@/lib/approvedSpokesStore';
+import { unapprovedSpokeRoutes } from '@/lib/spokeApprovals';
 import { findMissingLocalImages } from '@/lib/imageRefs';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
 import { servicePageSlugs } from '@/app/c/[slug]/build/vertical-templates';
@@ -413,7 +415,21 @@ export async function POST(req: Request) {
           ? composition.pages.map((p) => ({ route: p.route, pageType: p.pageType, label: p.label, sections: p.sections }))
           : [{ route: '', pageType: 'home', label: 'Home', sections: entries.map((e) => ({ categoryId: e.categoryId })) }];
         let shippedSeo: { pages: Record<string, PageSeo>; business: Record<string, unknown> } | null = null;
+        // Phase 3: a spoke ships only on demand Xander approved in Search. scoreSite checks a spoke
+        // with qualifiesForSpokePage(..., true), trusting that an approval exists, so the approved
+        // list in this client's approved-spokes.json is checked here, before the score.
+        const approvedSpokes = await readApprovedSpokesFor(slug);
         const passesSeo = (c: SiteContent): boolean => {
+          const unapproved = unapprovedSpokeRoutes(seoPages, c, approvedSpokes);
+          if (unapproved.length) {
+            send({
+              type: 'error',
+              message: `This export includes ${unapproved.length} town and service page(s) that weren’t approved in Search. Nothing was committed or pushed.`,
+              detail: unapproved.map((r) => `/${r}`).join('\n'),
+              next: 'Approve them in Manage › Search, or remove them in the Studio, then export again.',
+            });
+            return false;
+          }
           const pages = buildPageSeo(c, seoPages, vertical);
           const score = scoreSite(c, seoPages, pages, { preset: vertical ? presetFor(vertical) : {}, briefFacts, servicePicks });
           if (score.soft.length) step(`SEO check: ${score.soft.length} finding(s) to look at, none blocking. First: ${score.soft[0]}`);
