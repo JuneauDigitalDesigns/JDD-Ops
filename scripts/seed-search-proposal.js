@@ -9,7 +9,8 @@
  * A new Search Console property has no data for months, so the agency's nightly job can't make a
  * proposal during a test. This writes the record that job would write (lib/search-approvals.js
  * testFixtureProposal), marked `test: true` and with a "(test)" query, under the fixture's own
- * account scope. Refuses any slug that isn't an `_e2e_` fixture. Prints key names, never the
+ * account scope, in the KV named by THIS checkout's .env (run it from the test worktree for the
+ * test KV). Refuses any slug that doesn't name a test client. Prints key names, never the
  * account's email.
  */
 import dotenv from 'dotenv';
@@ -19,7 +20,8 @@ import { resolve } from 'node:path';
 import { Redis } from '@upstash/redis';
 import { parseEnvLocal } from '../lib/teardown-ops.js';
 import { accountScope } from '../lib/account-store.js';
-import { proposalKey, proposalIndexKey, testFixtureProposal } from '../lib/search-approvals.js';
+import { townSlug } from '@jdd/schema';
+import { proposalKey, proposalIndexKey, testFixtureProposal, E2E_SLUG } from '../lib/search-approvals.js';
 
 const argv = process.argv.slice(2);
 const arg = (n) => {
@@ -36,7 +38,7 @@ const townArg = arg('town');
 const service = arg('service');
 const write = argv.includes('--write');
 if (!slug || !townArg || !service) die('usage: --slug <_e2e_ fixture> --town <town> --service <service slug> [--write]');
-if (!/^_e2e_/.test(slug)) die(`refusing: ${slug} is not an _e2e_ test fixture`);
+if (!E2E_SLUG.test(slug)) die(`refusing: ${slug} is not an e2e test client`);
 
 const dir = resolve('clients', slug);
 if (!existsSync(resolve(dir, '.env.local'))) die(`no clients/${slug}/.env.local`);
@@ -52,18 +54,27 @@ if (!email && env.CLERK_USER_ID) email = (await redis.get(`jdd:account-by-user:$
 if (!email) die(`clients/${slug} has no portal account (PORTAL_ACCOUNT_EMAIL / CLERK_USER_ID)`);
 const acct = accountScope(email);
 
-// The town as the client spells it, and its page slug, from the published search profile.
+// The town as the client spells it, and its page slug: from the published search profile when
+// Search Console was set up for this client, else from the arguments as given (an isolated test
+// client that was never verified has no profile; the screen then shows the service by its slug).
 const profile = await redis.get(`jdd:seo:profile:v1:${acct}:${slug}`);
-if (!profile) die('no search profile yet: set Search Console up for this fixture in /manage › Search first');
-const town = profile.towns?.find((t) => t.name.toLowerCase() === townArg.trim().toLowerCase());
-if (!town) die(`${townArg} is not one of this fixture's towns (${(profile.towns ?? []).map((t) => t.name).join(', ')})`);
-if (!profile.services?.some((s) => s.slug === service)) die(`${service} is not one of this fixture's services (${(profile.services ?? []).map((s) => s.slug).join(', ')})`);
+let town = { name: townArg.trim(), slug: townSlug(townArg.trim()), hub: null, qualifies: null };
+if (profile) {
+  const found = profile.towns?.find((t) => t.name.toLowerCase() === townArg.trim().toLowerCase());
+  if (!found) die(`${townArg} is not one of this client's towns (${(profile.towns ?? []).map((t) => t.name).join(', ')})`);
+  if (!profile.services?.some((s) => s.slug === service)) die(`${service} is not one of this client's services (${(profile.services ?? []).map((s) => s.slug).join(', ')})`);
+  town = found;
+} else {
+  console.log('no search profile (Search Console not set up for this client): using the town and service as given');
+}
 
 const proposal = testFixtureProposal({ slug, town: town.name, townSlug: town.slug, service });
 const key = proposalKey(acct, slug, proposal.id);
 console.log(`${write ? 'writing' : 'would write'} ${key} (${proposal.kind}, ${town.name} × ${service})`);
-console.log(`  town has a page: ${town.hub ? 'yes' : town.qualifies ? 'qualifies' : 'NO, so Approve will list it but the Studio will not build it'}`);
-console.log(`  facts shared by town and service: ${profile.sharedFacts?.[`${town.name}|${service}`] ?? 0} (the Studio needs 2)`);
+if (profile) {
+  console.log(`  town has a page: ${town.hub ? 'yes' : town.qualifies ? 'qualifies' : 'NO, so Approve will list it but the Studio will not build it'}`);
+  console.log(`  facts shared by town and service: ${profile.sharedFacts?.[`${town.name}|${service}`] ?? 0} (the Studio needs 2)`);
+}
 if (!write) {
   console.log('preview only; add --write');
   process.exit(0);
