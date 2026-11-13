@@ -4,6 +4,7 @@ import { readArchiveRecord, type ArchiveStatus, type StepOutcome } from '@/lib/a
 import { isSecretKey, maskSecret } from '@/lib/envFields';
 import { PLAN_LABEL } from '@/lib/runbook-content';
 import PageHeader from '@/components/shell/PageHeader';
+import DepartureNotes from '@/components/manage/DepartureNotes';
 
 /**
  * One archive record — everything captured before a teardown destroyed it, plus the
@@ -141,6 +142,9 @@ export default function ArchiveRecordPage({ params }: { params: { id: string } }
           </p>
         )}
       </section>
+
+      {/* L11: the note for each custom domain JDD left in Search Console (W50–W52). */}
+      <DepartureNotes steps={receipt.steps} />
 
       {/* ── Orphans ────────────────────────────────────────────────────────── */}
       {orphans.length > 0 && (

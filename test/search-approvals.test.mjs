@@ -48,3 +48,16 @@ test('the approved list round-trips through its file', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+import { testFixtureProposal } from '../lib/search-approvals.js';
+
+test('a seeded test proposal is for e2e test clients only, and is marked as a test', () => {
+  assert.throws(() => testFixtureProposal({ slug: 'acme-air', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair' }), /not an e2e test client/);
+  assert.equal(testFixtureProposal({ slug: 'copperline-e2e2', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', now: NOW }).id, 'spoke:minneola:ac-repair');
+  const p = testFixtureProposal({ slug: '_e2e_test_starter', town: 'Minneola', townSlug: 'minneola', service: 'ac-repair', now: NOW });
+  assert.equal(p.id, 'spoke:minneola:ac-repair');
+  assert.equal(p.test, true);
+  assert.match(p.evidence.queries[0].query, /^\(test\) /);
+  // It is a proposal the real decide path accepts.
+  assert.equal(applyDecision({ proposal: p, decision: 'approved', approved: [], now: NOW }).approved.length, 1);
+});

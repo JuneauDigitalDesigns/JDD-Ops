@@ -18,13 +18,21 @@ export async function GET(req: Request) {
   const { resolved } = target;
   const approved = await readApproved(resolved.dir).catch(() => []);
   const accountEmail = await accountEmailForSite(resolved.env);
-  if (!accountEmail) return NextResponse.json({ property: null, verifiedAt: null, proposals: [], approved });
+  if (!accountEmail) return NextResponse.json({ property: null, verifiedAt: null, proposals: [], approved, services: [], sharedFacts: {} });
   try {
     const [profile, proposals] = await Promise.all([
       readSearchProfile(accountEmail, resolved.site.slug),
       listSiteProposals(accountEmail, resolved.site.slug),
     ]);
-    return NextResponse.json({ property: profile?.property ?? null, verifiedAt: profile?.verifiedAt ?? null, proposals, approved });
+    return NextResponse.json({
+      property: profile?.property ?? null,
+      verifiedAt: profile?.verifiedAt ?? null,
+      proposals,
+      approved,
+      // The screen names a service by its own name and says how many shared facts a pair has (W33).
+      services: (profile?.services ?? []).map((s) => ({ slug: s.slug, name: s.name })),
+      sharedFacts: profile?.sharedFacts ?? {},
+    });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err), approved }, { status: 502 });
   }
