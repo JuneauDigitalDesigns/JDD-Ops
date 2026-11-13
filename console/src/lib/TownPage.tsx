@@ -11,7 +11,7 @@
 //                    body:   the jobs and reviews tagged to both, then "More of our work in {Town}"
 //                            and "About our {service} service"
 //   /areas index     header: "Home › Areas", "Areas we serve"; body: every town served
-//   service page     "What changes the price" and "{Service} in nearby towns" (each trade's
+//   service page     "What affects the price" and "{Service} in nearby towns" (each trade's
 //                    ServiceDetail places them), each hidden until it has data
 //
 // Every block is hidden when it has no data, and a page the site doesn't have (not in
@@ -271,7 +271,7 @@ export function TownBody({
 export type ServiceBlockLook = { cap: ReactNode; h2: string; band: string; card: string; link: string };
 
 /**
- * "What changes the price" on a service page (approved 2026-11-12): the client's own answer to
+ * "What affects the price" on a service page (approved 2026-11-12): the client's own answer to
  * "What makes this job cost more or less?" (Q5), word for word. Hidden when they gave none; never
  * generated, and never a price.
  */
