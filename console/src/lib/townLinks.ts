@@ -35,7 +35,7 @@ export const AREA_WORDS = {
   in: 'in',
   areasWeServe: 'Areas we serve',
   source: 'Source',
-  priceFactors: 'What changes the price',
+  priceFactors: 'What affects the price',
   ourServicesIn: (town: string) => `Our services in ${town}`,
   recentJobsIn: (town: string) => `Recent jobs in ${town}`,
   customersSay: (town: string) => `What our ${town} customers say`,
@@ -177,7 +177,7 @@ export function nearbyTownLinks(content: unknown, serviceSlug: string): { town: 
     .map((r) => ({ town: r.town, href: spokeHref(r.slug, serviceSlug) }));
 }
 
-/** "What changes the price" on a service page: the client's own answer to Q5, with edit paths. */
+/** "What affects the price" on a service page: the client's own answer to Q5, with edit paths. */
 export function priceFactors(s: ServiceRef): { text: string; path: string }[] {
   return arr(s.item.priceFactors)
     .map((v, i) => ({ text: str(v), path: `services.items.${s.index}.priceFactors.${i}` }))

@@ -177,7 +177,7 @@ export default function HvacServiceDetail({ content = CONTENT, serviceSlug }: { 
         </section>
       )}
 
-      {/* What changes the price: the client's own answer to Q5, hidden when they gave none. */}
+      {/* What affects the price: the client's own answer to Q5, hidden when they gave none. */}
       <ServicePriceFactors s={s} look={blockLook('bg-bg')} />
 
       {signs.length > 0 && (

@@ -1,7 +1,7 @@
 // Town pages (/areas/<town>), town + service pages (/areas/<town>/<service>) and the /areas index,
 // built as Xander approved the mockups "HVAC Town Pages" on 2026-11-12 ("Build as shown", wording
 // T1 to T5 approved word for word, and "drop the extra word" for the doubled "service"). With the
-// service page additions he approved the same day: "What changes the price" and
+// service page additions he approved the same day: "What affects the price" and
 // "{Service} in nearby towns".
 //
 // The rules these pin, each one a way the page could quietly become a doorway page:
@@ -150,7 +150,7 @@ test('the approved words are exactly as approved', () => {
   assert.equal(AREA_WORDS.moreWorkIn('Maitland'), 'More of our work in Maitland');
   assert.equal(AREA_WORDS.inTown('AC Installation & Service', 'Maitland'), 'AC Installation & Service in Maitland');
   assert.equal(AREA_WORDS.nearbyTowns('AC Installation & Service'), 'AC Installation & Service in nearby towns');
-  assert.equal(AREA_WORDS.priceFactors, 'What changes the price');
+  assert.equal(AREA_WORDS.priceFactors, 'What affects the price');
 });
 
 // ── Headers ────────────────────────────────────────────────────────────────────
@@ -264,10 +264,10 @@ for (const [vertical, P] of Object.entries(TRADES)) {
 
   // ── Service page additions ───────────────────────────────────────────────────
 
-  test(`${P}ServiceDetail: "What changes the price" and "{Service} in nearby towns", each hidden until it has data`, async () => {
+  test(`${P}ServiceDetail: "What affects the price" and "{Service} in nearby towns", each hidden until it has data`, async () => {
     const svc = (c) => render(`services/${P}ServiceDetail.tsx`, { content: c, serviceSlug: SLUG });
     const t = text(await svc(tracewell()));
-    assert.ok(t.includes('What changes the price'));
+    assert.ok(t.includes('What affects the price'));
     assert.ok(t.includes('The size of the home') && t.includes('How hard the unit is to reach'));
     assert.ok(t.includes('AC Installation & Service in nearby towns'));
     const html = await svc(tracewell());
@@ -278,7 +278,7 @@ for (const [vertical, P] of Object.entries(TRADES)) {
     bare.services.items[0].priceFactors = [];
     bare.areaPages = [{ town: 'Maitland', slug: 'maitland', spokes: [] }];
     const t2 = text(await svc(bare));
-    assert.ok(!t2.includes('What changes the price'));
+    assert.ok(!t2.includes('What affects the price'));
     assert.ok(!t2.includes('in nearby towns'));
   });
 }
