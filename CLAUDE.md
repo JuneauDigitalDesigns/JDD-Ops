@@ -684,6 +684,33 @@ so the exporter marks each section that needs it (`console/src/lib/revealPolicy.
 `template/src/styles/globals.css` runs a CSS scroll-driven reveal: no JavaScript, never hidden in a
 browser without support or under reduced motion.
 
+## Google Search Console (L11, decided 2026-11-12)
+
+JDD verifies every client site itself; the client grants nothing. **One JDD Workspace account does
+it, through OAuth**, because the organization enforces `iam.disableServiceAccountKeyCreation` (no
+service-account key can exist). Proven end to end on `e2eteststarter.vercel.app` on 2026-11-13;
+the recorded responses are `test/fixtures/google/`.
+
+- **Credentials** are two files outside every repo, named by `.env`: `GOOGLE_OAUTH_CLIENT_FILE`
+  (Desktop-app client, audience Internal) and `GOOGLE_SEARCH_CONSOLE_TOKEN_FILE` (written by
+  `npm run google-sign-in`). The agency's nightly job holds its own copy in its Vercel env. The
+  refresh token is owner-level on every client property: never print it.
+- **The token file belongs to the account, not the site** (`google592bd3dd36f20226.html` for every
+  site). The console export writes it into `public/` on every export (`writeVerificationFile`);
+  Google re-checks it, and JDD's ownership ends when it is gone.
+- **A property is one host**: `https://<host>/`. A custom domain attached later is a NEW property;
+  `/api/manage/search-console/verify` sets up whatever host Vercel reports as live.
+- **The client is added with `webResource.update`** and shows as "Owner", but is a *delegated*
+  owner with no token. Google: once no verified owner is left, delegated owners lose access after
+  an unpublished grace period.
+- **Teardown order is Google's, not ours**: `webResource.delete` returns 400 while JDD's token is
+  still served. So the Search Console step runs after the Vercel project and repo are deleted:
+  relinquish, then `sites.delete`. The properties are captured in the preview (and its hash),
+  because Vercel forgets the hosts. The client then gets the departure note to verify themselves.
+- **The search profile** (`lib/search-profile.js`, KV `jdd:seo:profile:v1:{acctScope}:{slug}`) is
+  what the agency's nightly job knows about a site: towns, hubs, services and their terms, spokes.
+  Published on verify, refreshed after every export of a verified site.
+
 ## Never wire a client to a master resource
 
 A client must own its Airtable base and its own clone of the post-call Make scenario. Sharing

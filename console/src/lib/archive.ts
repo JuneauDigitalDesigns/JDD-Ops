@@ -54,6 +54,8 @@ export interface ArchiveSiteIdentifiers {
   makeScenarioId: string | null;
   makeWebhookUrl: string | null;
   airtableSiteTag: string | null;
+  /** L11: JDD's Search Console properties for this site. Absent on records written before 2026-11-13. */
+  gscProperties?: string[] | null;
 }
 
 export interface ArchiveIdentifiers {

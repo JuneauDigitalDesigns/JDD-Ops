@@ -34,6 +34,8 @@ import {
 } from '@/lib/sharedLibs';
 import { loadUiPinRules } from '@/lib/uiPinRules';
 import { loadSiteLayout } from '@/lib/siteLayout';
+import { loadSearchConsole } from '@/lib/searchConsoleLib';
+import { refreshSearchProfileAfterExport } from '@/lib/searchProfileStore';
 import { findMissingLocalImages } from '@/lib/imageRefs';
 import { navLinksFor, validateComposition, type SiteComposition } from '@/lib/pages';
 import { servicePageSlugs } from '@/app/c/[slug]/build/vertical-templates';
@@ -461,6 +463,11 @@ export async function POST(req: Request) {
             `Wrote the ${restoredRoutes.length} provisioning-owned API routes (lead delivery + call routing) from lib/site-routes.`,
           );
         }
+
+        // 1a0. JDD's Google Search Console token file (L11), on every export. Google re-checks it,
+        //      and JDD loses ownership of the property when it is gone. The name belongs to the
+        //      JDD account, not the site, so this needs no network; jdd-ops/lib/search-console.js.
+        (await loadSearchConsole()).writeVerificationFile(repoDirFor(repoRoot, slug));
 
         // 1a1. The site-wide pieces layout.tsx must mount (smooth scrolling, the mobile call bar).
         //      layout.tsx belongs to the client, so this only ADDS what is missing, the way
@@ -943,6 +950,11 @@ export async function POST(req: Request) {
           };
           step(`Pushed ${pushed.sha ?? ''} to origin/${target.remoteBranch}.`);
         }
+
+        // L11/L12: a site JDD already verified in Search Console gets its search profile
+        // refreshed from what just shipped, so the nightly job sees new towns, hubs and spokes.
+        // Silent and best-effort: a KV problem never fails a deploy.
+        if (pushed) await refreshSearchProfileAfterExport(slug).catch(() => null);
 
         // The repo is now the source of truth; the draft is stale.
         deleteDraft(slug);

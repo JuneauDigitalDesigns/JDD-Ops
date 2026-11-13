@@ -20,6 +20,7 @@ import { deleteClientState } from '@/lib/state';
 import { appendAudit } from '@/lib/audit';
 import { buildTeardownPlan, readAllEnvLocalVerbatim } from '@/lib/teardownPlan';
 import { a2pTeardownCreds, loadA2pTeardown } from '@/lib/a2pTeardown';
+import { leaveSearchConsoleProperty } from '@/lib/searchConsole';
 import {
   createArchiveRecord,
   writeArchiveRecord,
@@ -192,6 +193,7 @@ export async function POST(req: Request) {
                     makeScenarioId: s.make.scenarioId,
                     makeWebhookUrl: s.make.webhookUrl,
                     airtableSiteTag: null,
+                    gscProperties: s.searchConsole.properties,
                   })),
                 },
                 intake: {
@@ -370,6 +372,13 @@ export async function POST(req: Request) {
           await runStep(record, `Delete GitHub repo (${site.siteSlug})`, () =>
             ops.deleteGitHubRepo({ token: githubToken ?? undefined, org: process.env.GITHUB_ORG, repo: site.siteSlug }),
           );
+          // L11: JDD leaves Google Search Console, in the order Google requires. The site is gone
+          // now, and with it JDD's token file; then JDD relinquishes, then the property comes off
+          // JDD's list. The client stays an owner (a delegated one, for a grace period) and is
+          // told to verify with their own Google account wherever the site lives next.
+          for (const property of site.searchConsole.properties ?? []) {
+            await runStep(record, `Google Search Console (${site.siteSlug})`, () => leaveSearchConsoleProperty(property));
+          }
         }
 
         // ── Phase 6b: A2P registration — after every number is out and released ─
