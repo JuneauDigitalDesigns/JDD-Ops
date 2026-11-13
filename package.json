@@ -28,6 +28,7 @@
     "verify-post-call": "node scripts/verify-post-call.js",
     "repatch-post-call": "node scripts/repatch-post-call.js",
     "verify-agents": "node scripts/verify-agents.js",
+    "google-sign-in": "node scripts/google-sign-in.js",
     "audit-billing": "node scripts/audit-billing.js",
     "backfill-agent-limits": "node scripts/backfill-agent-limits.js",
     "backfill-agent-ids": "node scripts/backfill-account-agent-ids.js",

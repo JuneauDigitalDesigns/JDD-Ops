@@ -1,0 +1,2 @@
+{ "status": 403, "body": { "error": { "code": 403, "message": "You are not an owner of this site." } },
+  "note": "Only the message was captured; the code mirrors the HTTP status." }

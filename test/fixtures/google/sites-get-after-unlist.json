@@ -1,0 +1,2 @@
+{ "status": 404, "body": { "error": { "code": 404, "message": "'https://e2eteststarter.vercel.app/' is not a verified Search Console site in this account." } },
+  "note": "Only the message was captured; the code mirrors the HTTP status." }

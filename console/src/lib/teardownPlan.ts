@@ -11,6 +11,8 @@ import { accountStoreConfigured, getAccount, getAccountEmailByUserId } from './a
 import type { ArchiveOrphan, ArchiveSiteIdentifiers } from './archive';
 import type { ClientContext, Plan } from './types';
 import { planA2pForTeardown, type A2pTeardownPlan } from './a2pTeardown';
+import { jddPropertiesFor } from './searchConsole';
+import { loadGoogleCredentialPaths } from './opsSecrets';
 
 /**
  * The teardown preview — what actually exists, verified rather than assumed, and what
@@ -52,6 +54,12 @@ export interface TeardownPlanSite {
    * lead arrives, and a teardown must not abort because a customer filled in a form meanwhile.
    */
   portalData: { records: number | null; detail: string };
+  /**
+   * L11: the Search Console properties JDD holds for this site's hosts (custom domain and the
+   * vercel.app alias are separate properties). Captured here because the hosts come from Vercel,
+   * and the Vercel project is gone by the time teardown leaves them. null = could not check.
+   */
+  searchConsole: { properties: string[] | null };
 }
 
 export interface TeardownPlan {
@@ -143,6 +151,8 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
   if (!clerkSecretKey) warnings.push('CLERK_SECRET_KEY not set — the portal login could not be resolved.');
   const hasKv = loadKvCredentials();
   if (!hasKv) warnings.push('KV credentials not set — leads and CRM records could not be counted, and will NOT be purged.');
+  const hasGoogle = loadGoogleCredentialPaths() !== null;
+  if (!hasGoogle) warnings.push('Google Search Console credentials not set — JDD’s properties could not be checked, and will NOT be left.');
 
   const [ops, vercel] = await Promise.all([loadTeardownOps(), hasVercel ? loadVercelSync() : null]);
 
@@ -194,6 +204,10 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
           dryRun: true,
         })
       : null;
+    const gscHosts = (domains?.domains ?? []).filter((d) => d.name && !d.redirect).map((d) => d.name);
+    const gscProperties = hasGoogle ? await jddPropertiesFor(gscHosts) : null;
+    if (hasGoogle && gscProperties === null) warnings.push(`Google Search Console could not be checked for ${site.slug}.`);
+
     const portalData = {
       records: portalProbe && portalProbe.outcome !== 'failed' && portalProbe.keys ? portalProbe.keys.length : null,
       detail: portalProbe?.message ?? 'KV not configured — portal data could not be counted.',
@@ -223,6 +237,7 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
         webhookUrl: webhookUrl ?? null,
       },
       portalData,
+      searchConsole: { properties: gscProperties },
     });
   }
 
@@ -343,6 +358,7 @@ export async function buildTeardownPlan(slug: string): Promise<TeardownPlan> {
     makeScenarioId: s.make.scenarioId,
     makeWebhookUrl: s.make.webhookUrl,
     airtableSiteTag: null,
+    gscProperties: s.searchConsole.properties,
   }));
 
   const previewHash = hashPlan({

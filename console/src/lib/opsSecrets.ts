@@ -293,3 +293,16 @@ export function loadCloudflareCredentials(): { token: string; accountId: string 
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || ops.CLOUDFLARE_ACCOUNT_ID;
   return token && accountId ? { token, accountId } : null;
 }
+
+/**
+ * Where JDD's Google Search Console credentials live (L11): two PATHS, to the Desktop-app OAuth
+ * client JSON and to the refresh token `npm run google-sign-in` saved, both outside every repo.
+ * Only the paths are returned; jdd-ops/lib/search-console.js reads the files itself. Null unless
+ * both are set.
+ */
+export function loadGoogleCredentialPaths(): { GOOGLE_OAUTH_CLIENT_FILE: string; GOOGLE_SEARCH_CONSOLE_TOKEN_FILE: string } | null {
+  const ops = parseEnvFile(resolve(opsRoot(), '.env'));
+  const client = process.env.GOOGLE_OAUTH_CLIENT_FILE || ops.GOOGLE_OAUTH_CLIENT_FILE;
+  const token = process.env.GOOGLE_SEARCH_CONSOLE_TOKEN_FILE || ops.GOOGLE_SEARCH_CONSOLE_TOKEN_FILE;
+  return client && token ? { GOOGLE_OAUTH_CLIENT_FILE: client, GOOGLE_SEARCH_CONSOLE_TOKEN_FILE: token } : null;
+}
